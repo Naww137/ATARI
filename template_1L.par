@@ -1,0 +1,14 @@
+%%%E_level1%%% %%%_Gg_1%%% %%%_Gn_1%%%                       1 1 1     1
+ 
+100.00000000
+Channel radii in key-word format
+Radii=  6.700000,  6.700000    Flags=0, 0
+   Uncertainties=  0.300000,  6.700000
+   Group=  1   Chan=  1,
+   Group=  2   Chan=  1,
+Radii=  6.700000,  6.700000    Flags=0, 0
+   Uncertainties=  0.300000,  6.700000
+   Group=  3   Chan=  1,
+   Group=  4   Chan=  1,  2,
+   Group=  5   Chan=  1,  2,
+   Group=  6   Chan=  1,

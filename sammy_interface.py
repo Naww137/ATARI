@@ -71,7 +71,7 @@ class sammy_interface:
         sub_method_warning = []
         parameters = pd.read_csv(os.path.realpath(csv), index_col=0)
         
-        #!!! add warning if icase does not exit in csv
+        #!!! add warning if icase does not exist in csv
         case_parms = parameters.loc[icase]
         
         if len(case_parms) != number_of_levels*3:

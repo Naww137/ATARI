@@ -6,26 +6,64 @@ Created on Fri Apr  1 10:36:03 2022
 @author: noahwalton
 """
 
-
+import sys
 
 
 # =============================================================================
-#       USER INPUT
+#
+# give directory in which the case folder exists, one level up from where each individual sample will be
+# this will be user specific 
+# templates and csv's must be in this directory!
+#
 # =============================================================================
 
-case_basename = 'slbw_5L_allexp'
-number_of_cases = 100
-number_of_levels = 5
+# local
+interface_directory = '/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/'
 
-par_template = 'template_5L.par'
-inp_template = 'template_allexp.inp'
+# remote
+#interface_directory = '/home/nwalton1/my_sammy/interface/'
+
+# =============================================================================
+#       CASE SPECIFIC INPUTS
+# =============================================================================
+
+case_basename = 'slbw_testing_1L_noexp'
+number_of_samples = 2
+number_of_levels = 1
 
 
+inp_template = 'template_noexp.inp'
+
+
+# =============================================================================
+#       ACTIONS TO TAKE
+# =============================================================================
 create_synthetic_data = True
 
 run_sammy_wo_bayes = True
 
 run_bayes_with_baron_suggested_parameters = False
+
+
+
+# =============================================================================
+# template files
+# =============================================================================
+if number_of_levels == 1:
+    par_template = 'template_1L.par'
+elif number_of_levels == 5:
+    par_template = 'template_5L.par'
+else:
+    print(); print('WARNING: number of levels entered does not have an existing template file'); print()
+    sys.exit()
+
+
+
+
+
+
+
+
 
 
 
@@ -39,10 +77,10 @@ si = sammy_interface.sammy_interface() # initialize sammy interface
 
 if create_synthetic_data:
     # create sammy scripts for synthetic data
-    [csd_summary_stats, csd_warnings] = si.create_synthetic_data(case_basename, number_of_cases, number_of_levels, run_sammy_wo_bayes, 'true_parameters.csv', par_template, inp_template)
+    [csd_summary_stats, csd_warnings] = si.create_synthetic_data(interface_directory, case_basename, number_of_samples, number_of_levels, run_sammy_wo_bayes, 'true_parameters.csv', par_template, inp_template)
     
 if run_bayes_with_baron_suggested_parameters:
-    [rb_summary_stats, rb_warnings] = si.run_bayes(case_basename, number_of_cases, number_of_levels, 'baron_parameters.csv', par_template, inp_template)
+    [rb_summary_stats, rb_warnings] = si.run_bayes(interface_directory, case_basename, number_of_samples, number_of_levels, 'baron_parameters.csv', par_template, inp_template)
     
     
     

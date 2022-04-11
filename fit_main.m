@@ -1,14 +1,12 @@
 % clf
 
 
+
 case_basename = 'slbw_testing_1L_ss';%"slbw_testing_1L_noexp";
 
-addpath(strcat(case_basename,"/synthetic_data/"));
-addpath(case_basename);
-addpath("5 Resonance Tests/xs_functions/");
-
-
-
+% addpath("xs_functions/");
+interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";
+case_syndat_dir = strcat(interface_directory,case_basename,"/synthetic_data/");
 
 %% import synthetic experimental data
 
@@ -17,7 +15,7 @@ plotting = false;
 add_noise = false;
 run_baron_bool = true;
  
-true_parms = readtable('true_parameters.csv');
+true_parms = readtable(strcat(interface_directory,case_basename,"/true_parameters.csv"));
 % true_w = [true_parms{:,2:1+(NumPeaks*3)}].*[1, 1e-3, 1e-3]; % widths are in meV!!!
 
 solution_w = [2105.15160800000	506.740813000000*1e-3	20317.7426000000*1e-3 1];
@@ -31,8 +29,8 @@ baron_parms = zeros(size(true_parms));
 
 for icase = 1:100
 filename = "syndat_"+string(icase);
-
-synth_exp_dat = readmatrix(filename, 'FileType','text');
+filepath = strcat(case_syndat_dir,filename);
+synth_exp_dat = readmatrix(filepath, 'FileType','text');
 if size(synth_exp_dat,2) < 3
     continue
 end

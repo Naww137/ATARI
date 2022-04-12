@@ -14,14 +14,14 @@
 % plot(energies, f(energies),'DisplayName','simple form'); hold on
 
 %%
-re_sample_resparm = false;
+re_sample_resparm = true;
 run_baron_bool = true;
 
 NumPeaks = 5;
 parm_per_res = 4;
 parm_per_window = NumPeaks*parm_per_res;
 
-WE = linspace(1, 100, 1000);
+WE = linspace(1, 50, 500);
 if re_sample_resparm
     Elevels = rand(1,NumPeaks).*max(WE);
     widths = rand(1,NumPeaks);
@@ -31,7 +31,7 @@ z=WE;
 
 p = []; r = []; %p = 10+0.1i; r = 2*exp(3*pi/2*1i);
 for iRes = 1:NumPeaks
-    p = [p, Elevels(iRes)+widths(iRes)*1i];
+    p = [p, Elevels(iRes)+widths(iRes)*1i]; 
     r = [r, 2*exp(3*pi/2*1i)];
 end
 
@@ -44,7 +44,7 @@ end
 
 ir = imag(r);
 rr = real(r);
-ip = imag(p);  % careful!! I was renaming pi!!!
+ip = imag(p);
 rp = real(p);
 
 sol_parm = [];
@@ -80,8 +80,8 @@ end
 EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
 PeakSpacing=5;
 for jj=1:(NumPeaks-1)
-    EnergyOrder(jj,1+parm_per_res*(jj-1))=-1;
-    EnergyOrder(jj,1+parm_per_res*jj)=1;
+    EnergyOrder(jj,3+parm_per_res*(jj-1))=-1;
+    EnergyOrder(jj,3+parm_per_res*jj)=1;
     EnergyOrder(jj,parm_per_window+jj)=-PeakSpacing/2;
     EnergyOrder(jj,parm_per_window+(jj+1))=-PeakSpacing/2;
 end
@@ -89,13 +89,16 @@ end
 TotalRM_PerWindow = NumPeaks*parm_per_res;
 TotalParm_PerWindow=NumPeaks*(parm_per_res+1);
 
-A = [A_Lower;A_Upper;EnergyOrder]; 
-SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
-SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
+% A = [A_Lower;A_Upper;EnergyOrder]; 
+A = [A_Lower;A_Upper]; 
+% SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
+% SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
+SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow)];
+SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow)];
 lb=[repmat(MinVec,1,NumPeaks),ones(1,NumPeaks)];
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
-Options=baronset('threads',4,'PrLevel',1,'CutOff',10,'DeltaTerm',1,'EpsA',0.1,'MaxTime',5*60);
+Options=baronset('threads',4,'PrLevel',1,'CutOff',10,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
 % Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'MaxTime',5*60);
 xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 

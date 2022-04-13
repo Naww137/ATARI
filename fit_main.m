@@ -2,20 +2,22 @@
 
 
 
-case_basename = 'slbw_testing_1L_ms';%"slbw_testing_1L_noexp";
+case_basename = 'slbw_1L_ss_noedge';%"slbw_testing_1L_noexp";
 
 % addpath("xs_functions/");
-interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";
+% interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";
+interface_directory = "/home/nwalton1/my_sammy/interface/";
+case_dir = strcat(interface_directory,case_basename);
 case_syndat_dir = strcat(interface_directory,case_basename,"/synthetic_data/");
 
 %% import synthetic experimental data
 
 NumPeaks = 1; % per case
-plotting = true;
+plotting = false;
 add_noise = false;
 run_baron_bool = true;
  
-true_parms = readtable(strcat(interface_directory,case_basename,"/true_parameters.csv"));
+true_parms = readtable(strcat(case_dir,"/true_parameters.csv"));
 true_w = [true_parms{:,2:1+(NumPeaks*3)}].*repmat([1, 1e-3, 1e-3],1,NumPeaks); % widths are in meV!!!
 
 % solution_w = [2105.15160800000	506.740813000000*1e-3	20317.7426000000*1e-3 1];
@@ -24,12 +26,12 @@ true_w = [true_parms{:,2:1+(NumPeaks*3)}].*repmat([1, 1e-3, 1e-3],1,NumPeaks); %
 % initial_vec = [1837 0.1 10  1967 0.2 5   2176 0.25 20  2667 0.2 35   2752 0.2 5   1 1 1 1 1];
 initial_vec = [];
 
-colors = repmat(["b", "r", "g"],1,3);
+% colors = repmat(["b", "r", "g"],1,3);
 icolor = 0;
 
 baron_parms = zeros(size(true_parms));
 
-for icase = [2, 71, 96]
+for icase = 1:1
 filename = "syndat_"+string(icase);
 filepath = strcat(case_syndat_dir,filename);
 synth_exp_dat = readmatrix(filepath, 'FileType','text');
@@ -37,12 +39,12 @@ if size(synth_exp_dat,2) < 3
     continue
 end
 
-Energies = synth_exp_dat(800:2500,1)' ;
-true_xs = synth_exp_dat(800:2500,2)';
+% Energies = synth_exp_dat(800:2500,1)' ;
+% true_xs = synth_exp_dat(800:2500,2)';
 % Energies = synth_exp_dat(415:2200,1)' ;
 % true_xs = synth_exp_dat(415:2200,2)';
-% Energies = synth_exp_dat(:,1)' ;
-% true_xs = synth_exp_dat(:,2)';
+Energies = synth_exp_dat(:,1)' ;
+true_xs = synth_exp_dat(:,2)';
 
 icolor = icolor + 1 ;
 
@@ -85,7 +87,7 @@ if plotting
 end
 
 if run_baron_bool
-% 
+baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3];
 % baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3, ...
 %                            w(4), w(5).*1e3, w(6).*1e3, ...
 %                            w(7), w(8).*1e3, w(9).*1e3]; 
@@ -103,15 +105,15 @@ end
 
 %%
 % import baron_parms
-% T = array2table(baron_parms);
-% T.Properties.VariableNames(1) = "case";
-% for ilevel =1:NumPeaks
-%     stride = 3*(ilevel-1);
-%     E="E%d"; Gg="Gg%d"; Gn="Gn%d";
-%     stride_title = [sprintf(E,ilevel), sprintf(Gg,ilevel), sprintf(Gn,ilevel)];
-%     T.Properties.VariableNames(2+stride:4+stride) = stride_title;
-% end
-% writetable(T,'baron_parameters.csv')
+T = array2table(baron_parms);
+T.Properties.VariableNames(1) = "case";
+for ilevel =1:NumPeaks
+    stride = 3*(ilevel-1);
+    E="E%d"; Gg="Gg%d"; Gn="Gn%d";
+    stride_title = [sprintf(E,ilevel), sprintf(Gg,ilevel), sprintf(Gn,ilevel)];
+    T.Properties.VariableNames(2+stride:4+stride) = stride_title;
+end
+writetable(T,strcat(case_dir,'/baron_parameters.csv'))
 
 %%
 % save_name = strcat(case_basename,'.mat');

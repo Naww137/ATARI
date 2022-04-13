@@ -51,6 +51,8 @@ run_bayes_with_baron_suggested_parameters = False
 # =============================================================================
 if number_of_levels == 1:
     par_template = 'template_1L.par'
+elif number_of_levels == 3:
+    par_template = 'template_3L.par'
 elif number_of_levels == 5:
     par_template = 'template_5L.par'
 else:

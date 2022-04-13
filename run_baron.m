@@ -1,41 +1,17 @@
-function [w, xs_func, SE] = run_baron(NumPeaks, WC, WE, run_baron, initial_vec)
+function [w, SE] = run_baron(xs_func, NumPeaks, WC, WE, run_baron_bool, initial_vec)
 
-% Nuclear Parameters
-A=62.929599;
-Constant=0.002197; 
-Ac=0.67; 
-I=1.5; 
-ii=0.5; 
-l=0;  
-s=I-ii; 
-J=l+s;  %
-g=(2*J+1)/( (2*ii+1)*(2*I+1) );   
-pig=pi*g;
-
-%l=0   or s-wave spin group energy dependent functions of the wave number
-k=@(E) Constant*(A/(A+1))*sqrt(E);  
-rho=@(E) k(E)*Ac;    
-P=@(E) rho(E); % not using right now
-
-fun_robust = @(w) 0;
-for jj=1:NumPeaks
-    fun_robust=@(w) fun_robust(w)+( (w(3+3*(jj-1)).*w(2+3*(jj-1)))  ./ ( (WE-w(1+3*(jj-1))).^2  + ((w(3+3*(jj-1))+w(2+3*(jj-1)))./2).^2 ) );
-end
-
-fun_robust = @(w) ((pig)./k(WE).^2).*fun_robust(w) ;
-xs_func = @(w) fun_robust(w) ;
-fun_robust=@(w) sum((fun_robust(w)-WC).^2);
+fun_robust=@(w) sum((xs_func(w)-WC).^2);
 SE = fun_robust;
 
 % plot(WE,xs_func(true_w(1,:)))
 w = [];
-if run_baron
+if run_baron_bool
     % constraints
     % min/max vec must align with the order of parameters
     % MinVec = [min(WE) min(true_w(:,2)) min(true_w(:,3))];
     % MaxVec = [max(WE) max(true_w(:,2)) max(true_w(:,3))];
     MinVec = [min(WE) 0 0];
-    MaxVec = [max(WE) 1 50];
+    MaxVec = [max(WE) 1 100];
     
     RM_PerPeak = 3 ;
     
@@ -56,8 +32,8 @@ if run_baron
     EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
     PeakSpacing=15;
     for jj=1:(NumPeaks-1)
-        EnergyOrder(jj,RM_PerPeak+RM_PerPeak*(jj-1))=-1;
-        EnergyOrder(jj,RM_PerPeak+RM_PerPeak*jj)=1;
+        EnergyOrder(jj,1+RM_PerPeak*(jj-1))=-1;
+        EnergyOrder(jj,1+RM_PerPeak*jj)=1;
         EnergyOrder(jj,TotalRM_PerWindow+jj)=-PeakSpacing/2;
         EnergyOrder(jj,TotalRM_PerWindow+(jj+1))=-PeakSpacing/2;
     end
@@ -70,7 +46,7 @@ if run_baron
     
     
     % cutoff 10 is very important, also EpsA 100 makes it run much quicker 
-    Options=baronset('threads',8,'PrLevel',0,'CutOff',10,'DeltaTerm',1,'EpsA',100,'MaxTime',2*60);
+    Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
 %     Options=baronset('threads',8,'PrLevel',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',5*60);
     xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
     

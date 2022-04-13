@@ -29,7 +29,7 @@ avg_Gg = 0.5; %500 eV average capture width (known for an isotope)
 
 % user input
 number_of_cases = 100 ;
-levels_per_case = 5 ; 
+levels_per_case = 3 ; 
 
 parameters_per_level = 3 ;
 parameters_per_case = levels_per_case * parameters_per_level;
@@ -68,9 +68,13 @@ for ilevel =1:levels_per_case
 end
 
 % stride = @(stride_location)  stride_location+parameters_per_level*(ilevel-1);
-Elevels_only = [T{:,"E1"},T{:,"E2"},T{:,"E3"},T{:,"E4"},T{:,"E5"}]; 
-Gg_only = [T{:,"Gg1"},T{:,"Gg2"},T{:,"Gg3"},T{:,"Gg4"},T{:,"Gg5"}];
-Gn_only = [T{:,"Gn1"},T{:,"Gn2"},T{:,"Gn3"},T{:,"Gn4"},T{:,"Gn5"}]; 
+% Elevels_only = [T{:,"E1"},T{:,"E2"},T{:,"E3"},T{:,"E4"},T{:,"E5"}]; 
+% Gg_only = [T{:,"Gg1"},T{:,"Gg2"},T{:,"Gg3"},T{:,"Gg4"},T{:,"Gg5"}];
+% Gn_only = [T{:,"Gn1"},T{:,"Gn2"},T{:,"Gn3"},T{:,"Gn4"},T{:,"Gn5"}]; 
+
+Elevels_only = [T{:,"E1"},T{:,"E2"},T{:,"E3"}]; 
+Gg_only = [T{:,"Gg1"},T{:,"Gg2"},T{:,"Gg3"}];
+Gn_only = [T{:,"Gn1"},T{:,"Gn2"},T{:,"Gn3"}];
 
 disp('E Level Range min/max (eV)'); disp([min(Elevels_only,[],'all'), max(Elevels_only,[],'all')])
 disp('Gg Range min/max (meV)'); disp([min(Gg_only,[],'all'), max(Gg_only,[],'all')])

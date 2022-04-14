@@ -15,7 +15,8 @@
 
 %%
 re_sample_resparm = true;
-run_baron_bool = true;
+run_baron_bool = false;
+plotting = true;
 
 NumPeaks = 5;
 parm_per_res = 4;
@@ -55,8 +56,11 @@ end
 xs = @(w) f(w);
 true_xs = xs(sol_parm); 
 
-figure(1); clf
-plot(WE, true_xs,'.','DisplayName','true'); hold on
+if plotting
+    myfig = figure('Visible', 'off');
+%     set(myfig,'Visible', 'off');
+    plot(WE, true_xs,'.','DisplayName','true'); hold on
+end
 
 f_obj = @(w) sum((xs(w)-true_xs).^2) ;
 
@@ -90,15 +94,15 @@ TotalRM_PerWindow = NumPeaks*parm_per_res;
 TotalParm_PerWindow=NumPeaks*(parm_per_res+1);
 
 % A = [A_Lower;A_Upper;EnergyOrder]; 
-A = [A_Lower;A_Upper]; 
 % SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
 % SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
+A = [A_Lower;A_Upper]; 
 SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow)];
 SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow)];
 lb=[repmat(MinVec,1,NumPeaks),ones(1,NumPeaks)];
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
-Options=baronset('threads',4,'PrLevel',1,'CutOff',10,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
+Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',10*60);
 % Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'MaxTime',5*60);
 xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
@@ -108,8 +112,10 @@ x0 = NaN(1,4*NumPeaks+NumPeaks); %NaN(1,4*peaks+peaks);
 [w,~,~,~] = baron(f_obj,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,x0, Options);
 
 
-figure(1);
-plot(WE,xs(w), 'DisplayName','baron sol')
-legend()
+if plotting
+    plot(WE,xs(w), 'DisplayName','baron sol')
+    legend()
+    saveas(myfig,'figure.png');
+end
 
 end

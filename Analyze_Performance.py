@@ -12,8 +12,8 @@ import pandas as pd
 import os
 
 data_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/"
-case_directory = os.path.join(data_directory,'slbw_testing_1L_allexp') # case 51 didn't run, 
-has_bayes_solutions = True
+case_directory = os.path.join(data_directory,'slbw_testing_1L_ss_noedge') # case 51 didn't run, 
+has_bayes_solutions = False
 
 true_parameters = pd.read_csv(case_directory+'/true_parameters.csv') #pd.read_csv(os.path.realpath("True_Parameters_(E,Gg,Gn).csv"))
 baron_parameters = pd.read_csv(case_directory+'/baron_parameters.csv') #pd.read_csv(os.path.realpath("Baron_parameters.csv"))
@@ -27,7 +27,7 @@ baron_parameters['Gn1'] = baron_parameters['Gn1']#.apply(lambda x: x*1e3)
 
 plt.scatter(true_parameters['Gn1'],baron_parameters['Gn1'])
 plt.xlabel('True Gn'); plt.ylabel('Baron Pred. Gn')
-plt.title('With ms experimental corrections')
+plt.title('With ss w/o edge effects experimental corrections')
 #plt.ylim([17500,28000])
 #plt.ylim([45000,48550])
 

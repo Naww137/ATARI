@@ -12,3 +12,8 @@ capE = cap_dat.x(course_RRR_index); capXS = cap_dat.y(course_RRR_index);
 
 figure(2); clf
 loglog(capE,capXS); title('Course Reconstructed \sigma in RRR'); 
+
+%% break the data up into tractable windows of ~500 energy points
+
+
+

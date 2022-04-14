@@ -2,7 +2,7 @@
 
 
 
-case_basename = 'slbw_1L_ss_noedge';%"slbw_testing_1L_noexp";
+case_basename = 'slbw_1L_ss_shield';%"slbw_testing_1L_noexp";
 
 % addpath("xs_functions/");
 % interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";

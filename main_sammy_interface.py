@@ -53,6 +53,7 @@ if run_baron_on_synthetic_data:
 # make fit_main_template.m -> write a file from this template in case_dir with case_basename, options, numpeaks, etc
 # create corresponding submit.sh file -> submit fit_main_case.m in case_dir and wait on it to complete before moving on to running bayes
 # add appropriate unit tests, checkpoints, and statistics and return them
+# could add option to run baron cases serially or each case in parallel
 # =============================================================================
 
 if run_bayes_with_baron_suggested_parameters:

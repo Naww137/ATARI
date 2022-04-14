@@ -25,10 +25,15 @@ create_synthetic_data = True
 
 run_sammy_wo_bayes = True
 
+run_baron_on_synthetic_data = True
+
 run_bayes_with_baron_suggested_parameters = False
 
 
-
+# =============================================================================
+# as long as I use qsub, I can submit this file with different cases simultaneously 
+# tested that I can use the same titled submit.sh file (i.e. fit_main.m running simultaneously for multiple cases)
+# =============================================================================
 
 # =============================================================================
 # for debugging this code, call individual sub-methods instead of running all at oncc
@@ -41,10 +46,21 @@ if create_synthetic_data:
     # create sammy scripts for synthetic data
     [csd_summary_stats, csd_warnings] = si.create_synthetic_data(case_basename, number_of_cases, number_of_levels, run_sammy_wo_bayes, 'true_parameters.csv', par_template, inp_template)
     
+if run_baron_on_synthetic_data:
+    print("submit qsub_fit_main.sh to run matlab baron script ")
+# =============================================================================
+#      need to feed in casename, number of peaks, 
+# make fit_main_template.m -> write a file from this template in case_dir with case_basename, options, numpeaks, etc
+# create corresponding submit.sh file -> submit fit_main_case.m in case_dir and wait on it to complete before moving on to running bayes
+# add appropriate unit tests, checkpoints, and statistics and return them
+# =============================================================================
+
 if run_bayes_with_baron_suggested_parameters:
     [rb_summary_stats, rb_warnings] = si.run_bayes(case_basename, number_of_cases, number_of_levels, 'baron_parameters.csv', par_template, inp_template)
     
-    
+# =============================================================================
+# could also add a conditional to run post-processing analysis
+# =============================================================================
     
     
     

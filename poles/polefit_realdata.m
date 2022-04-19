@@ -21,8 +21,9 @@ course_RRR_index = RRR_index(1:2:end);
 
 capE = cap_dat.x(course_RRR_index); capXS = cap_dat.y(course_RRR_index);
 
-% figure(2); clf
-% loglog(capE,capXS); title('Course Reconstructed \sigma in RRR'); 
+figure(2); clf
+loglog(capE,capXS); title('Course Reconstructed \sigma in RRR'); 
+
 
 %% break the data up into tractable windows of ~500 energy points
 
@@ -43,27 +44,27 @@ LeftoverEnergyPoints = length(capE) - LastEnergyIndex_LastFullWindow;
 
 
 %% plot random windows for inspection
-if plot_random_windows
-    show_grid_spacing = false ;
-    number_of_sample_cases = 1 ;
-
-    for iW = randi(818,1,number_of_sample_cases)
-        if show_grid_spacing
-            figure(iW); clf
-            plot(Ewindows(iW,:), XSwindows(iW,:));hold on
-            ylabel('Cross Section')
-        %     figure(iW+1);clf
-            yyaxis right
-            plot(Ewindows(iW,1:end-1),diff(Ewindows(iW,:)))
-            ylabel('Spacing in energy grid')
-            xlabel('eV')
-        else
-            figure(iW); clf
-            loglog(Ewindows(iW,:), XSwindows(iW,:));hold on
-            ylabel('Cross Section')
-        end
-    end
-end
+% if plot_random_windows
+%     show_grid_spacing = false ;
+%     number_of_sample_cases = 1 ;
+% 
+%     for iW = randi(818,1,number_of_sample_cases)
+%         if show_grid_spacing
+%             figure(iW); clf
+%             plot(Ewindows(iW,:), XSwindows(iW,:));hold on
+%             ylabel('Cross Section')
+%         %     figure(iW+1);clf
+%             yyaxis right
+%             plot(Ewindows(iW,1:end-1),diff(Ewindows(iW,:)))
+%             ylabel('Spacing in energy grid')
+%             xlabel('eV')
+%         else
+%             figure(iW); clf
+%             loglog(Ewindows(iW,:), XSwindows(iW,:));hold on
+%             ylabel('Cross Section')
+%         end
+%     end
+% end
 
 %
 
@@ -71,15 +72,20 @@ end
 
 %% solve window by window
 plotting_baron_solve = true;
-NumPeaks = 1 ; % max per window
+NumPeaks = 2 ; % max per window
 
 for iW = 1:1 %FullWindows
 
 WE = Ewindows(iW,:);
 WXS = XSwindows(iW,:);
 
-WXS = WXS(find(WE>4 & WE<4.75));
-WE = WE(find(WE>4 & WE<4.75));
+
+figure(1); clf
+loglog(WE,WXS); title('Full Window')
+
+WXS = WXS(find(WE>4 & WE<4.7));
+WE = WE(find(WE>4 & WE<4.7));
+
 
 % create cross section function
 xs_func = @(w) 0; z=WE;
@@ -90,10 +96,11 @@ end
 
 
 poly_index = 4*NumPeaks+NumPeaks ;
-polynomial_terms = 6;
+polynomial_terms = 2;
 % background_polynomial = @(w) w(poly_index+1).*z + w(poly_index+2).*z.^2 ;
 
-xs_func = @(w) xs_func(w) + w(poly_index+1).*z + w(poly_index+2).*z.^2 + w(poly_index+3).*z.^3 + w(poly_index+4).*z.^4 + w(poly_index+5).*z.^5 + w(poly_index+6).*z.^6;
+% could use coef of legendre polynomial to simplify this polynomial term [-1,1]
+xs_func = @(w) xs_func(w) + w(poly_index+1).*z + w(poly_index+2).*z.^2 ;%+ w(poly_index+3).*z.^3 + w(poly_index+4).*z.^4 + w(poly_index+5).*z.^5 + w(poly_index+6).*z.^6;
 
 
 %% plot xs_func with guesses for solution to validate xs_func
@@ -149,7 +156,7 @@ end
 % end
 
 TotalRM_PerWindow = NumPeaks*4;
-TotalParm_PerWindow=NumPeaks*(4+1)+poly_parm; % 4 + 1 binary parms for each res + 1 parameter for polynomial
+TotalParm_PerWindow=NumPeaks*(4+1)+polynomial_terms; % 4 + 1 binary parms for each res + 1 parameter for polynomial
 
 % A = [A_Lower;A_Upper;EnergyOrder]; 
 % SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
@@ -162,14 +169,14 @@ ub=[repmat(parm_maxvec,1,NumPeaks), ones(1,NumPeaks)];
 % lb=[repmat(parm_minvec,1,NumPeaks), 1, ones(1,NumPeaks)];
 % ub=[repmat(parm_maxvec,1,NumPeaks), 1, ones(1,NumPeaks)];
 
-Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',10*60);
+Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
 % Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'MaxTime',5*60);
 xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks), repmat(["B"],1,NumPeaks)]))';
 % xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks), "C", repmat(["B"],1,NumPeaks)]))';
 
-% x0 = NaN(1,4*NumPeaks+NumPeaks+polynomial_terms); %NaN(1,4*peaks+peaks);
+x0 = NaN(1,4*NumPeaks+NumPeaks+polynomial_terms); %NaN(1,4*peaks+peaks);
 % x0 = [sol_parm, 1 1] ; %NaN(1,4*NumPeaks+NumPeaks); %NaN(1,4*peaks+peaks);
-x0 = w; 
+% x0 = w; 
 
 f_obj = @(w) sum((xs_func(w)-WXS).^2) ;
 % [w,fval,~,~] = baron(f_obj,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,x0, Options);

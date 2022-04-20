@@ -1,4 +1,4 @@
-function [w, SE] = run_baron(xs_func, NumPeaks, WC, WE, run_baron_bool, initial_vec)
+function [w, SE, fval] = run_baron(xs_func, NumPeaks, WC, WE, run_baron_bool, initial_vec, Options)
 
 fun_robust=@(w) sum((xs_func(w)-WC).^2);
 SE = fun_robust;
@@ -46,11 +46,10 @@ if run_baron_bool
     
     
     % cutoff 10 is very important, also EpsA 100 makes it run much quicker 
-    Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
 %     Options=baronset('threads',8,'PrLevel',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',5*60);
     xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
     
-    [w,~,~,~]=baron(fun_robust,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,initial_vec, Options);
+    [w,fval,~,~]=baron(fun_robust,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,initial_vec, Options);
 
 end
 

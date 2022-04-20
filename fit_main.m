@@ -2,23 +2,25 @@
 
 
 
-case_basename = 'slbw_1L_ss_shield';%"slbw_testing_1L_noexp";
+case_basename = 'slbw_2L_allexp';%"slbw_testing_1L_noexp";
 
 % addpath("xs_functions/");
-% interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";
-interface_directory = "/home/nwalton1/my_sammy/interface/";
+interface_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/";
+% interface_directory = "/home/nwalton1/my_sammy/interface/";
 case_dir = strcat(interface_directory,case_basename);
 case_syndat_dir = strcat(interface_directory,case_basename,"/synthetic_data/");
 
 %% import synthetic experimental data
 
-NumPeaks = 1; % per case
-plotting = false;
+NumPeaks = 2; % per case
+plotting = true;
 add_noise = false;
 run_baron_bool = true;
  
 true_parms = readtable(strcat(case_dir,"/true_parameters.csv"));
 true_w = [true_parms{:,2:1+(NumPeaks*3)}].*repmat([1, 1e-3, 1e-3],1,NumPeaks); % widths are in meV!!!
+true_w = [true_w repmat([1],length(true_w),NumPeaks)];
+
 
 % solution_w = [2105.15160800000	506.740813000000*1e-3	20317.7426000000*1e-3 1];
 % solution_w = [1837.37921100000	512*1e-3	9179.52334*1e-3	1967.63517300000	508.3718945*1e-3	390.4651094*1e-3    2176.58291900000	563.5903353*1e-3	11492.64564*1e-3 2667.59779800000	461.6442189*1e-3	23084.33704*1e-3	2752.96080800000	482.2181976*1e-3	197.2458461*1e-3 1 1 1 1 1];
@@ -57,9 +59,10 @@ if add_noise
     end
 end
 if plotting
-%     figure(icase); clf
-    figure(1); 
-    plot(Energies,true_xs,'.','Color', colors(icolor), 'DisplayName', strcat('Synth Data NoExp - ',string(icase))); hold on
+    figure(icase); clf
+%     figure(1);
+%     plot(Energies,true_xs,'.','Color', colors(icolor), 'DisplayName', strcat('Synth Data NoExp - ',string(icase))); hold on
+    plot(Energies,true_xs,'.', 'DisplayName', strcat('Synth Data AllExp - ',string(icase))); hold on
 %     plot(Energies,true_xs,'.','Color', colors(icolor), 'DisplayName', strcat('Synth Data AllExp - ',string(icase))); hold on
     if add_noise
         scatter(Energies,Noisy_CrossSection, 'DisplayName', 'Experimental')
@@ -71,23 +74,29 @@ end
 WC = true_xs; 
 WE = Energies;
 xs_func = xs_SLBW_EGgGn(NumPeaks,WE); 
-[w, SE] = run_baron(xs_func, NumPeaks, WC, WE, run_baron_bool, initial_vec); 
+Options=baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
+[w, SE, fval] = run_baron(xs_func, NumPeaks, WC, WE, run_baron_bool, initial_vec, Options); 
 
 if plotting
-%     solution_w = true_w(icase,:);
-%     plot(Energies, xs_func(solution_w), 'DisplayName','Baron Func w/TrueParm')
+    solution_w = true_w(icase,:);
+    plot(Energies, xs_func(solution_w), 'DisplayName','Baron Func w/TrueParm')
 %     plot(Energies, xs_func(initial_vec), 'DisplayName','Baron Func w/Initial')
 %     disp('SE for BaronFunc with: TrueParm, Initial, BaronSol')
 %     disp(SE(solution_w));disp(SE(initial_vec))
     if run_baron_bool
-        plot(Energies, xs_func(w), 'Color', colors(icolor), 'DisplayName', strcat('Baron Sol - ',string(icase)));
+%         plot(Energies, xs_func(w), 'Color', colors(icolor), 'DisplayName', strcat('Baron Sol - ',string(icase)));
+        plot(Energies, xs_func(w), 'DisplayName', strcat('Baron Sol - ',string(icase)));
 %         disp(SE(w))
     end
     legend()
 end
 
 if run_baron_bool
-baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3];
+% baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3];
+
+baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3, ...
+                           w(4), w(5).*1e3, w(6).*1e3]; 
+
 % baron_parms(icase,:) = [icase, w(1), w(2).*1e3, w(3).*1e3, ...
 %                            w(4), w(5).*1e3, w(6).*1e3, ...
 %                            w(7), w(8).*1e3, w(9).*1e3]; 
@@ -105,15 +114,15 @@ end
 
 %%
 % import baron_parms
-T = array2table(baron_parms);
-T.Properties.VariableNames(1) = "case";
-for ilevel =1:NumPeaks
-    stride = 3*(ilevel-1);
-    E="E%d"; Gg="Gg%d"; Gn="Gn%d";
-    stride_title = [sprintf(E,ilevel), sprintf(Gg,ilevel), sprintf(Gn,ilevel)];
-    T.Properties.VariableNames(2+stride:4+stride) = stride_title;
-end
-writetable(T,strcat(case_dir,'/baron_parameters.csv'))
+% T = array2table(baron_parms);
+% T.Properties.VariableNames(1) = "case";
+% for ilevel =1:NumPeaks
+%     stride = 3*(ilevel-1);
+%     E="E%d"; Gg="Gg%d"; Gn="Gn%d";
+%     stride_title = [sprintf(E,ilevel), sprintf(Gg,ilevel), sprintf(Gn,ilevel)];
+%     T.Properties.VariableNames(2+stride:4+stride) = stride_title;
+% end
+% writetable(T,strcat(case_dir,'/baron_parameters.csv'))
 
 %%
 % save_name = strcat(case_basename,'.mat');

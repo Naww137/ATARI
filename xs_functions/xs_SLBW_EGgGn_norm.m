@@ -1,4 +1,4 @@
-function xs = xs_SLBW_EGgGn(NumPeaks, WE)
+function xs = xs_SLBW_EGgGn_norm(NumPeaks, WE, normalize_range, minWC, maxWC, minWE, maxWE)
     
     % Nuclear Parameters
     A=62.929599;
@@ -17,12 +17,19 @@ function xs = xs_SLBW_EGgGn(NumPeaks, WE)
     rho=@(E) k(E)*Ac;    
     P=@(E) rho(E); % not using right now
     
+%     if normalize_range
+%         WE = WE.*(maxWE-minWE) + minWE;
+%     end
 
     xs = @(w) 0;
     for jj=1:NumPeaks
+%         xs=@(w) xs(w)+( (w(3+3*(jj-1)).*w(2+3*(jj-1)))  ./ ( (WE-w(1+3*(jj-1))).^2  + ((w(3+3*(jj-1))+w(2+3*(jj-1)))./2).^2 ) );
         xs=@(w) xs(w)+( (w(3+3*(jj-1)).*w(2+3*(jj-1)))  ./ ( (WE-w(1+3*(jj-1))).^2  + ((w(3+3*(jj-1))+w(2+3*(jj-1)))./2).^2 ) );
     end
     xs = @(w) ((pig)./k(WE).^2).*xs(w) ;
 % 
+    if normalize_range
+        xs = @(w) (xs(w)-minWC)./(maxWC-minWC);
+    end
 
 end

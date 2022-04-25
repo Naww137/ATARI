@@ -1,70 +1,83 @@
 %% loop over number of resonances in 
 
-loop_peaks = [1 2 3 4 5 6 7 8];
-% loop_peaks = [3 4 5 6 7 8];
+% loop_peaks = [1 2 3 4 5 6 7 8];
+loop_peaks = [3 4 5 6 7 8];
+% loop_peaks = [1];
+
+% loop_energies=[500];
 loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
 
-total_time_matrix = zeros(length(loop_peaks), length(loop_energies));
-final_SE_matrix = zeros(length(loop_peaks), length(loop_energies));
 
+%% user inputs 
 
-%%
-for ipeak = 1:length(loop_peaks)
-for ienergy = 1:length(loop_energies)
-
-
-% user input
-NumPeaks = loop_peaks(ipeak); % for baron solver
-TrueNumPeaks = 1; % for true xs calculation
-
+% SOLVER OPTIONS
 run_baron_bool = true ;
 iterate_baron = true;
+normalize_range = true;
 
+% OUTPUT OPTIONS
 plotting = false ;
-print_results_to_csv = true;
+print_results_to_csv = true ;
 
+% EXP DATA OPTIONS
+TrueNumPeaks = 1; % for true xs calculation
 use_sammy_data = false ;
 sample_new_resonance_parameters = false ;
 
-
-
-if sample_new_resonance_parameters
-    number_of_cases = 1 ;
-    levels_per_case = TrueNumPeaks ; 
-end
-
-Energies = linspace(10, 1000, loop_energies(ienergy));
-
+% BARON RUNTIME OPTIONS
+maximum_total_time = 2*60*60; % 5*60; %
+absolute_tolerance = 0.0001; % absolute tolerance should be lower if transforming to [0,1]
+print_out = 0;
 
 initial_vec = [];
 % initial_vec = w;
 % Options = baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
-Options = baronset('threads',8,'PrLevel',0,'EpsA',0.01,'MaxTime',20*60);
+options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',20*60);
+options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
 
 
 
 
 
-%% nuclear properties
-A = 62.929599; %Cu-63, number from cu63 input txt file
-Constant = 0.002197; %sqrt(2Mn)/hbar; units of (10^(-12) cm sqrt(eV)^-1)
-Ac = 0.67; % scattering radius 6.7 fermi expressed as 10^-12 cm
-I = 1.5; % target angular Momentum
-ii = 0.5; % incident angular momentum
-l = 0;   % l=0 or s-wave spin group
+%% start loop
+total_time_matrix = zeros(length(loop_peaks), length(loop_energies));
+final_SE_matrix = zeros(length(loop_peaks), length(loop_energies));
+final_SE_reconstructed =zeros(length(loop_peaks), length(loop_energies));
+baron_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
+model_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
 
-s = I-ii; %
+for ipeak = 1:1%length(loop_peaks)
+for ienergy = 1:1%length(loop_energies)
+
+
+NumPeaks = loop_peaks(ipeak); % for baron solver
+if sample_new_resonance_parameters
+    number_of_cases = 1 ;
+    levels_per_case = TrueNumPeaks ; 
+end
+Energies = linspace(10, 1000, loop_energies(ienergy));
+
+
+% nuclear properties
+A = 62.929599; 
+Constant = 0.002197; 
+Ac = 0.67; 
+I = 1.5; 
+ii = 0.5; 
+l = 0; 
+
+s = I-ii; 
 J = l+s; 
-g = (2*J+1)/( (2*ii+1)*(2*I+1) );   % spin statistical factor g sub(j alpha)
+g = (2*J+1)/( (2*ii+1)*(2*I+1) ); 
 pig = pi*g;
 
 %l=0   or s-wave spin group energy dependent functions of the wave number
-k = @(E) Constant*(A/(A+1))*sqrt(E);   % wave number
-rho = @(E) k(E)*Ac;       % related to the center of mass momentum
-P = @(E) rho(E);          % penatrability factor
+k = @(E) Constant*(A/(A+1))*sqrt(E); 
+rho = @(E) k(E)*Ac;     
+P = @(E) rho(E);
 S = 0; % for l=0
 % average values for this single spin group
-S0 = 2.3e-4; % strength function goes in to jordans derivation for reduced neutron width amplitude
+S0 = 2.3e-4;
 D0 = 300; %722; %s-wave; 722+-47 eV --- average level spacing <D>
 avg_gn2 = ((4*D0.*S0)/(2*J+1))*((1/Constant)*((A+1)/A))/Ac; % Jordan derived this equation
 avg_Gg = 0.5; %500 eV average capture width (known for an isotope)
@@ -108,8 +121,10 @@ else
         end 
     end
 
-%     sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
-    sol_w = [373.446529425425	0.458411490362457	3.55575669868274];
+%     for perfromances testing, the following two sets of parameters were used
+    sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
+%     sol_w = [373.446529425425	0.458411490362457	3.55575669868274];
+
     true_xs_function = xs_SLBW_EGgGn(TrueNumPeaks,Energies);
     true_xs = true_xs_function(sol_w); 
     
@@ -122,27 +137,63 @@ if plotting
 end
 
 
+
+%% make a window to solve
+
+WC = true_xs; minWC=min(WC); maxWC=max(WC);
+WE = Energies; minWE=min(WE); maxWE=max(WE);
+
+if normalize_range
+    WC_norm = (WC-minWC)./(maxWC-minWC);
+    WE_norm = (WE-minWE)./(maxWE-minWE);
+    if plotting
+        figure(2); clf
+        plot(WE_norm,WC_norm, '.','DisplayName','True Normed'); hold on
+    end
+end
+
+if normalize_range
+    WC_reconstructed = (WC_norm.*(maxWC-minWC)) + minWC ;
+    WE_reconstructed = (WE_norm.*(maxWE-minWE)) + minWE;
+    if plotting
+        figure(1)
+        plot(WE_reconstructed,WC_reconstructed, 'o', 'DisplayName', 'True Reconstructed')
+    end
+end
+
+%% solve problem
+
 if run_baron_bool
-
     tic 
-
-    WC = true_xs; 
-    WE = Energies;
-    xs_function = xs_SLBW_EGgGn(NumPeaks,Energies) ;
-    [w, SE, fval] = run_baron(xs_function, NumPeaks, WC, WE, run_baron_bool, initial_vec, Options); 
     
-    if iterate_baron
-        while fval > 1
-            Options = baronset('threads',8,'PrLevel',0,'EpsA',0.01,'MaxTime',10*60);
-            [w, SE, fval] = run_baron(xs_function, NumPeaks, WC, WE, run_baron_bool, w, Options);
+    if normalize_range
+        WE_to_baron = WE; %WE_norm;
+        WC_to_baron = WC_norm;
+    else
+        WE_to_baron = WE;
+        WC_to_baron = WC;
+    end
 
-            if tic > 2*60
+%   Need to update peak spacing to be more robust if normalizing E range !!!
+    xs_function = xs_SLBW_EGgGn(NumPeaks,WE);
+    xs_function_norm = xs_SLBW_EGgGn_norm(NumPeaks,WE,normalize_range, minWC, maxWC, minWE, maxWE);
+    if normalize_range
+        xs_func_to_baron = xs_function_norm ;
+    else
+        xs_func_to_baron = xs_function ;
+    end
+
+    [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, options_first_run);
+    % cannot reconstruct SE before entering the following tolerance loop
+    % because baron will just keep terminating and outputting the same solution
+    if iterate_baron
+        while SE > absolute_tolerance
+            [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, options_iterations);
+            if toc > maximum_total_time
                 break
             end
-
         end
     end
-    
     total_time = toc ;
 
     if plotting
@@ -157,16 +208,38 @@ if plotting
 end
 
 total_time_matrix(ipeak,ienergy) = total_time;
-final_SE_matrix(ipeak,ienergy) = fval;
+final_SE_matrix(ipeak,ienergy) = SE;
+baron_stat{ipeak,ienergy} = barout2.BARON_Status;
+model_stat{ipeak,ienergy} = barout2.Model_Status;
+if normalize_range
+    final_SE_reconstructed(ipeak,ienergy) = reconstruct_SE(xs_function, w, WC);
+end
 
 % end loops
 end
 end
 
 if print_results_to_csv
-    writematrix(total_time_matrix, 'total_time_matrix_1L.csv')
-    writematrix(final_SE_matrix, 'final_SE_matrix_1L.csv')
+    writematrix(total_time_matrix, 'total_time_matrix_3L_norm.csv')
+    writematrix(final_SE_matrix, 'final_SE_matrix_3L_norm.csv')
+    writecell(baron_stat, 'baron_stat_matrix_3L_norm.csv')
+    writecell(model_stat, 'model_stat_matrix_3L_norm.csv')
+    if normalize_range
+        writematrix(final_SE_reconstructed,'final_SE_reconstructed_3L.csv');
+    end
 end
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -212,4 +285,8 @@ Trans_sigma=a*CrossSection+b;
 NoisyTrans_sigma=normrnd(Trans_sigma,sqrt(Trans_sigma));
 New_CrossSection=(NoisyTrans_sigma-b)/a; %
 std=(sqrt(Trans_sigma))/a;
+end
+
+function reconstructed_SE = reconstruct_SE(xs_function, w, WC)
+    reconstructed_SE = sum((xs_function(w)-WC).^2);
 end

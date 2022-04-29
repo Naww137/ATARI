@@ -5,3 +5,4 @@ __pycache__
 *.asv
 *.bar*
 */.bar*
+*.dat

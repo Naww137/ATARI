@@ -1,0 +1,37 @@
+
+ >>> Better Solution Found at Iteration        7787
+ >>> Objective value is:           1462220448.3867971897125     
+ >>> Corresponding solution vector is:
+ >>> Variable no.              Value
+ >>>       1            -55.097501065083058335858     
+ >>>       2            -2036.5394358818130058353     
+ >>>       3             34.274024442294134473741     
+ >>>       4            -882.64071591761603485793     
+ 
+ >>> No dual information is available
+ >>> Variable no.              Marginal
+ >>>       1             0.0000000000000000000000     
+ >>>       2             0.0000000000000000000000     
+ >>>       3             0.0000000000000000000000     
+ >>>       4             0.0000000000000000000000     
+ 
+
+
+                    *** Max. allowable time exceeded ***      
+
+
+ >>> Objective value is:           1462220448.3867971897125     
+ >>> Corresponding solution vector is:
+ >>> Variable no.              Value
+ >>>       1            -55.097501065083058335858     
+ >>>       2            -2036.5394358818130058353     
+ >>>       3             34.274024442294134473741     
+ >>>       4            -882.64071591761603485793     
+ 
+ >>> No dual information is available
+ >>> Variable no.              Marginal
+ >>>       1             0.0000000000000000000000     
+ >>>       2             0.0000000000000000000000     
+ >>>       3             0.0000000000000000000000     
+ >>>       4             0.0000000000000000000000     
+ 

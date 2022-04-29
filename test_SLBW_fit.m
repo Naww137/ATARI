@@ -1,23 +1,24 @@
 %% loop over number of resonances in 
 
 % loop_peaks = [1 2 3 4 5 6 7 8];
-loop_peaks = [3 4 5 6 7 8];
-% loop_peaks = [1];
+% loop_peaks = [3 4 5 6 7 8];
+loop_peaks = [1];
 
-% loop_energies=[500];
-loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
+loop_energies=[500];
+% loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
 
 
 %% user inputs 
 
 % SOLVER OPTIONS
 run_baron_bool = true ;
-iterate_baron = true;
-normalize_range = true;
+iterate_baron = false;
+normalize_range = false;
+constraints = false;
 
 % OUTPUT OPTIONS
-plotting = false ;
-print_results_to_csv = true ;
+plotting = true ;
+print_results_to_csv = false ;
 
 % EXP DATA OPTIONS
 TrueNumPeaks = 1; % for true xs calculation
@@ -32,7 +33,7 @@ print_out = 0;
 initial_vec = [];
 % initial_vec = w;
 % Options = baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
-options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',20*60);
+options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',5*60);
 options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
 
 
@@ -46,8 +47,8 @@ final_SE_reconstructed =zeros(length(loop_peaks), length(loop_energies));
 baron_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
 model_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
 
-for ipeak = 1:1%length(loop_peaks)
-for ienergy = 1:1%length(loop_energies)
+for ipeak = 1:length(loop_peaks)
+for ienergy = 1:length(loop_energies)
 
 
 NumPeaks = loop_peaks(ipeak); % for baron solver
@@ -183,12 +184,12 @@ if run_baron_bool
         xs_func_to_baron = xs_function ;
     end
 
-    [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, options_first_run);
+    [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, constraints, options_first_run);
     % cannot reconstruct SE before entering the following tolerance loop
     % because baron will just keep terminating and outputting the same solution
     if iterate_baron
         while SE > absolute_tolerance
-            [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, options_iterations);
+            [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, constraints, options_iterations);
             if toc > maximum_total_time
                 break
             end

@@ -1,4 +1,9 @@
 .DS_Store
+__pycache__
 *.png
 *.csv
-*.bar
+*.asv
+*.bar*
+*/.bar*
+*.dat
+fort*

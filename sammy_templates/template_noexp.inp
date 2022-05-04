@@ -1,0 +1,36 @@
+Cu63
+      Cu63 62.929599 1500.0000 4000.0000       -20                     
+key-word particle-pair definitions
+reich-moore formalism
+generate plot file a
+twenty
+ev
+normalize as cross sections rather than yeild
+%%% solve bayes ? %%%
+ignore input binary covariance file
+broadening is not wanted
+
+Name=Inc Chan Particle a=neutron Particle b=other
+Pent=1        Shift=0
+Za=0          Zb=0  
+Sa=0.5        Sb=-1.5 
+Ma=1.00866492 Mb=62.929599
+                  
+ 6.7000000 0.008804
+capture
+  1      1    0 -1.0 0.9987500
+    1  Inc Chan    0      -1.0
+  2      1    0 -2.0 0.9987500
+    1  Inc Chan    0      -2.0
+  3      1    0  0.0 0.9987500
+    1  Inc Chan    1      -1.0
+  4      2    0  1.0 0.9987500
+    1  Inc Chan    1      -1.0
+    2  Inc Chan    1      -2.0
+  5      2    0  2.0 0.9987500
+    1  Inc Chan    1      -1.0
+    2  Inc Chan    1      -2.0
+  6      1    0  3.0 0.9987500
+    1  Inc Chan    1      -2.0
+
+     

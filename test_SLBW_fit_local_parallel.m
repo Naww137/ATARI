@@ -5,8 +5,28 @@
 % loop_peaks = [5 6 7 8];
 loop_peaks = [3 4];
 
-loop_energies=[100 200];
+loop_energies=[300 400 500];
 % loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
+
+cases = length(loop_peaks)+length(loop_energies);
+
+% loop_parameters(cases) = struct();
+clear loop_parameters
+% flatten matrix
+for ipeak = 1:length(loop_peaks)
+    for ienergy = 1:length(loop_energies)
+        loop_parameters(((ipeak-1)*length(loop_energies))+ienergy).peaks = loop_peaks(ipeak);
+        loop_parameters(((ipeak-1)*length(loop_energies))+ienergy).energies = loop_energies(ienergy);
+        
+        loop_parameters_matrix_sol(ipeak,ienergy).peaks = loop_peaks(ipeak);
+        loop_parameters_matrix_sol(ipeak,ienergy).energies = loop_energies(ienergy);
+    end
+end
+
+% reshape vector back to matrix - figure out the indexing for this so that
+% I can write to CSV within each loop
+loop_parameters_matrix = reshape(loop_parameters,[length(loop_peaks),length(loop_energies)]);
+
 
 
 %% user inputs 
@@ -31,7 +51,7 @@ sample_new_resonance_parameters = false ;
 % BARON RUNTIME OPTIONS
 maximum_total_time = 2*60; % 2*60*60; %
 absolute_tolerance = 0.01; % absolute tolerance should be lower if transforming to [0,1]
-print_out = 1;
+print_out = 0;
 
 initial_vec = [];
 % initial_vec = w;
@@ -50,7 +70,7 @@ if solver == 'pswarm'
     Options.MaxIter = Options.MaxObj ;
     Options.CPTolerance = 1e-7;
     Options.DegTolerance = 1e-5;
-    Options.IPrint = 1000;
+    Options.IPrint = 0;
     
     options_first_run = Options;
     options_iterations = Options;
@@ -60,27 +80,24 @@ elseif solver == 'baron'
     options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
 end
 
-partime = tic ;
+
 
 %% start loop
-total_time_matrix = zeros(length(loop_peaks), length(loop_energies));
-final_SE_matrix = zeros(length(loop_peaks), length(loop_energies));
-final_SE_reconstructed =zeros(length(loop_peaks), length(loop_energies));
-baron_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
-model_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
-iterations_matrix = zeros(length(loop_peaks), length(loop_energies));
-w_vecs = [];
+total_time_vector = zeros(length(loop_parameters),1);
+final_SE_vector = zeros(length(loop_parameters),1);
 
-for ipeak = 1:length(loop_peaks)
-for ienergy = 1:length(loop_energies)
+% final_SE_reconstructed =zeros(length(loop_peaks), length(loop_energies));
+% baron_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
+% model_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
+% iterations_matrix = zeros(length(loop_peaks), length(loop_energies));
+% w_vecs = [];
 
 
-NumPeaks = loop_peaks(ipeak); % for baron solver
 if sample_new_resonance_parameters
     number_of_cases = 1 ;
     levels_per_case = TrueNumPeaks ; 
 end
-Energies = linspace(10, 1000, loop_energies(ienergy));
+
 
 
 % nuclear properties
@@ -129,40 +146,44 @@ if use_sammy_data
     % Energies = synth_exp_dat(:,1)' ;
     % true_xs = synth_exp_dat(:,2)';
 
-else
+end
 
-    if sample_new_resonance_parameters
-        parameters_per_level = 3 ;
-        parameters_per_case = TrueNumPeaks * parameters_per_level;
-        starting_energy = min(Energies) ;
-        for icase = 1:number_of_cases
-            E_levels = sample_resonance_levels(starting_energy, TrueNumPeaks, D0);
-            [Gg, gn] = sample_widths(TrueNumPeaks, avg_Gg, avg_gn2, P) ;
-            Gn = 2.*P(E_levels).*gn.^2;
-        end
-        for ilevel = 1:TrueNumPeaks
-            stride = parameters_per_level*(ilevel-1);
-            sol_w(icase,1+stride:3+stride) = [E_levels(ilevel), Gg(ilevel), Gn(ilevel)];
-        end 
+if sample_new_resonance_parameters
+    disp('need to set up sample new parameters')
+    return
+
+    parameters_per_level = 3 ;
+    parameters_per_case = TrueNumPeaks * parameters_per_level;
+    starting_energy = min(Energies) ;
+    for icase = 1:number_of_cases
+        E_levels = sample_resonance_levels(starting_energy, TrueNumPeaks, D0);
+        [Gg, gn] = sample_widths(TrueNumPeaks, avg_Gg, avg_gn2, P) ;
+        Gn = 2.*P(E_levels).*gn.^2;
     end
+    for ilevel = 1:TrueNumPeaks
+        stride = parameters_per_level*(ilevel-1);
+        sol_w(icase,1+stride:3+stride) = [E_levels(ilevel), Gg(ilevel), Gn(ilevel)];
+    end 
+end
 
 %     for perfromances testing, the following sets of parameters/solution vectors were used for 5,3,1 resonance levels
 %     sol_w = [101.376060493010	0.478851274772800	0.461939296106014	250.126196580691	0.504946050979878	0.673558371317974	390.537463129541	0.495179161370906	3.09098004695145	542.411117575875	0.533150966626179	7.15994181215124	595.999564102533	0.509760263268351	1.48982868028870];
     sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
 %     sol_w = [373.446529425425	0.458411490362457	3.55575669868274];
 
-    true_xs_function = xs_SLBW_EGgGn(TrueNumPeaks,Energies);
-    true_xs = true_xs_function(sol_w); 
-    
-end
+looptime = tic ;
+for iparm = 1:length(loop_parameters)
 
+NumPeaks = loop_parameters(iparm).peaks; % for solver
+Energies = linspace(10, 1000, loop_parameters(iparm).energies);
+
+true_xs_function = xs_SLBW_EGgGn(TrueNumPeaks,Energies);
+true_xs = true_xs_function(sol_w); 
 
 if plotting
     figure(1); clf
     plot(Energies, true_xs, '.', 'DisplayName','True'); hold on
 end
-
-
 
 %% make a window to solve
 
@@ -251,40 +272,45 @@ if plotting
 end
 
 
-total_time_matrix(ipeak,ienergy) = total_time;
-final_SE_matrix(ipeak,ienergy) = SE;
-if solver == 'baron'
-    baron_stat{ipeak,ienergy} = barout2.BARON_Status;
-    model_stat{ipeak,ienergy} = barout2.Model_Status;
-end
-iterations_matrix = iterations ;
-if normalize_range
-    final_SE_reconstructed(ipeak,ienergy) = reconstruct_SE(xs_function, w, WC);
-end
+total_time_vector(iparm) = total_time;
+final_SE_vector(iparm) = SE;
+% if solver == 'baron'
+%     baron_stat{ipeak,ienergy} = barout2.BARON_Status;
+%     model_stat{ipeak,ienergy} = barout2.Model_Status;
+% end
+% iterations_matrix = iterations ;
+% if normalize_range
+%     final_SE_reconstructed(ipeak,ienergy) = reconstruct_SE(xs_function, w, WC);
+% end
 
-if print_results_to_csv
-    writematrix(total_time_matrix, 'total_time_matrix_3L_PSwarm.csv')
-    writematrix(final_SE_matrix, 'final_SE_matrix_3L_PSwarm.csv')
-    writematrix(iterations_matrix, 'iterations_3L.csv')
-    if solver == 'baron'
-        writecell(baron_stat, 'baron_stat_matrix_5L.csv')
-        writecell(model_stat, 'model_stat_matrix_5L.csv')
-    end
-    if normalize_range
-        writematrix(final_SE_reconstructed,'final_SE_reconstructed_3L.csv');
-    end
-end
+% if print_results_to_csv
+%     writematrix(total_time_vector, 'total_time_vec_3L_PSwarm.csv')
+%     writematrix(final_SE_vector, 'final_SE_vec_3L_PSwarm.csv')
+% %     writematrix(iterations_matrix, 'iterations_3L.csv')
+% %     if solver == 'baron'
+% %         writecell(baron_stat, 'baron_stat_matrix_5L.csv')
+% %         writecell(model_stat, 'model_stat_matrix_5L.csv')
+% %     end
+% %     if normalize_range
+% %         writematrix(final_SE_reconstructed,'final_SE_reconstructed_3L.csv');
+% %     end
+% end
 
 % w_vecs = [w_vecs, w];
 
 % end loops
 end
-end
 
+% total_time_matrix = reshape(total_time_vector,[length(loop_peaks),length(loop_energies)]) ;
+% final_SE_matrix = reshape(final_SE_vector,[length(loop_peaks),length(loop_energies)]) ;
+% 
+% writematrix(total_time_matrix, 'total_time_matrix_3L_PSwarm.csv')
+% writematrix(final_SE_matrix, 'final_SE_matrix_3L_PSwarm.csv')
 
-
-toc(partime)
-
+final_looptime = toc(looptime);
+% parfor final_looptime = 123
+% for final_looptime = 406
+%
 
 
 

@@ -6,69 +6,34 @@ Created on Fri Apr  1 10:36:03 2022
 @author: noahwalton
 """
 
-import sys
 
-
-# =============================================================================
-#
-# give directory in which the case folder exists, one level up from where each individual sample will be
-# this will be user specific 
-# templates and csv's must be in this directory!
-#
-# =============================================================================
-
-# local
-interface_directory = '/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/'
-
-# remote
-#interface_directory = '/home/nwalton1/my_sammy/interface/'
-
-# =============================================================================
-#       CASE SPECIFIC INPUTS
-# =============================================================================
-
-case_basename = 'slbw_testing_1L_noexp'
-number_of_samples = 2
-number_of_levels = 1
-
-
-inp_template = 'template_noexp.inp'
 
 
 # =============================================================================
-#       ACTIONS TO TAKE
+#       USER INPUT
 # =============================================================================
+
+case_basename = 'slbw_5L_allexp'
+number_of_cases = 100
+number_of_levels = 5
+
+par_template = 'template_5L.par'
+inp_template = 'template_allexp.inp'
+
+
 create_synthetic_data = True
 
 run_sammy_wo_bayes = True
 
+run_baron_on_synthetic_data = True
+
 run_bayes_with_baron_suggested_parameters = False
 
 
-
 # =============================================================================
-# template files
+# as long as I use qsub, I can submit this file with different cases simultaneously 
+# tested that I can use the same titled submit.sh file (i.e. fit_main.m running simultaneously for multiple cases)
 # =============================================================================
-if number_of_levels == 1:
-    par_template = 'template_1L.par'
-elif number_of_levels == 3:
-    par_template = 'template_3L.par'
-elif number_of_levels == 5:
-    par_template = 'template_5L.par'
-else:
-    print(); print('WARNING: number of levels entered does not have an existing template file'); print()
-    sys.exit()
-
-
-
-
-
-
-
-
-
-
-
 
 # =============================================================================
 # for debugging this code, call individual sub-methods instead of running all at oncc
@@ -79,12 +44,24 @@ si = sammy_interface.sammy_interface() # initialize sammy interface
 
 if create_synthetic_data:
     # create sammy scripts for synthetic data
-    [csd_summary_stats, csd_warnings] = si.create_synthetic_data(interface_directory, case_basename, number_of_samples, number_of_levels, run_sammy_wo_bayes, 'true_parameters.csv', par_template, inp_template)
+    [csd_summary_stats, csd_warnings] = si.create_synthetic_data(case_basename, number_of_cases, number_of_levels, run_sammy_wo_bayes, 'true_parameters.csv', par_template, inp_template)
     
+if run_baron_on_synthetic_data:
+    print("submit qsub_fit_main.sh to run matlab baron script ")
+# =============================================================================
+#      need to feed in casename, number of peaks, 
+# make fit_main_template.m -> write a file from this template in case_dir with case_basename, options, numpeaks, etc
+# create corresponding submit.sh file -> submit fit_main_case.m in case_dir and wait on it to complete before moving on to running bayes
+# add appropriate unit tests, checkpoints, and statistics and return them
+# could add option to run baron cases serially or each case in parallel
+# =============================================================================
+
 if run_bayes_with_baron_suggested_parameters:
-    [rb_summary_stats, rb_warnings] = si.run_bayes(interface_directory, case_basename, number_of_samples, number_of_levels, 'baron_parameters.csv', par_template, inp_template)
+    [rb_summary_stats, rb_warnings] = si.run_bayes(case_basename, number_of_cases, number_of_levels, 'baron_parameters.csv', par_template, inp_template)
     
-    
+# =============================================================================
+# could also add a conditional to run post-processing analysis
+# =============================================================================
     
     
     

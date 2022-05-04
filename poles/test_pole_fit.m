@@ -11,7 +11,7 @@ loop_energies=[200];
 %% user inputs 
 
 % SOLVER OPTIONS
-run_baron_bool = true ;
+run_baron_bool = false ;
 iterate_baron = false;
 normalize_range = false;
 constraints = false;

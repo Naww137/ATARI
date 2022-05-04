@@ -11,24 +11,25 @@ plot_random_windows = false;
 
 %% load in data
 cap_dat = load('U238cap.mat');
+% this data is already in form x=log(E) and y=sigma*log(E)
 
 % figure(1); clf
 % loglog(cap_dat.x,cap_dat.y); title('Total Reconstructed \sigma'); 
 
 % find resolve resonance range and less-dense energy grid
 RRR_index = find(cap_dat.x>3.5 & cap_dat.x<140);
-course_RRR_index = RRR_index(1:2:end);
+course_RRR_index = RRR_index(1:3:end);
 
 capE = cap_dat.x(course_RRR_index); capXS = cap_dat.y(course_RRR_index);
 
-figure(2); clf
-loglog(capE,capXS); title('Course Reconstructed \sigma in RRR'); 
+% figure(2); clf
+% loglog(capE,capXS); title('Course Reconstructed \sigma in RRR'); 
 
 
 %% break the data up into tractable windows of ~500 energy points
 
 
-ppw = 500;
+ppw = 300;
 FullWindows = floor(length(capE)/(ppw/2)) - 1;
 Ewindows = zeros(FullWindows-1, ppw); XSwindows = zeros(FullWindows-1, ppw);
 
@@ -44,27 +45,27 @@ LeftoverEnergyPoints = length(capE) - LastEnergyIndex_LastFullWindow;
 
 
 %% plot random windows for inspection
-% if plot_random_windows
-%     show_grid_spacing = false ;
-%     number_of_sample_cases = 1 ;
-% 
-%     for iW = randi(818,1,number_of_sample_cases)
-%         if show_grid_spacing
-%             figure(iW); clf
-%             plot(Ewindows(iW,:), XSwindows(iW,:));hold on
-%             ylabel('Cross Section')
-%         %     figure(iW+1);clf
-%             yyaxis right
-%             plot(Ewindows(iW,1:end-1),diff(Ewindows(iW,:)))
-%             ylabel('Spacing in energy grid')
-%             xlabel('eV')
-%         else
-%             figure(iW); clf
-%             loglog(Ewindows(iW,:), XSwindows(iW,:));hold on
-%             ylabel('Cross Section')
-%         end
-%     end
-% end
+if plot_random_windows
+    show_grid_spacing = false ;
+    number_of_sample_cases = 1 ;
+
+    for iW = randi(818,1,number_of_sample_cases)
+        if show_grid_spacing
+            figure(iW); clf
+            plot(Ewindows(iW,:), XSwindows(iW,:));hold on
+            ylabel('Cross Section')
+        %     figure(iW+1);clf
+            yyaxis right
+            plot(Ewindows(iW,1:end-1),diff(Ewindows(iW,:)))
+            ylabel('Spacing in energy grid')
+            xlabel('eV')
+        else
+            figure(iW); clf
+            loglog(Ewindows(iW,:), XSwindows(iW,:));hold on
+            ylabel('Cross Section')
+        end
+    end
+end
 
 %
 
@@ -72,7 +73,7 @@ LeftoverEnergyPoints = length(capE) - LastEnergyIndex_LastFullWindow;
 
 %% solve window by window
 plotting_baron_solve = true;
-NumPeaks = 2 ; % max per window
+NumPeaks = 1 ; % max per window
 
 for iW = 1:1 %FullWindows
 
@@ -80,12 +81,25 @@ WE = Ewindows(iW,:);
 WXS = XSwindows(iW,:);
 
 
-figure(1); clf
-loglog(WE,WXS); title('Full Window')
+% figure(1); clf
+% loglog(WE,WXS); title('Full Window')
 
-WXS = WXS(find(WE>4 & WE<4.7));
-WE = WE(find(WE>4 & WE<4.7));
+% narrow window down to an even smaller energy space
+WXS = WXS(find(WE>4 & WE<4.8));
+WE = WE(find(WE>4 & WE<4.8));
 
+
+% normalize window to [0,1]
+% WXS_norm = (WXS-min(WXS))./(max(WXS)-min(WXS));
+% WE_norm = (WE-min(WE))./max(WE);
+% figure(2); clf
+% loglog(WE_norm,WXS_norm)
+% 
+% WXS = WXS_norm;
+% WE = WE_norm;
+
+% figure(1); clf
+% loglog(WE,WXS_norm);
 
 % create cross section function
 xs_func = @(w) 0; z=WE;
@@ -96,11 +110,11 @@ end
 
 
 poly_index = 4*NumPeaks+NumPeaks ;
-polynomial_terms = 2;
+polynomial_terms = 3;
 % background_polynomial = @(w) w(poly_index+1).*z + w(poly_index+2).*z.^2 ;
 
 % could use coef of legendre polynomial to simplify this polynomial term [-1,1]
-xs_func = @(w) xs_func(w) + w(poly_index+1).*z + w(poly_index+2).*z.^2 ;%+ w(poly_index+3).*z.^3 + w(poly_index+4).*z.^4 + w(poly_index+5).*z.^5 + w(poly_index+6).*z.^6;
+xs_func = @(w) xs_func(w) + w(poly_index+1).*z + w(poly_index+2).*z.^2 + w(poly_index+3).*z.^3 ;%+ w(poly_index+4).*z.^4 + w(poly_index+5).*z.^5 + w(poly_index+6).*z.^6;
 
 
 %% plot xs_func with guesses for solution to validate xs_func
@@ -169,8 +183,8 @@ ub=[repmat(parm_maxvec,1,NumPeaks), ones(1,NumPeaks)];
 % lb=[repmat(parm_minvec,1,NumPeaks), 1, ones(1,NumPeaks)];
 % ub=[repmat(parm_maxvec,1,NumPeaks), 1, ones(1,NumPeaks)];
 
-Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
-% Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'MaxTime',5*60);
+% Options=baronset('threads',4,'PrLevel',1,'CutOff',1,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',2*60);
 xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks), repmat(["B"],1,NumPeaks)]))';
 % xtype=squeeze(char([repmat(["C","C","C","C"],1,NumPeaks), "C", repmat(["B"],1,NumPeaks)]))';
 

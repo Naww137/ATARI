@@ -46,7 +46,7 @@ if run_baron_bool
         [w,fval,~,barout2]=baron(fun_robust,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,initial_vec, Options);
     else
         if isempty(initial_vec)
-            initial_vec = NaN(1,3*NumPeaks+NumPeaks);
+            initial_vec = NaN(1,3*NumPeaks);
         end
         [w,fval,~,barout2] = baron(fun_robust,[],[],[],[],[],[],[],[],[],initial_vec, Options);
     end

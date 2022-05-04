@@ -2,43 +2,65 @@
 
 % loop_peaks = [1 2 3 4 5 6 7 8];
 % loop_peaks = [3 4 5 6 7 8];
-loop_peaks = [1];
+% loop_peaks = [5 6 7 8];
+loop_peaks = [3 4];
 
-loop_energies=[500];
+loop_energies=[100 200];
 % loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
 
 
 %% user inputs 
 
 % SOLVER OPTIONS
-run_baron_bool = true ;
-iterate_baron = false;
+run_solver = true ;
+iterate_solver = true;
 normalize_range = false;
-constraints = false;
+constraints = true;
+solver = 'pswarm';
 
 % OUTPUT OPTIONS
-plotting = true ;
-print_results_to_csv = false ;
+plotting = false ;
+print_results_to_csv = true ;
+running_on_cluster = false ;
 
 % EXP DATA OPTIONS
-TrueNumPeaks = 1; % for true xs calculation
+TrueNumPeaks = 3; % for true xs calculation
 use_sammy_data = false ;
 sample_new_resonance_parameters = false ;
 
 % BARON RUNTIME OPTIONS
-maximum_total_time = 2*60*60; % 5*60; %
-absolute_tolerance = 0.0001; % absolute tolerance should be lower if transforming to [0,1]
-print_out = 0;
+maximum_total_time = 2*60; % 2*60*60; %
+absolute_tolerance = 0.01; % absolute tolerance should be lower if transforming to [0,1]
+print_out = 1;
 
 initial_vec = [];
 % initial_vec = w;
-% Options = baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
-options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',5*60);
-options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
 
 
 
+if running_on_cluster
+    if solver == 'pswarm'
+        addpath('/home/nwalton1/PSwarm');
+    end
+end
 
+if solver == 'pswarm'
+    Options = PSwarm('defaults') ;
+    Options.MaxObj = 1e6;
+    Options.MaxIter = Options.MaxObj ;
+    Options.CPTolerance = 1e-7;
+    Options.DegTolerance = 1e-5;
+    Options.IPrint = 1000;
+    
+    options_first_run = Options;
+    options_iterations = Options;
+elseif solver == 'baron'
+%     Options = baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
+    options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',5*60);
+    options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
+end
+
+partime = tic ;
 
 %% start loop
 total_time_matrix = zeros(length(loop_peaks), length(loop_energies));
@@ -46,6 +68,8 @@ final_SE_matrix = zeros(length(loop_peaks), length(loop_energies));
 final_SE_reconstructed =zeros(length(loop_peaks), length(loop_energies));
 baron_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
 model_stat = num2cell(zeros(length(loop_peaks), length(loop_energies)));
+iterations_matrix = zeros(length(loop_peaks), length(loop_energies));
+w_vecs = [];
 
 for ipeak = 1:length(loop_peaks)
 for ienergy = 1:length(loop_energies)
@@ -79,7 +103,7 @@ P = @(E) rho(E);
 S = 0; % for l=0
 % average values for this single spin group
 S0 = 2.3e-4;
-D0 = 300; %722; %s-wave; 722+-47 eV --- average level spacing <D>
+D0 = 200; %722; %s-wave; 722+-47 eV --- average level spacing <D>
 avg_gn2 = ((4*D0.*S0)/(2*J+1))*((1/Constant)*((A+1)/A))/Ac; % Jordan derived this equation
 avg_Gg = 0.5; %500 eV average capture width (known for an isotope)
 
@@ -122,7 +146,8 @@ else
         end 
     end
 
-%     for perfromances testing, the following two sets of parameters were used
+%     for perfromances testing, the following sets of parameters/solution vectors were used for 5,3,1 resonance levels
+%     sol_w = [101.376060493010	0.478851274772800	0.461939296106014	250.126196580691	0.504946050979878	0.673558371317974	390.537463129541	0.495179161370906	3.09098004695145	542.411117575875	0.533150966626179	7.15994181215124	595.999564102533	0.509760263268351	1.48982868028870];
     sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
 %     sol_w = [373.446529425425	0.458411490362457	3.55575669868274];
 
@@ -164,41 +189,58 @@ end
 
 %% solve problem
 
-if run_baron_bool
-    tic 
+if run_solver
+    tstart = tic ;
     
     if normalize_range
-        WE_to_baron = WE; %WE_norm;
-        WC_to_baron = WC_norm;
+        WE_to_solver = WE; %WE_norm;
+        WC_to_solver = WC_norm;
     else
-        WE_to_baron = WE;
-        WC_to_baron = WC;
+        WE_to_solver = WE;
+        WC_to_solver = WC;
     end
 
 %   Need to update peak spacing to be more robust if normalizing E range !!!
     xs_function = xs_SLBW_EGgGn(NumPeaks,WE);
-    xs_function_norm = xs_SLBW_EGgGn_norm(NumPeaks,WE,normalize_range, minWC, maxWC, minWE, maxWE);
+%     xs_function_norm = xs_SLBW_EGgGn_norm(NumPeaks,WE,normalize_range, minWC, maxWC, minWE, maxWE);
     if normalize_range
-        xs_func_to_baron = xs_function_norm ;
+        xs_func_to_solver = xs_function_norm ;
     else
-        xs_func_to_baron = xs_function ;
+        xs_func_to_solver = xs_function ;
     end
 
-    [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, constraints, options_first_run);
+
+    if solver == 'pswarm'
+        [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, initial_vec, constraints, options_first_run);
+    elseif solver == 'baron'
+        [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, constraints, options_first_run);
+    end
+
     % cannot reconstruct SE before entering the following tolerance loop
     % because baron will just keep terminating and outputting the same solution
-    if iterate_baron
+    iterations = 0;
+    if iterate_solver
         while SE > absolute_tolerance
-            [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, constraints, options_iterations);
-            if toc > maximum_total_time
+
+            if solver == 'pswarm'
+                [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, w, constraints, options_iterations);
+            elseif solver == 'baron'
+                [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, constraints, options_iterations);
+            end
+
+                % for PSwarm, if SE is the same for multiple iterations,
+                % restart with no intial guess might help
+            iterations = iterations+1;
+            if toc(tstart) > maximum_total_time
                 break
             end
+           
         end
     end
-    total_time = toc ;
+    total_time = toc(tstart) ;
 
     if plotting
-        plot(Energies, xs_function(w),'DisplayName','Baron')
+        plot(Energies, xs_function(w),'DisplayName','Pred')
     end
 
 end
@@ -208,27 +250,41 @@ if plotting
     legend()
 end
 
+
 total_time_matrix(ipeak,ienergy) = total_time;
 final_SE_matrix(ipeak,ienergy) = SE;
-baron_stat{ipeak,ienergy} = barout2.BARON_Status;
-model_stat{ipeak,ienergy} = barout2.Model_Status;
+if solver == 'baron'
+    baron_stat{ipeak,ienergy} = barout2.BARON_Status;
+    model_stat{ipeak,ienergy} = barout2.Model_Status;
+end
+iterations_matrix = iterations ;
 if normalize_range
     final_SE_reconstructed(ipeak,ienergy) = reconstruct_SE(xs_function, w, WC);
 end
+
+if print_results_to_csv
+    writematrix(total_time_matrix, 'total_time_matrix_3L_PSwarm.csv')
+    writematrix(final_SE_matrix, 'final_SE_matrix_3L_PSwarm.csv')
+    writematrix(iterations_matrix, 'iterations_3L.csv')
+    if solver == 'baron'
+        writecell(baron_stat, 'baron_stat_matrix_5L.csv')
+        writecell(model_stat, 'model_stat_matrix_5L.csv')
+    end
+    if normalize_range
+        writematrix(final_SE_reconstructed,'final_SE_reconstructed_3L.csv');
+    end
+end
+
+% w_vecs = [w_vecs, w];
 
 % end loops
 end
 end
 
-if print_results_to_csv
-    writematrix(total_time_matrix, 'total_time_matrix_3L_norm.csv')
-    writematrix(final_SE_matrix, 'final_SE_matrix_3L_norm.csv')
-    writecell(baron_stat, 'baron_stat_matrix_3L_norm.csv')
-    writecell(model_stat, 'model_stat_matrix_3L_norm.csv')
-    if normalize_range
-        writematrix(final_SE_reconstructed,'final_SE_reconstructed_3L.csv');
-    end
-end
+
+
+toc(partime)
+
 
 
 

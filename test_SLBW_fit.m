@@ -39,12 +39,12 @@ initial_vec = [];
 
 
 if running_on_cluster
-    if solver == 'pswarm'
+    if strcmp(solver,'pswarm')
         addpath('/home/nwalton1/PSwarm');
     end
 end
 
-if solver == 'pswarm'
+if strcmp(solver,'pswarm')
     Options = PSwarm('defaults') ;
     Options.MaxObj = 1e6;
     Options.MaxIter = Options.MaxObj ;
@@ -54,7 +54,7 @@ if solver == 'pswarm'
     
     options_first_run = Options;
     options_iterations = Options;
-elseif solver == 'baron'
+elseif strcmp(solver,'baron')
 %     Options = baronset('threads',8,'PrLevel',1,'CutOff',5,'DeltaTerm',1,'EpsA',0.1,'MaxTime',2*60);
     options_first_run = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',5*60);
     options_iterations = baronset('threads',8,'PrLevel',print_out,'EpsA',absolute_tolerance,'MaxTime',10*60);
@@ -210,9 +210,9 @@ if run_solver
     end
 
 
-    if solver == 'pswarm'
+    if strcmp(solver,'pswarm')
         [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, initial_vec, constraints, options_first_run);
-    elseif solver == 'baron'
+    elseif strcmp(solver,'baron')
         [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, constraints, options_first_run);
     end
 
@@ -222,9 +222,9 @@ if run_solver
     if iterate_solver
         while SE > absolute_tolerance
 
-            if solver == 'pswarm'
+            if strcmp(solver,'pswarm')
                 [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, w, constraints, options_iterations);
-            elseif solver == 'baron'
+            elseif strcmp(solver,'baron')
                 [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, constraints, options_iterations);
             end
 
@@ -253,7 +253,7 @@ end
 
 total_time_matrix(ipeak,ienergy) = total_time;
 final_SE_matrix(ipeak,ienergy) = SE;
-if solver == 'baron'
+if strcmp(solver,'baron')
     baron_stat{ipeak,ienergy} = barout2.BARON_Status;
     model_stat{ipeak,ienergy} = barout2.Model_Status;
 end
@@ -266,7 +266,7 @@ if print_results_to_csv
     writematrix(total_time_matrix, 'total_time_matrix_3L_PSwarm.csv')
     writematrix(final_SE_matrix, 'final_SE_matrix_3L_PSwarm.csv')
     writematrix(iterations_matrix, 'iterations_3L.csv')
-    if solver == 'baron'
+    if strcmp(solver,'baron')
         writecell(baron_stat, 'baron_stat_matrix_5L.csv')
         writecell(model_stat, 'model_stat_matrix_5L.csv')
     end

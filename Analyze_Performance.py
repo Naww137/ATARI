@@ -12,7 +12,7 @@ import pandas as pd
 import os
 
 data_directory = "/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/sammy/"
-case_directory = os.path.join(data_directory,'slbw_testing_1L_ss_noedge') # case 51 didn't run, 
+case_directory = os.path.join(data_directory,'slbw_3L_noexp') # case 51 didn't run, 
 has_bayes_solutions = False
 
 true_parameters = pd.read_csv(case_directory+'/true_parameters.csv') #pd.read_csv(os.path.realpath("True_Parameters_(E,Gg,Gn).csv"))

@@ -1,12 +1,12 @@
 %% loop over number of resonances in 
 
 % loop_peaks = [1 2 3 4 5 6 7 8];
-% loop_peaks = [3 4 5 6 7 8];
+loop_peaks = [3 4 5 6 7 8];
 % loop_peaks = [5 6 7 8];
-loop_peaks = [3 4];
+% loop_peaks = [3];
 
-loop_energies=[100 200];
-% loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
+% loop_energies=[200];
+loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
 
 
 %% user inputs 
@@ -19,14 +19,15 @@ constraints = true;
 solver = 'pswarm';
 
 % OUTPUT OPTIONS
-plotting = false ;
-print_results_to_csv = true ;
+plotting = true ;
+print_results_to_csv = false ;
 running_on_cluster = false ;
 
 % EXP DATA OPTIONS
 TrueNumPeaks = 3; % for true xs calculation
 use_sammy_data = false ;
 sample_new_resonance_parameters = false ;
+add_noise = true ; a = 1; b = 50;
 
 % BARON RUNTIME OPTIONS
 maximum_total_time = 2*60; % 2*60*60; %
@@ -153,7 +154,11 @@ else
 
     true_xs_function = xs_SLBW_EGgGn(TrueNumPeaks,Energies);
     true_xs = true_xs_function(sol_w); 
-    
+
+    if add_noise
+        [std,true_xs] = Noise(true_xs,a,b) ;
+    end
+
 end
 
 

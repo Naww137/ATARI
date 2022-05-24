@@ -1,22 +1,22 @@
 %% loop over number of resonances in 
 
 % loop_peaks = [1 2 3 4 5 6 7 8];
-loop_peaks = [3 4 5 6 7 8];
+% loop_peaks = [3 4 5 6 7 8];
 % loop_peaks = [5 6 7 8];
-% loop_peaks = [3];
+loop_peaks = [3];
 
-% loop_energies=[200];
-loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
+loop_energies=[600];
+% loop_energies=[100 200 300 400 500 600 700 800 900 1200 1500];
 
 
 %% user inputs 
 
 % SOLVER OPTIONS
-run_solver = true ;
+run_solver = false ;
 iterate_solver = true;
 normalize_range = false;
 constraints = true;
-solver = 'pswarm';
+solver = 'baron';
 
 % OUTPUT OPTIONS
 plotting = true ;
@@ -26,8 +26,8 @@ running_on_cluster = false ;
 % EXP DATA OPTIONS
 TrueNumPeaks = 3; % for true xs calculation
 use_sammy_data = false ;
-sample_new_resonance_parameters = false ;
-add_noise = true ; a = 1; b = 50;
+sample_new_resonance_parameters = true ;
+add_noise = false ; a = 1; b = 50;
 
 % BARON RUNTIME OPTIONS
 maximum_total_time = 2*60; % 2*60*60; %
@@ -47,11 +47,12 @@ end
 
 if strcmp(solver,'pswarm')
     Options = PSwarm('defaults') ;
-    Options.MaxObj = 1e6;
+    Options.MaxObj = 1e3;
     Options.MaxIter = Options.MaxObj ;
     Options.CPTolerance = 1e-7;
     Options.DegTolerance = 1e-5;
     Options.IPrint = 1000;
+    Options.SearchType = 1 ;
     
     options_first_run = Options;
     options_iterations = Options;
@@ -81,7 +82,9 @@ if sample_new_resonance_parameters
     number_of_cases = 1 ;
     levels_per_case = TrueNumPeaks ; 
 end
-Energies = linspace(10, 1000, loop_energies(ienergy));
+
+starting_energy = 100 ;
+% Energies = linspace(10, 1000, loop_energies(ienergy));
 
 
 % nuclear properties
@@ -104,7 +107,7 @@ P = @(E) rho(E);
 S = 0; % for l=0
 % average values for this single spin group
 S0 = 2.3e-4;
-D0 = 200; %722; %s-wave; 722+-47 eV --- average level spacing <D>
+D0 = 100; %722; %s-wave; 722+-47 eV --- average level spacing <D>
 avg_gn2 = ((4*D0.*S0)/(2*J+1))*((1/Constant)*((A+1)/A))/Ac; % Jordan derived this equation
 avg_Gg = 0.5; %500 eV average capture width (known for an isotope)
 
@@ -135,7 +138,6 @@ else
     if sample_new_resonance_parameters
         parameters_per_level = 3 ;
         parameters_per_case = TrueNumPeaks * parameters_per_level;
-        starting_energy = min(Energies) ;
         for icase = 1:number_of_cases
             E_levels = sample_resonance_levels(starting_energy, TrueNumPeaks, D0);
             [Gg, gn] = sample_widths(TrueNumPeaks, avg_Gg, avg_gn2, P) ;
@@ -147,16 +149,27 @@ else
         end 
     end
 
-%     for perfromances testing, the following sets of parameters/solution vectors were used for 5,3,1 resonance levels
+% for perfromances testing, the following sets of parameters/solution vectors were used for 5,3,1 resonance levels
 %     sol_w = [101.376060493010	0.478851274772800	0.461939296106014	250.126196580691	0.504946050979878	0.673558371317974	390.537463129541	0.495179161370906	3.09098004695145	542.411117575875	0.533150966626179	7.15994181215124	595.999564102533	0.509760263268351	1.48982868028870];
-    sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
+%     sol_w = [417.501971239733	0.509754943249714	0.946324000441694	499.704338697496	0.502030277600131	5.48791199950379	815.972252536289	0.509617216760288	7.43229242626594];
 %     sol_w = [373.446529425425	0.458411490362457	3.55575669868274];
+
+    Energies = linspace(starting_energy, max(E_levels)+D0/2, loop_energies(ienergy));
 
     true_xs_function = xs_SLBW_EGgGn(TrueNumPeaks,Energies);
     true_xs = true_xs_function(sol_w); 
 
     if add_noise
-        [std,true_xs] = Noise(true_xs,a,b) ;
+        [std,exp_dat] = Noise(true_xs,a,b) ;
+        absolute_tolerance = sum((true_xs - exp_dat).^2);
+
+        if strcmp(solver,'baron')
+            options_first_run.epsa = absolute_tolerance ;
+            options_iterations.epsa = absolute_tolerance ;
+        end
+
+    else
+        exp_dat = true_xs ;
     end
 
 end
@@ -164,14 +177,15 @@ end
 
 if plotting
     figure(1); clf
-    plot(Energies, true_xs, '.', 'DisplayName','True'); hold on
+    plot(Energies, exp_dat, '.', 'DisplayName','True'); hold on
 end
 
 
 
 %% make a window to solve
 
-WC = true_xs; minWC=min(WC); maxWC=max(WC);
+
+WC = exp_dat; minWC=min(WC); maxWC=max(WC);
 WE = Energies; minWE=min(WE); maxWE=max(WE);
 
 if normalize_range
@@ -218,7 +232,7 @@ if run_solver
     if strcmp(solver,'pswarm')
         [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, initial_vec, constraints, options_first_run);
     elseif strcmp(solver,'baron')
-        [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, initial_vec, constraints, options_first_run);
+        [w, SE, barout2] = run_baron(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, initial_vec, constraints, options_first_run);
     end
 
     % cannot reconstruct SE before entering the following tolerance loop
@@ -230,7 +244,7 @@ if run_solver
             if strcmp(solver,'pswarm')
                 [w, SE, barout2] = run_PSwarm(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, w, constraints, options_iterations);
             elseif strcmp(solver,'baron')
-                [w, SE, barout2] = run_baron(xs_func_to_baron, NumPeaks, WC_to_baron, WE_to_baron, run_baron_bool, w, constraints, options_iterations);
+                [w, SE, barout2] = run_baron(xs_func_to_solver, NumPeaks, WC_to_solver, WE_to_solver, run_solver, w, constraints, options_iterations);
             end
 
                 % for PSwarm, if SE is the same for multiple iterations,

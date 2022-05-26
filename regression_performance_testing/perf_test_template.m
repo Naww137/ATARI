@@ -20,7 +20,7 @@ add_noise = false ; a = 1; b = 50;
 
 % RUNTIME OPTIONS
 maximum_total_time = 10*60; % 2*60*60; %
-absolute_tolerance = 0.001; % absolute tolerance should be lower if transforming to [0,1]
+absolute_tolerance = 0.01; % absolute tolerance should be lower if transforming to [0,1]
 print_out = 0;
 
 initial_vec = [];
@@ -41,7 +41,7 @@ end
 
 if strcmp(solver,'pswarm')
     Options = PSwarm('defaults') ;
-    Options.MaxObj = 1e6;
+    Options.MaxObj = 1e7;
     Options.MaxIter = Options.MaxObj ;
     Options.CPTolerance = 1e-7;
     Options.DegTolerance = 1e-5;
@@ -243,13 +243,13 @@ end
 
 
 if SE < absolute_tolerance
-    convergence = 'converged' ;
+    convergence = 1; %'converged' ;
 else
-    convergence = 'not converged';
+    convergence = 0 ; %'not converged';
 end
 
 fileID = fopen('%%%output_filename%%%', 'a') ;
-fprintf(fileID,'time (s) : %1$.5E\nSE : %2$.5E\niterations : %3$i\n%4$s', total_time, SE, iterations, convergence) ;
+fprintf(fileID,'time (s) : %1$.5E\nSE : %2$.5E\niterations : %3$i\nconvergence : %4$i', total_time, SE, iterations, convergence) ;
 
 if strcmp(solver,'baron')
     fprintf(fileID,'%1$s\n%2$s', barout2.BARON_Status, barout2.Model_Status);

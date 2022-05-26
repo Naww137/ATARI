@@ -1,16 +1,16 @@
 %% user inputs 
 
 % SOLVER OPTIONS
-run_solver = false ;
+run_solver = true ;
 iterate_solver = true;
 normalize_range = false;
 constraints = true;
-solver = 'baron';
+solver = 'pswarm';
 
 % OUTPUT OPTIONS
 plotting = true ;
-print_results_to_csv = false ;
-running_on_cluster = false ;
+print_results_to_csv = true ;
+running_on_cluster = true ;
 
 % EXP DATA OPTIONS
 TrueNumPeaks = %%%TrueNumPeaks%%% ; % for true xs calculation
@@ -18,10 +18,10 @@ use_sammy_data = false ;
 sample_new_resonance_parameters = true ;
 add_noise = false ; a = 1; b = 50;
 
-% BARON RUNTIME OPTIONS
-maximum_total_time = 2*60; % 2*60*60; %
-absolute_tolerance = 0.01; % absolute tolerance should be lower if transforming to [0,1]
-print_out = 1;
+% RUNTIME OPTIONS
+maximum_total_time = 10*60; % 2*60*60; %
+absolute_tolerance = 0.001; % absolute tolerance should be lower if transforming to [0,1]
+print_out = 0;
 
 initial_vec = [];
 % initial_vec = w;
@@ -31,16 +31,21 @@ initial_vec = [];
 if running_on_cluster
     if strcmp(solver,'pswarm')
         addpath('/home/nwalton1/PSwarm');
+        addpath('%%%main_directory%%%')
+    end
+else
+    if strcmp(solver,'pswarm')
+        addpath('/Users/noahwalton/Documents/GitHub/ATARI')
     end
 end
 
 if strcmp(solver,'pswarm')
     Options = PSwarm('defaults') ;
-    Options.MaxObj = 1e3;
+    Options.MaxObj = 1e6;
     Options.MaxIter = Options.MaxObj ;
     Options.CPTolerance = 1e-7;
     Options.DegTolerance = 1e-5;
-    Options.IPrint = 1000;
+    Options.IPrint = -1;
     Options.SearchType = 1 ;
     
     options_first_run = Options;
@@ -136,7 +141,11 @@ end
 
 
 if plotting
-    figure(1); clf
+    if running_on_cluster
+        f = figure('visible','off');
+    else
+        figure(1); clf
+    end
     plot(Energies, exp_dat, '.', 'DisplayName','True'); hold on
 end
 
@@ -227,17 +236,26 @@ end
 if plotting
     xlabel('Energy'); ylabel('\sigma')
     legend()
+    if running_on_cluster
+        saveas(f, '﻿%%%figure_filename%%%');
+    end
+end
+
+
+if SE < absolute_tolerance
+    convergence = 'converged' ;
+else
+    convergence = 'not converged';
 end
 
 fileID = fopen('%%%output_filename%%%', 'a') ;
-fprintf(fileID,'\n%1$.5E\n%2$.5E\n%3$i', total_time, SE, iterations)
+fprintf(fileID,'time (s) : %1$.5E\nSE : %2$.5E\niterations : %3$i\n%4$s', total_time, SE, iterations, convergence) ;
 
 if strcmp(solver,'baron')
     fprintf(fileID,'%1$s\n%2$s', barout2.BARON_Status, barout2.Model_Status);
 end
 
 
-toc(partime)
 
 
 

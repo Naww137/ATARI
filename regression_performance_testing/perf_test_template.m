@@ -29,9 +29,9 @@ initial_vec = [];
 
 
 if running_on_cluster
+    addpath('%%%main_directory%%%')
     if strcmp(solver,'pswarm')
         addpath('/home/nwalton1/PSwarm');
-        addpath('%%%main_directory%%%')
     end
 else
     if strcmp(solver,'pswarm')

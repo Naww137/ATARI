@@ -15,13 +15,17 @@
 
 %%
 re_sample_resparm = false;
-run_baron_bool = true;
+run_baron_bool = false;
+run_pswarm = true ;
 plot_local = true;
 plot_cluster = false;
-poly_term = false;
+poly_term = true;
 
-NumPeaks = 1;
+NumPeaks = 2;
 
+% initial_vec = sol_parm;
+initial_vec = w ;
+% initial_vec = [];
 
 
 
@@ -154,6 +158,73 @@ x0 = NaN(1,4*NumPeaks+polynomial_terms); %NaN(1,4*peaks+peaks);
 
 % [w,~,~,~] = baron(f_obj,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,x0, Options);
 [w,~,~,~] = baron(f_obj,[],[],[],[],[],[],[],[],[],x0, Options);
+
+
+
+if plot_cluster
+    myfig = figure('Visible', 'off'); hold on
+    set(gca, 'YScale', 'log')
+    set(gca, 'XScale', 'log')
+    loglog(WE, true_xs,'.','DisplayName','true'); hold on
+    loglog(WE,xs_func(w), 'DisplayName','baron sol')
+    legend()
+    saveas(myfig,'figure.png');
+%         set(myfig,'Visible', 'off');
+end
+if plot_local
+    figure(2);clf
+    loglog(WE, true_xs,'.','DisplayName','true'); hold on
+    loglog(WE,xs_func(w), 'DisplayName','baron sol')
+end
+
+end
+
+%%
+if run_pswarm
+
+    fobj.ObjFunction = @(w) sum((xs_func(w)-true_xs).^2);
+
+    MinVec = [-1 -2 3.9 0];
+    MaxVec = [ 0  0 4.8 1];
+
+        RM_PerPeak = 4 ;
+        TotalRM_PerWindow = NumPeaks*RM_PerPeak;
+        TotalParm_PerWindow=NumPeaks*(RM_PerPeak);
+        
+        minimum = []; maximum = [];
+        for jj=1:NumPeaks
+            minimum = [minimum; MinVec'];
+            maximum = [maximum; MaxVec'];
+        end
+        if poly_term
+            minimum = [minimum; -1000; -1000; -1000];
+            maximum = [maximum; 1000; 1000; 1000];
+            fobj.Variables = TotalParm_PerWindow + 3 ;
+        else
+            fobj.Variables = TotalParm_PerWindow ;
+        end
+        
+
+        fobj.LB = minimum;
+        fobj.UB = maximum;
+        
+        InitialPopulation = [];
+        if isempty(initial_vec)
+        else
+            InitialPopulation(1).x = initial_vec;
+            % InitialPopulation(2).x = [2,3]; second guess
+        end
+
+        % could add other constraints
+        Options = PSwarm('defaults') ;
+        Options.MaxObj = 1e7;
+        Options.MaxIter = Options.MaxObj ;
+        Options.CPTolerance = 1e-7;
+        Options.DegTolerance = 1e-5;
+        Options.IPrint = 1000;
+        Options.SearchType = 1 ;
+
+        [w, fval, RunData] = PSwarm(fobj,InitialPopulation,Options);
 
 
 

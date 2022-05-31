@@ -178,9 +178,9 @@ if plot_cluster
     plot(Energies, true_xs,'.','DisplayName','true')
 end
 
-figure(1)
-[std,true_xs]=Noise(true_xs,1,40);
-plot(Energies, true_xs, '.', 'DisplayName','True')
+% figure(1)
+% [std,true_xs]=Noise(true_xs,1,40);
+% plot(Energies, true_xs, '.', 'DisplayName','True')
 
 %% make a window to solve
 

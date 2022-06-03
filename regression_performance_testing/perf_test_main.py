@@ -69,8 +69,8 @@ if create_parmdir_and_smplfiles:
 
 
     if os.path.isdir(case_directory):
-        os.remove(case_directory)
-        os.mkdir(case_basename)
+        print('case directory already exists, please delete or update code')
+        os.sys.exit()
     else:
         os.mkdir(case_basename)
     

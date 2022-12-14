@@ -1,7 +1,7 @@
 %% nuclear properties
 A = 62.929599; %Cu-63, number from cu63 input txt file
 Constant = 0.002197; %sqrt(2Mn)/hbar; units of (10^(-12) cm sqrt(eV)^-1)
-Ac = 0.67; % scattering radius 6.7 fermi expressed as 10^-12 cm
+Ac = 0.67; % scattering radius 6.7 femtometer expressed as 10^-14 cm instead of 10^-15
 I = 1.5; % target angular Momentum
 ii = 0.5; % incident angular momentum
 l = 0;   % l=0 or s-wave spin group

@@ -1,7 +1,5 @@
 % clf
 
-
-
 case_basename = 'slbw_2L_allexp';%"slbw_testing_1L_noexp";
 
 % addpath("xs_functions/");

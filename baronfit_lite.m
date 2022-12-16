@@ -145,8 +145,10 @@ w0 = []; % optional inital guess
 
 figure(1); clf
 plot(Energies,WC, '.', 'DisplayName', 'Synth Exp Data'); hold on
-plot(Energies, xs_func(w1), 'DisplayName','Baron Sol1');
-plot(Energies, xs_func(sol_w), 'DisplayName','Sol Vec');
+% plot(Energies, xs_func(w1), 'DisplayName','Baron Sol1');
+% plot(Energies, xs_func(sol_w), 'DisplayName','Sol Vec');
+plot(Energies, trans_func(w1), 'DisplayName','Baron Sol1');
+plot(Energies, trans_func(sol_w), 'DisplayName','Sol Vec');
 legend()
 
 fprintf('SE solution: %f\n',fun_robust1(sol_w))

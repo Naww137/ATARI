@@ -70,9 +70,10 @@ trans_func = @(w) exp(-n*xs_func(w));
 true = trans_func(sol_w); 
 % true = xs_func(sol_w);
 
-% add noise and plot synthetic data
+% compare to a sammy calculation
 % sammy = readmatrix('/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/ATARI_workspace/sammy/SAMMY.LST', 'FileType','text');
 
+% add noise and plot synthetic data
 % if fitting transmission, noise parameters must be decreased
 % a=15;
 % b=100;
@@ -158,10 +159,6 @@ fprintf('SE Baron: %f\n', fval)
 % function to add noise to synthetic true cross section
 % ========
 function [std,New_CrossSection]=Noise(CrossSection,a,b)
-%Noise model to modify the cross section values that we are given from
-%SAMMY, and report the std on those new cross sections values. These
-%"represent" the exp cross sections that would be seen.
-
 Trans_sigma=a*CrossSection+b;
 NoisyTrans_sigma=normrnd(Trans_sigma,sqrt(Trans_sigma));
 New_CrossSection=(NoisyTrans_sigma-b)/a; %

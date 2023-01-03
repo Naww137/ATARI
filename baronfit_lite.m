@@ -2,7 +2,7 @@
 
 A=180.948434; %Cu-63, number from cu63 input txt file
 Constant=0.00219680781008; %sqrt(2Mn)/hbar; units of (10^(-12) cm sqrt(eV)^-1)
-Ac=0.7860000; % scattering radius 6.7 fermi expressed as 10^-12 cm
+Ac=0.81271; % scattering radius 6.7 fermi expressed as 10^-12 cm
 I=3.5; % target angular Momentum
 ii=0.5; % incident angular momentum
 l=0;   % l=0 or s-wave spin group
@@ -23,7 +23,7 @@ P=@(E) rho(E);          % penatrability factor
 
 % These are coefficients for equation at bottom of page 32 in SAMMY manual 
 % (Rich Moore approximation for single level)
-Gc = [4.811, 19.362] ;
+Gc = [0.4811, 0.5362] ;
 Gn = [.113, .847];
 Elevels = [1.94707086e+03, 2.054739864e+03]; %linspace(3000,4000,1) ;
 gn_square = Gn./2./P([Elevels(1), Elevels(2)]) ;
@@ -31,6 +31,7 @@ gn_square = Gn./2./P([Elevels(1), Elevels(2)]) ;
 % Baron formatted vector of solution parameters
 % Last three values are binary switches for whether or not resonance exists
 sol_w = [Gc(1) gn_square(1) Elevels(1) Gc(2) gn_square(2) Elevels(2) 0 0 0 1 1 0] ;
+% sol_w = [Gc(1) gn_square(1) Elevels(1) 0 0 0 0 0 0 1 0 0] ;
 
 % DEFINE ENERGY GRID
 Energies = linspace(1900, 2100, 200);
@@ -38,6 +39,7 @@ WE = Energies;
 
 % number of peaks baron will solve for
 NumPeaks = 3;
+
 
 % create cross section function(s)
 
@@ -47,12 +49,31 @@ phi = rho(WE);
 kE = k(WE) ;
 xs_func = @(w) 0;
 for jj=1:NumPeaks % here index 1 is Gc, 2 is gn, 3 is Elevel
-
-    xs_func = @(w) xs_func(w) + (2.*pig./kE.^2) .* ( (1- (1-(( w(1+3*(jj-1))+(w(2+3*(jj-1)).*2.*Pen) ).*( w(2+3*(jj-1)).*2.*Pen )./2./( (w(3+3*(jj-1))-WE).^2 + (( w(1+3*(jj-1))+(w(2+3*(jj-1)).*2.*Pen) )./2).^2 ))) ...
+    
+    xs_func = @(w) xs_func(w) + (w(1+3*(jj-1))+w(2+3*(jj-1)).*2.*Pen).*w(2+3*(jj-1)).*2.*Pen./4./((w(3+3*(jj-1))-WE).^2 + ((w(1+3*(jj-1))+w(2+3*(jj-1)).*2.*Pen)./2).^2) ...
                                              .*cos(2.*phi) ...
-                                         - (w(3+3*(jj-1))-WE).*( w(2+3*(jj-1)).*2.*Pen )./( (w(3+3*(jj-1))-WE).^2 + (( w(1+3*(jj-1))+(w(2+3*(jj-1)).*2.*Pen) )./2).^2 ) ...
-                                             .*sin(2.*phi) ) )    ;
+                                         - (w(3+3*(jj-1))-WE).*(w(2+3*(jj-1)).*2.*Pen)./2./( (w(3+3*(jj-1))-WE).^2 + (( w(1+3*(jj-1))+w(2+3*(jj-1)).*2.*Pen )./2).^2 ) ...
+                                             .*sin(2.*phi)   ;
 end
+xs_func = @(w) (4.*pig./kE.^2) .* (sin(phi).^2+xs_func(w));
+
+
+% Gg = [Gc(1), 0];
+% Gn = [gn_square(1).*2.*Pen; 0.*2.*Pen];
+% El = [Elevels(1), 0];
+% xs=0;
+% for jj=1:2 % here index 1 is Gc, 2 is gn, 3 is Elevel
+% 
+%     xs = xs + (Gg(jj)+Gn(jj,:)).*Gn(jj,:)./4./((El(jj)-WE).^2 + ((Gg(jj)+Gn(jj,:))./2).^2) ...
+%                                              .*cos(2.*phi) ...
+%                                          - (El(jj)-WE).*( Gn(jj,:) )./2./( (El(jj)-WE).^2 + (( Gg(jj)+Gn(jj,:) )./2).^2 ) ...
+%                                              .*sin(2.*phi)   ;
+% end
+% xs = (4.*pig./kE.^2) .* (sin(phi).^2+xs); 
+
+% Gg = w(1+3*(jj-1)) ;
+% Gn = w(2+3*(jj-1)).*2.*Pen ;
+% El = w(3+3*(jj-1));
 
 n = 0.067166; 
 trans_func = @(w) exp(-n*xs_func(w));
@@ -71,7 +92,8 @@ true = trans_func(sol_w);
 % true = xs_func(sol_w);
 
 % compare to a sammy calculation
-% sammy = readmatrix('/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/ATARI_workspace/sammy/SAMMY.LST', 'FileType','text');
+sammy = readmatrix('/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/ATARI_workspace/sammy/SAMMY.LST', 'FileType','text');
+syndat = readmatrix('/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/ATARI_workspace/sammy/syndat', 'FileType','text');
 
 % add noise and plot synthetic data
 % if fitting transmission, noise parameters must be decreased
@@ -89,7 +111,8 @@ WC = Noisy_CrossSection;
 
 figure(1); clf
 scatter(Energies, WC, '.', 'DisplayName', 'Exp'); hold on
-plot(Energies, true, 'DisplayName', 'True') % ; hold on
+plot(Energies, true, 'DisplayName', 'Matlab') ; hold on
+% plot(syndat(:,1), syndat(:,2), '.', 'DisplayName', 'Syndat')
 % plot(sammy(:,1), sammy(:,4), 'DisplayName', 'Sammy')
 legend()
 

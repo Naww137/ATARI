@@ -36,8 +36,6 @@ class performance_test():
         ### Gather options
         self.overwrite_syndat = options['Overwrite Syndats']
         self.overwrite_fits = options['Overwrite Fits']
-        if not self.overwrite_syndat:
-            raise ValueError('Need to implement False for overwrite syndats option')
     
 
     def __repr__(self):
@@ -54,7 +52,8 @@ class performance_test():
                                 self.number_of_datasets, 
                                 self.case_directory,
                                 fixed_resonance_ladder=None, 
-                                open_data=None
+                                open_data=None,
+                                overwrite=self.overwrite_syndat
                                                                             )
 
         return
@@ -103,7 +102,7 @@ class performance_test():
         fitting_script_directory = os.path.dirname(path_to_fitting_script)
 
         out = subprocess.run([f'{path_to_application_exe}', '-nodisplay', '-batch', f'{fitting_script}("{syndat_pw}","{syndat_par}")'],
-                                cwd=f'{fitting_script_directory}' , check=True, encoding="utf-8", capture_output=True)
+                                cwd=f'{fitting_script_directory}' , check=False, encoding="utf-8", capture_output=True)
 
         return out
 

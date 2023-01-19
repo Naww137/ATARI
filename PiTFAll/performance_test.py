@@ -4,19 +4,19 @@ import syndat
 import subprocess
 import PiTFAll as pf
 import pandas as pd
-import matplotlib.pyplot as plt
+import h5py
 
 
 class performance_test():
 
     def __init__(self,
                     number_of_datasets,
-                    case_directory,
+                    case_file,
                     input_options={}):
 
         ### Gather inputs
         self.number_of_datasets = number_of_datasets
-        self.case_directory = case_directory
+        self.case_file = case_file
 
         ### Default options
         default_options = { 'Overwrite Syndats'    :   False, 
@@ -44,129 +44,139 @@ class performance_test():
 
 
 
-    def generate(self, Ta_pair, exp, 
+    def generate_syndats(self, particle_pair, experiment, 
                                 solver='syndat_SLBW'):
-
-        syndat.MMDA.generate(Ta_pair, exp, 
+        ### generate syndats
+        syndat.MMDA.generate(particle_pair, experiment, 
                                 solver, 
                                 self.number_of_datasets, 
-                                self.case_directory,
+                                self.case_file,
                                 fixed_resonance_ladder=None, 
                                 open_data=None,
                                 overwrite=self.overwrite_syndat
                                                                             )
+        ### Get test-level statistics
+        NumRes = []
+        NumEpts = []
+        for i in range(self.number_of_datasets):
+            Res, Epts = pf.sample_case.analyze_syndat(self.case_file, i)
+            NumRes.append(Res)
+            NumEpts.append(Epts)
+
+        sample_data_df = pd.DataFrame(  {'NumRes'   :   NumRes,
+                                         'NumEpts'  :   NumEpts})
+        
+        sample_data_df.to_hdf(self.case_file, 'test_stats/sample_data')
 
         return
 
+    def generate_fits(self, run_local,
+                            path_to_application_exe = None, 
+                            path_to_fitting_script  = None):
+        
+        ### Check input
+        if run_local:
+            if (path_to_application_exe is None) or (path_to_fitting_script is None):
+                raise ValueError('User chose to run fitting algorithm locally but did not supply the proper paths.')
+            else:
+                pass
 
-    def fit(self, path_to_application_exe, path_to_fitting_script):
+        ### prepare case_file.hdf5 based on overwrite option and run_fitting_algorithm() - if not run_local this function does nothing
+        samples_not_being_run = []
 
         for i in range(self.number_of_datasets):
-            
-            sample_directory = os.path.join(self.case_directory, f'sample_{i}')
 
-            # check for isample directory
-            if os.path.isdir(sample_directory):
+            f = h5py.File(self.case_file, "r+")
+            sample_group = f'sample_{i}'
 
+            if sample_group in f:
                 # check for syndat
-                syndat_pw = os.path.join(sample_directory, f'syndat_{i}_pw.csv')
-                syndat_par = os.path.join(sample_directory, f'syndat_{i}_par.csv')
-                if os.path.isfile(syndat_pw) and os.path.isfile(syndat_par):
+                if ('syndat_pw' in f[sample_group]) and ('syndat_par' in f[sample_group]):
                     pass
                 else:
-                    raise ValueError(f'Syndat in sample directory {os.path.abspath(sample_directory)} does not exist.')
-
-                # check for fits
-                fit_pw = os.path.join(sample_directory, f'fit_{i}_pw.csv')
-                fit_par = os.path.join(sample_directory, f'fit_{i}_par.csv')
-                if os.path.isfile(fit_pw) and os.path.isfile(fit_par):
+                    raise ValueError(f'Syndat in sample group {sample_group} does not exist in {self.case_file}.')
+                # if both exist, either overwrite or return
+                if ('fit_pw' in f[sample_group]) and ('fit_par' in f[sample_group]):
                     if self.overwrite_fits:
-                        out = self.run_fitting_algorithm(syndat_pw, syndat_par, path_to_fitting_script, path_to_application_exe)
+                        del f[sample_group]['fit_pw']
+                        del f[sample_group]['fit_par']
+                        out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe)
                     else:
-                        out = "Did not call subprocess for fitting - fits already existed"
+                        samples_not_being_run.append(i)
+                # if only one exists must have been an error - delete and re-run fit
+                elif 'fit_pw' in f[sample_group]:
+                    del f[sample_group]['fit_pw']
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe)
+                elif 'fit_par' in f[sample_group]:
+                    del f[sample_group]['fit_par']
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe)
+                # if neither exist, run fit
                 else:
-                    out = self.run_fitting_algorithm(syndat_pw, syndat_par, path_to_fitting_script, path_to_application_exe)
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe)
 
+            # raise error if sample group does not exist
             else:
-                raise ValueError(f'Sample directory {os.path.abspath(sample_directory)} does not exist.')
+                raise ValueError(f'Sample group {sample_group} does not exist in {self.case_file}.')
+            
+        # close hdf5 file    
+        f.close()
 
+        # TODO: if not running locally, generate a jobarray.sh with appropriate isamples and print breif instructions
+        if not run_local:
+            min_value = min(samples_not_being_run, default=0)
+
+            out = f"User chose to NOT run the fitting algorithm locally. \
+The data file {self.case_file}.hdf5 has been prepared based on the selected overwrite options. \
+Please run samples {min_value}-{self.number_of_datasets}"
+                        
         return out
-    
 
-    def run_fitting_algorithm(self, syndat_pw, syndat_par,
+
+    def run_fitting_algorithm(self, case_file, isample, run_local,
                                     path_to_fitting_script, path_to_application_exe,
                                     solver=None
                                                                                                 ):
 
-        fitting_script = os.path.splitext(os.path.basename(path_to_fitting_script))[0]
-        fitting_script_directory = os.path.dirname(path_to_fitting_script)
+        if run_local:
+            fitting_script = os.path.splitext(os.path.basename(path_to_fitting_script))[0]
+            fitting_script_directory = os.path.dirname(path_to_fitting_script)
 
-        out = subprocess.run([f'{path_to_application_exe}', '-nodisplay', '-batch', f'{fitting_script}("{syndat_pw}","{syndat_par}")'],
-                                cwd=f'{fitting_script_directory}' , check=False, encoding="utf-8", capture_output=True)
+            out = subprocess.run([f'{path_to_application_exe}', '-nodisplay', '-batch', f'{fitting_script}("{case_file}",{isample})'],
+                                    cwd=f'{fitting_script_directory}' , check=False, encoding="utf-8", capture_output=True)
+        else:
+            out = 0
 
         return out
 
+
     
     def analyze(self):
-
-        # initialize case array
-        case_array = []
+        
+        ### build integral figures of merit
+        fit_theo_SE = []
+        fit_exp_SE = []; fit_exp_chi2 = []; fit_exp_chi2dof = []
+        theo_exp_SE = []; theo_exp_chi2 = []; theo_exp_chi2dof = []
         for i in range(self.number_of_datasets):
-            case = pf.sample_case(self.case_directory, i)
-            case.analyze()
-            case_array.append(case)
-        self.case_array = case_array
+            # analyze the case
+            FoM = pf.sample_case.analyze_fit(self.case_file,i)
+            # append key FoMs
+            fit_theo_SE.append( FoM.fit_theo.SE) 
+            fit_exp_SE.append(FoM.fit_exp.SE); fit_exp_chi2.append(FoM.fit_exp.Chi2); fit_exp_chi2dof.append(FoM.fit_exp['Chi2/dof']) 
+            theo_exp_SE.append(FoM.theo_exp.SE); theo_exp_chi2.append(FoM.theo_exp.Chi2) ; theo_exp_chi2dof.append(FoM.theo_exp['Chi2/dof']) 
 
-        # integral analysis (stats for each sample over all energy points)
-        SE_df = pd.DataFrame()
-        chi_square_df = pd.DataFrame()
-        chi_square_perdof_df = pd.DataFrame()
-        for case in case_array:
-            icase = case.icase
-            if icase == 0:
-                SE_df = case.FoMs.loc['SE']
-                SE_df.name = icase
-                chi_square_df = case.FoMs.loc['Chi2']
-                chi_square_df.name = icase
-                chi_square_perdof_df = case.FoMs.loc['Chi2/dof']
-                chi_square_perdof_df.name = icase
-            else:
-                SE = case.FoMs.loc['SE']
-                SE.name = icase
-                chi_square = case.FoMs.loc['Chi2']
-                chi_square.name = icase
-                chi_square_perdof = case.FoMs.loc['Chi2/dof']
-                chi_square_perdof.name = icase
+        integral_FoMs_df = pd.DataFrame(  { 'fit_theo_SE'       :   fit_theo_SE     ,
+                                            'fit_exp_SE'        :   fit_exp_SE      ,
+                                            'fit_exp_chi2'      :   fit_exp_chi2    , 
+                                            'fit_exp_chi2dof'   :   fit_exp_chi2dof , 
+                                            'theo_exp_SE'       :   theo_exp_SE     , 
+                                            'theo_exp_chi2'     :   theo_exp_chi2   , 
+                                            'theo_exp_chi2dof'  :   theo_exp_chi2dof    })
 
-                SE_df = pd.merge(SE_df,SE, right_index=True,left_index=True)
-                chi_square_df = pd.merge(chi_square_df,chi_square, right_index=True,left_index=True)
-                chi_square_perdof_df = pd.merge(chi_square_perdof_df,chi_square_perdof, right_index=True,left_index=True)
+        # write integral FoMs to hdf5 file
+        integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
+        # read out sample data so it can be returned with analyze
+        sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')
 
-        # now transpose and instantiate all
-        self.SE_df = SE_df.T
-        self.chi_square_df = chi_square_df.T
-        self.chi_square_perdof_df = chi_square_perdof_df.T
+        return integral_FoMs_df, sample_data_df
 
 
-        return
-
-
-
-
-    def plot_trans(self, icase):
-
-        case = self.case_array[icase]
-
-        plt.figure()
-        plt.errorbar(case.pw_data.E, case.pw_data.exp_trans, yerr=case.pw_data.exp_trans_unc, zorder=0, 
-                                     fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
-
-        plt.plot(case.pw_data.E, case.pw_data.theo_trans, lw=1, color='g', label='sol', zorder=2)
-        plt.plot(case.pw_data.E, case.pw_data.est_trans, lw=1, color='r', label='est')
-
-        plt.ylim([-.1, 1])
-        plt.xscale('log')
-        plt.xlabel('Energy'); plt.ylabel('Transmission')
-        plt.legend()
-
-        return

@@ -1,10 +1,16 @@
-function baron_fit_rev1(pw_file, data_file)
+function baron_fit_rev1(case_file, isample)
+tStart = tic ; 
+
+% case_file = './perf_test_baron.hdf5';
+% isample = 0 ;
 
 % check type of read in data
 
-% Load data
-syndat_pw = readtable(pw_file) ;
-syndat_data = readtable(data_file) ; 
+
+% Load data as a table
+syndat_pw = read_hdf5(case_file, sprintf('/sample_%i/syndat_pw', isample)) ;
+syndat_par = read_hdf5(case_file, sprintf('/sample_%i/syndat_par', isample)) ; 
+
 % disp('Running matlab script')
 % sort syndat?
 
@@ -32,13 +38,13 @@ P=@(E) rho(E);          % penatrability factor
 %% solution vector
 
 % Extract resonance ladder values from Syndat
-Elevels = syndat_data.E';
-Gc = 0.001 * syndat_data.Gg';
-gn_square = 0.001 * syndat_data.gnx2';
+Elevels = syndat_par.E';
+Gc = 0.001 * syndat_par.Gg';
+gn_square = 0.001 * syndat_par.gnx2';
 
 
 % Number of resonances
-num_res_actual = height(syndat_data);
+num_res_actual = height(syndat_par);
 NumPeaks = num_res_actual; % Number of resonance guesses
 
 % Baron formatted vector of solution parameters
@@ -128,7 +134,7 @@ lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',2*60);
+Options=baronset('threads',8,'PrLevel',0,'MaxTime',10*60, 'EpsA', 0.1);
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
 w0 = []; % optional inital guess
@@ -146,40 +152,32 @@ w0 = []; % optional inital guess
 % plot(Energies, syndat_pw.theo_trans, 'DisplayName', 'Syndat theo'); hold on
 % plot(Energies, trans_func(w1), 'DisplayName','Baron sol');
 % legend()
-% 
+% % 
 % fprintf('SE solution: %f\n',fun_robust1(sol_w))
 % fprintf('SE Baron: %f\n', fval)
 
 %% Write out results
+tStop = toc(tStart) ; 
+h5writeatt(case_file,sprintf('/sample_%i', isample),'tfit',tStop)
 
-% write estimated parameters
+% estimated parameter table
 parameter_matrix = reshape(w1(1:NumPeaks*3),3,[])' ;
 E = parameter_matrix(:,3) ; 
 Gg = parameter_matrix(:,1)   *1e3 ; 
 gnx2 = parameter_matrix(:,2) *1e3 ; 
+% fit_par = array2table([E, Gg, gnx2, syndat_par.J, syndat_par.chs, syndat_par.lwave, syndat_par.J_ID], 'VariableNames', syndat_par.Properties.VariableNames);
 
-pathparts = strsplit(data_file,'/');
-data_dir = pathparts(1:end-1) ; 
-split_filename = strsplit(string(pathparts(end)), '_');
-split_filename(1) = "fit" ;
-new_filename= join(split_filename, '_') ;
-new_data_file = join([data_dir,new_filename],'/') ;
+h5create(case_file, sprintf('/sample_%i/fit_par', isample), size([E,Gg, gnx2]))
+h5write(case_file, sprintf('/sample_%i/fit_par', isample), [E,Gg, gnx2])
 
-writetable(table(E, Gg, gnx2), new_data_file) ;
 
-% write estimated pw transmission
+% estimated pw transmission table
 E = Energies' ;
-est_trans = trans_func(sol_w)' ;
+est_trans = trans_func(w1)' ;
 
-pathparts = strsplit(pw_file,'/');
-data_dir = pathparts(1:end-1) ; 
-split_filename = strsplit(string(pathparts(end)), '_');
-split_filename(1) = "fit" ;
-new_filename= join(split_filename, '_') ;
-new_pw_file = join([data_dir,new_filename],'/') ;
-
-writetable(table(E, est_trans), new_pw_file) ;
-
+fit_pw = table(E,est_trans);
+h5create(case_file, sprintf('/sample_%i/fit_pw', isample), size([E,est_trans]))
+h5write(case_file, sprintf('/sample_%i/fit_pw', isample), [E,est_trans])
 
 
 %% return values 

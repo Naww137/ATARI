@@ -1,6 +1,6 @@
 %% Nuclear Parameters and functions for scattering theory 
 
-A=180.948434; %Cu-63, number from cu63 input txt file
+M=180.948434; %Cu-63, number from cu63 input txt file
 Constant=0.00219680781008; %sqrt(2Mn)/hbar; units of (10^(-12) cm sqrt(eV)^-1)
 Ac=0.81271; % scattering radius 6.7 fermi expressed as 10^-12 cm
 I=3.5; % target angular Momentum
@@ -14,7 +14,7 @@ g=(2*J+1)/( (2*ii+1)*(2*I+1) );   % spin statistical factor g sub(j alpha)
 pig=pi*g;
 
 %l=0   or s-wave spin group energy dependent functions of the wave number
-k=@(E) Constant*(A/(A+1))*sqrt(E);   % wave number
+k=@(E) Constant*(M/(M+1))*sqrt(E);   % wave number
 rho=@(E) k(E)*Ac;       % related to the center of mass momentum
 P=@(E) rho(E);          % penatrability factor
 % phi = @(E) rho(E) ; 
@@ -30,8 +30,9 @@ gn_square = Gn./2./P([Elevels(1), Elevels(2)]) ;
 
 % Baron formatted vector of solution parameters
 % Last three values are binary switches for whether or not resonance exists
-sol_w = [Gc(1) gn_square(1) Elevels(1) Gc(2) gn_square(2) Elevels(2) 0 0 0 1 1 0] ;
-% sol_w = [Gc(1) gn_square(1) Elevels(1) 0 0 0 0 0 0 1 0 0] ;
+sol_w = [Gc(1) gn_square(1) Elevels(1) Gc(2) gn_square(2) Elevels(2) 0 0 0] ;
+% sol_w = [Gc(1) gn_square(1) Elevels(1) 0 0 0 0 0 0] ;
+% sol_w = [0 0 0 0 0 0 0 0 0 0 0 0] ;
 
 % DEFINE ENERGY GRID
 Energies = linspace(1900, 2100, 200);
@@ -129,40 +130,20 @@ MaxVec = [25 10 max(Energies)];
 % automated setup of baron inputs
 RM_PerPeak = 3 ;
 TotalRM_PerWindow = NumPeaks*RM_PerPeak;
-TotalParm_PerWindow=NumPeaks*(RM_PerPeak+1);
+TotalParm_PerWindow=NumPeaks*(RM_PerPeak);
 
-A_Lower=[diag(ones(1,TotalRM_PerWindow)),zeros(TotalRM_PerWindow,NumPeaks)];
-A_Upper=[diag(ones(1,TotalRM_PerWindow)),zeros(TotalRM_PerWindow,NumPeaks)];
-for jj=1:NumPeaks
-    Index1=3*(jj-1); % striding function
-    Index2=TotalRM_PerWindow+jj;
-    A_Lower([1+Index1,2+Index1,3+Index1],Index2)=-MinVec;
-    A_Upper([1+Index1,2+Index1,3+Index1],Index2)=-MaxVec;
-end
- 
-EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
-PeakSpacing=15;
-for jj=1:(NumPeaks-1)
-    EnergyOrder(jj,RM_PerPeak+RM_PerPeak*(jj-1))=-1;
-    EnergyOrder(jj,RM_PerPeak+RM_PerPeak*jj)=1;
-    EnergyOrder(jj,TotalRM_PerWindow+jj)=-PeakSpacing/2;
-    EnergyOrder(jj,TotalRM_PerWindow+(jj+1))=-PeakSpacing/2;
-end
-
-A = [A_Lower;A_Upper;EnergyOrder];
-
-SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
-SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
-
-lb=zeros(1,TotalParm_PerWindow);
-ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
+lb=repmat(MinVec,1,NumPeaks);
+ub=repmat(MaxVec,1,NumPeaks);
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',1,'MaxTime',2*60);
-xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
+Options=baronset('threads',8,'PrLevel',1, 'MaxTime',5*60, 'EpsA',0.704255,'LPSol', 8);
 
-w0 = []; % optional inital guess
-[w1,fval,ef,info]=baron(fun_robust1,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,w0, Options); % run baron
+xtype=squeeze(char(repmat(["C","C","C"],1,NumPeaks)))';
+
+w0 = [w1]; % optional inital guess
+
+%%
+[w1,fval,ef,info]=baron(fun_robust1,[],[],[],lb,ub,[],[],[],xtype,w0, Options); % run baron
 
 %%
 

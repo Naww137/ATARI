@@ -221,21 +221,21 @@ Please run samples {min_value}-{self.number_of_datasets}"
 
 
 ###
-    def analyze(self):
+    def analyze(self, particle_pair):
         
         ### build integral figures of merit
-        fit_theo_SE = []
+        fit_theo_MSE = []
         fit_exp_SE = []; fit_exp_chi2 = []; fit_exp_chi2dof = []
         theo_exp_SE = []; theo_exp_chi2 = []; theo_exp_chi2dof = []
         for i in range(self.number_of_datasets):
             # analyze the case
-            FoM = pf.sample_case.analyze_fit(self.case_file, i)
+            FoM = pf.sample_case.analyze_fit(self.case_file, i, particle_pair)
             # append key FoMs
-            fit_theo_SE.append(FoM.fit_theo.SE) 
+            fit_theo_MSE.append(FoM.fit_theo.SE) 
             fit_exp_SE.append(FoM.fit_exp.SE); fit_exp_chi2.append(FoM.fit_exp.Chi2); fit_exp_chi2dof.append(FoM.fit_exp['Chi2/dof']) 
             theo_exp_SE.append(FoM.theo_exp.SE); theo_exp_chi2.append(FoM.theo_exp.Chi2) ; theo_exp_chi2dof.append(FoM.theo_exp['Chi2/dof']) 
 
-        integral_FoMs_df = pd.DataFrame(  { 'fit_theo_SE'       :   fit_theo_SE     ,
+        integral_FoMs_df = pd.DataFrame(  { 'fit_theo_MSE'      :   fit_theo_MSE    ,
                                             'fit_exp_SE'        :   fit_exp_SE      ,
                                             'fit_exp_chi2'      :   fit_exp_chi2    , 
                                             'fit_exp_chi2dof'   :   fit_exp_chi2dof , 
@@ -244,10 +244,8 @@ Please run samples {min_value}-{self.number_of_datasets}"
                                             'theo_exp_chi2dof'  :   theo_exp_chi2dof    })
 
         if self.use_hdf5:
-            # write integral FoMs to hdf5 file
             integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
-            # read out sample data so it can be returned with analyze
-            sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')
+            sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')   # read out sample data so it can be returned with self.analyze
         else:
             integral_FoMs_df.to_csv(os.path.join(self.case_file, 'test_stats/integral_FoMs.csv'))
             sample_data_df = pd.read_csv(os.path.join(self.case_file, 'test_stats/sample_data.csv'))

@@ -2,9 +2,10 @@
 import numpy as np
 import pandas as pd
 import os
-from scipy import interpolate
+from scipy import integrate
 import h5py
 import matplotlib.pyplot as plt
+from syndat import scattering_theory
 
 
 ###
@@ -63,31 +64,36 @@ def read_sample_case_data(case_file, isample):
     return pw_data, syndat_par_df, fit_par_df
 
 ###
-def interp(x,y):
-    f_interp = interpolate.interp1d(x, y)
-    minx = min(x); maxx = max(x)
-    n = int((maxx - minx)*1e2)
-    new_x = np.linspace(minx, maxx, n)
-    new_y = f_interp(new_x)
-    return new_x, new_y
+def fine_egrid(energy):
+    minE = min(energy); maxE = max(energy)
+    n = int((maxE - minE)*1e2)
+    new_egrid = np.linspace(minE, maxE, n)
+    return new_egrid
 
 ###
-def interp_int_SE(energy, theo, est):
-
-    # interpolate to get fine grid
-    efine, theo_fine = interp(energy,theo)
-    efine, est_fine = interp(energy,est)
-
-    # numerically integrate over fine grid as (x2-x1)*(y(x1.5)) where x1.5 is the midpoint between x1 and x2
-    theo_int = np.diff(efine)*(theo_fine[0:-1]+np.diff(theo_fine)/2)
-    est_int = np.diff(efine)*(est_fine[0:-1]+np.diff(est_fine)/2)
-    # calculate SE of integral values
-    est_sol_SE = np.sum((theo_int-est_int)**2)
-
-    return est_sol_SE
+def take_syndat_spingroups(syndat_par_df, fit_par_df):
+    if all(item in fit_par_df.columns for item in ['J', 'chs', 'lwave', 'J_ID']):
+        print('yes')
+    else:
+        fit_par_df[['J', 'chs', 'lwave', 'J_ID']] = syndat_par_df[['J', 'chs', 'lwave', 'J_ID']]
+    return
 
 ###
-def analyze_fit(case_file,isample):
+def calculate_xs(energy, Ta_pair, syndat_par_df, fit_par_df, finegrid_bool):
+
+    if finegrid_bool:
+        egrid = fine_egrid(energy)
+    else:
+        egrid = energy
+
+    xs_tot_syndat, xs_scat_syndat, xs_cap_syndat = scattering_theory.SLBW(egrid, Ta_pair, syndat_par_df)
+    take_syndat_spingroups(syndat_par_df, fit_par_df)
+    xs_tot_fit, xs_scat_fit, xs_cap_fit = scattering_theory.SLBW(egrid, Ta_pair, fit_par_df)
+
+    return xs_tot_syndat, xs_tot_fit, egrid
+
+###
+def analyze_fit(case_file, isample, particle_pair):
 
     pw_data, syndat_par_df, fit_par_df = read_sample_case_data(case_file, isample)
 
@@ -99,14 +105,14 @@ def analyze_fit(case_file,isample):
     est_trans = np.array(pw_data.est_trans)
 
     # def integral_FoMs(exp_trans, exp_trans_unc, theo_trans, est_trans):)
-    dof = len(exp_trans)
+    dof = len(exp_trans)-1
     est_SE = np.sum((exp_trans-est_trans)**2)
     sol_SE = np.sum((exp_trans-theo_trans)**2)
     est_chi_square = np.sum((exp_trans-est_trans)**2/exp_trans_unc**2)
     sol_chi_square = np.sum((exp_trans-theo_trans)**2/exp_trans_unc**2)
 
-    # est_sol_SE = np.sum((theo_trans-est_trans)**2)
-    est_sol_SE = interp_int_SE(energy, theo_trans, est_trans)
+    xs_tot_syndat, xs_tot_fit, new_egrid = calculate_xs(energy, particle_pair, syndat_par_df, fit_par_df, True)
+    est_sol_SE = integrate.trapezoid((xs_tot_syndat-xs_tot_fit)**2, new_egrid)
 
     FoMs = pd.DataFrame({'fit_exp'     :   [est_SE,     est_chi_square, est_chi_square/dof], 
                         'theo_exp'     :   [sol_SE,     sol_chi_square, sol_chi_square/dof],
@@ -127,44 +133,51 @@ def analyze_syndat(case_file, isample):
 
     return NumRes, NumEpts, theo_exp_SE
 
+
+
 ###
-def plot_trans(case_file, isample, fit_bool):
+def plot(case_file, isample, particle_pair, fit_bool, finegrid_bool):
 
         if fit_bool:
             # read
             pw_data, syndat_par_df, fit_par_df = read_sample_case_data(case_file, isample)
-            # plot
-            plt.figure()
-            plt.errorbar(pw_data.E, pw_data.exp_trans, yerr=pw_data.exp_trans_unc, zorder=0, 
+            #convert to xs
+            xs_tot_syndat, xs_tot_fit, new_egrid = calculate_xs(pw_data.E, particle_pair, syndat_par_df, fit_par_df, finegrid_bool)
+            # create plot
+            fig, ax = plt.subplots(1,2, figsize=(10,4), sharex=True)
+            # plot trans
+            ax[0].errorbar(pw_data.E, pw_data.exp_trans, yerr=pw_data.exp_trans_unc, zorder=0, 
                                     fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
-
-            plt.plot(pw_data.E, pw_data.theo_trans, lw=2, color='g', label='sol', zorder=1)
-            plt.plot(pw_data.E, pw_data.est_trans, lw=1, color='r', label='est', zorder=2)
-            # make it pretty
-            plt.ylim([-.1, 1])
-            plt.xscale('log')
-            plt.xlabel('Energy'); plt.ylabel('Transmission')
-            plt.legend()
-            plt.show()
-            # plt.close()
+            ax[0].plot(pw_data.E, pw_data.theo_trans, lw=2, color='g', label='sol', zorder=1)
+            ax[0].plot(pw_data.E, pw_data.est_trans, lw=1, color='r', label='est', zorder=2)
+            ax[0].set_ylim([-.1, 1]); #ax[0].set_xscale('log')
+            ax[0].set_xlabel('Energy'); ax[0].set_ylabel('Transmission')
+            ax[0].legend()
+            # plot xs
+            ax[1].plot(new_egrid, xs_tot_syndat, lw=2, color='g', label='sol', zorder=1)
+            ax[1].plot(new_egrid, xs_tot_fit, lw=1, color='r', label='est', zorder=2)
+            ax[1].set_yscale('log'); #ax[1].set_xscale('log')
+            ax[1].set_xlabel('Energy'); ax[1].set_ylabel('Total Cross Section')
+            ax[1].legend()
+            fig.tight_layout()
 
         else:
-            #read
-            syndat_pw_df, syndat_par_df = read_syndat_datasets(case_file, isample)
-            # plot
-            plt.figure()
-            plt.errorbar(syndat_pw_df.E, syndat_pw_df.exp_trans, yerr=syndat_pw_df.exp_trans_unc, zorder=0, 
-                                    fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
+            pass
+            # #read
+            # syndat_pw_df, syndat_par_df = read_syndat_datasets(case_file, isample)
+            # # plot
+            # plt.figure()
+            # plt.errorbar(syndat_pw_df.E, syndat_pw_df.exp_trans, yerr=syndat_pw_df.exp_trans_unc, zorder=0, 
+            #                         fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
 
-            plt.plot(syndat_pw_df.E, syndat_pw_df.theo_trans, lw=2, color='g', label='sol', zorder=1)
-            # make it pretty
-            plt.ylim([-.1, 1])
-            plt.xscale('log')
-            plt.xlabel('Energy'); plt.ylabel('Transmission')
-            plt.legend()
-            plt.show()
-            # plt.close()
+            # plt.plot(syndat_pw_df.E, syndat_pw_df.theo_trans, lw=2, color='g', label='sol', zorder=1)
+            # # make it pretty
+            # plt.ylim([-.1, 1])
+            # plt.xscale('log')
+            # plt.xlabel('Energy'); plt.ylabel('Transmission')
+            # plt.legend()
+            # plt.show()
+            # # plt.close()
             
-        return
-
+        return fig
 

@@ -10,6 +10,7 @@ tStart = tic ;
 % Load data as a table
 syndat_pw = read_hdf5(case_file, sprintf('/sample_%i/syndat_pw', isample)) ;
 syndat_par = read_hdf5(case_file, sprintf('/sample_%i/syndat_par', isample)) ; 
+theo_SE = sum((syndat_pw.theo_trans-syndat_pw.exp_trans).^2);
 
 % disp('Running matlab script')
 % sort syndat?
@@ -134,7 +135,7 @@ lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',10*60, 'EpsA', 0.1);
+Options=baronset('threads',8,'PrLevel',0,'MaxTime',5*60, 'EpsA', theo_SE);
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
 w0 = []; % optional inital guess

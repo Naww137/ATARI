@@ -7,19 +7,45 @@ import h5py
 import matplotlib.pyplot as plt
 
 
+###
+def check_case_file_or_dir(case_file):
+    if os.path.isfile(case_file):
+        use_hdf5 = True
+    else:
+        use_hdf5 = False
+    return use_hdf5
+
+###
 def read_fit_datasets(case_file, i):
-    with h5py.File(case_file, 'r') as f:
-        fit_pw_df = pd.DataFrame(f[f'sample_{i}/fit_pw'][()].T, columns=['E','est_trans'])
-        fit_par_df = pd.DataFrame(f[f'sample_{i}/fit_par'][()].T, columns=['E','Gg','gnx2'])
-        f.close()
+    use_hdf5 = check_case_file_or_dir(case_file)
+    if use_hdf5:
+        with h5py.File(case_file, 'r') as f:
+            fit_pw_df = pd.DataFrame(f[f'sample_{i}/fit_pw'][()].T, columns=['E','est_trans'])
+            fit_par_df = pd.DataFrame(f[f'sample_{i}/fit_par'][()].T, columns=['E','Gg','gnx2'])
+            f.close()
+    else:
+        fit_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', 'fit_pw.csv'))
+        fit_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', 'fit_par.csv'))
     return fit_pw_df, fit_par_df
 
+###
 def read_syndat_datasets(case_file, i):
-    syndat_pw_df = pd.read_hdf(case_file, f'sample_{i}/syndat_pw')
-    syndat_par_df = pd.read_hdf(case_file, f'sample_{i}/syndat_par')
+    if i == 44:
+        _=0
+    use_hdf5 = check_case_file_or_dir(case_file)
+    if use_hdf5:
+        syndat_pw_df = pd.read_hdf(case_file, f'sample_{i}/syndat_pw')
+        syndat_par_df = pd.read_hdf(case_file, f'sample_{i}/syndat_par')
+    else:
+        syndat_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/syndat_pw.csv'))
+        try:
+            syndat_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/syndat_par.csv'))
+        except: 
+            syndat_par_df = pd.DataFrame()
+
     return syndat_pw_df, syndat_par_df
 
-
+###
 def read_sample_case_data(case_file, isample):
     # read in data
     syndat_pw_df, syndat_par_df = read_syndat_datasets(case_file, isample)
@@ -36,7 +62,7 @@ def read_sample_case_data(case_file, isample):
 
     return pw_data, syndat_par_df, fit_par_df
 
-
+###
 def interp(x,y):
     f_interp = interpolate.interp1d(x, y)
     minx = min(x); maxx = max(x)
@@ -45,6 +71,7 @@ def interp(x,y):
     new_y = f_interp(new_x)
     return new_x, new_y
 
+###
 def interp_int_SE(energy, theo, est):
 
     # interpolate to get fine grid
@@ -59,8 +86,7 @@ def interp_int_SE(energy, theo, est):
 
     return est_sol_SE
 
-
-
+###
 def analyze_fit(case_file,isample):
 
     pw_data, syndat_par_df, fit_par_df = read_sample_case_data(case_file, isample)
@@ -91,18 +117,17 @@ def analyze_fit(case_file,isample):
 
     return FoMs
 
-
-
+###
 def analyze_syndat(case_file, isample):
-    syndat_pw_df, syndat_par_df = read_syndat_datasets(case_file, isample)  
+    
+    syndat_pw_df, syndat_par_df = read_syndat_datasets(case_file, isample) 
+    theo_exp_SE = np.sum((syndat_pw_df.exp_trans-syndat_pw_df.theo_trans)**2)
     NumRes = len(syndat_par_df)
     NumEpts = len(syndat_pw_df)
-    return NumRes, NumEpts
 
+    return NumRes, NumEpts, theo_exp_SE
 
-
-
-
+###
 def plot_trans(case_file, isample, fit_bool):
 
         if fit_bool:

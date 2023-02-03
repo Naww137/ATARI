@@ -123,7 +123,6 @@ def plot_trcs(
         axs.axvline(x = x1, label=r'real positions', color = 'g', linestyle = 'dashed', linewidth = 1.0, alpha=0.5)
 
 def calc_linear_interp_index(df, input_index, input_col='point_number', output_col='E'):
-
     return np.interp(input_index, df[input_col], df[output_col])
 
 
@@ -256,11 +255,11 @@ def plot_search_results(transm_df: pd.DataFrame,
     fig.suptitle('Theo and exp Cross-section/T, positions of estimated pulses (missed data removed, filtered)')
 
     #theoretical cross-section
-    axs[0].plot(transm_df['E'], transm_df['theo_cs'], marker = "o", markersize = 1, linewidth = 1.0, alpha=0.8, color = 'g', label = 'Theo')
+    axs[0].plot(transm_df['E'], transm_df['theo_cs'], marker = "o", markersize = 1, linewidth = 1.0, alpha=0.8, color = 'g', label = 'Theo', zorder=1)
     axs[1].plot(transm_df['E'], transm_df['theo_trans'], marker = "o", markersize = 1, linewidth = 1.0, alpha=0.8, color = 'g', label = 'Theo')
 
     #experimental cross-section
-    axs[0].plot(transm_df['E'], transm_df['exp_cs'], marker = "o", markersize = 1, linewidth = 1.0, alpha=1, color = 'red', label = 'Exp')
+    axs[0].plot(transm_df['E'], transm_df['exp_cs'], marker = "o", markersize = 1, linewidth = 1.0, alpha=1, color = 'red', label = 'Exp', zorder=3)
     axs[1].plot(transm_df['E'], transm_df['exp_trans'], marker = "o", markersize = 2, linewidth = 0.5, alpha=0.2, color = 'red', label = 'Exp')
 
 
@@ -268,6 +267,10 @@ def plot_search_results(transm_df: pd.DataFrame,
     axs[1].grid(color = 'grey', linestyle = '--', linewidth = 0.2)
     
     axs[0].legend()
+    axs[1].set_xlabel('E')
+    axs[0].set_ylabel('$\sigma(E)$')
+    axs[1].set_ylabel('T(E)')
+    
 
     # initial ladder - green vertical lines
     for index, row in ladder_df.iterrows():
@@ -307,33 +310,6 @@ def plot_search_results(transm_df: pd.DataFrame,
         current_h = current_tr_h
 
         boxes.append(Rectangle(current_rect_left_corner, current_w, current_h))
-
-        """
-        left = row['left_win_pos_in_E']
-        right = row['right_win_pos_in_E']
-        bottom = row['min_height_in_window']
-        top = row['max_height_in_window']
-
-        #mark of the start of the current window
-        axs_w.text(
-            left, #left corner,  #0.5*(left+right), #middle of the rectangle
-            top, #top
-            str(index),
-            horizontalalignment='center',
-            verticalalignment='center',
-            fontsize=5
-            )
-            
-        #mark of the end of the current window
-        axs_w.text(
-            right, #right corner,  #0.5*(left+right), #middle of the rectangle
-            top+0.5*bottom, #top
-            str(index)+'e',
-            horizontalalignment='center',
-            verticalalignment='center',
-            fontsize=5
-            )
-        """
 
     pc = PatchCollection(boxes, facecolor='y', alpha=0.2, edgecolor='black')
     axs[1].add_collection(pc)

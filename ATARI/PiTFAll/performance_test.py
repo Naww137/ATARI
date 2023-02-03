@@ -7,18 +7,26 @@ import pandas as pd
 import h5py
 
 
-class performance_test:
-    def __init__(self, number_of_datasets, case_file, input_options={}):
+
+class performance_test():
+
+    def __init__(self,
+                    dataset_range,
+                    case_file,
+                    input_options={}):
+
+
         ### Gather inputs
-        self.number_of_datasets = number_of_datasets
+        self.dataset_range = dataset_range
         self.case_file = case_file
 
         ### Default options
-        default_options = {
-            "Overwrite Syndats": False,
-            "Overwrite Fits": False,
-            "Use HDF5": True,
-        }
+
+        default_options = { 'Overwrite Syndats'    :   False, 
+                            'Overwrite Fits'       :   False,
+                            'Use HDF5'             :   True,
+                            'Vary Erange'          :   None
+                                                                    } 
 
         ### redefine options dictionary if any input options are given
         options = default_options
@@ -31,9 +39,12 @@ class performance_test:
         self.options = options
 
         ### Gather options
-        self.overwrite_syndat = options["Overwrite Syndats"]
-        self.overwrite_fits = options["Overwrite Fits"]
-        self.use_hdf5 = options["Use HDF5"]
+
+        # self.overwrite_syndat = options['Overwrite Syndats']
+        # self.overwrite_fits = options['Overwrite Fits']
+        # self.use_hdf5 = options['Use HDF5']
+        # self.vary_Erange = options['Vary Erange']
+
 
     ###
     def __repr__(self):
@@ -50,40 +61,54 @@ class performance_test:
     ###
     def generate_syndats(self, particle_pair, experiment, solver="syndat_SLBW"):
         ### generate syndats
-        syndat.MMDA.generate(
-            particle_pair,
-            experiment,
-            solver,
-            self.number_of_datasets,
-            self.case_file,
-            fixed_resonance_ladder=None,
-            open_data=None,
-            use_hdf5=self.use_hdf5,
-            overwrite=self.overwrite_syndat,
-        )
+
+        samples_not_generated = syndat.MMDA.generate(particle_pair, experiment, 
+                                                    solver, 
+                                                    self.dataset_range, 
+                                                    self.case_file,
+                                                    fixed_resonance_ladder=None, 
+                                                    open_data=None,
+                                                    vary_Erange=self.options['Vary Erange'],
+                                                    use_hdf5=self.options['Use HDF5'],
+                                                    overwrite=self.options['Overwrite Syndats']
+                                                                                                )
+
         ### Get test-level statistics
         NumRes = []
         NumEpts = []
         theo_exp_SE = []
-        for i in range(self.number_of_datasets):
+        for i in range(min(self.dataset_range), max(self.dataset_range)):
             Res, Epts, te_SE = pf.sample_case.analyze_syndat(self.case_file, i)
             NumRes.append(Res)
             NumEpts.append(Epts)
             theo_exp_SE.append(te_SE)
 
-        sample_data_df = pd.DataFrame(
-            {"NumRes": NumRes, "NumEpts": NumEpts, "theo_exp_SE": theo_exp_SE}
-        )
 
-        if self.use_hdf5:
-            sample_data_df.to_hdf(self.case_file, "test_stats/sample_data")
+        sample_data_df = pd.DataFrame(  {'NumRes'   :   NumRes,
+                                         'NumEpts'  :   NumEpts,
+                                         'theo_exp_SE': theo_exp_SE}, index=range(min(self.dataset_range),max(self.dataset_range)) )
+        
+        if self.options['Use HDF5']:
+            sample_data_df.to_hdf(self.case_file, 'test_stats/sample_data')
+
         else:
             self.check_case_directory(os.path.join(self.case_file, "test_stats/"))
             sample_data_df.to_csv(
                 os.path.join(self.case_file, "test_stats/sample_data.csv")
             )
 
-        return sample_data_df
+        if not self.options['Overwrite Syndats']:
+            samples_to_be_run = np.setdiff1d(np.arange(0,max(self.dataset_range)), np.array(samples_not_generated))
+            min_value = min(samples_to_be_run, default=max(self.dataset_range))
+
+            out = f"User chose to NOT overwrite previously generated datasets in the file {self.case_file}.\n\
+Samples {min_value}-{max(self.dataset_range)} already existed.\n\
+If Syndat generation settings were changed these files should be overwriten."
+            
+        else:
+            out = ""
+
+        return sample_data_df, out
 
     ###
     def generate_fits(
@@ -99,10 +124,10 @@ class performance_test:
                 pass
 
         ### prepare case_file.hdf5 or csv's based on overwrite option and run_fitting_algorithm() - if not run_local this function does nothing
-        if self.use_hdf5:
-            samples_not_being_run = self.prepare_and_fit_hdf5(
-                run_local, path_to_application_exe, path_to_fitting_script
-            )
+
+        if self.options['Use HDF5']:
+            samples_not_being_run = self.prepare_and_fit_hdf5(run_local, path_to_application_exe,  path_to_fitting_script)
+
         else:
             samples_not_being_run = self.prepare_and_fit_csv(
                 run_local, path_to_application_exe, path_to_fitting_script
@@ -110,14 +135,19 @@ class performance_test:
 
         # TODO: if not running locally, generate a jobarray.sh with appropriate isamples and print breif instructions
         if not run_local:
-            samples_to_be_run = np.setdiff1d(
-                np.arange(0, self.number_of_datasets), np.array(samples_not_being_run)
-            )
-            min_value = min(samples_to_be_run, default=self.number_of_datasets)
 
-            out = f"User chose to NOT run the fitting algorithm locally. \
-The data file {self.case_file} has been prepared based on the selected overwrite options. \
-Please run samples {min_value}-{self.number_of_datasets}"
+            samples_to_be_run = np.setdiff1d(np.arange(0,max(self.dataset_range)), np.array(samples_not_being_run))
+            min_value = min(samples_to_be_run, default=max(self.dataset_range))
+
+            out = f"User chose to NOT run the fitting algorithm locally.\n\
+The data file {self.case_file} has been prepared based on the selected overwrite options.\n\
+Please run samples {min_value}-{max(self.dataset_range)}"
+
+        else:
+            out = ""
+                        
+        return out
+
 
         return out
 
@@ -126,8 +156,10 @@ Please run samples {min_value}-{self.number_of_datasets}"
         self, run_local, path_to_application_exe, path_to_fitting_script
     ):
         samples_not_being_run = []
-        for i in range(self.number_of_datasets):
-            sample_directory = os.path.join(self.case_file, f"sample_{i}")
+
+        for i in range(min(self.dataset_range), max(self.dataset_range)):
+            sample_directory = os.path.join(self.case_file, f'sample_{i}')
+
             # check for isample directory
             if os.path.isdir(sample_directory):
                 # check for syndat
@@ -143,26 +175,14 @@ Please run samples {min_value}-{self.number_of_datasets}"
                 fit_pw = os.path.join(sample_directory, f"fit_pw.csv")
                 fit_par = os.path.join(sample_directory, f"fit_par.csv")
                 if os.path.isfile(fit_pw) and os.path.isfile(fit_par):
-                    if self.overwrite_fits:
-                        out = self.run_fitting_algorithm(
-                            self.case_file,
-                            i,
-                            run_local,
-                            path_to_fitting_script,
-                            path_to_application_exe,
-                            self.use_hdf5,
-                        )
+
+                    if self.options['Overwrite Fits']:
+                        out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
                     else:
                         samples_not_being_run.append(i)
                 else:
-                    out = self.run_fitting_algorithm(
-                        self.case_file,
-                        i,
-                        run_local,
-                        path_to_fitting_script,
-                        path_to_application_exe,
-                        self.use_hdf5,
-                    )
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
+
             else:
                 raise ValueError(
                     f"Sample directory {os.path.abspath(sample_directory)} does not exist."
@@ -175,7 +195,7 @@ Please run samples {min_value}-{self.number_of_datasets}"
         self, run_local, path_to_application_exe, path_to_fitting_script
     ):
         samples_not_being_run = []
-        for i in range(self.number_of_datasets):
+        for i in range(min(self.dataset_range), max(self.dataset_range)):
             f = h5py.File(self.case_file, "r+")
             sample_group = f"sample_{i}"
             if sample_group in f:
@@ -189,51 +209,25 @@ Please run samples {min_value}-{self.number_of_datasets}"
                         f"Syndat in sample group {sample_group} does not exist in {self.case_file}."
                     )
                 # if both exist, either overwrite or return
-                if ("fit_pw" in f[sample_group]) and ("fit_par" in f[sample_group]):
-                    if self.overwrite_fits:
-                        del f[sample_group]["fit_pw"]
-                        del f[sample_group]["fit_par"]
-                        out = self.run_fitting_algorithm(
-                            self.case_file,
-                            i,
-                            run_local,
-                            path_to_fitting_script,
-                            path_to_application_exe,
-                            self.use_hdf5,
-                        )
+
+                if ('fit_pw' in f[sample_group]) and ('fit_par' in f[sample_group]):
+                    if self.options['Overwrite Fits']:
+                        del f[sample_group]['fit_pw']
+                        del f[sample_group]['fit_par']
+                        out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
                     else:
                         samples_not_being_run.append(i)
                 # if only one exists must have been an error - delete and re-run fit
-                elif "fit_pw" in f[sample_group]:
-                    del f[sample_group]["fit_pw"]
-                    out = self.run_fitting_algorithm(
-                        self.case_file,
-                        i,
-                        run_local,
-                        path_to_fitting_script,
-                        path_to_application_exe,
-                        self.use_hdf5,
-                    )
-                elif "fit_par" in f[sample_group]:
-                    del f[sample_group]["fit_par"]
-                    out = self.run_fitting_algorithm(
-                        self.case_file,
-                        i,
-                        run_local,
-                        path_to_fitting_script,
-                        path_to_application_exe,
-                        self.use_hdf5,
-                    )
+                elif 'fit_pw' in f[sample_group]:
+                    del f[sample_group]['fit_pw']
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
+                elif 'fit_par' in f[sample_group]:
+                    del f[sample_group]['fit_par']
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
                 # if neither exist, run fit
                 else:
-                    out = self.run_fitting_algorithm(
-                        self.case_file,
-                        i,
-                        run_local,
-                        path_to_fitting_script,
-                        path_to_application_exe,
-                        self.use_hdf5,
-                    )
+                    out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
+
             # raise error if sample group does not exist
             else:
                 raise ValueError(
@@ -291,17 +285,24 @@ Please run samples {min_value}-{self.number_of_datasets}"
 
         return out
 
-    ###
+
+###
+    def analyze_printout(self, integral_FoMs_df):
+        mean_fit_exp_chi2dof, std_fit_exp_chi2dof = np.mean(integral_FoMs_df.fit_exp_chi2dof), np.std(integral_FoMs_df.fit_exp_chi2dof)
+        mean_fit_theo_MSE, std_fit_theo_MSE = np.mean(integral_FoMs_df.fit_theo_MSE), np.std(integral_FoMs_df.fit_theo_MSE)
+        printout = f"The mean/std of the fit to experimental chi2/dof is {mean_fit_exp_chi2dof} +/- {std_fit_exp_chi2dof} in transmission space.\n\
+The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_theo_MSE} in cross section space."
+        return printout
+    
+###
     def analyze(self, particle_pair):
         ### build integral figures of merit
         fit_theo_MSE = []
-        fit_exp_SE = []
-        fit_exp_chi2 = []
-        fit_exp_chi2dof = []
-        theo_exp_SE = []
-        theo_exp_chi2 = []
-        theo_exp_chi2dof = []
-        for i in range(self.number_of_datasets):
+
+        fit_exp_SE = []; fit_exp_chi2 = []; fit_exp_chi2dof = []
+        theo_exp_SE = []; theo_exp_chi2 = []; theo_exp_chi2dof = []
+        for i in range(min(self.dataset_range), max(self.dataset_range)):
+
             # analyze the case
             FoM = pf.sample_case.analyze_fit(self.case_file, i, particle_pair)
             # append key FoMs
@@ -324,12 +325,11 @@ Please run samples {min_value}-{self.number_of_datasets}"
                 "theo_exp_chi2dof": theo_exp_chi2dof,
             }
         )
+        
+        if self.options['Use HDF5']:
+            integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
+            sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')   # read out sample data so it can be returned with self.analyze
 
-        if self.use_hdf5:
-            integral_FoMs_df.to_hdf(self.case_file, "test_stats/integral_FoMs")
-            sample_data_df = pd.read_hdf(
-                self.case_file, "test_stats/sample_data"
-            )  # read out sample data so it can be returned with self.analyze
         else:
             integral_FoMs_df.to_csv(
                 os.path.join(self.case_file, "test_stats/integral_FoMs.csv")
@@ -338,4 +338,8 @@ Please run samples {min_value}-{self.number_of_datasets}"
                 os.path.join(self.case_file, "test_stats/sample_data.csv")
             )
 
-        return integral_FoMs_df, sample_data_df
+        printout = self.analyze_printout(integral_FoMs_df)
+
+        return integral_FoMs_df, sample_data_df, printout
+
+

@@ -138,6 +138,15 @@ Please run samples {min_value}-{max(self.dataset_range)}"
                         
         return out
 
+###
+    # def read_csv_to_hdf5(directory):
+    #     # dataset_range = (0,11)
+    #     # directory = '/Users/noahwalton/Documents/GitHub/ATARI/Fitting'
+    #     # case_file = 'perf_test_baron.hdf5'
+    #     for i in range(min(dataset_range), max(dataset_range)):
+    #         csv_2_hdf5(directory, case_file, i, 'baron')
+
+    #     return
 
 ###
     def prepare_and_fit_csv(self, run_local, path_to_application_exe,  path_to_fitting_script):

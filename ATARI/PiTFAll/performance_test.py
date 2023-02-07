@@ -95,7 +95,8 @@ class performance_test():
             min_value = min(samples_to_be_run, default=max(self.dataset_range))
 
             out = f"User chose to NOT overwrite previously generated datasets in the file {self.case_file}.\n\
-Samples {min_value}-{max(self.dataset_range)} already existed.\n\
+Samples  {min(self.dataset_range)}-{min_value} already existed.\n\
+Samples {min_value}-{max(self.dataset_range)} were generated.\n\
 If Syndat generation settings were changed these files should be overwriten."
             
         else:
@@ -178,15 +179,14 @@ Please run samples {min_value}-{max(self.dataset_range)}"
             sample_group = f'sample_{i}'
             if sample_group in f:
                 # check for syndat
-                if ('syndat_pw' in f[sample_group]) and ('syndat_par' in f[sample_group]):
+                if ('exp_pw' in f[sample_group]) and ('theo_par' in f[sample_group]):
                     pass
                 else:
                     raise ValueError(f'Syndat in sample group {sample_group} does not exist in {self.case_file}.')
                 # if both exist, either overwrite or return
-                if ('fit_pw' in f[sample_group]) and ('fit_par' in f[sample_group]):
+                if ('est_par' in f[sample_group]):
                     if self.options['Overwrite Fits']:
-                        del f[sample_group]['fit_pw']
-                        del f[sample_group]['fit_par']
+                        del f[sample_group]['est_par']
                         out = self.run_fitting_algorithm(self.case_file, i, run_local, path_to_fitting_script, path_to_application_exe, self.options['Use HDF5'])
                     else:
                         samples_not_being_run.append(i)
@@ -245,7 +245,7 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
         return printout
     
 ###
-    def analyze(self, particle_pair):
+    def analyze(self, particle_pair, experiment, fit_name):
         
         ### build integral figures of merit
         fit_theo_MSE = []
@@ -253,7 +253,7 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
         theo_exp_SE = []; theo_exp_chi2 = []; theo_exp_chi2dof = []
         for i in range(min(self.dataset_range), max(self.dataset_range)):
             # analyze the case
-            FoM = pf.sample_case.analyze_fit(self.case_file, i, particle_pair)
+            FoM = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
             # append key FoMs
             fit_theo_MSE.append(FoM.fit_theo.SE) 
             fit_exp_SE.append(FoM.fit_exp.SE); fit_exp_chi2.append(FoM.fit_exp.Chi2); fit_exp_chi2dof.append(FoM.fit_exp['Chi2/dof']) 

@@ -7,6 +7,9 @@ import h5py
 import matplotlib.pyplot as plt
 from syndat import scattering_theory
 
+# ===========================================================================================
+#   METHODS FOR READING DATA
+# ===========================================================================================
 
 ###
 def check_case_file_or_dir(case_file):
@@ -67,6 +70,32 @@ def read_sample_case_data(case_file, isample, fit_name):
 
     return exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov
 
+
+
+
+# ===========================================================================================
+#   METHODS FOR ANLYZING SYNTHETIC DATA
+# ===========================================================================================
+
+
+###
+def analyze_syndat(case_file, isample):
+    
+    exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov = read_sample_case_data(case_file, isample, None)
+
+    theo_exp_SE = np.sum((exp_pw_df.exp_trans-exp_pw_df.theo_trans)**2)
+    NumRes = len(theo_par_df)
+    NumEpts = len(exp_pw_df)
+
+    return [isample, NumRes, NumEpts, theo_exp_SE]
+
+
+
+
+# ===========================================================================================
+#   METHODS FOR RECONSTRUCTING FITS
+# ===========================================================================================
+
 ###
 def fine_egrid(energy):
     minE = min(energy); maxE = max(energy)
@@ -116,8 +145,16 @@ def reconstruct_fit(experiment, particle_pair,
 
     return  exp_pw_df, theo_pw_df, est_par_df
 
+
+
+
+# ===========================================================================================
+#   METHODS FOR ANLYZING FITS
+# ===========================================================================================
+
+
 ###
-def analyze_exp_pw(exp_pw_df, exp_cov, fit_name):
+def calculate_integral_pw_FoMs(isample, exp_pw_df, theo_pw_df, exp_cov, fit_name):
     
     # pull vectors from dfs and cast into numpy arrays
     energy = np.array(exp_pw_df.E)
@@ -125,14 +162,34 @@ def analyze_exp_pw(exp_pw_df, exp_cov, fit_name):
     exp_trans = np.array(exp_pw_df.exp_trans)
     est_trans = np.array(exp_pw_df[f'est_trans_{fit_name}'])
 
-    # def integral_FoMs(exp_trans, exp_trans_unc, theo_trans, est_trans):)
+    # calculate integral_FoMs on experimental grid
     dof = len(exp_trans)-1
     est_SE = np.sum((exp_trans-est_trans)**2)
     sol_SE = np.sum((exp_trans-theo_trans)**2)
     est_chi_square = (exp_trans-est_trans) @ exp_cov @ (exp_trans-est_trans).T
     sol_chi_square = (exp_trans-theo_trans) @ exp_cov @ (exp_trans-theo_trans).T
 
-    return est_SE, sol_SE, est_chi_square, sol_chi_square, dof
+    # calculate integral_FoMs on theoretical grid 
+    est_sol_MSE = integrate.trapezoid((theo_pw_df.theo_xs-theo_pw_df[f'est_xs_{fit_name}'])**2, theo_pw_df.E)
+    # return as list
+    integral_pw_FoMs = [isample, est_sol_MSE, est_SE, est_chi_square, est_chi_square/dof, sol_SE, sol_chi_square, sol_chi_square/dof]
+
+    return integral_pw_FoMs
+
+
+###
+def bias_variance_pw_window(isample, theo_pw_df, exp_pw_df, fit_name):
+    window_energy_midpoint  = (min(theo_pw_df.E)+max(theo_pw_df.E))/2
+    assert window_energy_midpoint == (min(exp_pw_df.E)+max(exp_pw_df.E))/2
+
+    window_bias_xs = np.mean(theo_pw_df.theo_xs-theo_pw_df[f'est_xs_{fit_name}'])
+    window_bias_trans = np.mean(exp_pw_df.theo_trans-exp_pw_df[f'est_trans_{fit_name}'])
+
+    window_variance_xs = np.mean( ( np.mean(theo_pw_df[f'est_xs_{fit_name}']) - theo_pw_df[f'est_xs_{fit_name}'] )**2 );
+    window_variance_trans = np.mean( ( np.mean(exp_pw_df[f'est_trans_{fit_name}']) - exp_pw_df[f'est_trans_{fit_name}'] )**2 )
+
+    return [isample, window_energy_midpoint, window_bias_xs, window_bias_trans, window_variance_xs, window_variance_trans]
+
 
 ###
 def analyze_fit(case_file, isample, experiment, particle_pair, fit_name):
@@ -143,47 +200,19 @@ def analyze_fit(case_file, isample, experiment, particle_pair, fit_name):
                                                         case_file, isample,
                                                         exp_pw_df, theo_pw_df, theo_par_df, est_par_df, fit_name)
 
-    # analyze pw data on experimental grid (transmission) and fine grid (xs)
-    est_SE, sol_SE, est_chi_square,  sol_chi_square, dof = analyze_exp_pw(exp_pw_df, exp_cov, fit_name)
-    est_sol_SE = integrate.trapezoid((theo_pw_df.theo_xs-theo_pw_df[f'est_xs_{fit_name}'])**2, theo_pw_df.E)
+    # Get integral FoMs from data on experimental grid (transmission) and fine grid (xs)
+    integral_pw_FoMs = calculate_integral_pw_FoMs(isample, exp_pw_df, theo_pw_df, exp_cov, fit_name)
 
-    FoMs = pd.DataFrame({'fit_exp'     :   [est_SE,     est_chi_square, est_chi_square/dof], 
-                        'theo_exp'     :   [sol_SE,     sol_chi_square, sol_chi_square/dof],
-                        'fit_theo'     :   [est_sol_SE, None,           None],
-                        'FoM'          :   ['SE',      'Chi2',         'Chi2/dof']})
+    # calulate average/variance of bais for bias variance plot
+    bv_pw_inwindow = bias_variance_pw_window(isample, theo_pw_df, exp_pw_df, fit_name)
 
-    FoMs.set_index('FoM', inplace=True)
-
-    return FoMs
-
-###
-def csv_2_hdf5(directory, case_file, isample, fit_name):
-        
-    est_par_df = pd.read_csv(os.path.join(directory, f'./par_est_{isample}.csv'))
-    tfit = est_par_df.tfit[0]
-    est_par_df.drop('tfit', axis=1)
-
-    est_par_df.to_hdf(os.path.join(directory,case_file), f"sample_{isample}/est_par_{fit_name}")
-
-    h5file = h5py.File(os.path.join(directory,case_file), 'a')
-    sample_est_dataset = h5file[f"sample_{isample}/est_par_{fit_name}"]
-    sample_est_dataset.attrs['tfit'] = tfit
-    h5file.close()
-
-    return
+    return integral_pw_FoMs, bv_pw_inwindow
 
 
-###
-def analyze_syndat(case_file, isample):
-    
-    exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov = read_sample_case_data(case_file, isample, None)
 
-    theo_exp_SE = np.sum((exp_pw_df.exp_trans-exp_pw_df.theo_trans)**2)
-    NumRes = len(theo_par_df)
-    NumEpts = len(exp_pw_df)
-
-    return NumRes, NumEpts, theo_exp_SE
-
+# ===========================================================================================
+#   METHODS FOR PLOTTING A SAMPLE CASE
+# ===========================================================================================
 
 
 ###
@@ -212,3 +241,27 @@ def plot(case_file, isample, fit_name):
 
         return fig
 
+
+
+
+
+# ===========================================================================================
+#  OTHER UTILITY METHODS
+# ===========================================================================================
+
+
+###
+def csv_2_hdf5(directory, case_file, isample, fit_name):
+        
+    est_par_df = pd.read_csv(os.path.join(directory, f'/par_est_{isample}.csv'))
+    tfit = est_par_df.tfit[0]
+    est_par_df.drop('tfit', axis=1)
+
+    est_par_df.to_hdf(os.path.join(directory,case_file), f"sample_{isample}/est_par_{fit_name}")
+
+    h5file = h5py.File(os.path.join(directory,case_file), 'a')
+    sample_est_dataset = h5file[f"sample_{isample}/est_par_{fit_name}"]
+    sample_est_dataset.attrs['tfit'] = tfit
+    h5file.close()
+
+    return

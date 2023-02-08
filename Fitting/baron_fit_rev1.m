@@ -1,16 +1,19 @@
-function baron_fit_rev1(case_file, isample)
+% function baron_fit_rev1(case_file, isample)
+
+% Description
+% Setup jordan was using
+
 tStart = tic ; 
 
-% case_file = './perf_test_baron.hdf5';
-% isample = 0 ;
-
-% check type of read in data
-
+case_file = './perf_test_baron.hdf5';
+isample = 2 ;
 
 % Load data as a table
-syndat_pw = read_hdf5(case_file, sprintf('/sample_%i/syndat_pw', isample)) ;
-syndat_par = read_hdf5(case_file, sprintf('/sample_%i/syndat_par', isample)) ; 
-theo_SE = sum((syndat_pw.theo_trans-syndat_pw.exp_trans).^2);
+exp_pw = read_hdf5(case_file, sprintf('/sample_%i/exp_pw', isample)) ;
+exp_cov = h5read(case_file, sprintf('/sample_%i/exp_cov', isample));
+theo_par = read_hdf5(case_file, sprintf('/sample_%i/theo_par', isample)) ; 
+theo_chi2 = (exp_pw.theo_trans-exp_pw.exp_trans)' * inv(exp_cov) *  (exp_pw.theo_trans-exp_pw.exp_trans) ;
+% theo_SE = sum((exp_pw.theo_trans-exp_pw.exp_trans).^2);
 
 % disp('Running matlab script')
 % sort syndat?
@@ -18,7 +21,7 @@ theo_SE = sum((syndat_pw.theo_trans-syndat_pw.exp_trans).^2);
 % Nuclear Parameters and functions for scattering theory 
 
 % Input parameters
-A=180.948434; %Cu-63, number from cu63 input txt file
+A=180.948434;
 Constant=0.00219680781008; %sqrt(2Mn)/hbar; units of (10^(-12) cm sqrt(eV)^-1)
 Ac=0.81271; % scattering radius 6.7 fermi expressed as 10^-12 cm
 I=3.5; % target angular Momentum
@@ -39,14 +42,14 @@ P=@(E) rho(E);          % penatrability factor
 %% solution vector
 
 % Extract resonance ladder values from Syndat
-Elevels = syndat_par.E';
-Gc = 0.001 * syndat_par.Gg';
-gn_square = 0.001 * syndat_par.gnx2';
+Elevels = theo_par.E';
+Gc = 0.001 * theo_par.Gg';
+gn_square = 0.001 * theo_par.gnx2';
 
 
 % Number of resonances
-num_res_actual = height(syndat_par);
-NumPeaks = num_res_actual; % Number of resonance guesses
+num_res_actual = height(theo_par);
+NumPeaks = 6; % Number of resonance guesses
 
 % Baron formatted vector of solution parameters
 % Last num_res_guess values are binary switches for whether or not resonance exists
@@ -62,8 +65,7 @@ end
 %% Create total cross section function
 
 % Define energy grid
-Energies = syndat_pw.E';
-WE = Energies;  % Passing Energies to WE is artifact of Jordan-Noah edits
+WE = exp_pw.E';  % Passing Energies to WE is artifact of Jordan-Noah edits
 
 % Create function pieces
 Pen = P(WE);
@@ -85,23 +87,24 @@ n = 0.067166;
 trans_func = @(w) exp(-n*xs_func(w));
 
 % Use syndat data instead of Jordan's noisy data
-WC = syndat_pw.exp_trans';
+WC = exp_pw.exp_trans';
 
-% Plot theoretical and experimental syndat data
-% figure(1); clf
-% scatter(Energies, WC, '.', 'DisplayName', 'Syndat exp'); hold on
-% plot(Energies, trans_func(sol_w),'o', 'DisplayName', 'Matlab theo') ; hold on
-% plot(Energies, syndat_pw.theo_trans, 'DisplayName', 'Syndat theo')
-% legend()
+% % Plot theoretical and experimental syndat data
+figure(1); clf
+errorbar(WE, WC, sqrt(diag(exp_cov)), '.', 'DisplayName', 'Syndat exp'); hold on
+plot(WE, trans_func(sol_w),'o', 'DisplayName', 'Matlab theo') ; hold on
+plot(WE, exp_pw.theo_trans, 'DisplayName', 'Syndat theo')
+legend()
 
 
 %% Set Baron options
 
-fun_robust1=@(w) sum((trans_func(w)-WC).^2);
+fun_robust1=@(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ;
+% fun_robust1=@(w) sum((trans_func(w)-WC).^2) ;
 
 % insert min/max of Gc, gn_square, and energy 
-MinVec = [0 0 min(Energies)];
-MaxVec = [max(Gc)*10 max(gn_square)*10 max(Energies)];
+MinVec = [min(Gc)*0.9 min(gn_square)*0.9 min(WE)];
+MaxVec = [max(Gc)*1.1 max(gn_square)*1.1 max(WE)];
 
 % automated setup of baron inputs
 RM_PerPeak = 3 ;
@@ -118,7 +121,7 @@ for jj=1:NumPeaks
 end
  
 EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
-PeakSpacing=2;
+PeakSpacing=0.5;
 for jj=1:(NumPeaks-1)
     EnergyOrder(jj,RM_PerPeak+RM_PerPeak*(jj-1))=-1;
     EnergyOrder(jj,RM_PerPeak+RM_PerPeak*jj)=1;
@@ -135,10 +138,10 @@ lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',5*60, 'EpsA', theo_SE);
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',0.5*60) ;%, 'barscratch', sprintf('/home/nwalton1/regression_performance_testing/perf_test_baron/bar_%i/', isample));
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
-w0 = []; % optional inital guess
+w0 = [sol_w]; % optional inital guess
 
 
 %% Baron solve
@@ -147,47 +150,30 @@ w0 = []; % optional inital guess
 
 %% Plot results
 
-% figure(1); clf
-% scatter(Energies, WC, '.', 'DisplayName', 'Syndat exp'); hold on
-% plot(Energies, trans_func(sol_w), 'DisplayName', 'Matlab theo') ; hold on
-% plot(Energies, syndat_pw.theo_trans, 'DisplayName', 'Syndat theo'); hold on
-% plot(Energies, trans_func(w1), 'DisplayName','Baron sol');
-% legend()
-% % 
-% fprintf('SE solution: %f\n',fun_robust1(sol_w))
-% fprintf('SE Baron: %f\n', fval)
+figure(1); clf
+errorbar(WE, WC, sqrt(diag(exp_cov)), '.', 'DisplayName', 'Syndat exp'); hold on
+plot(WE, trans_func(sol_w), 'DisplayName', 'Matlab theo') ; hold on
+% plot(WE, exp_pw.theo_trans, 'DisplayName', 'Syndat theo'); hold on
+plot(WE, trans_func(w1), 'DisplayName','Baron sol');
+legend()
+
+fprintf('SE solution: %f\n',fun_robust1(sol_w))
+fprintf('SE Baron: %f\n', fval)
 
 %% Write out results
 tStop = toc(tStart) ; 
-h5writeatt(case_file,sprintf('/sample_%i', isample),'tfit',tStop)
+% h5writeatt(case_file,sprintf('/sample_%i', isample),'tfit',tStop)
 
 % estimated parameter table
 parameter_matrix = reshape(w1(1:NumPeaks*3),3,[])' ;
 E = parameter_matrix(:,3) ; 
 Gg = parameter_matrix(:,1)   *1e3 ; 
 gnx2 = parameter_matrix(:,2) *1e3 ; 
-% fit_par = array2table([E, Gg, gnx2, syndat_par.J, syndat_par.chs, syndat_par.lwave, syndat_par.J_ID], 'VariableNames', syndat_par.Properties.VariableNames);
+tfit = [tStop; zeros(NumPeaks-1,1)];
 
-h5create(case_file, sprintf('/sample_%i/fit_par', isample), size([E,Gg, gnx2]))
-h5write(case_file, sprintf('/sample_%i/fit_par', isample), [E,Gg, gnx2])
+parameter_estimate_table = table(E, Gg, gnx2, tfit);
+writetable(parameter_estimate_table, sprintf('./par_est_%i.csv', isample))
 
-
-% estimated pw transmission table
-E = Energies' ;
-est_trans = trans_func(w1)' ;
-
-fit_pw = table(E,est_trans);
-h5create(case_file, sprintf('/sample_%i/fit_pw', isample), size([E,est_trans]))
-h5write(case_file, sprintf('/sample_%i/fit_pw', isample), [E,est_trans])
-
-
-%% return values 
-% SE = fval; 
-% sol_SE = fun_robust1(sol_w) ;
-% 
-% fprintf('SE = %d\n', SE)
-% fprintf('sol_SE = %d\n', sol_SE)
-
-end
+% end
 
 

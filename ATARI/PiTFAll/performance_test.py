@@ -46,7 +46,6 @@ class performance_test():
         return f"This performance test has the following options:\nINSERT OPTIONS HERE"
 
 
-
 ###
     def check_case_directory(self,case_directory):
         if os.path.isdir(case_directory):
@@ -54,6 +53,14 @@ class performance_test():
         else:
             os.mkdir(case_directory)
         return
+
+
+
+
+# ===========================================================================================
+#   METHODS FOR GENERATING SYNTHETIC DATA
+# ===========================================================================================
+
 
 ###
     def generate_syndats(self, particle_pair, experiment, 
@@ -71,19 +78,16 @@ class performance_test():
                                                     overwrite=self.options['Overwrite Syndats']
                                                                                                 )
         ### Get test-level statistics
-        NumRes = []
-        NumEpts = []
-        theo_exp_SE = []
+        FoMs = []
         for i in range(min(self.dataset_range), max(self.dataset_range)):
-            Res, Epts, te_SE = pf.sample_case.analyze_syndat(self.case_file, i)
-            NumRes.append(Res)
-            NumEpts.append(Epts)
-            theo_exp_SE.append(te_SE)
+            FoMs_sample = pf.sample_case.analyze_syndat(self.case_file, i)
+            FoMs.append(FoMs_sample)
 
-        sample_data_df = pd.DataFrame(  {'NumRes'   :   NumRes,
-                                         'NumEpts'  :   NumEpts,
-                                         'theo_exp_SE': theo_exp_SE}, index=range(min(self.dataset_range),max(self.dataset_range)) )
-        
+        sample_data_df = pd.DataFrame(FoMs, columns=['isample',
+                                                     'NumRes',
+                                                     'NumEpts',
+                                                     'theo_exp_SE'])
+                        
         if self.options['Use HDF5']:
             sample_data_df.to_hdf(self.case_file, 'test_stats/sample_data')
         else:
@@ -104,6 +108,86 @@ If Syndat generation settings were changed these files should be overwriten."
 
         return sample_data_df, out
 
+
+
+
+
+
+
+# ===========================================================================================
+#   METHODS FOR ANALYZING FITS
+# ===========================================================================================
+
+###
+    def analyze_printout(self, integral_FoMs_df):
+        mean_fit_exp_chi2dof, std_fit_exp_chi2dof = np.mean(integral_FoMs_df.fit_exp_chi2dof), np.std(integral_FoMs_df.fit_exp_chi2dof)
+        mean_fit_theo_MSE, std_fit_theo_MSE = np.mean(integral_FoMs_df.fit_theo_MSE), np.std(integral_FoMs_df.fit_theo_MSE)
+        printout = f"The mean/std of the fit to experimental chi2/dof is {mean_fit_exp_chi2dof} +/- {std_fit_exp_chi2dof} in transmission space.\n\
+The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_theo_MSE} in cross section space."
+        return printout
+    
+###
+    def analyze(self, particle_pair, experiment, fit_name):
+        
+        ### Loop over isamples
+        integral_pw_FoMs  = []
+        bv_pw_inwindow = [] 
+        for i in range(min(self.dataset_range), max(self.dataset_range)):
+            integral_pw_FoMs_sample, bv_pw_inwindow_sample = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
+            bv_pw_inwindow.append(bv_pw_inwindow_sample)
+            integral_pw_FoMs.append(integral_pw_FoMs_sample)
+
+        ### create dataframes
+        integral_FoMs_df = pd.DataFrame(integral_pw_FoMs, columns=['isample',
+                                                                    'fit_theo_MSE'    ,
+                                                                    'fit_exp_SE'      ,
+                                                                    'fit_exp_chi2'    , 
+                                                                    'fit_exp_chi2dof' , 
+                                                                    'theo_exp_SE'     , 
+                                                                    'theo_exp_chi2'   , 
+                                                                    'theo_exp_chi2dof'] )
+
+        bv_pw_inwindow_df = pd.DataFrame(bv_pw_inwindow, columns=['isample',
+                                                                    'WE_midpoint',
+                                                                    'window_bias_xs',
+                                                                    'window_bias_trans', 
+                                                                    'window_variance_xs', 
+                                                                    'window_variance_trans'] )
+        
+        # TODO: set index of dfs to isample
+
+        if self.options['Use HDF5']:
+            integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
+            sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')   # read out sample data so it can be returned with self.analyze
+        else:
+            integral_FoMs_df.to_csv(os.path.join(self.case_file, 'test_stats/integral_FoMs.csv'))
+            sample_data_df = pd.read_csv(os.path.join(self.case_file, 'test_stats/sample_data.csv'))
+
+        printout = self.analyze_printout(integral_FoMs_df)
+
+        return integral_FoMs_df, bv_pw_inwindow_df, sample_data_df, printout
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ===========================================================================================
+#   METHODS FOR GENERATING FITS
+# ===========================================================================================
 
 
 ###
@@ -244,47 +328,3 @@ Please run samples {min_value}-{max(self.dataset_range)}"
             #     out = 0
 
         return out
-
-###
-    def analyze_printout(self, integral_FoMs_df):
-        mean_fit_exp_chi2dof, std_fit_exp_chi2dof = np.mean(integral_FoMs_df.fit_exp_chi2dof), np.std(integral_FoMs_df.fit_exp_chi2dof)
-        mean_fit_theo_MSE, std_fit_theo_MSE = np.mean(integral_FoMs_df.fit_theo_MSE), np.std(integral_FoMs_df.fit_theo_MSE)
-        printout = f"The mean/std of the fit to experimental chi2/dof is {mean_fit_exp_chi2dof} +/- {std_fit_exp_chi2dof} in transmission space.\n\
-The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_theo_MSE} in cross section space."
-        return printout
-    
-###
-    def analyze(self, particle_pair, experiment, fit_name):
-        
-        ### build integral figures of merit
-        fit_theo_MSE = []
-        fit_exp_SE = []; fit_exp_chi2 = []; fit_exp_chi2dof = []
-        theo_exp_SE = []; theo_exp_chi2 = []; theo_exp_chi2dof = []
-        for i in range(min(self.dataset_range), max(self.dataset_range)):
-            # analyze the case
-            FoM = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
-            # append key FoMs
-            fit_theo_MSE.append(FoM.fit_theo.SE) 
-            fit_exp_SE.append(FoM.fit_exp.SE); fit_exp_chi2.append(FoM.fit_exp.Chi2); fit_exp_chi2dof.append(FoM.fit_exp['Chi2/dof']) 
-            theo_exp_SE.append(FoM.theo_exp.SE); theo_exp_chi2.append(FoM.theo_exp.Chi2) ; theo_exp_chi2dof.append(FoM.theo_exp['Chi2/dof']) 
-
-        integral_FoMs_df = pd.DataFrame(  { 'fit_theo_MSE'      :   fit_theo_MSE    ,
-                                            'fit_exp_SE'        :   fit_exp_SE      ,
-                                            'fit_exp_chi2'      :   fit_exp_chi2    , 
-                                            'fit_exp_chi2dof'   :   fit_exp_chi2dof , 
-                                            'theo_exp_SE'       :   theo_exp_SE     , 
-                                            'theo_exp_chi2'     :   theo_exp_chi2   , 
-                                            'theo_exp_chi2dof'  :   theo_exp_chi2dof    })
-
-        if self.options['Use HDF5']:
-            integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
-            sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')   # read out sample data so it can be returned with self.analyze
-        else:
-            integral_FoMs_df.to_csv(os.path.join(self.case_file, 'test_stats/integral_FoMs.csv'))
-            sample_data_df = pd.read_csv(os.path.join(self.case_file, 'test_stats/sample_data.csv'))
-
-        printout = self.analyze_printout(integral_FoMs_df)
-
-        return integral_FoMs_df, sample_data_df, printout
-
-

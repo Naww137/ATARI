@@ -156,6 +156,7 @@ def search_peaks(transm_nonzero: pd.DataFrame,
 
     # creating a dataframe for ALL pulses
     peaks_df_all = pd.DataFrame() # here all the peaks data will be stored
+    peaks_list_all = []
 
     for idx, x in enumerate(all_peaks_indexes_df[0]):
         
@@ -194,8 +195,9 @@ def search_peaks(transm_nonzero: pd.DataFrame,
         
         # TODO: speed up!
         # it works slow because of this? How to avoid this problem if I need to output a dataframe
-        temp = pd.DataFrame(
-          {
+    
+        peaks_list_all.append(
+        {
             'idx_global_num': idx, #pulse index
             'x': x, #pulse peak index
             'peak_E': peak_indx_E, #pulse peak index in E
@@ -212,9 +214,10 @@ def search_peaks(transm_nonzero: pd.DataFrame,
             'peak_simple_sq': peak_simple_sq,
             'peak_sq': peak_sq,
             'peak_sq_divE': peak_sq_divE
-          }, index=[idx]
-        )
-        peaks_df_all = pd.concat([peaks_df_all, temp])
+        })
+    
+    peaks_df_all = pd.DataFrame.from_dict(peaks_list_all)
+    
 
     ## reducement of the dataframe size using criteria
     cutoff_relative_threshold = reduce_params['cutoff_threshold']

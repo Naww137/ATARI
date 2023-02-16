@@ -86,7 +86,14 @@ class performance_test():
         sample_data_df = pd.DataFrame(FoMs, columns=['isample',
                                                      'NumRes',
                                                      'NumEpts',
-                                                     'theo_exp_SE'])
+                                                     'theo_exp_SE',
+                                                     'theo_avg_gnx2',
+                                                     'theo_avg_Gg', 
+                                                     'theo_min_gnx2', 
+                                                     'theo_min_Gg', 
+                                                     'theo_max_gnx2', 
+                                                     'theo_max_Gg'])
+        sample_data_df.set_index('isample', inplace=True)
                         
         if self.options['Use HDF5']:
             sample_data_df.to_hdf(self.case_file, 'test_stats/sample_data')
@@ -131,22 +138,34 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
         
         ### Loop over isamples
         integral_pw_FoMs  = []
+        integral_par_FoMs  = []
         bv_pw_inwindow = [] 
         for i in range(min(self.dataset_range), max(self.dataset_range)):
-            integral_pw_FoMs_sample, bv_pw_inwindow_sample = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
+            integral_pw_FoMs_sample, integral_par_FoMs_sample, bv_pw_inwindow_sample = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
             bv_pw_inwindow.append(bv_pw_inwindow_sample)
             integral_pw_FoMs.append(integral_pw_FoMs_sample)
+            integral_par_FoMs.append(integral_par_FoMs_sample)
 
         ### create dataframes
-        integral_FoMs_df = pd.DataFrame(integral_pw_FoMs, columns=['isample',
+        integral_pw_FoMs_df = pd.DataFrame(integral_pw_FoMs, columns=['isample',
                                                                     'fit_theo_MSE'    ,
                                                                     'fit_exp_SE'      ,
                                                                     'fit_exp_chi2'    , 
                                                                     'fit_exp_chi2dof' , 
                                                                     'theo_exp_SE'     , 
                                                                     'theo_exp_chi2'   , 
-                                                                    'theo_exp_chi2dof'] )
-
+                                                                    'theo_exp_chi2dof',
+                                                                    'tfit'] )
+        
+        integral_par_FoMs_df = pd.DataFrame(integral_par_FoMs, columns=['isample',
+                                                                    'est_card', 
+                                                                    'est_avg_Gg', 
+                                                                    'est_avg_gnx2',
+                                                                    'est_min_Gg', 
+                                                                    'est_min_gnx2', 
+                                                                    'est_max_Gg', 
+                                                                    'est_max_gnx2'] )
+        
         bv_pw_inwindow_df = pd.DataFrame(bv_pw_inwindow, columns=['isample',
                                                                     'WE_midpoint',
                                                                     'window_bias_xs',
@@ -154,18 +173,21 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
                                                                     'window_variance_xs', 
                                                                     'window_variance_trans'] )
         
-        # TODO: set index of dfs to isample
+        integral_pw_FoMs_df.set_index('isample', inplace=True)
+        integral_par_FoMs_df.set_index('isample', inplace=True)
+        bv_pw_inwindow_df.set_index('isample', inplace=True)
 
         if self.options['Use HDF5']:
-            integral_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_FoMs')
+            integral_pw_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_pw_FoMs')
+            # TODO: write integral par FoMs !!!
             sample_data_df = pd.read_hdf(self.case_file, 'test_stats/sample_data')   # read out sample data so it can be returned with self.analyze
         else:
-            integral_FoMs_df.to_csv(os.path.join(self.case_file, 'test_stats/integral_FoMs.csv'))
+            integral_pw_FoMs_df.to_csv(os.path.join(self.case_file, 'test_stats/integral_pw_FoMs.csv'))
             sample_data_df = pd.read_csv(os.path.join(self.case_file, 'test_stats/sample_data.csv'))
 
-        printout = self.analyze_printout(integral_FoMs_df)
+        printout = self.analyze_printout(integral_pw_FoMs_df)
 
-        return integral_FoMs_df, bv_pw_inwindow_df, sample_data_df, printout
+        return integral_pw_FoMs_df, integral_par_FoMs_df, bv_pw_inwindow_df, sample_data_df, printout
 
 
 

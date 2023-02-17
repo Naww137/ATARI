@@ -299,7 +299,7 @@ def plot(case_file, isample, fit_name):
 ###
 def csv_2_hdf5(directory, case_file, isample, fit_name):
         
-    est_par_df = pd.read_csv(os.path.join(directory, f'/par_est_{isample}.csv'))
+    est_par_df = pd.read_csv(os.path.join(directory, f'par_est_{isample}.csv'))
     tfit = est_par_df.tfit[0]
     est_par_df.drop('tfit', axis=1)
 

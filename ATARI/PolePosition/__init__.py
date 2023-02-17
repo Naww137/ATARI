@@ -1,1 +1,1 @@
-from polepos_funcs import *
+from .polepos_funcs import *

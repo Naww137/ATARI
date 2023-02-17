@@ -24,6 +24,9 @@ def load_transmission_data_csv(filename: str, n: float) -> pd.DataFrame:
     and calculating the crossection values
     """
 
+    # TODO : add logic s.t. this function can read formatted dataframes or path to csv
+
+
     # dataframe with transmission
     #filename = isotope_name + '_Emin_10_Emax_1000_2022.10.30_transmission_4980.csv'
 

@@ -220,7 +220,7 @@ def search_peaks(transm_nonzero: pd.DataFrame,
         })
     
     peaks_df_all = pd.DataFrame.from_dict(peaks_list_all)
-    
+    # TODO: if df is empty, do not perform 'cutoff' routines below
 
     ## reducement of the dataframe size using criteria
     cutoff_relative_threshold = reduce_params['cutoff_threshold']

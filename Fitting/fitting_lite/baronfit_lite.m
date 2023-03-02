@@ -91,6 +91,8 @@ trans_func = @(w) exp(-n*xs_func(w));
 % calculate true cross section or transmission model
 % true = trans_func(sol_w); 
 true = xs_func(sol_w);
+pscat = (4.*pig./kE.^2) .* (sin(phi).^2) ;
+test = xs_func(sol_w) - pscat;
 
 % compare to a sammy calculation
 sammy = readmatrix('/Users/noahwalton/Library/Mobile Documents/com~apple~CloudDocs/Research Projects/Resonance Fitting/ATARI_workspace/sammy/SAMMY.LST', 'FileType','text');
@@ -111,8 +113,10 @@ end
 WC = Noisy_CrossSection; 
 
 figure(1); clf
-scatter(Energies, WC, '.', 'DisplayName', 'Exp'); hold on
+% scatter(Energies, WC, '.', 'DisplayName', 'Exp'); hold on
 plot(Energies, true, 'DisplayName', 'Matlab') ; hold on
+plot(Energies, pscat, 'DisplayName', 'pscat') ; hold on
+plot(Energies, test, 'DisplayName', 'test') ; hold on
 % plot(syndat(:,1), syndat(:,2), '.', 'DisplayName', 'Syndat')
 % plot(sammy(:,1), sammy(:,4), 'DisplayName', 'Sammy')
 legend()
@@ -159,7 +163,7 @@ lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',30, 'LPSol', 8);
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',30, 'LPSol', 8);
 %%
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 

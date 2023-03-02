@@ -199,15 +199,43 @@ def calculate_integral_pw_FoMs(isample, exp_pw_df, theo_pw_df, exp_cov, fit_name
 
 
 ###
-def bias_variance_pw_window(isample, theo_pw_df, exp_pw_df, fit_name):
-    window_energy_midpoint  = (min(theo_pw_df.E)+max(theo_pw_df.E))/2
-    assert window_energy_midpoint == (min(exp_pw_df.E)+max(exp_pw_df.E))/2
+def calc_bias_variance_pw(isample, theo_pw_df, exp_pw_df, fit_name):
+    # cast to numpy arrays
+    theo_xs = np.array(theo_pw_df.theo_xs)
+    theo_trans = np.array(exp_pw_df.theo_trans)
+    est_xs = np.array(theo_pw_df[f'est_xs_{fit_name}'])
+    est_trans = np.array(exp_pw_df[f'est_trans_{fit_name}'])
+    energy_xs = np.array(theo_pw_df.E)
+    energy_trans = np.array(exp_pw_df.E)
 
-    window_bias_xs = np.mean(theo_pw_df.theo_xs-theo_pw_df[f'est_xs_{fit_name}'])
-    window_bias_trans = np.mean(exp_pw_df.theo_trans-exp_pw_df[f'est_trans_{fit_name}'])
+    # calculate bias and second moment so we can calculate variance
+    bias_xs = theo_xs-est_xs
+    first_moment_xs_est = est_xs
+    second_moment_xs_est = est_xs**2
 
-    window_variance_xs = np.mean( ( np.mean(theo_pw_df[f'est_xs_{fit_name}']) - theo_pw_df[f'est_xs_{fit_name}'] )**2 );
-    window_variance_trans = np.mean( ( np.mean(exp_pw_df[f'est_trans_{fit_name}']) - exp_pw_df[f'est_trans_{fit_name}'] )**2 )
+    bias_trans = theo_trans-est_trans
+    first_moment_trans_est = est_trans
+    second_moment_trans_est = est_trans**2
+
+    return [bias_xs, first_moment_xs_est, second_moment_xs_est, energy_xs] , [bias_trans, first_moment_trans_est, second_moment_trans_est, energy_trans]
+
+def calc_bias_variance_window(isample, theo_pw_df, exp_pw_df, fit_name):
+    # cast to numpy arrays
+    energy_xs = np.array(theo_pw_df.E); energy_trans=np.array(exp_pw_df.E)
+    theo_xs = np.array(theo_pw_df.theo_xs)
+    theo_trans = np.array(exp_pw_df.theo_trans)
+    est_xs = np.array(theo_pw_df[f'est_xs_{fit_name}'])
+    est_trans = np.array(exp_pw_df[f'est_trans_{fit_name}'])
+
+    # calculate bias/variance in window
+    window_energy_midpoint  = (min(energy_xs)+max(energy_xs))/2
+    assert window_energy_midpoint == (min(energy_trans)+max(energy_trans))/2
+
+    window_bias_xs = np.mean(theo_xs-est_xs)
+    window_bias_trans = np.mean(theo_trans-est_trans)
+
+    window_variance_xs = np.mean( (np.mean(est_xs)-est_xs)**2 )
+    window_variance_trans = np.mean( (np.mean(est_trans)-est_trans)**2 )
 
     return [isample, window_energy_midpoint, window_bias_xs, window_bias_trans, window_variance_xs, window_variance_trans]
 
@@ -234,7 +262,7 @@ def calculate_integral_par_FoMs(isample, est_par_df, theo_par_df):
     return [isample, est_cardinality, est_avg_Gg, est_avg_gnx2, est_min_Gg, est_min_gnx2, est_max_Gg, est_max_gnx2]
 
 ###
-def analyze_fit(case_file, isample, experiment, particle_pair, fit_name):
+def analyze_fit(case_file, isample, experiment, particle_pair, fit_name, vary_Erange):
 
     # read sample case data and check for fit pw reconstruction
     exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov = read_sample_case_data(case_file, isample, fit_name)
@@ -246,13 +274,18 @@ def analyze_fit(case_file, isample, experiment, particle_pair, fit_name):
     integral_pw_FoMs = calculate_integral_pw_FoMs(isample, exp_pw_df, theo_pw_df, exp_cov, fit_name)
     integral_pw_FoMs.append(est_par_df.tfit[0])
 
-    # calulate average/variance of bais for bias variance plot
-    bv_pw_inwindow = bias_variance_pw_window(isample, theo_pw_df, exp_pw_df, fit_name)
+    # calulate bias variance averages in the window and if the window is static calculate it pw
+    bias_variance_window = calc_bias_variance_window(isample, theo_pw_df, exp_pw_df, fit_name)
+    if vary_Erange is None:
+        bias_variance_pw = calc_bias_variance_pw(isample, theo_pw_df, exp_pw_df, fit_name)
+        bv = (bias_variance_window, bias_variance_pw)
+    else:
+        bv = bias_variance_window
 
     # get integreal FoMs from parameter data 
     integral_par_FoMs = calculate_integral_par_FoMs(isample, est_par_df, theo_par_df)
 
-    return integral_pw_FoMs, integral_par_FoMs, bv_pw_inwindow
+    return integral_pw_FoMs, integral_par_FoMs, bv
 
 
 

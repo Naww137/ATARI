@@ -22,7 +22,7 @@ def violin(violin_data, violin_labels, violin_colors, fom):
     bindat['cmeans'].set(colors='r', label='mean')
 
     ax = plt.gca()
-    ax.set_yticks([1, 2, 3])
+    ax.set_yticks(range(1, len(violin_data)+1) )
     ax.set_yticklabels(violin_labels, rotation=45)
     ax.set_xlabel(fom)
     ax.legend()

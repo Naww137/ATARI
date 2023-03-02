@@ -64,14 +64,15 @@ class performance_test():
 
 ###
     def generate_syndats(self, particle_pair, experiment, 
-                                solver='syndat_SLBW'
+                                solver='syndat_SLBW',
+                                fixed_resonance_ladder=None,
                                                         ):
         ### generate syndats
         samples_not_generated = syndat.MMDA.generate(particle_pair, experiment, 
                                                     solver, 
                                                     self.dataset_range, 
                                                     self.case_file,
-                                                    fixed_resonance_ladder=None, 
+                                                    fixed_resonance_ladder=fixed_resonance_ladder, 
                                                     open_data=None,
                                                     vary_Erange=self.options['Vary Erange'],
                                                     use_hdf5=self.options['Use HDF5'],
@@ -139,14 +140,30 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
         ### Loop over isamples
         integral_pw_FoMs  = []
         integral_par_FoMs  = []
-        bv_pw_inwindow = [] 
+        bias_variance_window = [] 
         for i in range(min(self.dataset_range), max(self.dataset_range)):
-            integral_pw_FoMs_sample, integral_par_FoMs_sample, bv_pw_inwindow_sample = pf.sample_case.analyze_fit(self.case_file, i, experiment, particle_pair, fit_name)
-            bv_pw_inwindow.append(bv_pw_inwindow_sample)
+            integral_pw_FoMs_sample, integral_par_FoMs_sample, bias_variance_sample = pf.sample_case.analyze_fit(
+                                                                                                        self.case_file, 
+                                                                                                        i, 
+                                                                                                        experiment, 
+                                                                                                        particle_pair, 
+                                                                                                        fit_name, self.options['Vary Erange'])
+            ### if static window/ladder, we can calculate bias and variance pw
+            if self.options['Vary Erange'] is None:
+                bias_variance_window.append(bias_variance_sample[0])
+                if i == 0:
+                    bias_variance_xs_pw = np.array(bias_variance_sample[1][0])
+                    bias_variance_trans_pw = np.array(bias_variance_sample[1][1])
+                else:
+                    bias_variance_xs_pw += np.array(bias_variance_sample[1][0])
+                    bias_variance_trans_pw += np.array(bias_variance_sample[1][1])
+            else:
+                bias_variance_window.append(bias_variance_sample)
+
             integral_pw_FoMs.append(integral_pw_FoMs_sample)
             integral_par_FoMs.append(integral_par_FoMs_sample)
 
-        ### create dataframes
+        ### create dataframes for window-integrated value
         integral_pw_FoMs_df = pd.DataFrame(integral_pw_FoMs, columns=['isample',
                                                                     'fit_theo_MSE'    ,
                                                                     'fit_exp_SE'      ,
@@ -166,17 +183,40 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
                                                                     'est_max_Gg', 
                                                                     'est_max_gnx2'] )
         
-        bv_pw_inwindow_df = pd.DataFrame(bv_pw_inwindow, columns=['isample',
+        bv_window_df = pd.DataFrame(bias_variance_window, columns=['isample',
                                                                     'WE_midpoint',
-                                                                    'window_bias_xs',
-                                                                    'window_bias_trans', 
-                                                                    'window_variance_xs', 
-                                                                    'window_variance_trans'] )
+                                                                    'bias_xs',
+                                                                    'bias_trans', 
+                                                                    'variance_xs', 
+                                                                    'variance_trans'] )
         
+        bv_window_df.set_index('isample', inplace=True)
         integral_pw_FoMs_df.set_index('isample', inplace=True)
         integral_par_FoMs_df.set_index('isample', inplace=True)
-        bv_pw_inwindow_df.set_index('isample', inplace=True)
+        
 
+        ### calculate pointwise bias and variance if static window
+        if self.options['Vary Erange'] is None:
+            total_N = max(self.dataset_range)
+
+            energy_xs = bias_variance_xs_pw[3,:]/total_N
+            mean_bias_xs = bias_variance_xs_pw[0,:] / total_N
+            variance_xs = bias_variance_xs_pw[2,:]/total_N - (bias_variance_xs_pw[1,:]/total_N)**2
+
+            energy_trans = bias_variance_trans_pw[3,:]/total_N
+            mean_bias_trans = bias_variance_trans_pw[0,:]/total_N
+            variance_trans = bias_variance_trans_pw[2,:]/total_N - (bias_variance_trans_pw[1,:]/total_N)**2
+
+            bv_pw_xs_df = pd.DataFrame(np.array([energy_xs, mean_bias_xs, variance_xs]).T, columns=['E', 'bias', 'variance'])
+            bv_pw_trans_df = pd.DataFrame(np.array([energy_trans, mean_bias_trans, variance_trans]).T, columns=['E', 'bias', 'variance'])
+
+        else:
+            bv_pw_xs_df = pd.DataFrame()
+            bv_pw_trans_df = pd.DataFrame()
+
+
+
+        #### save analysis data to hdf5 
         if self.options['Use HDF5']:
             integral_pw_FoMs_df.to_hdf(self.case_file, 'test_stats/integral_pw_FoMs')
             # TODO: write integral par FoMs !!!
@@ -187,7 +227,7 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
 
         printout = self.analyze_printout(integral_pw_FoMs_df)
 
-        return integral_pw_FoMs_df, integral_par_FoMs_df, bv_pw_inwindow_df, sample_data_df, printout
+        return integral_pw_FoMs_df, integral_par_FoMs_df, bv_window_df, (bv_pw_xs_df, bv_pw_trans_df), sample_data_df, printout
 
 
 

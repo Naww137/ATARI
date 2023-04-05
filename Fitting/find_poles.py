@@ -13,7 +13,7 @@ from ATARI import PiTFAll as pf
 import os
 
 
-case_file = os.path.realpath('/Users/noahwalton/Documents/GitHub/ATARI/Fitting/perf_test_staticladder.hdf5')
+case_file = os.path.realpath('/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/perf_test_staticwindow_poleposition.hdf5')
 
 
 # %%

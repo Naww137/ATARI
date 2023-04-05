@@ -1,0 +1,36 @@
+Tantalum produce PAR file
+Ta181     180.948434  10.0000   45.0000     0    0 0  0 0  0         8
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+DO NOT SOLVE BAYES EQUATIONS
+REICH-MOORE FORMALISM IS WANTED
+PUT QUANTUM NUMBERS INTO PARAMETER FILE
+# PUBLISH
+
+304.50000  35.185   0.049600               
+  7.860000  0.067166                       0.00000          
+TRANSMISSION                                                                
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+
+ORRESolution function parameters follow
+BURST 0    10.000000  0.10000
+WATER 0004 5.6822000 -0.54425 0.07733000
+WATER      0.5000000  0.05000 0.00700000
+LITHI 000  -1.000000  -1.0000 6.00000000
+LITHI      0.1000000  0.10000 0.60000000
+LITHI      166.87839 -28.7093 1.260690
+LITHI      0.2574580 -0.06871 0.004915
+CHANN 0    1.62      104857.6 0.8
+CHANN 0    2.39       52428.8 0.8
+CHANN 0    3.32        6553.6 0.8
+CHANN 0    6.51        1638.4 0.8
+CHANN 0    26.23        409.6 0.8
+CHANN 0    110.79       204.8 0.8
+CHANN 0    2014.67       25.6 0.8
+CHANN 0    30889.79      25.6 0.8
+CHANN 0    40287.59     819.2 0.8
+CHANN 0    120329.56    409.6 0.8

@@ -1,0 +1,16 @@
+Tantalum produce PAR file
+Ta181     180.948434  1.00000 6.0E7     0    0 0  0 0  0         0
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+DO NOT SOLVE BAYES EQUATIONS
+PUT QUANTUM NUMBERS INTO PARAMETER FILE
+BROADENING IS NOT WANTED
+%%%formalism%%%
+         
+%%%scattering_radius%%%
+%%%reaction%%%                                                              
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0

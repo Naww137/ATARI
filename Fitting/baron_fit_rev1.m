@@ -1,4 +1,4 @@
-function baron_fit_rev1(case_file, isample)
+% function baron_fit_rev1(case_file, isample)
 
 % Description
 % Setup jordan was using
@@ -6,10 +6,10 @@ function baron_fit_rev1(case_file, isample)
 tStart = tic ; 
 
 initial_guess = true;
-plotting = false ;
+plotting = true ;
 
-% case_file = './perf_test_staticladder.hdf5';
-% isample = 3 ;
+case_file = './perf_test_staticladder.hdf5';
+isample = 3 ;
 
 % Load data as a table
 exp_pw = read_hdf5(case_file, sprintf('/sample_%i/exp_pw', isample)) ;
@@ -116,7 +116,7 @@ fun_robust1=@(w) sum((trans_func(w)-WC).^2./diag_cov) ;
 
 % dof = length(WE)-1; 
 % G = gamma(dof/2) ; 
-% mypdf = @(w) ( 1/(2^(dof/2)*G) * chi2(w)^(dof/(2-1)) * exp(-chi2(w)/2) )  / chi2pdf(dof-2,dof);
+% mypdf = @(w) ( 1/(2^(dof/2)*G) * chi2(w)^(dof/2-1) * exp(-chi2(w)/2) )  / chi2pdf(dof-2,dof);
 % fun_robust1= @(w) -log10( mypdf(w) );
 
 % insert min/max of Gc, gn_square, and energy 
@@ -157,7 +157,7 @@ lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',15*60, 'EpsA', fun_robust1(sol_w), 'barscratch', sprintf('/home/nwalton1/reg_perf_tests/perf_tests/staticladder/baron_rev1/bar_%i/', isample));
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',15*60, 'EpsA', fun_robust1(sol_w)) %, 'barscratch', sprintf('/home/nwalton1/reg_perf_tests/perf_tests/staticladder/baron_rev1/bar_%i/', isample));
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
 %% format initial guess from pole position
@@ -171,7 +171,7 @@ if initial_guess
         w0(3 * NumPeaks + j) = 1;
     end
 else
-    w0 = []; 
+    w0 = sol_w; 
 end
 
 if plotting
@@ -213,7 +213,7 @@ tfit = [tStop; zeros(NumPeaks-1,1)];
 parameter_estimate_table = table(E, Gg, gnx2, tfit);
 writetable(parameter_estimate_table, sprintf('./par_est_%i.csv', isample))
 
-end
+% end
 
 
 

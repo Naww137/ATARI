@@ -55,8 +55,8 @@ for i in range(500):
         )
 
         # sorting result by weighted square
-        suggested_peaks = pulses_sel_df.nlargest(5, 'peak_sq_divE')#.peak_E
-        suggested_peaks = pd.DataFrame(suggested_peaks.loc[:,'peak_E'])
+        suggested_peaks = pulses_sel_df.nlargest(10, 'peak_sq_divE')#.peak_E
+        suggested_peaks = pd.DataFrame(suggested_peaks.loc[:, ['peak_E','peak_sq_divE'] ])
         suggested_peaks.rename(columns={'peak_E':'E'}, inplace=True)
 
         # plot_search_results(transm_df, ladder_df, pulses_sel_df)

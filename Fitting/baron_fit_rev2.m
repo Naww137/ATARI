@@ -1,4 +1,4 @@
-function baron_fit_rev2(case_file, isample)
+% function baron_fit_rev2(case_file, isample)
 
 % Description
 % same as baron_fit_rev1 but not using mixed integer or semi-continuous
@@ -8,8 +8,8 @@ tStart = tic ;
 initial_guess = true;
 plotting = false ;
 
-% case_file = './perf_test_staticladder.hdf5';
-% isample = 0 ;
+case_file = './perf_test_staticladder.hdf5';
+isample = 0 ;
 
 % Load data as a table
 exp_pw = read_hdf5(case_file, sprintf('/sample_%i/exp_pw', isample)) ;
@@ -124,7 +124,7 @@ fun_robust1=@(w) sum((trans_func(w)-WC).^2./diag_cov) ;
 
 % insert min/max of Gc, gn_square, and energy 
 Gc_bound = [min(Gc)*0.9 max(Gc)*1.1];
-gn_square_bound = [min(gn_square)*0.9, max(gn_square)*1.1];
+gn_square_bound = [0, max(gn_square)*1.1];
 MinVec = [Gc_bound(1) gn_square_bound(1)  min(WE)];
 MaxVec = [Gc_bound(2) gn_square_bound(2)  max(WE)];
 
@@ -132,14 +132,14 @@ lb=repmat(MinVec,1,NumPeaks);
 ub=repmat(MaxVec,1,NumPeaks);
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',0,'MaxTime',15*60, 'EpsA', fun_robust1(sol_w) ,'barscratch', sprintf('/home/nwalton1/reg_perf_tests/perf_tests/staticladder/baron_rev2/bar_%i/', isample));
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',1*60, 'EpsA', fun_robust1(sol_w) ) %,'barscratch', sprintf('/home/nwalton1/reg_perf_tests/perf_tests/staticladder/baron_rev2/bar_%i/', isample));
 xtype=squeeze(char(repmat(["C","C","C"],1,NumPeaks)))';
 
 if initial_guess
     w0 = zeros(1, 3 * NumPeaks);
     for j=1:length(suggested_peaks)
         w0(3*(j-1)+1) = rand*(Gc_bound(2)-Gc_bound(1)) + Gc_bound(1);
-        w0(3*(j-1)+2) = rand*(gn_square_bound(2)-gn_square_bound(1)) + gn_square_bound(1);
+        w0(3*(j-1)+2) = 0 ; %rand*(gn_square_bound(2)-gn_square_bound(1)) + gn_square_bound(1);
         w0(3*(j-1)+3) = suggested_peaks(j);
     end
 else
@@ -150,7 +150,7 @@ if plotting
     figure(1); clf
     errorbar(WE, WC, sqrt(diag(exp_cov)), '.', 'DisplayName', 'Syndat exp'); hold on
     plot(WE, trans_func(sol_w), 'DisplayName', 'Matlab theo') ; hold on
-    % plot(WE, trans_func(w0), 'o', 'DisplayName', 'initial guess') 
+    plot(WE, trans_func(w0), 'o', 'DisplayName', 'initial guess') 
     legend()
 end
 
@@ -186,7 +186,7 @@ tfit = [tStop; zeros(NumPeaks-1,1)];
 parameter_estimate_table = table(E, Gg, gnx2, tfit);
 writetable(parameter_estimate_table, sprintf('./par_est_%i.csv', isample))
 
-end
+% end
 
 
 

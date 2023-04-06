@@ -14,6 +14,7 @@ import numpy as np
 from pandas import HDFStore
 import h5py
 from syndat.scattering_theory import SLBW
+import ATARI.atari_io.hdf5 as io
 
 
 ###
@@ -137,10 +138,8 @@ def sample_and_write_syndat(case_file, isample, particle_pair, experiment, solve
 
     # write data
     if use_hdf5:
-        exp_pw_df.to_hdf(case_file, f"sample_{isample}/exp_pw")
-        theo_pw_df.to_hdf(case_file, f"sample_{isample}/theo_pw")
-        resonance_ladder.to_hdf(case_file, f"sample_{isample}/theo_par") 
-        pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_hdf(case_file, f"sample_{isample}/exp_cov")
+        io.write_experimental(case_file, isample, exp_pw_df, pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E))
+        io.write_theoretical(case_file, isample, theo_pw_df, resonance_ladder)
     else:
         exp_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','exp_pw'), index=False)
         theo_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','theo_pw'), index=False) 

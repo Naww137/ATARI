@@ -225,8 +225,8 @@ def SLBW(E, pair, resonance_ladder):
 
     Returns
     -------
-    _type_
-        _description_
+    xs_tot, xs_scat, xs_cap
+        Vectors of total, scattering, and capture cross sections.
     """
     
     # TODO: check types in resonance ladder

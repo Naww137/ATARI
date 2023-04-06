@@ -10,7 +10,7 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-import syndat
+from ATARI.syndat import scattering_theory
 import pandas as pd
 import subprocess
 
@@ -89,7 +89,7 @@ def write_sampar(df, pair, vary_parm, filename,
     """
 
     def gn2G(row):
-        S, P, phi, k = syndat.scattering_theory.FofE_recursive([row.E], pair.ac, pair.M, pair.m, max(row.lwave))
+        S, P, phi, k = scattering_theory.FofE_recursive([row.E], pair.ac, pair.M, pair.m, max(row.lwave))
         Gnx = 2*np.sum(P)*row.gnx2
         return Gnx.item()
 
@@ -143,7 +143,7 @@ def write_estruct_file(Energies, filename):
 # =============================================================================
 # 
 # =============================================================================
-def write_samdat(transmission_data, filename):
+def write_samdat(exp_pw, exp_cov, filename):
     """
     Writes a formatted sammy.dat file.
 
@@ -170,18 +170,18 @@ def write_samdat(transmission_data, filename):
         Experimental transmission uncertainty column not in DataFrame.
     """
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
-    iterable = transmission_data.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
-    cols = transmission_data.columns
+    exp_pw['exp_trans_unc'] = np.sqrt(np.diag(exp_cov))
+    iterable = exp_pw.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
+    cols = exp_pw.columns
     if 'E' not in cols:
         raise ValueError("transmission data passed to 'write_expdat_file' does not have the column 'E'")
     if 'exp_trans' not in cols:
         raise ValueError("transmission data passed to 'write_expdat_file' does not have the column 'exp'")
-    if 'exp_trans_unc' not in cols:
-        raise ValueError("transmission data passed to 'write_expdat_file' does not have the column 'dT'")
 
     iE = cols.get_loc('E')
     iexp = cols.get_loc('exp_trans')
     idT = cols.get_loc('exp_trans_unc')
+    
 
     with open(filename,'w') as f:
         for each in iterable:
@@ -313,7 +313,7 @@ def copy_template_to_runDIR(exp, file, target_dir):
                 os.path.join(target_dir,file))
     return
 
-def write_saminp(model, particle_pair, reaction, filepath):
+def write_saminp(model, particle_pair, reaction, bayes, filepath):
     ac = particle_pair.ac*10
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -325,6 +325,11 @@ def write_saminp(model, particle_pair, reaction, filepath):
                 f.write(f'  {ac: <8}  0.067166                       0.00000          \n')
             elif line.startswith('%%%reaction%%%'):
                 f.write(f'{reaction}\n')
+            elif line.startswith('%%%bayes%%%'):
+                if bayes:
+                    f.write('SOLVE BAYES EQUATIONS\n')
+                elif not bayes:
+                    f.write('DO NOT SOLVE BAYES EQUATIONS')
             else:
                 f.write(line)
            
@@ -384,10 +389,88 @@ def calculate_xs(energy_grid, resonance_ladder, particle_pair,
     write_estruct_file(energy_grid, os.path.join(sammy_runDIR,'estruct'))
 
     # edit copied runtime template files
-    write_saminp(model, particle_pair, reaction, os.path.join(sammy_runDIR, 'sammy.inp'))
+    write_saminp(model, particle_pair, reaction, False, os.path.join(sammy_runDIR, 'sammy.inp'))
     write_sampar(resonance_ladder, particle_pair, False, os.path.join(sammy_runDIR,"sammy.par"))
     with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
         f.write('sammy.inp\nsammy.par\nestruct\n')
+
+    # run sammy and wait for completion with subprocess
+    runsammy_process = subprocess.run(
+                                    ["zsh", "-c", "/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<pipe.sh"], 
+                                    cwd=os.path.realpath(sammy_runDIR),
+                                    capture_output=True
+                                    )
+    if len(runsammy_process.stderr) > 0:
+        raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
+
+    # read output lst and delete sammy_runDIR
+    lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
+    if not keep_runDIR:
+        shutil.rmtree(sammy_runDIR)
+
+    return lst_df
+
+
+# =============================================================================
+# 
+# =============================================================================
+def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
+                                                model   = 'XCT',
+                                                reaction = 'total',
+                                                expertimental_corrections = 'all_exp',
+                                                sammy_runDIR='SAMMY_runDIR',
+                                                keep_runDIR = False  
+                                                                                        ):
+    """
+    Calculate a cross section using the SAMMY code.
+
+    This function executes the SAMMY code in a separate run directory defined by the user. 
+    If no directory is given, the default will be 'SAMMY_runDIR'. 
+    For running batch jobs, the user should specify different directories for each job.
+    
+    Parameters
+    ----------
+    energy_grid : _type_
+        _description_
+    resonance_ladder : _type_
+        _description_
+    particle_pair : _type_
+        _description_
+    model : str
+        SAMMY input key for R-Matrix approximation: SLBW, MLBW, XCT (Reich-Moore) are most common. XCT is default.
+    experimental_corrections : str
+        Directory name in syndat/sammy_templates for input file, current templates just allow for different experimental corrections.
+    sammy_runDIR : str
+        Full or relative path to the temporary directory in which SAMMY will be run. Default is realtive 'SAMMY_runDIR'.
+
+    Raises
+    ------
+    ValueError
+        _description_
+    ValueError
+        _description_
+    ValueError
+        _description_
+    """
+
+    if os.path.isdir(sammy_runDIR):
+        pass
+    else:
+        os.mkdir(sammy_runDIR)
+
+    # fill temporary sammy_runDIR with runtime appropriate template files
+    copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
+    copy_template_to_runDIR(expertimental_corrections, 'sammy.par', sammy_runDIR)
+
+    # write estruct file to runDIR
+    # write_estruct_file(energy_grid, os.path.join(sammy_runDIR,'estruct'))
+    write_samdat(exp_dat, exp_cov, os.path.join(sammy_runDIR,'sammy.dat'))
+
+    # edit copied runtime template files
+    write_saminp(model, particle_pair, reaction, True, os.path.join(sammy_runDIR, 'sammy.inp'))
+    write_sampar(resonance_ladder, particle_pair, False, os.path.join(sammy_runDIR,"sammy.par"))
+    with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
+        f.write('sammy.inp\nsammy.par\sammy.dat\n')
 
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(

@@ -14,7 +14,7 @@ from syndat import scattering_theory
 import pandas as pd
 
 
-class particle_pair:
+class Particle_Pair:
     """
     _summary_
 

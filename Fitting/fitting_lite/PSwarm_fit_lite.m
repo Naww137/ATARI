@@ -86,17 +86,16 @@ plot(WE, exp_pw.theo_trans, 'DisplayName', 'Syndat theo')
 legend()
 
 %% setup optimization and constraints
-
-% fobj.ObjFunction =@(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ;
-% fobj.ObjFunction =@(w) sum((trans_func(w)-WC).^2);
-
-chi2 = @(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ; 
-dof = length(WE)-1;
-fobj.ObjFunction = @(w) -log10( chi2pdf(chi2(w), dof) ); 
+inv_cov = inv(exp_cov) ;
+fobj.ObjFunction =@(w) (trans_func(w)-WC) * inv_cov *  (trans_func(w)-WC)' ;
+% diag_cov = (diag(exp_cov))';
+% fobj.ObjFunction =@(w) sum((trans_func(w)-WC).^2./diag_cov);
 
 % insert min/max of Gc, gn_square, and energy 
-MinVec = [0 0 min(WE)];
-MaxVec = [max(Gc)*1.1 max(gn_square)*1.1 max(WE)];
+Gc_bound = [min(Gc)*0.9 max(Gc)*1.1];
+gn_square_bound = [min(gn_square)*0.9, max(gn_square)*1.1];
+MinVec = [Gc_bound(1) gn_square_bound(1)  min(WE)];
+MaxVec = [Gc_bound(2) gn_square_bound(2)  max(WE)];
 
 RM_PerPeak = 3 ;
 
@@ -114,7 +113,7 @@ fobj.LB = minimum;
 fobj.UB = maximum;
 
 InitialPopulation = [];
-% InitialPopulation(1).x = BestParticle ;%sol_w';
+InitialPopulation(1).x = sol_w;
 % InitialPopulation(2).x = []; second guess
 
 opt=PSwarm('defaults') ;
@@ -146,4 +145,11 @@ legend()
 fprintf('SE solution: %f\n',fobj.ObjFunction(sol_w))
 fprintf('SE PSwarm: %f\n', BestParticleObj)
 
+%%
 
+
+chi2 = @(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ; 
+dof = length(WE)-1;
+fobj.ObjFunction = @(w) -log10( chi2pdf(chi2(w), dof) ) / chi2pdf(dof-2,dof); 
+
+% function nll = get_nll()

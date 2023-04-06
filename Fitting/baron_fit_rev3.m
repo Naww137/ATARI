@@ -1,4 +1,4 @@
-function baron_fit_rev3(case_file, isample)
+% function baron_fit_rev3(case_file, isample)
 
 % Description
 % MINLP similar to Jordan's setup but removed the Energy Ordering constraint
@@ -8,8 +8,8 @@ tStart = tic ;
 initial_guess = true;
 plotting = false ;
 
-% case_file = './perf_test_staticladder.hdf5';
-% isample = 490 ;
+case_file = './perf_test_staticladder.hdf5';
+isample = 490 ;
 
 % Load data as a table
 exp_pw = read_hdf5(case_file, sprintf('/sample_%i/exp_pw', isample)) ;
@@ -107,11 +107,11 @@ end
 
 %% Set Baron options
 
-% chi2 = @(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ;
-diag_cov = (diag(exp_cov))' ;
+chi2 = @(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ;
+% diag_cov = (diag(exp_cov))' ;
 % chi2 = @(w) (trans_func(w)-WC) * inv_diag_cov *  (trans_func(w)-WC)' ;
-fun_robust1=@(w) sum((trans_func(w)-WC).^2./diag_cov) ;
-% fun_robust1=@(w) chi2(w) ;
+% fun_robust1=@(w) sum((trans_func(w)-WC).^2./diag_cov) ;
+fun_robust1=@(w) chi2(w) ;
 
 % dof = length(WE)-1; 
 % G = gamma(dof/2) ; 
@@ -203,7 +203,7 @@ tfit = [tStop; zeros(NumPeaks-1,1)];
 parameter_estimate_table = table(E, Gg, gnx2, tfit);
 writetable(parameter_estimate_table, sprintf('./par_est_%i.csv', isample))
 
-end
+% end
 
 
 

@@ -1,0 +1,105 @@
+Ta181
+Ta181     180.948030  1.00000 6.0E7     0    0 0  0 0  0         0
+# 
+#Ta181     180.948030  10.0000 100.0     0    0 0  0 0  0         0
+#
+# _____________________________________
+#     Card Set 3 - end with blank
+# _____________________________________
+#
+# === FROM SAMNDF.INP ===
+print all input parameters
+do not solve bayes equations
+# debug
+twenty
+ev
+# put quantum numbers into parameter file
+# ==== DEFAULT OPTIONS ====
+broadening is wanted
+use free gas model of doppler broadening
+reich-moore formalism is wanted
+shift energy for exponential tail on resolution broadening
+# do not include self-shielding of multiple-scattering corrections
+# ==== ALT TO DEFAULT ====
+# use multiple scattering plus single scattering
+# ==== NON-DEFAULT OPTIONS ====
+shift rpi resolution function to center
+# plot resolution function
+generate plot file a
+# use total cross section for resolution broadening
+# ==== SPECIAL OPTIONS ====
+# generate spin group cross sections
+#
+# _____________________________________
+#     Card Set 4 - end with blank
+# _____________________________________
+# Particle pair definitions... taken care of in card set 10.1
+#
+# _____________________________________
+#     Card Set 4.5
+# _____________________________________
+# res(epts) if "plot resolution func"
+# 0.001000 0.1000000 1.0000000 10.000000 100.00000 300.00000
+# _____________________________________
+#     Card Set 5 
+# Numerical broadening definitions
+# preceding cards blank line must be just before this card begins
+# _____________________________________
+
+300.       400.                             0.0000               
+  8.127100  0.120000                       0.00000        
+total                                                               
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+  3      1    0 -2.0       1.0  3.5
+    1    1    0    1       3.0
+  4      2    0 -3.0       1.0  3.5
+    1    1    0    1       3.0
+    2    1    0    1       4.0
+  5      2    0 -4.0       1.0  3.5
+    1    1    0    1       3.0
+    2    1    0    1       4.0
+  6      1    0 -5.0       1.0  3.5
+    1    1    0    1       3.0
+
+# _____________________________________
+#     Card Set 11
+# present if ss and ms corrections are flagged in card 3
+# _____________________________________
+# sample thickness (cm), other info
+0.120000         
+#
+# ===========================================================================
+# Following card sets can either be here in .inp or in .par, not both
+#     - Must be in .par if you want to vary them
+#     - Order does not matter, but they must be below here!
+# ===========================================================================
+# par card set 4: doppler broadening 
+#     - ignoring, done above
+# par card set 6: normalization and background 
+#     - ignoring, doing this outside of sammy
+#     - If I put this into the par file, I can vary the variables
+# par card set 8: data reduction parameters 
+#     - ignoring, doing this outside of sammy
+#     - If I put this into the par file, I can vary the variables
+# par card set 9: Oak Ridge Resolution Function
+# par card set 10: isotopic and nuclid abundances 
+# par card set 11: miscellaneous parameters that may vary
+# par card set 12: paramagnetic cross seciton parameters to follow
+# par card set 13: background functions, can be varied if in .par
+# _____________________________________
+#     par Card Set 14 - end with blank
+# Resolution function definition - put into par file if varying parameters
+# _____________________________________
+RPI Resolution
+# many omitted lines
+CHANN 0    1.62 52428.8 0.8
+CHANN 0    2.71 26214.4 0.8
+CHANN 0    6.51 819.2 0.8
+CHANN 0  145.80 102.4 0.8
+CHANN 0  32211.30 25.6 0.8
+
+# par card set 15: detector efficiencies
+# par card set 16: user defined resolution function

@@ -13,7 +13,7 @@ from ATARI import PiTFAll as pf
 import os
 
 
-case_file = os.path.realpath('/Users/noahwalton/Documents/GitHub/ATARI/Fitting/perf_test_staticladder.hdf5')
+case_file = os.path.realpath('/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/perf_test_staticwindow_poleposition.hdf5')
 
 
 # %%
@@ -55,8 +55,8 @@ for i in range(500):
         )
 
         # sorting result by weighted square
-        suggested_peaks = pulses_sel_df.nlargest(5, 'peak_sq_divE')#.peak_E
-        suggested_peaks = pd.DataFrame(suggested_peaks.loc[:,'peak_E'])
+        suggested_peaks = pulses_sel_df.nlargest(10, 'peak_sq_divE')#.peak_E
+        suggested_peaks = pd.DataFrame(suggested_peaks.loc[:, ['peak_E','peak_sq_divE'] ])
         suggested_peaks.rename(columns={'peak_E':'E'}, inplace=True)
 
         # plot_search_results(transm_df, ladder_df, pulses_sel_df)

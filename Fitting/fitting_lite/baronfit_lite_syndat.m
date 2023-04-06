@@ -86,15 +86,24 @@ plot(WE, trans_func(sol_w),'o', 'DisplayName', 'Matlab theo') ; hold on
 plot(WE, exp_pw.theo_trans, 'DisplayName', 'Syndat theo')
 legend()
 
+% figure(2)
+% plot(WE, trans_func(sol_w)-exp_pw.theo_trans')
 
 %% solve baron 1 Original implementation - Works!
 
-% fun_robust1=@(w) sum((xs_func(w)-WC).^2);
-fun_robust1=@(w) sum((trans_func(w)-WC).^2);
+
+% chi2 = @(w) (trans_func(w)-WC) * inv(exp_cov) *  (trans_func(w)-WC)' ;
+diag_cov = (diag(exp_cov))' ;
+% chi2 = @(w) (trans_func(w)-WC) * inv_diag_cov *  (trans_func(w)-WC)' ;
+fun_robust1=@(w) sum((trans_func(w)-WC).^2./diag_cov) ;
+% fun_robust1=@(w) chi2(w) ;
+
 
 % insert min/max of Gc, gn_square, and energy 
-MinVec = [0 0 min(WE)];
-MaxVec = [25 10 max(WE)];
+Gc_bound = [min(Gc)*0.9 max(Gc)*1.1];
+gn_square_bound = [min(gn_square)*0.9, max(gn_square)*1.1];
+MinVec = [Gc_bound(1) gn_square_bound(1)  min(WE)];
+MaxVec = [Gc_bound(2) gn_square_bound(2)  max(WE)];
 
 % automated setup of baron inputs
 RM_PerPeak = 3 ;
@@ -110,39 +119,38 @@ for jj=1:NumPeaks
     A_Upper([1+Index1,2+Index1,3+Index1],Index2)=-MaxVec;
 end
  
-% EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
-% PeakSpacing=1;
-% for jj=1:(NumPeaks-1)
-%     EnergyOrder(jj,RM_PerPeak+RM_PerPeak*(jj-1))=-1;
-%     EnergyOrder(jj,RM_PerPeak+RM_PerPeak*jj)=1;
-%     EnergyOrder(jj,TotalRM_PerWindow+jj)=-PeakSpacing/2;
-%     EnergyOrder(jj,TotalRM_PerWindow+(jj+1))=-PeakSpacing/2;
-% end
-% 
-% A = [A_Lower;A_Upper;EnergyOrder];
-% 
-% SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
-% SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
+EnergyOrder=zeros(NumPeaks-1,4*NumPeaks);
+PeakSpacing=1;
+for jj=1:(NumPeaks-1)
+    EnergyOrder(jj,RM_PerPeak+RM_PerPeak*(jj-1))=-1;
+    EnergyOrder(jj,RM_PerPeak+RM_PerPeak*jj)=1;
+    EnergyOrder(jj,TotalRM_PerWindow+jj)=-PeakSpacing/2;
+    EnergyOrder(jj,TotalRM_PerWindow+(jj+1))=-PeakSpacing/2;
+end
 
-A = [A_Lower;A_Upper]; 
-SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow)];
-SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow)];
+A = [A_Lower;A_Upper;EnergyOrder];
+
+SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow),zeros(1,NumPeaks-1)];
+SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow),inf(1,NumPeaks-1)];
+
+% A = [A_Lower;A_Upper]; 
+% SC_LowerBounds=[zeros(1,TotalRM_PerWindow),inf(1,TotalRM_PerWindow)];
+% SC_UpperBounds=[-inf(1,TotalRM_PerWindow),zeros(1,TotalRM_PerWindow)];
 
 lb=zeros(1,TotalParm_PerWindow);
 ub=[repmat(MaxVec,1,NumPeaks),ones(1,NumPeaks)];
 
 % baron runtime options
-Options=baronset('threads',8,'PrLevel',1,'MaxTime',2*60, 'EpsA', fun_robust1(sol_w), 'filekp', 0);
+Options=baronset('threads',8,'PrLevel',1,'MaxTime',4*60, 'EpsA', fun_robust1(sol_w));
 
 %%
 xtype=squeeze(char([repmat(["C","C","C"],1,NumPeaks),repmat(["B"],1,NumPeaks)]))';
 
-w0 = w1; % optional inital guess
+w0 = []; % optional inital guess
 [w1,fval,ef,info]=baron(fun_robust1,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,w0, Options); % run baron
 
 
 %%
-
 
 figure(1); clf
 errorbar(WE, WC, sqrt(diag(exp_cov)), '.', 'DisplayName', 'Syndat exp'); hold on
@@ -154,3 +162,30 @@ legend()
 
 fprintf('SE solution: %f\n',fun_robust1(sol_w))
 fprintf('SE Baron: %f\n', fval)
+
+
+%% solve for maximum liklihood
+
+inv_exp_cov = inv(exp_cov) ; 
+chi2 = @(w) (trans_func(w)-WC) * inv_exp_cov *  (trans_func(w)-WC)' ;
+
+dof = length(WE)-TotalParm_PerWindow; 
+G = gamma(dof/2) ;                              % why is Vlad normalizing by chi2pdf(dof-2,dof) ??
+mypdf = @(w) ( 1/(2^(dof/2)*G) * chi2(w)^(dof/2-1) * exp(-chi2(w)/2) ) / chi2pdf(dof-2,dof);
+fun_robust2= @(w) -log10( mypdf(w) );
+
+[w2,fval,ef,info]=baron(fun_robust2,A,SC_LowerBounds,SC_UpperBounds,lb,ub,[],[],[],xtype,w1, Options); % run baron
+
+%%
+
+figure(1); clf
+errorbar(WE, WC, sqrt(diag(exp_cov)), '.', 'DisplayName', 'Syndat exp'); hold on
+plot(WE, trans_func(sol_w), 'DisplayName', 'Matlab theo') ; hold on
+% plot(WE, exp_pw.theo_trans, 'DisplayName', 'Syndat theo'); hold on
+plot(WE, trans_func(w2), 'DisplayName','Baron sol');
+legend()
+
+
+fprintf('SE solution: %f\n',fun_robust1(sol_w))
+fprintf('SE Baron: %f\n', fval)
+

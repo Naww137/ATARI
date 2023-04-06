@@ -1,14 +1,14 @@
-function pswarm_fit_rev1(case_file, isample)
-% addpath('/Users/noahwalton/software/PSwarmM_v2_1')
-addpath('/home/nwalton1/PSwarm')
+% function pswarm_fit_rev1(case_file, isample)
+addpath('/Users/noahwalton/software/PSwarmM_v2_1')
+% addpath('/home/nwalton1/PSwarm')
 % Description
 
 tStart = tic ; 
 initial_guess = true;
 plotting = false;
 
-% case_file = './perf_test_staticladder.hdf5';
-% isample = 4 ;
+case_file = '/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/perf_test_staticladder_old.hdf5';
+isample = 4 ;
 
 % Load data as a table
 exp_pw = read_hdf5(case_file, sprintf('/sample_%i/exp_pw', isample)) ;
@@ -203,7 +203,7 @@ tfit = [tStop; zeros(NumPeaks-1,1)];
 parameter_estimate_table = table(E, Gg, gnx2, tfit);
 writetable(parameter_estimate_table, sprintf('./par_est_%i.csv', isample))
 
-end
+% end
 
 
 

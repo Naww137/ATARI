@@ -1,0 +1,19 @@
+Ta181
+Ta181     180.948030  0.00001  330.0000     0    0 0  0 0  0         0
+PRINT ALL INPUT PARAMETERS
+DO NOT SOLVE BAYES EQUATIONS
+DEBUG
+TWENTY
+GENERATE PLOT FILE A
+MLBW FORMALISM IS WANTED
+PUT QUANTUM NUMBERS INTO PARAMETER FILE
+ 
+300.                                        0.0000                    
+  8.127100  0.120000                       0.00000          
+TRANSMISSION                                                                  
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+  3      1    0  2.0       1.0  3.5
+    1    1    0    0      -2.0

@@ -9,7 +9,7 @@ examples/*.hdf5
 */.bar*
 *.dat
 fort*
-Fitting/
+#Fitting/
 
 
 # Byte-compiled / optimized / DLL files

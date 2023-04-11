@@ -24,7 +24,7 @@ def plot1(energy,theo,exp,label1,label2):
 
 def plot2(x,theo,exp,exp_unc, title):
     
-    fig, (ax1,ax2,ax3) = plt.subplots(3,1, sharex=True, constrained_layout=True, gridspec_kw={'height_ratios': [2, 1, 1]}) # , figsize=(12,5)
+    fig, (ax1,ax2,ax3) = subplots(3,1, sharex=True, constrained_layout=True, gridspec_kw={'height_ratios': [2, 1, 1]}) # , figsize=(12,5)
     rcParams['figure.dpi'] = 500
     
     ax1.plot(x,theo, lw=0.5, color='b', label='$T_{theo}$', zorder=2)

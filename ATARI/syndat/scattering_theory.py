@@ -119,13 +119,13 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
         k = k_wavenumber(E, M, m)
         rho = k*ac
 
-        S_array = np.zeros([orbital_angular_momentum+1,len(E)])
-        P_array = np.ones([orbital_angular_momentum+1,len(E)])
-        arcphi_array = np.ones([orbital_angular_momentum+1,len(E)])
+        S_array = np.zeros([int(orbital_angular_momentum+1),len(E)])
+        P_array = np.ones([int(orbital_angular_momentum+1),len(E)])
+        arcphi_array = np.ones([int(orbital_angular_momentum+1),len(E)])
         P_array[0,:] *= rho
         arcphi_array[0,:] *= rho
 
-        for l in range(1,orbital_angular_momentum+1):
+        for l in range(1,int(orbital_angular_momentum+1)):
             S = (rho**2*(l-S_array[l-1]) / ((l-S_array[l-1])**2 + P_array[l-1]**2)) - l
             P = rho**2*P_array[l-1] / ((l-S_array[l-1])**2 + P_array[l-1]**2)
             arcphi = arcphi_array[l-1] - np.arctan(P_array[l-1]/(l-S_array[l-1]))
@@ -203,7 +203,7 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
 
 
 def reduced_width_square_2_partial_width(E, ac, M, m, reduced_widths_square, orbital_angular_momentum):
-    S, P, psi, k = FofE_explicit(np.array(E), ac, M, m, orbital_angular_momentum)
+    S, P, psi, k = FofE_recursive(np.array(E), ac, M, m, orbital_angular_momentum)
     partial_widths = 2*P*reduced_widths_square 
     return partial_widths
 

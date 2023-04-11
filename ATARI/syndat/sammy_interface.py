@@ -468,9 +468,9 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
 
     # edit copied runtime template files
     write_saminp(model, particle_pair, reaction, True, os.path.join(sammy_runDIR, 'sammy.inp'))
-    write_sampar(resonance_ladder, particle_pair, False, os.path.join(sammy_runDIR,"sammy.par"))
+    write_sampar(resonance_ladder, particle_pair, True, os.path.join(sammy_runDIR,"sammy.par"))
     with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
-        f.write('sammy.inp\nsammy.par\sammy.dat\n')
+        f.write('sammy.inp\nsammy.par\nsammy.dat\n')
 
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(

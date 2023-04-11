@@ -9,6 +9,7 @@ examples/*.hdf5
 */.bar*
 *.dat
 fort*
+*/SAMMY_runDIR/*
 #Fitting/
 
 

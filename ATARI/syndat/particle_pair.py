@@ -10,7 +10,7 @@ import os
 import numpy as np
 from ATARI.syndat import sample_widths
 from ATARI.syndat import sample_levels
-from ATARI.syndat import scattering_theory
+from ATARI.scattering_theory import xs
 import pandas as pd
 
 
@@ -294,7 +294,7 @@ class Particle_Pair:
 
                 # sample observable width as sum of multiple single-channel width with the same average (chi2, DOF=channels)
                 red_nwidth = sample_widths.sample_RRR_widths(levels, average_parameters.gn2[f'{j[0]}']/j[1], j[1])
-                E_Gn_gnx2 = pd.DataFrame([levels, Gwidth, red_nwidth, [j[0]]*len(levels), [j[1]]*len(levels), [min(j[2])]*len(levels), [J_ID]*len(levels)], index=['E','Gg', 'gnx2', 'J', 'chs', 'lwave', 'J_ID'])  
+                E_Gn_gnx2 = pd.DataFrame([levels, Gwidth, red_nwidth, [j[0]]*len(levels), [j[1]]*len(levels), [j[2]]*len(levels), [J_ID]*len(levels)], index=['E','Gg', 'gnx2', 'J', 'chs', 'lwave', 'J_ID'])  
                 # assert len(np.unique(j[2]))==1, "Code cannot consider different l-waves contributing to a spin group"
                 resonance_ladder = pd.concat([resonance_ladder, E_Gn_gnx2.T])
 

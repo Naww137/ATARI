@@ -11,7 +11,7 @@ Created on Wed Jul 27 12:19:52 2022
 import numpy as np     
 import pandas as pd
 from ATARI.syndat import exp_effects
-from ATARI.syndat import sammy_interface
+from ATARI.sammy_interface import sammy_interface
 from copy import deepcopy
     
 

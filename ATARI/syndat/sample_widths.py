@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import scipy.stats as stats
-from ATARI.syndat import scattering_theory
 
 
 def sample_chisquare(N_samples, DOF):

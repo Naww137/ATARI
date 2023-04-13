@@ -12,8 +12,8 @@ import pandas as pd
 import numpy as np
 from pandas import HDFStore
 import h5py
-from ATARI.syndat.scattering_theory import SLBW
-from ATARI.syndat import sammy_interface
+from ATARI.scattering_theory.xs import SLBW
+from ATARI.sammy_interface import sammy_interface
 import ATARI.atari_io.hdf5 as io
 
 

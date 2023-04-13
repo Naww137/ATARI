@@ -5,7 +5,7 @@ import os
 from scipy import integrate
 import h5py
 import matplotlib.pyplot as plt
-from ATARI.syndat import scattering_theory
+from ATARI.scattering_theory.xs import SLBW
 from numpy.linalg import inv
 
 # ===========================================================================================
@@ -122,9 +122,9 @@ def take_syndat_spingroups(theo_par_df, est_par_df):
 ###
 def calculate_xs(energy, particle_pair, theo_par_df, est_par_df):
 
-    xs_tot_theo, xs_scat_syndat, xs_cap_syndat = scattering_theory.SLBW(energy, particle_pair, theo_par_df)
+    xs_tot_theo, xs_scat_syndat, xs_cap_syndat = SLBW(energy, particle_pair, theo_par_df)
     take_syndat_spingroups(theo_par_df, est_par_df)
-    xs_tot_est, xs_scat_fit, xs_cap_fit = scattering_theory.SLBW(energy, particle_pair, est_par_df)
+    xs_tot_est, xs_scat_fit, xs_cap_fit = SLBW(energy, particle_pair, est_par_df)
 
     return xs_tot_theo, xs_tot_est
 
@@ -137,14 +137,14 @@ def reconstruct_fit(experiment, particle_pair,
     est_par_df = take_syndat_spingroups(theo_par_df, est_par_df)
 
     if f'est_trans_{fit_name}' not in exp_pw_df:
-        est_xs_tot, est_xs_scat, est_xs_cap = scattering_theory.SLBW(exp_pw_df.E, particle_pair, est_par_df)
+        est_xs_tot, est_xs_scat, est_xs_cap = SLBW(exp_pw_df.E, particle_pair, est_par_df)
         n = experiment.redpar.val.n  # atoms per barn or atoms/(1e-12*cm^2)
         est_trans = np.exp(-n*est_xs_tot)
         exp_pw_df[f'est_trans_{fit_name}'] = est_trans
         exp_pw_df.to_hdf(case_file, f'sample_{isample}/exp_pw')
     else:
         if overwrite_reconstructed_fits:
-            est_xs_tot, est_xs_scat, est_xs_cap = scattering_theory.SLBW(exp_pw_df.E, particle_pair, est_par_df)
+            est_xs_tot, est_xs_scat, est_xs_cap = SLBW(exp_pw_df.E, particle_pair, est_par_df)
             n = experiment.redpar.val.n  # atoms per barn or atoms/(1e-12*cm^2)
             est_trans = np.exp(-n*est_xs_tot)
             exp_pw_df[f'est_trans_{fit_name}'] = est_trans
@@ -153,12 +153,12 @@ def reconstruct_fit(experiment, particle_pair,
             pass 
 
     if f'est_xs_{fit_name}' not in theo_pw_df:
-        est_xs_tot, est_xs_scat, est_xs_cap = scattering_theory.SLBW(theo_pw_df.E, particle_pair, est_par_df)
+        est_xs_tot, est_xs_scat, est_xs_cap = SLBW(theo_pw_df.E, particle_pair, est_par_df)
         theo_pw_df[f'est_xs_{fit_name}'] = est_xs_tot
         theo_pw_df.to_hdf(case_file, f'sample_{isample}/theo_pw')
     else:
         if overwrite_reconstructed_fits:
-            est_xs_tot, est_xs_scat, est_xs_cap = scattering_theory.SLBW(theo_pw_df.E, particle_pair, est_par_df)
+            est_xs_tot, est_xs_scat, est_xs_cap = SLBW(theo_pw_df.E, particle_pair, est_par_df)
             theo_pw_df[f'est_xs_{fit_name}'] = est_xs_tot
             theo_pw_df.to_hdf(case_file, f'sample_{isample}/theo_pw')
         else:

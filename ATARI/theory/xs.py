@@ -1,5 +1,5 @@
 import numpy as np
-from ATARI.scattering_theory import params
+from ATARI.theory import scattering_params
 
 
 def SLBW(E, pair, resonance_ladder):
@@ -29,8 +29,8 @@ def SLBW(E, pair, resonance_ladder):
         
         # window potential scattering
         lwave=0; Jpi=3.0
-        window_shift, window_penetration, window_phi, window_k = params.FofE_explicit(E, pair.ac, pair.M, pair.m, lwave)
-        g = params.gstat(Jpi, pair.I, pair.i)
+        window_shift, window_penetration, window_phi, window_k = scattering_params.FofE_explicit(E, pair.ac, pair.M, pair.m, lwave)
+        g = scattering_params.gstat(Jpi, pair.I, pair.i)
         potential_scattering = (4*np.pi*g/(window_k**2)) * np.sin(window_phi)**2
         # TODO: if resonance ladder is empty, need to calculate scattering phase shift for EACH JPI
         xs_cap = 0
@@ -52,8 +52,8 @@ def SLBW(E, pair, resonance_ladder):
         assert len(orbital_angular_momentum) == 1, "Cannot handle different l-waves contributing to multichannel widths"
         
         # calculate functions of energy -> shift, penetrability, phase shift
-        g = params.gstat(Jpi, pair.I, pair.i) #(2*J+1)/( (2*ii+1)*(2*I+1) );   # spin statistical factor g sub(j alpha)
-        shift, penetration, phi, k = params.FofE_explicit(E, pair.ac, pair.M, pair.m, orbital_angular_momentum[0])
+        g = scattering_params.gstat(Jpi, pair.I, pair.i) #(2*J+1)/( (2*ii+1)*(2*I+1) );   # spin statistical factor g sub(j alpha)
+        shift, penetration, phi, k = scattering_params.FofE_explicit(E, pair.ac, pair.M, pair.m, orbital_angular_momentum[0])
 
         # calculate capture
         sum1 = 0

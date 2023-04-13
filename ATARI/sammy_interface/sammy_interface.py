@@ -10,7 +10,7 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-from ATARI.scattering_theory import params
+from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
 
@@ -89,7 +89,7 @@ def write_sampar(df, pair, vary_parm, filename,
     """
 
     def gn2G(row):
-        S, P, phi, k = params.FofE_recursive([row.E], pair.ac, pair.M, pair.m, row.lwave)
+        S, P, phi, k = scattering_params.FofE_recursive([row.E], pair.ac, pair.M, pair.m, row.lwave)
         Gnx = 2*np.sum(P)*row.gnx2
         return Gnx.item()
 
@@ -498,8 +498,11 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
 
     # read output lst and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
+    # par_df = read_sammy_par(os.path.join(sammy_runDIR, 'sammy.par'))
+    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+    
     if not keep_runDIR:
         shutil.rmtree(sammy_runDIR)
 
-    return lst_df
+    return lst_df, par_df
 

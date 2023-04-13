@@ -10,7 +10,7 @@ import os
 import numpy as np
 from ATARI.syndat import sample_widths
 from ATARI.syndat import sample_levels
-from ATARI.scattering_theory import xs
+from ATARI.theory import xs
 import pandas as pd
 
 

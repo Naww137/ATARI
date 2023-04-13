@@ -7,13 +7,10 @@ Created on Thu Jun 23 11:26:07 2022
 """
 
 import os
-import shutil
 import pandas as pd
 import numpy as np
-from pandas import HDFStore
 import h5py
-from ATARI.scattering_theory.xs import SLBW
-from ATARI.sammy_interface import sammy_interface
+from ATARI.theory.xs import SLBW
 import ATARI.atari_io.hdf5 as io
 
 

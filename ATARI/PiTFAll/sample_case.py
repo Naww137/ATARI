@@ -5,7 +5,7 @@ import os
 from scipy import integrate
 import h5py
 import matplotlib.pyplot as plt
-from ATARI.scattering_theory.xs import SLBW
+from ATARI.theory.xs import SLBW
 from numpy.linalg import inv
 
 # ===========================================================================================

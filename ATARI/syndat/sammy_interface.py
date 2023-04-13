@@ -89,7 +89,7 @@ def write_sampar(df, pair, vary_parm, filename,
     """
 
     def gn2G(row):
-        S, P, phi, k = scattering_theory.FofE_recursive([row.E], pair.ac, pair.M, pair.m, max(row.lwave))
+        S, P, phi, k = scattering_theory.FofE_recursive([row.E], pair.ac, pair.M, pair.m, row.lwave)
         Gnx = 2*np.sum(P)*row.gnx2
         return Gnx.item()
 
@@ -101,6 +101,9 @@ def write_sampar(df, pair, vary_parm, filename,
             df['Gnx'] = df.apply(lambda row: gn2G(row), axis=1)
         else:
             pass
+        
+        # force to 0.001 if Gnx == 0
+        df['Gnx'][df['Gnx']==0] = 0.001
 
         par_array = np.array([df.E, df.Gg, df.Gnx]).T
         zero_neutron_widths = 5-(len(par_array[0]))
@@ -309,8 +312,12 @@ def read_sammy_par(filename, calculate_average):
 # 
 # ============================================================================= 
 def copy_template_to_runDIR(exp, file, target_dir):
+    if os.path.splitext(file)[0] != 'sammy':
+        file_out = ''.join(('sammy', os.path.splitext(file)[1]))
+    else:
+        file_out = file
     shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', f'{exp}', file), 
-                os.path.join(target_dir,file))
+                os.path.join(target_dir,file_out))
     return
 
 def write_saminp(model, particle_pair, reaction, bayes, filepath):
@@ -342,7 +349,8 @@ def calculate_xs(energy_grid, resonance_ladder, particle_pair,
                                                 reaction = 'total',
                                                 expertimental_corrections = 'all_exp',
                                                 sammy_runDIR='SAMMY_runDIR',
-                                                keep_runDIR = False  
+                                                keep_runDIR = False,
+                                                one_spingroup = False  
                                                                                         ):
     """
     Calculate a cross section using the SAMMY code.
@@ -382,7 +390,10 @@ def calculate_xs(energy_grid, resonance_ladder, particle_pair,
         os.mkdir(sammy_runDIR)
 
     # fill temporary sammy_runDIR with runtime appropriate template files
-    copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
+    if one_spingroup:
+        copy_template_to_runDIR(expertimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
+    else:
+        copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
     copy_template_to_runDIR(expertimental_corrections, 'sammy.par', sammy_runDIR)
 
     # write estruct file to runDIR
@@ -419,7 +430,8 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
                                                 reaction = 'total',
                                                 expertimental_corrections = 'all_exp',
                                                 sammy_runDIR='SAMMY_runDIR',
-                                                keep_runDIR = False  
+                                                keep_runDIR = False,
+                                                one_spingroup = False  
                                                                                         ):
     """
     Calculate a cross section using the SAMMY code.
@@ -459,7 +471,10 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
         os.mkdir(sammy_runDIR)
 
     # fill temporary sammy_runDIR with runtime appropriate template files
-    copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
+    if one_spingroup:
+        copy_template_to_runDIR(expertimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
+    else:
+        copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
     copy_template_to_runDIR(expertimental_corrections, 'sammy.par', sammy_runDIR)
 
     # write estruct file to runDIR

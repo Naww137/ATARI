@@ -8,9 +8,9 @@ Created on Thu Jun 16 12:18:04 2022
 
 import os
 import numpy as np
-from syndat import sample_widths
-from syndat import sample_levels
-from syndat import scattering_theory
+from ATARI.syndat import sample_widths
+from ATARI.syndat import sample_levels
+from ATARI.syndat import scattering_theory
 import pandas as pd
 
 

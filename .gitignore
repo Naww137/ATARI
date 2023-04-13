@@ -1,7 +1,7 @@
 # misc
 *.DS_Store
 workspace/
-examples/*.hdf5
+*.hdf5
 *.png
 *.csv
 *.asv

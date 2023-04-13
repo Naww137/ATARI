@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import syndat
+from ATARI.syndat import MMDA
 import subprocess
 from ATARI import PiTFAll as pf
 import pandas as pd
@@ -68,7 +68,7 @@ class performance_test():
                                 fixed_resonance_ladder=None,
                                                         ):
         ### generate syndats
-        samples_not_generated = syndat.MMDA.generate(particle_pair, experiment, 
+        samples_not_generated = MMDA.generate(particle_pair, experiment, 
                                                     solver, 
                                                     self.dataset_range, 
                                                     self.case_file,

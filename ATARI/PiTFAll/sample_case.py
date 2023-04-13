@@ -5,7 +5,7 @@ import os
 from scipy import integrate
 import h5py
 import matplotlib.pyplot as plt
-from syndat import scattering_theory
+from ATARI.syndat import scattering_theory
 from numpy.linalg import inv
 
 # ===========================================================================================

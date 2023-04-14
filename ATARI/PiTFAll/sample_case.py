@@ -58,9 +58,7 @@ def read_sample_case_data(case_file, isample, fit_name):
     # read in data
     exp_pw_df, theo_pw_df = read_pw_datasets(case_file, isample)
     theo_par_df, est_par_df = read_par_datasets(case_file, isample, fit_name)
-    with h5py.File(case_file) as f:
-        exp_cov = f[f'sample_{isample}/exp_cov'][()]
-        f.close()
+    exp_cov = pd.read_hdf(case_file, f'sample_{isample}/exp_cov')
 
     # sort parameter data
     theo_par_df.sort_values('E', inplace=True)

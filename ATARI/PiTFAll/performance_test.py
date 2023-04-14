@@ -2,12 +2,12 @@ import os
 import numpy as np
 from ATARI.syndat import MMDA
 import subprocess
-from ATARI import PiTFAll as pf
+from ATARI.PiTFAll import sample_case
 import pandas as pd
 import h5py
 
 
-class performance_test():
+class Performance_Test():
 
     def __init__(self,
                     dataset_range,
@@ -81,7 +81,7 @@ class performance_test():
         ### Get test-level statistics
         FoMs = []
         for i in range(min(self.dataset_range), max(self.dataset_range)):
-            FoMs_sample = pf.sample_case.analyze_syndat(self.case_file, i)
+            FoMs_sample = sample_case.analyze_syndat(self.case_file, i)
             FoMs.append(FoMs_sample)
 
         sample_data_df = pd.DataFrame(FoMs, columns=['isample',
@@ -142,7 +142,7 @@ The mean/std of the fit to theorectical MSE is {mean_fit_theo_MSE} +/- {std_fit_
         integral_par_FoMs  = []
         bias_variance_window = [] 
         for i in range(min(self.dataset_range), max(self.dataset_range)):
-            integral_pw_FoMs_sample, integral_par_FoMs_sample, bias_variance_sample = pf.sample_case.analyze_fit(
+            integral_pw_FoMs_sample, integral_par_FoMs_sample, bias_variance_sample = sample_case.analyze_fit(
                                                                                                         self.case_file, 
                                                                                                         i, 
                                                                                                         experiment, 

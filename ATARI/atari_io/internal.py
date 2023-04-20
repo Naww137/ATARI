@@ -18,15 +18,14 @@ def check_and_place(resonance_ladder, item, key):
     if key in resonance_ladder.columns:
         pass
     else:
-        if item == None:
-            raise ValueError("Spin group information is missing and not provided")
+        if isinstance(item, list) or isinstance(item, np.ndarray):
+            if len(resonance_ladder.index) != len(item):
+                raise ValueError(f"A list was passed for {key} but it does not match the length of the resonance ladder")
+            resonance_ladder.loc[:,key] = item
         else:
-            if isinstance(item, list):
-                if len(resonance_ladder.index) != len(item):
-                    raise ValueError(f"A list was passed for {key} but it does not match the length of the resonance ladder")
-                resonance_ladder.loc[:,key] = item
-            else:
-                resonance_ladder.loc[:,key] = [item]*len(resonance_ladder.index)
+            if item == None:
+                raise ValueError("Spin group information is missing and not provided")
+            resonance_ladder.loc[:,key] = [item]*len(resonance_ladder.index)
     return 
 
 
@@ -35,6 +34,38 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
                                                     chs=None,
                                                     lwave=None,
                                                     J_ID= None  ):
+    """
+    Fills out the resonance ladder DataFrame. 
+    Calculates partial width from reduced width and vice-versa. 
+    Optional **kwargs allow for sping group information to be added.
+
+    Parameters
+    ----------
+    resonance_ladder : DataFrame
+        Resonance ladder you want to fill.
+    particle_pair : ATARI.syndat Particle_Pair class
+        Particle pair class instance.
+    J : float or array-like, optional
+        J will only be assigned if the column does not already exist. 
+        If scalar it is applied to all resonances in the ladder. 
+        If array-like it is concatenated to the DataFrame, by default None
+    chs : _type_, optional
+        chs will only be assigned if the column does not already exist. 
+        If scalar it is applied to all resonances in the ladder. 
+        If array-like it is concatenated to the DataFrame, by default None
+    lwave : _type_, optional
+        lwave will only be assigned if the column does not already exist. 
+        If scalar it is applied to all resonances in the ladder. 
+        If array-like it is concatenated to the DataFrame, by default None
+    J_ID : _type_, optional
+        J_ID will only be assigned if the column does not already exist. 
+        If scalar it is applied to all resonances in the ladder. 
+        If array-like it is concatenated to the DataFrame, by default None
+
+    Returns
+    -------
+    resonance_ladder : DataFrame
+    """
 
     def gn2G(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)

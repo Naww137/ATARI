@@ -103,7 +103,7 @@ def write_sampar(df, pair, vary_parm, filename,
             pass
         
         # force to 0.001 if Gnx == 0
-        df['Gnx'][df['Gnx']==0] = 0.001
+        df.loc[df['Gnx']==0.0, 'Gnx'] = 0.0001
 
         par_array = np.array([df.E, df.Gg, df.Gnx]).T
         zero_neutron_widths = 5-(len(par_array[0]))

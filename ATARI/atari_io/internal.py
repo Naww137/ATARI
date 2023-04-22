@@ -14,7 +14,7 @@ from ATARI.theory.scattering_params import FofE_recursive
 #     return est_par_df
 
 
-def check_and_place(resonance_ladder, item, key):
+def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
     if key in resonance_ladder.columns:
         pass
     else:
@@ -79,14 +79,17 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     # check spin group information
     for item, key in zip([J,chs,lwave,J_ID], ['J', 'chs', 'lwave', 'J_ID']):
-        check_and_place(resonance_ladder, item, key)
+        check_and_place_resonance_latter_columns(resonance_ladder, item, key)
 
-    # calculate other missing widths
-    if 'Gnx' not in resonance_ladder:
-        resonance_ladder['Gnx'] = resonance_ladder.apply(lambda row: gn2G(row), axis=1)
-    if 'gnx' not in resonance_ladder:
-        resonance_ladder['gnx2'] = resonance_ladder.apply(lambda row: G2gn(row), axis=1)
-    if 'Gt' not in resonance_ladder:
-        resonance_ladder['Gt'] = resonance_ladder['Gnx'] + resonance_ladder['Gg']
+    if len(resonance_ladder.index) == 0:
+        return resonance_ladder
+    else:
+        # calculate other missing widths
+        if 'Gnx' not in resonance_ladder:
+            resonance_ladder['Gnx'] = resonance_ladder.apply(lambda row: gn2G(row), axis=1)
+        if 'gnx' not in resonance_ladder:
+            resonance_ladder['gnx2'] = resonance_ladder.apply(lambda row: G2gn(row), axis=1)
+        if 'Gt' not in resonance_ladder:
+            resonance_ladder['Gt'] = resonance_ladder['Gnx'] + resonance_ladder['Gg']
 
     return resonance_ladder

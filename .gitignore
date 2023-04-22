@@ -10,8 +10,6 @@ workspace/
 *.dat
 fort*
 SAMMY_runDIR/
-noah_dev/
-#Fitting/
 
 
 # Byte-compiled / optimized / DLL files

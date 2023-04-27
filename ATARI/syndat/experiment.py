@@ -444,7 +444,8 @@ class Experiment:
             self.trans['exp_trans_unc'] = np.sqrt(np.diag(self.CovT))
         else:
             self.trans['exp_trans_unc'] = np.sqrt(self.CovT)
-            
+        self.CovT = pd.DataFrame(self.CovT, columns=self.trans.E, index=self.trans.E)
+        self.CovT.index.name = None
 
         # define data cps
         self.odat['cps'] = rates[0]

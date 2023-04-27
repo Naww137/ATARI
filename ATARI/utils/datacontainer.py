@@ -52,9 +52,14 @@ class DataContainer():
         return
 
 
-    def add_experimental(self, experiment, threshold=1e-2):
+    def add_experimental(self, experiment, 
+                                threshold=1e-2,
+                                uncertainty_on_nan_xs = 100,
+                                correlation_on_nan_xs = 0   ):
         self.has_exp = True
         self.threshold = threshold
+        self.uncertainty_on_nan_xs = uncertainty_on_nan_xs 
+        self.correlation_on_nan_xs = correlation_on_nan_xs 
 
         # copy experimental grid dataframe and some reduction parameters
         pw_exp = experiment.trans.copy(deep=True)
@@ -74,8 +79,6 @@ class DataContainer():
         return
 
 
-
-
     def add_estimate(self, resonance_ladder, 
                                     est_name='est',
                                     particle_pair=None):
@@ -85,40 +88,30 @@ class DataContainer():
 
 
 
-
-    def calculate_theo_on_finegrid(self):
-        if self.has_exp:
-            minE = min(self.pw_exp.E)
-            maxE = max(self.pw_exp.E)
-        else:
-            minE = min(self.theo_resonance_ladder.E) - self.theo_resonance_ladder.Gt*1e-3
-            maxE = max(self.theo_resonance_ladder.E) + self.theo_resonance_ladder.Gt*1e-3
-        fineE, theo_xs_tot = calc_xs_on_fine_egrid(np.array([minE, maxE]), 1e2, self.particle_pair, self.theo_resonance_ladder)
-        self.pw_fine = pd.DataFrame({'E':fineE, 'theo_xs':theo_xs_tot})
-        return
-
-
-
     def fill(self):
         
-        self.calculate_theo_on_finegrid()
+        if self.has_theo:
+            self.calculate_theo_pw()
 
         if self.has_exp:
+
             # convert experimental data to cross section and covariance too
             self.pw_exp.sort_values('E', inplace=True)
             self.CovT.sort_index(axis='index', inplace=True)
             self.CovT.sort_index(axis='columns', inplace=True)
             xs_exp, CovXS = trans_2_xs(self.pw_exp.exp_trans, self.n, self.n_unc, self.CovT)
-            index_0trans = np.argwhere(np.array(self.pw_exp.exp_trans<self.threshold)).flatten()
-            xs_exp[index_0trans] = np.nan
-            CovXS[index_0trans,index_0trans] = np.nan
+
+            # set xs and Cov values below threshold to nan, Cov should be large variance 0 covaraiance
+            index_0trans = np.argwhere(np.array(self.pw_exp.exp_trans<self.threshold)).flatten() 
+            xs_exp.iloc[index_0trans] = np.nan
+            CovXS[index_0trans, :] = self.correlation_on_nan_xs
+            CovXS[:, index_0trans] = self.correlation_on_nan_xs
+            CovXS[index_0trans, index_0trans] = self.uncertainty_on_nan_xs 
             self.pw_exp['exp_xs'] = xs_exp
             self.pw_exp['exp_xs_unc'] = np.sqrt(np.diag(CovXS))
             CovXS = pd.DataFrame(CovXS, columns=self.pw_exp.E, index=self.pw_exp.E)
             CovXS.index.name = None
             self.CovXS = CovXS
-
-            # calculate theoretical cross section and transmission on experimental grid 
             
         if self.has_est:
             est_ladder_dict = self.est_resonance_ladder
@@ -143,3 +136,19 @@ class DataContainer():
         self.CovXS = None
 
         return
+    
+
+    def calculate_theo_pw(self):
+        if self.has_exp:
+            minE = min(self.pw_exp.E)
+            maxE = max(self.pw_exp.E)
+            xs_tot, _, _ = SLBW(self.pw_exp.E, self.particle_pair, self.theo_resonance_ladder)
+            self.pw_exp[f'theo_xs'] = xs_tot
+            self.pw_exp[f'theo_trans'] = xs_2_trans(xs_tot, self.n)
+        else:
+            minE = min(self.theo_resonance_ladder.E) - self.theo_resonance_ladder.Gt*1e-3
+            maxE = max(self.theo_resonance_ladder.E) + self.theo_resonance_ladder.Gt*1e-3
+        fineE, theo_xs_tot = calc_xs_on_fine_egrid(np.array([minE, maxE]), 1e2, self.particle_pair, self.theo_resonance_ladder)
+        self.pw_fine = pd.DataFrame({'E':fineE, 'theo_xs':theo_xs_tot})
+        return
+

@@ -1,5 +1,6 @@
 
 import numpy as np
+import pandas as pd
 import scipy.stats as sts
 
 from scipy.linalg import block_diag
@@ -27,8 +28,9 @@ def get_parameter_grid(energy_grid, average_parameters, spin_group, dE, dGt):
     return Elam_features, Gtot_features
 
 
-def get_resonance_matrix(E, particle_pair, Elam_features, Gtot_features):
+def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
     
+    E = np.array(E)
     number_of_resonances = len(Elam_features)*len(Gtot_features)
     Resonance_Matrix = np.zeros((len(E), number_of_resonances))
 
@@ -72,9 +74,48 @@ def convert_2_xs(exp, CovT):
     return exp, CovXS, Lxs
 
 
+
 def get_bound_arrays(nfeat, lb, ub):
     return np.ones(nfeat)*lb, np.ones(nfeat)*ub
 
+
+def get_0Trans_constraint(A, max_xs, index_0Trans, E):
+    constraint = np.array([max_xs]*len(E))
+    constraint[index_0Trans] = -constraint[index_0Trans]
+    constraint_mat = A.copy()
+    constraint_mat[index_0Trans, :] = -constraint_mat[index_0Trans, :]
+    return constraint_mat, constraint
+
+
+def get_resonance_ladder_from_feature_bank(weights, Elam_features, Gtot_features, threshold):
+    feature_indices = np.argwhere(weights>threshold).flatten()
+    resonances = []
+    for ifeature in feature_indices:
+        Efeature_index, Gfeature_index = divmod(ifeature, len(Gtot_features))
+        Elam = Elam_features[Efeature_index]
+        Gt = Gtot_features[Gfeature_index]*1e3
+        w = weights[ifeature]
+        Gnx = Gt*w
+        Gg = Gt-Gnx
+        resonances.append([Elam, Gt, Gnx, Gg, w])
+    resonance_ladder = pd.DataFrame(resonances, columns=['E', 'Gt', 'Gnx', 'Gg', 'w'])
+    return resonance_ladder
+
+
+# def calculate_integral_FoMs(weights, Elam_features, Gtot_features, threshold, datacon):
+#     est_resonance_ladder = get_resonance_ladder_from_matrix(weights, Elam_features, Gtot_features, threshold)
+#     est_resonance_ladder = fill_resonance_ladder(est_resonance_ladder, datacon.particle_pair, J=3.0, chs=1.0, lwave=0.0, J_ID=1.0)
+
+#     xs = Resonance_Matrix@ws_vs_factor[9]+potential_scattering.flatten()
+#     trans = np.exp(-exp.redpar.val.n*xs)
+
+#     fineE = fine_egrid(datacon.pw_exp.E, 1e2)
+#     est_xs_tot, _, _ = SLBW(fineE, datacon.particle_pair, est_resonance_ladder)
+#     theo_xs_tot, _, _ = SLBW(fineE, datacon.particle_pair, datacon.theo_resonance_ladder)
+#     MSE = trapezoid((est_xs_tot-theo_xs_tot)**2, fineE)
+#     bias = est_xs_tot-theo_xs_tot
+
+#     return MSE, bias
 
 
 

@@ -427,7 +427,7 @@ class Experiment:
         # self.odat['cps'], self.odat['dcps'] = exp_effects.cts_to_ctr(self.odat.c, self.odat.dc, self.odat.bw*1e-6, self.redpar.val.trigs)
 
         # estimated background function
-        self.Bi = self.bkg(self.odat.tof*1e6,self.redpar.val.a,self.redpar.val.b) # calc bkg again to recalculate Bi on restructured grid
+        self.Bi = self.bkg(self.odat.tof,self.redpar.val.a,self.redpar.val.b) # calc bkg again to recalculate Bi on restructured grid
 
         # define systematic uncertainties
         sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)

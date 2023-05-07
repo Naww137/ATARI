@@ -10,6 +10,9 @@ from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.theory.scattering_params import gstat
 
 
+# ================================================================================================
+# Functions for setting up the feature bank and constriants
+# ================================================================================================
 
 def get_parameter_grid(energy_grid, average_parameters, spin_group, dE, dGt):
 
@@ -78,14 +81,36 @@ def convert_2_xs(exp, CovT):
 def get_bound_arrays(nfeat, lb, ub):
     return np.ones(nfeat)*lb, np.ones(nfeat)*ub
 
+# def get_0Trans_constraint(A, max_xs, index_0Trans, E):
+#     constraint = np.array([max_xs]*len(E))
+#     constraint[index_0Trans] = -constraint[index_0Trans]
+#     constraint_mat = A.copy()
+#     constraint_mat[index_0Trans, :] = -constraint_mat[index_0Trans, :]
+#     return constraint_mat, constraint
 
-def get_0Trans_constraint(A, max_xs, index_0Trans, E):
-    constraint = np.array([max_xs]*len(E))
-    constraint[index_0Trans] = -constraint[index_0Trans]
-    constraint_mat = A.copy()
-    constraint_mat[index_0Trans, :] = -constraint_mat[index_0Trans, :]
+def get_0Trans_constraint(A, max_xs, index_0Trans):
+    constraint = - np.array([max_xs]*len(index_0Trans))
+    constraint_mat = -A.copy()[index_0Trans, :]
     return constraint_mat, constraint
 
+def remove_nan_values(full_xs, full_cov, full_pscat, full_feature_matrix):
+    index_0T = np.argwhere(np.isnan(full_xs)).flatten()
+    index_finiteT = np.argwhere(np.isfinite(full_xs)).flatten()
+
+    cov = full_cov.copy()[index_finiteT, :]
+    cov = cov[:, index_finiteT]
+
+    xs = full_xs[index_finiteT]
+    pscat = full_pscat[index_finiteT]
+
+    feature_matrix = full_feature_matrix[index_finiteT, :]
+
+    return xs, cov, pscat, feature_matrix, index_0T
+
+
+# ================================================================================================
+# Functions for decoding the feature bank
+# ================================================================================================
 
 def get_resonance_ladder_from_feature_bank(weights, Elam_features, Gtot_features, threshold):
     feature_indices = np.argwhere(weights>threshold).flatten()
@@ -131,3 +156,9 @@ def get_resonance_ladder_from_feature_bank(weights, Elam_features, Gtot_features
 # print((Ap@x-bp)@(Ap@x-bp).T)
 # print((A@x-b)@inv(C)@(A@x-b).T)
 # (Ap@x-bp)@(Ap@x-bp).T == (A@x-b)@inv(C)@(A@x-b).T
+
+
+
+# ================================================================================================
+# Functions runnning the linear or quadratic programs
+# ================================================================================================

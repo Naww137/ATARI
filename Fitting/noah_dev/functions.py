@@ -16,17 +16,23 @@ from ATARI.theory.scattering_params import gstat
 
 def get_parameter_grid(energy_grid, average_parameters, spin_group, dE, dGt):
 
+    # get range of total widths from chi2 cdfs on Gn and Gg
     Gtot_avg = average_parameters['Gn'][spin_group] + average_parameters['Gg'][spin_group]
-    max_Gtot = sts.chi2.ppf(0.99, 1, loc=0, scale=average_parameters['Gn'][spin_group])/1 + average_parameters['Gg'][spin_group]
-    min_Gtot = average_parameters['Gg'][spin_group]
-    max_Gtot = max_Gtot*1e-3
-    min_Gtot = min_Gtot*1e-3
+    maxGn = sts.chi2.ppf(0.99, 1, loc=0, scale=average_parameters['Gn'][spin_group])/1
+    maxGg = sts.chi2.ppf(0.99, 1000, loc=0, scale=average_parameters['Gg'][spin_group])/1000
+    minGg = sts.chi2.ppf(0.01, 1000, loc=0, scale=average_parameters['Gg'][spin_group])/1000
+    max_Gtot = maxGn+maxGg
+    min_Gtot = minGg
+    max_Gtot = max_Gtot/1e3
+    min_Gtot = min_Gtot/1e3
 
+    # allow Elambda to be just outside of the window
     max_Elam = max(energy_grid) + Gtot_avg/10e3
     min_Elam = min(energy_grid) - Gtot_avg/10e3
 
+    # define grid
     Elam_features = np.arange(min_Elam, max_Elam, dE)
-    Gtot_features = np.arange(min_Gtot, max_Gtot, dGt)
+    Gtot_features = np.arange(min_Gtot, max_Gtot, dGt/1e3)
 
     return Elam_features, Gtot_features
 
@@ -106,6 +112,23 @@ def remove_nan_values(full_xs, full_cov, full_pscat, full_feature_matrix):
     feature_matrix = full_feature_matrix[index_finiteT, :]
 
     return xs, cov, pscat, feature_matrix, index_0T
+
+def get_qp_inputs(exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix):
+    nfeatures = np.shape(feature_matrix)[1]
+    
+    # remove nan values in xs and cov for solver
+    b, cov, pscat, A, index_0T = remove_nan_values(exp_xs, cov_xs, potential_scattering, feature_matrix)
+    b = b-pscat
+
+    # get bounds and constraints
+    lb, ub = get_bound_arrays(nfeatures, 0, 1)
+    G, h = get_0Trans_constraint(feature_matrix, max_xs, index_0T)
+
+    # Cast into quadratic program 
+    P = A.T @ inv(cov) @ A
+    q = - A.T @ inv(cov) @ b
+
+    return P, q, G, h, lb, ub, index_0T
 
 
 # ================================================================================================

@@ -82,8 +82,12 @@ class DataContainer():
     def add_estimate(self, resonance_ladder, 
                                     est_name='est',
                                     particle_pair=None):
+        if self.has_est:
+            self.est_resonance_ladder[f'{est_name}'] = resonance_ladder
+        else:
+            self.est_resonance_ladder = {est_name:resonance_ladder}
+
         self.has_est = True
-        self.est_resonance_ladder = {est_name:resonance_ladder}
         self.fill()
 
 

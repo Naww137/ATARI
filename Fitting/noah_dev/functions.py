@@ -9,6 +9,8 @@ from numpy.linalg import inv
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.theory.scattering_params import gstat
 
+from operator import itemgetter
+from itertools import groupby
 
 # ================================================================================================
 # Functions for setting up the feature bank and constriants
@@ -42,6 +44,7 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
     E = np.array(E)
     number_of_resonances = len(Elam_features)*len(Gtot_features)
     Resonance_Matrix = np.zeros((len(E), number_of_resonances))
+    feature_pairs = []
 
     lwave = 0
     _, P, phi, k = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
@@ -52,6 +55,8 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
     for iElam, Elam in enumerate(Elam_features):
         for iGtot, Gtot in enumerate(Gtot_features):
 
+            feature_pairs.append([Elam,Gtot])
+
             _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
             PPElam = P/PElam
             A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
@@ -60,32 +65,28 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
             vertical_index = (iElam)*len(Gtot_features) + iGtot
             Resonance_Matrix[:, vertical_index] = A_column
 
-    return Resonance_Matrix, potential_scattering
+    return Resonance_Matrix, potential_scattering, np.array(feature_pairs)
 
 
-def convert_2_xs(exp, CovT):
-
-    xs_theo = (-1/exp.redpar.val.n)*np.log(exp.theo.theo_trans)
-    xs_exp = (-1/exp.redpar.val.n)*np.log(exp.trans.exp_trans)
-
-    exp.theo['theo_xs'] = xs_theo
-    exp.trans['exp_xs'] = xs_exp
-
-    dXi_dn = (1/exp.redpar.val.n**2) * np.log(exp.theo.theo_trans)
-    dXi_dT = (-1/exp.redpar.val.n) * (1/exp.theo.theo_trans)
-
-    Jac = np.vstack((np.diag(dXi_dT),dXi_dn))
-    Cov = block_diag(CovT,exp.redpar.unc.n**2)
-    CovXS = Jac.T @ Cov @ Jac
-
-    Lxs = np.linalg.cholesky(inv(CovXS))
-
-    return exp, CovXS, Lxs
-
+# 
 
 
 def get_bound_arrays(nfeat, lb, ub):
     return np.ones(nfeat)*lb, np.ones(nfeat)*ub
+
+
+# def convert_2_xs(exp, CovT):
+#     xs_theo = (-1/exp.redpar.val.n)*np.log(exp.theo.theo_trans)
+#     xs_exp = (-1/exp.redpar.val.n)*np.log(exp.trans.exp_trans)
+#     exp.theo['theo_xs'] = xs_theo
+#     exp.trans['exp_xs'] = xs_exp
+#     dXi_dn = (1/exp.redpar.val.n**2) * np.log(exp.theo.theo_trans)
+#     dXi_dT = (-1/exp.redpar.val.n) * (1/exp.theo.theo_trans)
+#     Jac = np.vstack((np.diag(dXi_dT),dXi_dn))
+#     Cov = block_diag(CovT,exp.redpar.unc.n**2)
+#     CovXS = Jac.T @ Cov @ Jac
+#     Lxs = np.linalg.cholesky(inv(CovXS))
+#     return exp, CovXS, Lxs
 
 # def get_0Trans_constraint(A, max_xs, index_0Trans, E):
 #     constraint = np.array([max_xs]*len(E))
@@ -94,10 +95,54 @@ def get_bound_arrays(nfeat, lb, ub):
 #     constraint_mat[index_0Trans, :] = -constraint_mat[index_0Trans, :]
 #     return constraint_mat, constraint
 
-def get_0Trans_constraint(A, max_xs, index_0Trans):
-    constraint = - np.array([max_xs]*len(index_0Trans))
-    constraint_mat = -A.copy()[index_0Trans, :]
-    return constraint_mat, constraint
+# def get_0Trans_constraint(A, max_xs, index_0Trans):
+#     constraint = - np.array([max_xs]*len(index_0Trans))
+#     constraint_mat = -A.copy()[index_0Trans, :]
+#     return constraint_mat, constraint
+
+def get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_pairs):
+    
+    # group consecutive ranges of 0T
+    consecutive_ranges = []
+    for k,g in groupby(enumerate(index_0T),lambda x:x[0]-x[1]):
+        group = (map(itemgetter(1),g))
+        group = list(map(int,group))
+        consecutive_ranges.append((group[0],group[-1]))
+
+    # create a fine grid in energy where we have blackout resonances
+    fineE_0T = []
+    for each_group in consecutive_ranges:
+        Emin = exp_E[each_group[0]]
+        Emax = exp_E[each_group[1]]
+        fineE = np.linspace(Emin, Emax, max(int((Emax-Emin)*5e1),1)  )
+        fineE_0T.extend(fineE)
+    
+    # calculate resonance matrix on fine E grid for constraint
+    E = np.array(fineE_0T)
+    number_of_resonances = np.shape(feature_pairs)[0]
+    Constraint_Matrix = np.zeros((len(E), number_of_resonances))
+    Constraint = - np.array([max_xs]*len(E))
+
+    lwave = 0
+    _, P, phi, k = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
+    g = gstat(3.0, particle_pair.I, particle_pair.i)
+    kinematic_constant = (4*np.pi*g/k**2)
+
+    for ifeature, resonance in enumerate(feature_pairs):
+
+        Elam = resonance[0]
+        Gtot = resonance[1]
+
+        _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
+        PPElam = P/PElam
+        A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+                                                -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+
+        Constraint_Matrix[:, ifeature] = - A_column
+
+    return Constraint_Matrix ,Constraint 
+
+
 
 def remove_nan_values(full_xs, full_cov, full_pscat, full_feature_matrix):
     index_0T = np.argwhere(np.isnan(full_xs)).flatten()
@@ -113,7 +158,8 @@ def remove_nan_values(full_xs, full_cov, full_pscat, full_feature_matrix):
 
     return xs, cov, pscat, feature_matrix, index_0T
 
-def get_qp_inputs(exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix):
+
+def get_qp_inputs(exp_E, exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix, feature_pairs, particle_pair):
     nfeatures = np.shape(feature_matrix)[1]
     
     # remove nan values in xs and cov for solver
@@ -122,7 +168,7 @@ def get_qp_inputs(exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix):
 
     # get bounds and constraints
     lb, ub = get_bound_arrays(nfeatures, 0, 1)
-    G, h = get_0Trans_constraint(feature_matrix, max_xs, index_0T)
+    G, h = get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_pairs)
 
     # Cast into quadratic program 
     P = A.T @ inv(cov) @ A
@@ -130,6 +176,13 @@ def get_qp_inputs(exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix):
 
     return P, q, G, h, lb, ub, index_0T
 
+
+def get_reduced_features(full_feature_matrix, solution_ws, w_threshold, feature_pairs):
+    index_w_surviving = np.argwhere(solution_ws>w_threshold).flatten()
+    reduced_solw = solution_ws[index_w_surviving]
+    reduced_feature_matrix = full_feature_matrix[:, index_w_surviving]
+    reduced_feature_pairs = feature_pairs[index_w_surviving,:]
+    return reduced_feature_matrix, reduced_feature_pairs, reduced_solw
 
 # ================================================================================================
 # Functions for decoding the feature bank
@@ -148,6 +201,8 @@ def get_resonance_ladder_from_feature_bank(weights, Elam_features, Gtot_features
         resonances.append([Elam, Gt, Gnx, Gg, w])
     resonance_ladder = pd.DataFrame(resonances, columns=['E', 'Gt', 'Gnx', 'Gg', 'w'])
     return resonance_ladder
+
+
 
 
 # def calculate_integral_FoMs(weights, Elam_features, Gtot_features, threshold, datacon):

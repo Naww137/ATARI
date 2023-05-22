@@ -335,86 +335,6 @@ def write_saminp(model, particle_pair, reaction, bayes, filepath):
                 f.write(line)
            
 
-# =============================================================================
-# 
-# =============================================================================
-def calculate_xs(energy_grid, resonance_ladder, particle_pair,
-                                                model   = 'XCT',
-                                                reaction = 'total',
-                                                expertimental_corrections = 'all_exp',
-                                                sammy_runDIR='SAMMY_runDIR',
-                                                keep_runDIR = False,
-                                                one_spingroup = False  
-                                                                                        ):
-    """
-    Calculate a cross section using the SAMMY code.
-
-    This function executes the SAMMY code in a separate run directory defined by the user. 
-    If no directory is given, the default will be 'SAMMY_runDIR'. 
-    For running batch jobs, the user should specify different directories for each job.
-    
-    Parameters
-    ----------
-    energy_grid : _type_
-        _description_
-    resonance_ladder : _type_
-        _description_
-    particle_pair : _type_
-        _description_
-    model : str
-        SAMMY input key for R-Matrix approximation: SLBW, MLBW, XCT (Reich-Moore) are most common. XCT is default.
-    experimental_corrections : str
-        Directory name in syndat/sammy_templates for input file, current templates just allow for different experimental corrections.
-    sammy_runDIR : str
-        Full or relative path to the temporary directory in which SAMMY will be run. Default is realtive 'SAMMY_runDIR'.
-
-    Raises
-    ------
-    ValueError
-        _description_
-    ValueError
-        _description_
-    ValueError
-        _description_
-    """
-
-    if os.path.isdir(sammy_runDIR):
-        pass
-    else:
-        os.mkdir(sammy_runDIR)
-
-    # fill temporary sammy_runDIR with runtime appropriate template files
-    if one_spingroup:
-        copy_template_to_runDIR(expertimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
-    else:
-        copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
-    copy_template_to_runDIR(expertimental_corrections, 'sammy.par', sammy_runDIR)
-
-    # write estruct file to runDIR
-    write_estruct_file(energy_grid, os.path.join(sammy_runDIR,'estruct'))
-
-    # edit copied runtime template files
-    write_saminp(model, particle_pair, reaction, False, os.path.join(sammy_runDIR, 'sammy.inp'))
-    write_sampar(resonance_ladder, particle_pair, False, os.path.join(sammy_runDIR,"sammy.par"))
-    with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
-        f.write('sammy.inp\nsammy.par\nestruct\n')
-
-    # run sammy and wait for completion with subprocess
-    runsammy_process = subprocess.run(
-                                    ["zsh", "-c", "/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<pipe.sh"], 
-                                    cwd=os.path.realpath(sammy_runDIR),
-                                    capture_output=True
-                                    )
-    if len(runsammy_process.stderr) > 0:
-        raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
-
-    # read output lst and delete sammy_runDIR
-    lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
-    if not keep_runDIR:
-        shutil.rmtree(sammy_runDIR)
-
-    return lst_df
-
 
 
 
@@ -434,7 +354,7 @@ def fill_runDIR_with_templates(sammy_runDIR, one_spingroup, experimental_correct
     copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
 
 
-from sammy_classes import SammyInputData, SammyRunTimeOptions
+from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
 
 
 def update_template_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
@@ -488,7 +408,10 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     # read output  and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
-    par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+    if sammy_RTO.solve_bayes:
+        par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+    else:
+        par_df = sammy_INP.resonance_ladder
     if not sammy_RTO.keep_runDIR:
         shutil.rmtree(sammy_RTO.sammy_runDIR)
 

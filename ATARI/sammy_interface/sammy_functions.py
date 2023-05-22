@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jun 22 12:30:52 2022
 
-@author: noahwalton
-"""
 
 import numpy as np
 import os
@@ -35,7 +29,7 @@ def readlst(filepath):
     DataFrame
         DataFrame with headers.
     """
-    df = pd.read_csv(filepath, sep='\s+', names=['E','exp_dat','exp_dat_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+    df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_dat','exp_dat_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
     return df
 
 
@@ -422,98 +416,80 @@ def calculate_xs(energy_grid, resonance_ladder, particle_pair,
     return lst_df
 
 
-# =============================================================================
-# 
-# =============================================================================
-def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
-                                                model   = 'XCT',
-                                                reaction = 'total',
-                                                expertimental_corrections = 'all_exp',
-                                                sammy_runDIR='SAMMY_runDIR',
-                                                keep_runDIR = False,
-                                                one_spingroup = False,
-                                                energy_window = None  
-                                                                                        ):
-    """
-    Calculate a cross section using the SAMMY code.
 
-    This function executes the SAMMY code in a separate run directory defined by the user. 
-    If no directory is given, the default will be 'SAMMY_runDIR'. 
-    For running batch jobs, the user should specify different directories for each job.
-    
-    Parameters
-    ----------
-    energy_grid : _type_
-        _description_
-    resonance_ladder : _type_
-        _description_
-    particle_pair : _type_
-        _description_
-    model : str
-        SAMMY input key for R-Matrix approximation: SLBW, MLBW, XCT (Reich-Moore) are most common. XCT is default.
-    experimental_corrections : str
-        Directory name in syndat/sammy_templates for input file, current templates just allow for different experimental corrections.
-    sammy_runDIR : str
-        Full or relative path to the temporary directory in which SAMMY will be run. Default is realtive 'SAMMY_runDIR'.
 
-    Raises
-    ------
-    ValueError
-        _description_
-    ValueError
-        _description_
-    ValueError
-        _description_
-    """
 
+def make_runDIR(sammy_runDIR):
     if os.path.isdir(sammy_runDIR):
         pass
     else:
         os.mkdir(sammy_runDIR)
 
+def fill_runDIR_with_templates(sammy_runDIR, one_spingroup, experimental_corrections):
     # fill temporary sammy_runDIR with runtime appropriate template files
     if one_spingroup:
-        copy_template_to_runDIR(expertimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
+        copy_template_to_runDIR(experimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
     else:
-        copy_template_to_runDIR(expertimental_corrections, 'sammy.inp', sammy_runDIR)
-    copy_template_to_runDIR(expertimental_corrections, 'sammy.par', sammy_runDIR)
+        copy_template_to_runDIR(experimental_corrections, 'sammy.inp', sammy_runDIR)
+    copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
 
-    # write estruct file to runDIR
-    # write_estruct_file(energy_grid, os.path.join(sammy_runDIR,'estruct'))
-    write_samdat(exp_dat, exp_cov, os.path.join(sammy_runDIR,'sammy.dat'))
+
+from sammy_classes import SammyInputData, SammyRunTimeOptions
+
+
+def update_template_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+
+    # write experimental data if you have it, else write using the estructure
+    if sammy_INP.experimental_data is not None:
+        write_samdat(sammy_INP.experimental_data, sammy_INP.experimental_cov, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
+    elif sammy_INP.energy_grid is not None:
+        write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'estruct'))
+    else:
+        raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
 
     # edit copied runtime template files
-    write_saminp(model, particle_pair, reaction, True, os.path.join(sammy_runDIR, 'sammy.inp'))
-    write_sampar(resonance_ladder, particle_pair, True, os.path.join(sammy_runDIR,"sammy.par"))
+    write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
+    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR,"sammy.par"))
+
+
+def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
         f.write('sammy.inp\nsammy.par\nsammy.dat')
-        if energy_window is None:
+        if sammy_RTO.energy_window is None:
             f.write('\n')
-        else:
-            iter = np.arange(np.floor(min(exp_dat.E)),np.ceil(max(exp_dat.E))+energy_window,energy_window)
+        elif sammy_INP.experimental_data is not None:
+            iter = np.arange(np.floor(min(sammy_INP.experimental_data.E)),np.ceil(max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
             if len(iter) >= 50:
                 raise ValueError("To many energy windows supplied, please solve in less sections")
             string = ''
             for ie in range(len(iter)-1):
                 string += f'{int(iter[ie])}. {int(iter[ie+1])}.\n'
             f.write(f' {string}')
+        else:
+            raise ValueError("An energy window input was provided but no experimental data.")
+
+
+def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+
+    # setup sammy runtime files
+    make_runDIR(sammy_RTO.sammy_runDIR)
+    fill_runDIR_with_templates(sammy_RTO.sammy_runDIR, sammy_RTO.one_spingroup, sammy_RTO.experimental_corrections)
+    update_template_files(sammy_INP, sammy_RTO)
+    write_shell_script(sammy_INP, sammy_RTO)
 
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
-                                    ["zsh", "-c", "/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<pipe.sh"], 
-                                    cwd=os.path.realpath(sammy_runDIR),
+                                    ["zsh", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
+                                    cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                     capture_output=True
                                     )
     if len(runsammy_process.stderr) > 0:
         raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
 
-    # read output lst and delete sammy_runDIR
-    lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
-    # par_df = read_sammy_par(os.path.join(sammy_runDIR, 'sammy.par'))
-    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
-    
-    if not keep_runDIR:
-        shutil.rmtree(sammy_runDIR)
+    # read output  and delete sammy_runDIR
+    lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
+    par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+    if not sammy_RTO.keep_runDIR:
+        shutil.rmtree(sammy_RTO.sammy_runDIR)
 
     return lst_df, par_df
-

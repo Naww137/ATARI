@@ -8,8 +8,6 @@ from ATARI.theory.xs import SLBW
 from ATARI.utils.misc import calc_xs_on_fine_egrid
 
 
-
-
 class DataContainer():
     """
     ATARI Data Container object to hold theoretical, experimental, and estimated data.

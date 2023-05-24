@@ -2,7 +2,7 @@ import numpy as np
 from ATARI.theory.xs import SLBW
 from ATARI.utils.atario import fill_resonance_ladder
 
-def fine_egrid(energy, ppeV):
+def fine_egrid(energy, ppeV=100):
     """
     Calculates an energy grid of the same domain with a specified number of points per eV.
 

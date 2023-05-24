@@ -36,4 +36,4 @@ def chi2_val(a,b,cov):
     if np.shape(a)[1] != len(cov):
         raise ValueError("Covariance matrix is not the same length as the vectors.")
     
-    return (b-a) @ inv(cov) @ (b-a).T
+    return ((b-a) @ inv(cov) @ (b-a).T).item()

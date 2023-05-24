@@ -2,7 +2,7 @@ import numpy as np
 from scipy.linalg import block_diag
 
 
-def trans_2_xs(T, n, n_unc=0, CovT=None):
+def trans_2_xs(T, n, n_unc=0.0, CovT=None):
     """
     Converts pointwise transmission data to total cross section data. 
     If covariance data is supplied, first order linear propagation is used to approximate the cross section covariance matrix.

@@ -315,7 +315,7 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
         ### T covariance is sum of systematic and statistical covariance 
         CovT = CovT_stat + CovT_sys
 
-        data = [CovT, CovT_stat, CovT_sys]
+        data = [CovT, CovT_stat, CovT_sys, Jac_sys, Cov_sys]
     else:
         
         diag_sys = (sys_unc[0]**2)*(dTi_da**2) + (sys_unc[1]**2)*(dTi_db**2) + (sys_unc[2]**2)*(dTi_dk**2) + (sys_unc[3]**2)*(dTi_dK**2) + (sys_unc[4]**2)*(dTi_db0**2) \

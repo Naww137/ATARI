@@ -439,7 +439,7 @@ class Experiment:
                                                                                     self.redpar.val.ks, self.redpar.val.ko, self.Bi, self.redpar.val.b0s,
                                                                                     self.redpar.val.b0o, monitor_array, sys_unc, self.redpar.val.ab_cov, self.calc_cov)
         
-        self.CovT, self.CovT_stat, self.CovT_sys = unc_data
+        self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
         if self.calc_cov:
             self.trans['exp_trans_unc'] = np.sqrt(np.diag(self.CovT))
         else:

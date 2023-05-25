@@ -10,20 +10,20 @@ def trans_2_xs(T, n, n_unc=0.0, CovT=None):
 
     Parameters
     ----------
-    T : array-like
+    T : ndarray
         Vector of transmission values.
     n : float
         Target thickness in atoms/bn-cm.
     n_unc : float
         Uncertainty in the target thickness, default 0.
-    CovT : array-like or None
+    CovT : ndarray or None
         Transmission covariance matrix, default None.
 
     Returns
     -------
-    array-like
+    ndarray
         Pointwise cross section values.
-    array-like
+    ndarray
         Cross section covariance matrix
     """
     

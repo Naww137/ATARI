@@ -217,7 +217,7 @@ def main(casenum):
     min_wcon = prob.get_MinSolvableWeight(fb1.nfeatures, inp1)
     max_wcon = np.sum(fb1.solution_ws)
     max_numres = np.count_nonzero(fb1.solution_ws>prob.w_threshold)
-    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.00, qpopt)
+    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.1, qpopt)
     min_numres = np.count_nonzero(min_wcon_solw>prob.w_threshold)
 
 

@@ -8,7 +8,7 @@ from ATARI.theory.experimental import trans_2_xs, xs_2_trans
 from ATARI.syndat.particle_pair import Particle_Pair
 from ATARI.utils.io.parameters import ExperimentalParameters
 from ATARI.utils.io.parameters import TheoreticalParameters
-import ATARI.atari_io.hdf5 as io
+import ATARI.utils.io.hdf5 as h5io
 
 
 class TheoreticalInfo(Protocol):
@@ -64,7 +64,7 @@ class PointwiseContainer:
 
     @property
     def models(self) -> list:
-        return [each.split('_')[0] for each in self.exp.columns]
+        return [each.split('_')[0] for each in self.fine.columns]
 
     def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters):
         if theoretical_parameters.label in self.models:
@@ -92,8 +92,8 @@ class PointwiseContainer:
         self.CovXS = CovXS
     
     def to_hdf5(self, file: str, isample: int) -> None:
-        io.write_experimental(file, isample, self.exp, self.CovT)
-        io.write_finepw(file, isample, self.fine)
+        h5io.write_pw_exp(file, isample, self.exp, self.CovT)
+        h5io.write_pw_fine(file, isample, self.fine)
 
 
 # # def test_add_experimental():

@@ -5,7 +5,7 @@ from ATARI.theory.experimental import trans_2_xs
 from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.syndat.particle_pair import Particle_Pair
 from pandas import DataFrame
-import ATARI.atari_io.hdf5 as io
+import ATARI.utils.io.hdf5 as h5io
 
 
 @dataclass

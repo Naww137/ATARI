@@ -13,10 +13,11 @@ class SammyRunTimeOptions:
     reaction: str = 'total'
     experimental_corrections: str = 'all_exp'
     solve_bayes: bool = False
-    sammy_runDIR: str = 'SAMMY_runDIR'
-    keep_runDIR: bool = False
     one_spingroup: bool = False
     energy_window: Optional[float] = None
+    sammy_runDIR: str = 'SAMMY_runDIR'
+    keep_runDIR: bool = False
+    shell: str = 'zsh'
 
 
 @dataclass

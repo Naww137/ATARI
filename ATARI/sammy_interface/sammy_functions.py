@@ -373,7 +373,7 @@ def update_template_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptio
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
-    with open('./SAMMY_runDIR/pipe.sh', 'w') as f:
+    with open(os.path.join(sammy_RTO.sammy_runDIR, 'pipe.sh'), 'w') as f:
         f.write('sammy.inp\nsammy.par\nsammy.dat')
         if sammy_RTO.energy_window is None:
             f.write('\n')
@@ -399,7 +399,7 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
-                                    ["zsh", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
+                                    [f"{sammy_RTO.shell}", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                     capture_output=True
                                     )

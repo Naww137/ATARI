@@ -55,58 +55,109 @@ Ta_pair = Particle_Pair( ac, M, m, I, i, l_max,
 # exp.run(df_true)
 
 #%%
-from dataclasses import dataclass
-import ATARI.atari_io.hdf5 as io
-from ATARI.utils.io import parameters
-from ATARI.utils.io import pointwise
-from ATARI.utils.misc import fine_egrid 
-
-from datacontainer import DataContainer
-from pointwise import Pointwise_Container
-from parameters import TheoreticalParameters
-from parameters import ExperimentalParameters
-from parameters import Estimates
-
-
-case_file = '/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/TestFMReduction.hdf5'
-
-# read hdf
-casenum = 3
-theo_resladder = pd.read_hdf(case_file, f'sample_{casenum}/theo_par')
-exp_pw, exp_cov = io.read_experimental(case_file, casenum)
-
-exp_par = ExperimentalParameters(0.06, 0, 1e-2)
-theo_par = TheoreticalParameters(Ta_pair, theo_resladder)
-est_par = TheoreticalParameters(Ta_pair, theo_resladder)
-
 
 from ATARI.utils.misc import fine_egrid 
-pwfine = pd.DataFrame({'E':fine_egrid(exp_pw.E,100)})
-pw = Pointwise_Container(exp_pw, pwfine)
-pw.add_experimental(exp_pw, exp_cov, exp_par)
-pw.add_model(theo_par, exp_par, 'theo')
+
+from ATARI.utils.io.experimental_parameters import BuildExperimentalParameters_fromDIRECT, DirectExperimentalParameters
+from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, BuildTheoreticalParameters_fromATARI, DirectTheoreticalParameters
+from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, BuildPointwiseContainer_fromATARI, DirectPointwiseContainer
+from ATARI.utils.io.data_container import BuildDataContainer_fromBUILDERS, DirectDataContainer
 
 
-dc = DataContainer(pw, exp_par, theo_par)
-dc.add_estimate(est_par, 'est')
+### Build data objects from atari 
+
+# build theoretical parameters
+resonance_ladder = pd.DataFrame({'E':[], 'Gg':[], 'Gnx':[], 'chs':[], 'lwave':[], 'J':[], 'J_ID':[]})
+director = DirectTheoreticalParameters()
+builder_theo_par = BuildTheoreticalParameters_fromATARI('test', resonance_ladder, Ta_pair)
+director.builder = builder_theo_par
+director.build_product()
+# theo_par = builder_theo_par.product
+
+# build experimental parameters
+director = DirectExperimentalParameters()
+builder_exp_par = BuildExperimentalParameters_fromDIRECT(0.05, 0, 1e-2)
+director.builder = builder_exp_par
+director.build_product()
+# exp_par = builder_exp_par.product
+
+# build pointwise data
+pwfine = pd.DataFrame({'E':fine_egrid([5,20],10)})
+pw_exp = pd.DataFrame({'E':[5,20], 'exp_trans': [0.8,0.8]})
+CovT = pd.DataFrame(np.array([[0.1,0], [0,0.1]]), index=pw_exp.E, columns= pw_exp.E)
+CovT.index.name = None
+
+director = DirectPointwiseContainer()
+builder_pw = BuildPointwiseContainer_fromATARI(pw_exp, CovT=CovT, ppeV=10)
+director.builder = builder_pw
+director.build_lite_w_CovT()
+# pw = builder_pw.product
+# pw.add_model(theo_par, exp_par)
+
+
+director = DirectDataContainer()
+builder = BuildDataContainer_fromBUILDERS(
+    builder_pw,
+    builder_exp_par,
+    [builder_theo_par]
+    )
+director.builder = builder
+# director.build_product()
+# dc = builder.product
+dc = director.construct()
+# dc.pw.add_model()
 
 print(dc.pw.exp)
+# print(dc.pw.CovT)
 
 
-# class DataContainerConstructor:
-#     def __init__():
-        
+### write to hdf5
+casenum = 1
+case_file = './test.hdf5'
+dc.to_hdf5(case_file, casenum)
 
 
-# pw_exp.add_model(theo_par, 'test')
-# pw_exp.add_experimental_data(exp.trans, exp.CovT, 1e-2, exp.redpar.val.n, 0)
+### Buld from hdf5
+director = DirectTheoreticalParameters()
+builder_theo_par_h5 = BuildTheoreticalParameters_fromHDF5('test', case_file, casenum, Ta_pair)
+director.builder = builder_theo_par_h5
+director.build_product()
 
-figure()
-# plot(pw.fine.E, pw.fine.theo_xs)
-plot(pw.exp.E, pw.exp.theo_xs)
-errorbar(pw.exp.E, pw.exp.exp_xs, yerr=pw.exp.exp_xs_unc, fmt='.', capsize=2)
-show()
-close()
+
+director = DirectPointwiseContainer()
+builder_pw_h5 = BuildPointwiseContainer_fromHDF5(case_file, casenum)
+director.builder = builder_pw_h5
+director.build_lite_w_CovT()
+
+## Can get the product result directly and call dc director.build or can wait to get product and call dc director.construct
+## similar option above
+# theo_par_h5 = builder_theo_par_h5.product
+# pw_h5 = builder_pw_h5.product
+
+
+director = DirectDataContainer()
+builder = BuildDataContainer_fromBUILDERS(
+    builder_pw_h5,
+    builder_exp_par,
+    [builder_theo_par_h5]
+    )
+director.builder = builder
+# director.build_product()
+# dc_h5 = builder.product
+dc_h5 = director.construct()
+
+print(dc_h5.pw.exp)
+
+
+# # pw_exp.add_model(theo_par, 'test')
+# # pw_exp.add_experimental_data(exp.trans, exp.CovT, 1e-2, exp.redpar.val.n, 0)
+
+# figure()
+# # plot(pw.fine.E, pw.fine.theo_xs)
+# plot(pw.exp.E, pw.exp.theo_xs)
+# errorbar(pw.exp.E, pw.exp.exp_xs, yerr=pw.exp.exp_xs_unc, fmt='.', capsize=2)
+# show()
+# close()
 
 #%%
 

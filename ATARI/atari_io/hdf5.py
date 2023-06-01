@@ -25,3 +25,9 @@ def write_theoretical(case_file, isample, theo_pw_df, theo_par):
     theo_par.to_hdf(case_file, f"sample_{isample}/theo_par") 
     return
         
+
+def write_finepw(case_file, isample, theo_pw_df):
+    theo_pw_df.to_hdf(case_file, f"sample_{isample}/theo_pw")
+
+def write_par(case_file, isample, par, label):
+    par.to_hdf(case_file, f"sample_{isample}/{label}_par")

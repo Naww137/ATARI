@@ -1,7 +1,6 @@
 from ATARI.utils.io.pointwise import PointwiseContainer
 from ATARI.utils.io.parameters import TheoreticalParameters
 from ATARI.utils.io.parameters import ExperimentalParameters
-from ATARI.utils.io.parameters import Estimates
 
 class DataContainer:
 
@@ -11,9 +10,15 @@ class DataContainer:
         self.theo_par = theo_par
         self.est_par = est_par
 
-    def add_estimate(self, theopar: TheoreticalParameters, label: str) -> None:
-        self.pw.add_model(theopar, self.exp_par, label)
-        self.est_par[label] = theopar
+    def add_estimate(self, theopar: TheoreticalParameters) -> None:
+        self.pw.add_model(theopar, self.exp_par)
+        self.est_par[theopar.label] = theopar
+
+    def to_hdf5(self, file: str, isample: int) -> None:
+        self.pw.to_hdf5(file, isample)
+        self.theo_par.to_hdf5(file,isample)
+        for key, est_par in self.est_par.items():
+            est_par.to_hdf5(file, isample)
 
 
 # import object_factory

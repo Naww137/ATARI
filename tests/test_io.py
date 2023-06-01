@@ -7,6 +7,9 @@ class TestPointwiseContainer(unittest.TestCase):
 
 
     def test_add_experimental(self):
+        """
+        Tests the conversion of experimental data to cross section space and ensures that the proper energy order is maintained. 
+        """
 
         PwConObj = PointwiseContainer(
                 DataFrame({'E':[10,0]}),
@@ -33,6 +36,12 @@ class TestPointwiseContainer(unittest.TestCase):
 
         self.assertFalse(   np.isnan(PwConObj.exp.exp_xs.loc[PwConObj.exp.E==0]).item() )
         self.assertFalse(   np.isnan(PwConObj.CovXS.loc[0,0]).item() )
+
+
+    # def test_hdf5_io(self):
+
+
+    #     return
 
 
 

@@ -12,6 +12,8 @@ from ATARI.theory.scattering_params import gstat
 from operator import itemgetter
 from itertools import groupby
 
+from classes import FeatureBank
+
 # ================================================================================================
 # Functions for setting up the feature bank and constriants
 # ================================================================================================
@@ -50,18 +52,20 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
     _, P, phi, k = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
     g = gstat(3.0, particle_pair.I, particle_pair.i)
     kinematic_constant = (4*np.pi*g/k**2)
-    potential_scattering = kinematic_constant * np.sin(phi)**2
+    potential_scattering = kinematic_constant * np.sin(phi)**2 
 
     for iElam, Elam in enumerate(Elam_features):
         for iGtot, Gtot in enumerate(Gtot_features):
-
+            # Gtot = Gtot/1e3*1e3 
             feature_pairs.append([Elam,Gtot])
 
             _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
             PPElam = P/PElam
-            A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
-                                                    -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
-
+            # A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+            #                                         -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+            A_column =  kinematic_constant* ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+                                            - (Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+            
             vertical_index = (iElam)*len(Gtot_features) + iGtot
             Resonance_Matrix[:, vertical_index] = A_column
 
@@ -71,8 +75,8 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
 # 
 
 
-def get_bound_arrays(nfeat, lb, ub):
-    return np.ones(nfeat)*lb, np.ones(nfeat)*ub
+def get_bound_arrays(nfeat, bounds):
+    return np.ones(nfeat)*bounds[0], np.ones(nfeat)*bounds[1]
 
 
 # def convert_2_xs(exp, CovT):
@@ -135,8 +139,10 @@ def get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_pairs)
 
         _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
         PPElam = P/PElam
-        A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
-                                                -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+        # A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+        #                                         -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) ) 
+        A_column =  kinematic_constant* ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+                                            - (Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
 
         Constraint_Matrix[:, ifeature] = - A_column
 
@@ -158,23 +164,26 @@ def remove_nan_values(full_xs, full_cov, full_pscat, full_feature_matrix):
 
     return xs, cov, pscat, feature_matrix, index_0T
 
+# from typing import Protocol
+# class get_qp_inputsProtocol(Protocol):
+#     @
 
-def get_qp_inputs(exp_E, exp_xs, cov_xs, potential_scattering, max_xs, feature_matrix, feature_pairs, particle_pair):
-    nfeatures = np.shape(feature_matrix)[1]
+# def get_qp_inputs(exp_E, exp_xs, cov_xs, max_xs, particle_pair, feature_bank: FeatureBank):
+#     nfeatures = np.shape(feature_bank.feature_matrix)[1]
     
-    # remove nan values in xs and cov for solver
-    b, cov, pscat, A, index_0T = remove_nan_values(exp_xs, cov_xs, potential_scattering, feature_matrix)
-    b = b-pscat
+#     # remove nan values in xs and cov for solver
+#     b, cov, pscat, A, index_0T = remove_nan_values(exp_xs, cov_xs, feature_bank.potential_scattering, feature_bank.feature_matrix)
+#     b = b-pscat
 
-    # get bounds and constraints
-    lb, ub = get_bound_arrays(nfeatures, 0, 1)
-    G, h = get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_pairs)
+#     # get bounds and constraints
+#     lb, ub = get_bound_arrays(nfeatures, 0, 1)
+#     G, h = get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_bank.feature_pairs)
 
-    # Cast into quadratic program 
-    P = A.T @ inv(cov) @ A
-    q = - A.T @ inv(cov) @ b
+#     # Cast into quadratic program 
+#     P = A.T @ inv(cov) @ A
+#     q = - A.T @ inv(cov) @ b
 
-    return P, q, G, h, lb, ub, index_0T
+#     return P, q, G, h, lb, ub, index_0T
 
 
 def get_reduced_features(full_feature_matrix, solution_ws, w_threshold, feature_pairs):

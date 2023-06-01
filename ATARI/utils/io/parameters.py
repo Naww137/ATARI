@@ -5,6 +5,7 @@ from ATARI.theory.experimental import trans_2_xs
 from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.syndat.particle_pair import Particle_Pair
 from pandas import DataFrame
+import ATARI.utils.io.hdf5 as h5io
 
 
 @dataclass
@@ -27,16 +28,13 @@ class ExperimentalParameters:
 class TheoreticalParameters:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
+    label: str
 
     def __post_init__(self):
         self.resonance_ladder = fill_resonance_ladder(self.resonance_ladder, self.particle_pair)
 
-class Estimates():
-    def __init__(self):
-        self.container = {}
-
-    def add_estimate(self, theopar: TheoreticalParameters, label: str):
-        self.container[label] = theopar
+    def to_hdf5(self, file: str, isample: int) -> None:
+        h5io.write_par(file, isample, self.resonance_ladder, self.label)
 
 
 

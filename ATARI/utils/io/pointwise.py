@@ -6,9 +6,9 @@ import numpy as np
 from ATARI.theory.xs import SLBW
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
 from ATARI.syndat.particle_pair import Particle_Pair
-# from ATARI.utils.io.parameters import Parameters
 from ATARI.utils.io.parameters import ExperimentalParameters
 from ATARI.utils.io.parameters import TheoreticalParameters
+import ATARI.utils.io.hdf5 as h5io
 
 
 class TheoreticalInfo(Protocol):
@@ -62,10 +62,18 @@ class PointwiseContainer:
     exp: DataFrame
     fine: DataFrame
 
-    def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters, label: str):
-        self.fine[f'{label}_xs'], _ = calculate_model(self.fine.E, theoretical_parameters, experimental_parameters)
-        self.exp[f'{label}_xs'], self.exp[f'{label}_trans'] = calculate_model(self.exp.E, theoretical_parameters, experimental_parameters)
+    @property
+    def models(self) -> list:
+        return [each.split('_')[0] for each in self.fine.columns]
 
+    def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters):
+        if theoretical_parameters.label in self.models:
+            print("Model label already exists in this instance, no action was taken")
+        else:
+            self.fine[f'{theoretical_parameters.label}_xs'], _ = calculate_model(self.fine.E, theoretical_parameters, experimental_parameters)
+            self.exp[f'{theoretical_parameters.label}_xs'], self.exp[f'{theoretical_parameters.label}_trans'] = calculate_model(self.exp.E, theoretical_parameters, experimental_parameters)
+
+    # TODO: add a filter to catch warning for np.sqrt(negative transmission)
     def add_experimental(self, exp_df: DataFrame, CovT: DataFrame, exp_parm: ExperimentalInfo_get_exp_xs_data):
         merge_keys = list(set(self.exp.columns).intersection(exp_df.columns))
         df = merge(self.exp, exp_df, on=merge_keys)
@@ -83,6 +91,9 @@ class PointwiseContainer:
         self.CovT = CovT
         self.CovXS = CovXS
     
+    def to_hdf5(self, file: str, isample: int) -> None:
+        h5io.write_pw_exp(file, isample, self.exp, self.CovT)
+        h5io.write_pw_fine(file, isample, self.fine)
 
 
 # # def test_add_experimental():

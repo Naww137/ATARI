@@ -28,6 +28,8 @@ class BuildExperimentalParameters(ABC):
         pass
     def build_blackthreshold(self):
         pass
+    def construct(self):
+        pass
 
     @property
     @abstractmethod
@@ -59,6 +61,11 @@ class BuildExperimentalParameters_fromDIRECT(BuildExperimentalParameters):
     def build_blackthreshold(self) -> None:
         self._product.set_blackthreshold(self.blackthreshold)
 
+
+    def construct(self) -> ExperimentalParameters:
+        self.build_n()
+        self.build_blackthreshold()
+        return self.product
 
 class DirectExperimentalParameters:
     """ The Director is only responsible for executing the building steps in a particular sequence. """

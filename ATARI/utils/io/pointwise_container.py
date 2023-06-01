@@ -1,8 +1,6 @@
 
 
 from abc import ABC, abstractmethod 
-from typing import Protocol
-from ATARI.theory.experimental import xs_2_trans, trans_2_xs
 from pandas import DataFrame, Series, merge
 from typing import Protocol
 import numpy as np
@@ -10,6 +8,8 @@ import numpy as np
 from ATARI.theory.xs import SLBW
 from ATARI.utils.misc import fine_egrid 
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
+from ATARI.utils.stats import chi2_val
+
 from ATARI.syndat.particle_pair import Particle_Pair
 from ATARI.utils.io.theoretical_parameters import TheoreticalParameters
 from ATARI.utils.io.experimental_parameters import ExperimentalParameters
@@ -87,6 +87,7 @@ class PointwiseContainer:
     def fine_models(self) -> list:
         return [each.split('_')[0] for each in self.fine.columns]
 
+    ### methods for adding data to pointwise container
 
     def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters):
         if theoretical_parameters.label in self.exp_models:
@@ -126,18 +127,29 @@ class PointwiseContainer:
         #TODO: Implement
         pass
     
+    ### methods for writing the data out
     def to_hdf5(self, file: str, isample: int) -> None:
         h5io.write_pw_exp(file, isample, self.exp, self.CovT)
         if self.mem == 'full':
             h5io.write_pw_fine(file, isample, self.fine)
 
 
+    ### methods for calculating FoMs
+    # def chi2_trans(self, model_label) -> float:
+    #     return chi2_val(self.exp[model_label], self.exp.exp_trans, self.exp.CovT)
+
+
+
+### Builder classes
 
 class BuildPointwiseContainer(ABC):
     def build_exp(self): pass
     def build_CovT(self): pass
     def build_mem(self, mem): pass
     def build_fine(self): pass
+    def construct_full(self): pass
+    def construct_lite(self): pass
+    def construct_lite_w_CovT(self): pass
 
     @property
     @abstractmethod
@@ -166,15 +178,35 @@ class BuildPointwiseContainer_fromATARI(BuildPointwiseContainer):
     
     def build_exp(self) -> None:
         self._product.set_exp(self.exp)
-
     def build_CovT(self) -> None:
         self._product.set_CovT(self.CovT)
-    
     def build_mem(self,mem) -> None:
         self._product.set_mem(mem)
-    
     def build_fine(self) -> None:
         self._product.set_fine(DataFrame({'E':fine_egrid(self.exp.E,self.ppeV)}))
+
+
+    ### Construction methods to bypass the director
+
+    def construct_full(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_CovT()
+        self.build_fine()
+        self.build_mem('full')
+        return self.product
+    
+    def construct_lite(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_mem('lite')
+        return self.product
+
+    def construct_lite_w_CovT(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_CovT()
+        self.build_mem('lite')
+        return self.product
+
+
 
 
 class BuildPointwiseContainer_fromHDF5(BuildPointwiseContainer):
@@ -217,6 +249,29 @@ class BuildPointwiseContainer_fromHDF5(BuildPointwiseContainer):
         self._product.set_fine(df)
 
 
+    ### Construction methods acting as director
+    
+    def construct_full(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_CovT()
+        self.build_fine()
+        self.build_mem('full')
+        return self.product
+    
+    def construct_lite(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_mem('lite')
+        return self.product
+
+    def construct_lite_w_CovT(self) -> PointwiseContainer:
+        self.build_exp()
+        self.build_CovT()
+        self.build_mem('lite')
+        return self.product
+
+
+
+### Director class
 class DirectPointwiseContainer:
     """ The Director is only responsible for executing the building steps in a particular sequence. """
 

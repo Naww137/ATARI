@@ -32,9 +32,69 @@ Ta_pair = Particle_Pair( ac, M, m, I, i, l_max,
 from ATARI.utils.io.experimental_parameters import BuildExperimentalParameters_fromDIRECT, DirectExperimentalParameters
 from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, BuildTheoreticalParameters_fromATARI, DirectTheoreticalParameters
 from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, BuildPointwiseContainer_fromATARI, DirectPointwiseContainer
-from ATARI.utils.io.data_container import BuildDataContainer_fromBUILDERS, DirectDataContainer
+from ATARI.utils.io.data_container import BuildDataContainer_fromBUILDERS, BuildDataContainer_fromOBJECTS, DirectDataContainer
+
+#%% testing using the builder.construct method
+
+print()
+print('Now testing using the builder.construct methods')
+print()
+
+### Build data objects from atari 
+
+# build theoretical parameters
+resonance_ladder = pd.DataFrame({'E':[], 'Gg':[], 'Gnx':[], 'chs':[], 'lwave':[], 'J':[], 'J_ID':[]})
+builder_theo_par = BuildTheoreticalParameters_fromATARI('test', resonance_ladder, Ta_pair)
+theo_par = builder_theo_par.construct()
+
+# build experimental parameters
+builder_exp_par = BuildExperimentalParameters_fromDIRECT(0.05, 0, 1e-2)
+exp_par = builder_exp_par.construct()
+
+# build pointwise data
+from ATARI.utils.misc import fine_egrid 
+pwfine = pd.DataFrame({'E':fine_egrid([5,20],10)})
+pw_exp = pd.DataFrame({'E':[5,20], 'exp_trans': [0.8,0.8]})
+CovT = pd.DataFrame(np.array([[0.1,0], [0,0.1]]), index=pw_exp.E, columns= pw_exp.E)
+CovT.index.name = None
+
+builder_pw = BuildPointwiseContainer_fromATARI(pw_exp, CovT=CovT, ppeV=10)
+pw = builder_pw.construct_full()
+pw.add_model(theo_par, exp_par)
+
+# build data container
+builder_dc = BuildDataContainer_fromOBJECTS(pw, exp_par, [theo_par])
+dc = builder_dc.construct()
+
+# dc.pw.add_model(theo_par, exp_par)
+
+print(dc.pw.exp)
+# print(dc.pw.CovT)
 
 
+# ### write to hdf5
+casenum = 1
+case_file = './test.hdf5'
+dc.to_hdf5(case_file, casenum)
+
+
+# ### Buld from hdf5
+builder_theo_par_h5 = BuildTheoreticalParameters_fromHDF5('test', case_file, casenum, Ta_pair)
+theo_par_h5 = builder_theo_par_h5.construct()
+
+builder_pw_h5 = BuildPointwiseContainer_fromHDF5(case_file, casenum)
+pw_h5 = builder_pw_h5.construct_lite_w_CovT()
+
+builder_dc_h5 = BuildDataContainer_fromOBJECTS(pw, exp_par, [theo_par])
+dc_h5 = builder_dc_h5.construct()
+
+print(dc_h5.pw.exp)
+
+
+#%% testing using the director class
+print()
+print('Now testing using the director class')
+print()
 ### Build data objects from atari 
 
 # build theoretical parameters
@@ -74,9 +134,8 @@ builder = BuildDataContainer_fromBUILDERS(
     [builder_theo_par]
     )
 director.builder = builder
-# director.build_product()
-# dc = builder.product
-dc = director.construct()
+director.build_product()
+dc = builder.product
 # dc.pw.add_model()
 
 print(dc.pw.exp)
@@ -114,8 +173,8 @@ builder = BuildDataContainer_fromBUILDERS(
     [builder_theo_par_h5]
     )
 director.builder = builder
-# director.build_product()
-# dc_h5 = builder.product
-dc_h5 = director.construct()
+director.build_product()
+dc_h5 = builder.product
+# dc_h5 = director.construct()
 
 print(dc_h5.pw.exp)

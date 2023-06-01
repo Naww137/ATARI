@@ -37,7 +37,9 @@ class BuildTheoreticalParameters(ABC):
     def build_label(self): pass
     def build_particle_pair(self): pass
     def build_resonance_ladder(self): pass
-
+    def construct(self):
+        pass
+    
     @property
     @abstractmethod
     def product(self): 
@@ -74,6 +76,14 @@ class BuildTheoreticalParameters_fromATARI(BuildTheoreticalParameters):
         # resonance_ladder = fill_resonance_ladder(resonance_ladder, self_produce.particle_pair) # could fill resonance ladder here or not
         self._product.set_resonance_ladder(self.resonance_ladder)
 
+    def construct(self) -> TheoreticalParameters:
+        """Construct method acts as the director"""
+        self.build_label()
+        self.build_particle_pair()
+        self.build_resonance_ladder()
+        return self.product
+
+
 class BuildTheoreticalParameters_fromHDF5(BuildTheoreticalParameters):
 
     def __init__(self, label: str, hdf5_file: str, isample: int, particle_pair: Particle_Pair) -> None:
@@ -107,6 +117,13 @@ class BuildTheoreticalParameters_fromHDF5(BuildTheoreticalParameters):
             resonance_ladder = resonance_ladder.to_frame().T
         # resonance_ladder = fill_resonance_ladder(resonance_ladder, self_produce.particle_pair) # could fill resonance ladder here or not
         self._product.set_resonance_ladder(resonance_ladder)
+
+    def construct(self) -> TheoreticalParameters:
+        """Construct method acts as the director"""
+        self.build_label()
+        self.build_particle_pair()
+        self.build_resonance_ladder()
+        return self.product
 
 
 ### Director

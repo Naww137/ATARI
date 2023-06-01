@@ -13,7 +13,7 @@ class DataContainer:
     def __init__(self) -> None:
         self.theoretical_parameters = {}
 
-    def set_pw(self, pw) -> None: #, pw: PointwiseContainer, exp_par: ExperimentalParameters, theo_par: TheoreticalParameters, est_par: dict = {}
+    def set_pw(self, pw: PointwiseContainer) -> None: #, pw: PointwiseContainer, exp_par: ExperimentalParameters, theo_par: TheoreticalParameters, est_par: dict = {}
         self.pw = pw
     def set_experimental_parameters(self, experimental_parameters: ExperimentalParameters) -> None:
         self.experimental_parameters = experimental_parameters
@@ -34,20 +34,21 @@ class DataContainer:
 class BuildDataContainer(ABC):
     def build_pw(self): pass
     def build_experimental_parameters(self): pass
-    def build_theoretical_parameters(self, list_of_theoretical_parameters: list = []): pass
+    def build_theoretical_parameters(self): pass
+    def construct(self): pass
 
     @property
     @abstractmethod
     def product(self): 
         pass 
 
-class BuildDataContainer_fromBUILDERS(BuildDataContainer):
+class BuildDataContainer_fromOBJECTS(BuildDataContainer):
 
-    def __init__(self, pointwise_container_builder: BuildPointwiseContainer, experimental_parameter_builder: BuildExperimentalParameters, list_of_theoretical_parameters: list = []) -> None:
+    def __init__(self, pw: PointwiseContainer, experimental_parameter: ExperimentalParameters, list_of_theoretical_parameters: list = []) -> None:
         """Fresh builder should be a clean slate"""
         self.reset()
-        self.pw = pointwise_container_builder.product
-        self.experimental_parameters = experimental_parameter_builder.product
+        self.pw = pw
+        self.experimental_parameters = experimental_parameter
         self.list_of_theoretical_parameters = list_of_theoretical_parameters
 
     def reset(self) -> None:
@@ -67,9 +68,50 @@ class BuildDataContainer_fromBUILDERS(BuildDataContainer):
 
     def build_theoretical_parameters(self) -> None:
         for theoretical_parameters in self.list_of_theoretical_parameters:
+            self._product.add_theoretical_parameters(theoretical_parameters)
+
+    def construct(self) -> DataContainer:
+        self.build_pw()
+        self.build_experimental_parameters()
+        self.build_theoretical_parameters()
+        return self.product
+    
+
+
+class BuildDataContainer_fromBUILDERS(BuildDataContainer):
+
+    def __init__(self, pointwise_container_builder: BuildPointwiseContainer, experimental_parameter_builder: BuildExperimentalParameters, list_of_theoretical_parameter_builders: list = []) -> None:
+        """Fresh builder should be a clean slate"""
+        self.reset()
+        self.pw = pointwise_container_builder.product
+        self.experimental_parameters = experimental_parameter_builder.product
+        self.list_of_theoretical_parameter_builders = list_of_theoretical_parameter_builders
+
+    def reset(self) -> None:
+        self._product = DataContainer()
+
+    @property
+    def product(self) -> DataContainer:
+        """After returning the end result to the client, a builder instance is expected to be ready to start producing another product."""
+        product = self._product
+        self.reset()
+        return product
+
+    def build_pw(self) -> None:
+        self._product.set_pw(self.pw)
+    def build_experimental_parameters(self) -> None:
+        self._product.set_experimental_parameters(self.experimental_parameters)
+
+    def build_theoretical_parameters(self) -> None:
+        for theoretical_parameters in self.list_of_theoretical_parameter_builders:
             self._product.add_theoretical_parameters(theoretical_parameters.product)
 
-
+    def construct(self) -> DataContainer:
+        self.build_pw()
+        self.build_experimental_parameters()
+        self.build_theoretical_parameters()
+        return self.product
+    
 # class BuildDataContainer_fromATARI(BuildDataContainer):
 
 #     def __init__(self, 
@@ -127,7 +169,3 @@ class DirectDataContainer:
         self.builder.build_pw()
         self.builder.build_experimental_parameters()
         self.builder.build_theoretical_parameters()
-
-    def construct(self) -> DataContainer:
-        self.build_product()
-        return self.builder.product

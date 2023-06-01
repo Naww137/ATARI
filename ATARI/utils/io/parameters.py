@@ -34,7 +34,7 @@ class TheoreticalParameters:
         self.resonance_ladder = fill_resonance_ladder(self.resonance_ladder, self.particle_pair)
 
     def to_hdf5(self, file: str, isample: int) -> None:
-        io.write_par(file, isample, self.resonance_ladder, self.label)
+        h5io.write_par(file, isample, self.resonance_ladder, self.label)
 
 
 

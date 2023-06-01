@@ -31,7 +31,7 @@ def write_pw_exp(case_file, isample, pw_exp_df, CovT, CovXS=None):
         CovXS.to_hdf(case_file, f"sample_{isample}/CovXS")
 
 
-def write_pw_fine(case_file, isample, pw_fine_df)
+def write_pw_fine(case_file, isample, pw_fine_df):
     pw_fine_df.to_hdf(case_file, f"sample_{isample}/pw_fine")
 
 

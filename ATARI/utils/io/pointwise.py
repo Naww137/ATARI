@@ -73,7 +73,7 @@ class PointwiseContainer:
             self.fine[f'{theoretical_parameters.label}_xs'], _ = calculate_model(self.fine.E, theoretical_parameters, experimental_parameters)
             self.exp[f'{theoretical_parameters.label}_xs'], self.exp[f'{theoretical_parameters.label}_trans'] = calculate_model(self.exp.E, theoretical_parameters, experimental_parameters)
 
-
+    # TODO: add a filter to catch warning for np.sqrt(negative transmission)
     def add_experimental(self, exp_df: DataFrame, CovT: DataFrame, exp_parm: ExperimentalInfo_get_exp_xs_data):
         merge_keys = list(set(self.exp.columns).intersection(exp_df.columns))
         df = merge(self.exp, exp_df, on=merge_keys)

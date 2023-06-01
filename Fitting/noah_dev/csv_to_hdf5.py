@@ -28,7 +28,7 @@ import os
 #                 with open(os.path.join(directory, f'resub_job_template.sh'), 'r') as f:
 #                     template = f.readlines()
 #                     f.close()
-#                 with open(os.path.join(fit_directory, f'resub_job_{i}.sh'), 'w') as f:
+#                 with open(os.path.join(fit_directory, f'resub_job_{isamp}.sh'), 'w') as f:
 #                     for line in template:
 #                         if line.startswith('matlab'):
 #                             f.write(f"""matlab -nodisplay -batch "{matfile}('{os.path.join(directory,case_file)}', {i})" \n""")

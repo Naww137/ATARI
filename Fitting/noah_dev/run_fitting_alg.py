@@ -8,6 +8,7 @@ from ATARI.syndat.particle_pair import Particle_Pair
 from ATARI.utils.datacontainer import DataContainer
 from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.utils.stats import chi2_val
+from numpy.linalg import inv
 
 import functions as fn 
 
@@ -16,7 +17,7 @@ def main(casenum):
 
     #%% Import data
 
-    casenum = 1
+    # casenum = 1
     filepath = f"/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/Ta181_500samples_E75_125/sample_{casenum}"
     theo_resladder = pd.read_csv(os.path.join(filepath, 'ladder.csv'), index_col=0)
     exp_cov = pd.read_csv(os.path.join(filepath, 'cov.csv'), index_col=0)
@@ -46,20 +47,6 @@ def main(casenum):
                                     spin_groups=spin_groups,
                                     average_parameters=average_parameters )   
 
-    # E_min_max = [75, 125]
-    # energy_grid = E_min_max
-    # input_options = {'Add Noise': True,
-    #                 'Calculate Covariance': True,
-    #                 'Compression Points':[],
-    #                 'Grouping Factors':None}
-
-    # experiment_parameters = {'bw': {'val':0.0256,   'unc'   :   0},
-    #                          'n':  {'val':0.067166,     'unc'   :0}}
-
-    # # initialize experimental setup
-    # exp = Experiment(energy_grid, 
-    #                         input_options=input_options, 
-    #                         experiment_parameters=experiment_parameters)
 
     #%% initialize the data objects
 
@@ -70,13 +57,12 @@ def main(casenum):
 
     threshold_0T = 1e-2
     exp_par = ExperimentalParameters(0.067166, 0, threshold_0T)
-    theo_par = TheoreticalParameters(Ta_pair, theo_resladder)
-    est_par = TheoreticalParameters(Ta_pair, theo_resladder)
+    theo_par = TheoreticalParameters(Ta_pair, theo_resladder, 'theo')
 
     pwfine = pd.DataFrame({'E':fine_egrid(exp_pw.E,100)})
     pw = PointwiseContainer(exp_pw, pwfine)
     pw.add_experimental(exp_pw, exp_cov, exp_par)
-    pw.add_model(theo_par, exp_par, 'theo')
+    pw.add_model(theo_par, exp_par)
 
 
     dc = DataContainer(pw, exp_par, theo_par,{})
@@ -86,14 +72,14 @@ def main(casenum):
     import classes as cls
 
     average_parameters.loc[:,['Gn']] = average_parameters['gn2']/12.5
-    Elam_features, Gtot_features = fn.get_parameter_grid(pw.exp.E, average_parameters, '3.0', 1e0, 1e0)
+    Elam_features, Gtot_features = fn.get_parameter_grid(pw.exp.E, average_parameters, '3.0', 1e0, 2e0)
     Gtot_features = np.append(Gtot_features, np.round(np.array(theo_resladder.Gt),1)*1e-3 )
     Elam_features = np.append(Elam_features, np.round(np.array(theo_resladder.E),1))
     # Elam_features = np.round(np.array(theo_resladder.E),1)
     # Gtot_features = np.array(theo_resladder.Gt)*1e-3
     # Elam_features = np.array(theo_resladder.E)
 
-    w_threshold = 1e-5
+    w_threshold = 1e-6
     prob = cls.ProblemHandler(w_threshold)
 
     fb0 = prob.get_FeatureBank(dc, Elam_features, Gtot_features)
@@ -107,15 +93,16 @@ def main(casenum):
 
     # %%  Step 1, solve unconstrained problem
 
-    qpopt = cls.QPopt(verbose=False,
-                    abstol = 1e-10,
-                    reltol = 1e-10,
-                    feastol=1e-7)
+    qpopt = cls.QPopt(verbose=True,
+                    abstol = 1e-8,
+                    reltol = 1e-8,
+                    feastol=1e-7,
+                    maxiters = 200)
 
     fb1, sol_lp0_ereduced = prob.reduce_FeatureBank(fb0, sol_lp0)
     inp1 = prob.get_MatrixInputs(dc, fb1)
-    fb1 = fb0
-    inp1 = inp0
+    # fb1 = fb0
+    # inp1 = inp0
     fb1.solution_ws = cls.Solvers.solve_quadratic_program(inp1, qpopt)
 
     # %% [markdown]
@@ -214,10 +201,11 @@ def main(casenum):
     # %%
 
     # determine mins and maxes
+    # qpopt.verbose=True; qpopt.maxiters=200
     min_wcon = prob.get_MinSolvableWeight(fb1.nfeatures, inp1)
     max_wcon = np.sum(fb1.solution_ws)
     max_numres = np.count_nonzero(fb1.solution_ws>prob.w_threshold)
-    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.1, qpopt)
+    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.01, qpopt)
     min_numres = np.count_nonzero(min_wcon_solw>prob.w_threshold)
 
 
@@ -293,8 +281,8 @@ def main(casenum):
         integer_resonance_solutions[new_numres] = {'prior':ires_resladder_combined}
 
         # add prior to dc
-        est_par = TheoreticalParameters(Ta_pair, ires_resladder_combined)
-        dc.add_estimate(est_par, label=f'{new_numres}_prior')
+        est_par = TheoreticalParameters(Ta_pair, ires_resladder_combined, label=f'{new_numres}_prior')
+        dc.add_estimate(est_par)
 
     print(f'Surviving integer number of resonance solutions: {list(integer_resonance_solutions.keys())}')
 
@@ -308,10 +296,11 @@ def main(casenum):
         reaction = 'transmission',
         solve_bayes = True,
         experimental_corrections = 'no_exp',
+        one_spingroup = False,
+        energy_window = None,
         sammy_runDIR = 'SAMMY_runDIR',
-        keep_runDIR = True,
-        one_spingroup = True,
-        energy_window = None 
+        keep_runDIR = False,
+        shell = 'zsh'
         )
 
     print(f'Now running SAMMY Bayes for each integer resonance solution')
@@ -334,8 +323,8 @@ def main(casenum):
         posterior = fill_resonance_ladder(posterior, Ta_pair, J=3.0, chs=1, lwave=0.0, J_ID=1)
         integer_resonance_solutions[numres]['posterior'] = posterior
 
-        est_par = TheoreticalParameters(Ta_pair, posterior)
-        dc.add_estimate(est_par, label=f'{numres}_post')
+        est_par = TheoreticalParameters(Ta_pair, posterior, label=f'{numres}_post')
+        dc.add_estimate(est_par)
 
     # %% LRT
 
@@ -413,8 +402,14 @@ def main(casenum):
     print(f'Model Selected: {posterior_ires_chi2[inull][0]}')
 
     final_estimate = dc.est_par[f'{selected_model_ires}_post'].resonance_ladder
+    final_par = TheoreticalParameters(Ta_pair, final_estimate, 'final')
+    dc.add_estimate(final_par)
+    est_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.final_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.final_trans).T
+    sol_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.theo_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.theo_trans).T
+    from scipy import integrate
+    est_sol_MSE = integrate.trapezoid((dc.pw.fine.theo_xs-dc.pw.fine.final_xs)**2, dc.pw.fine.E)
 
-    return final_estimate
+    return est_sol_MSE #final_estimate
     
 
 
@@ -423,7 +418,7 @@ def main(casenum):
 
 
 import sys
-args = sys.argv[1]
+args = 29 # sys.argv[1]
 import time
 
 start_time = time.time()
@@ -431,5 +426,11 @@ final_estimate = main(args)
 end_time = time.time()
 elapsed_time = end_time - start_time
 
-final_estimate['tfit'] = np.ones(len(final_estimate))*elapsed_time
-final_estimate.to_csv(f'./par_est_{casenum}.csv')
+
+# final_estimate['tfit'] = np.ones(len(final_estimate))*elapsed_time
+# final_estimate.to_csv(f'./par_est_{casenum}.csv')
+print()
+print(f'Case: {args}')
+print(f'Final MSE: {final_estimate}')
+print(f'Time: {elapsed_time}')
+print()

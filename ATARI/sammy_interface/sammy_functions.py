@@ -29,39 +29,97 @@ def readlst(filepath):
     DataFrame
         DataFrame with headers.
     """
-    df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_dat','exp_dat_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+    if filepath.endswith('.LST'):
+        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+    else:
+        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_dat','exp_dat_unc'])
     return df
+
+def readpar(filepath):
+    """
+    Reads a sammy .par file.
+
+    Parameters
+    ----------
+    filepath : str
+        Full path to the .par file you want to read
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with appropriately names columns
+    """
+    column_widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+    data = []
+    with open(filepath, 'r') as file:
+        lines = file.readlines()[0:-3]
+        for line in lines:
+            row = []
+            start = 0
+            for width in column_widths:
+                value = line[start:start+width].strip()
+                try:
+                    value = float(value)
+                except:
+                    value = None
+                row.append(value)
+                start += width
+            data.append(row)
+    df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
+    return df.dropna(axis=1)
+
+# def readpar(filepath):
+
+#     data = []
+#     with open(filepath, 'r') as file:
+#         for line in file:
+#             row = []
+#             start = 0
+#             for width in column_widths:
+#                 value = line[start:start+width].strip()
+#                 row.append(value)
+#                 start += width
+#             data.append(row)
+#     df = pd.DataFrame(data)
+#     return df
 
 
 # =============================================================================
 # 
 # =============================================================================
-def samtools_fmtpar(a, filename, template):
+def samtools_fmtpar(a, filename, template, initial_parameter_uncertainty):
     
     # print("WARNING: check parameter file created - formatting in sammy_interface.samtools_fmtpar could be more robust")
-    
-    with open(template, 'r') as f:
-        template_lines = f.readlines()
-    f.close()
-    
-    with open(filename,'w+') as f:
-        for line in template_lines:
-            
-            if line.startswith("%%%ResParms%%%"):
-                for row in a:
-                    # for some reason, the first format string has had problems with the width definition,
-                    #if using a different sized energy range (digits before decimal) this may become an issue
-                    f.write(f'{row[0]:0<11.4f} {row[1]:0<10f} {row[2]:0<10f} {row[3]:0<10f} {row[4]:0<10f} ')
-                    f.write(f'{row[5]:1g} {row[6]:1g} {row[7]:1g} {row[8]:1g} {row[9]:1g} {row[10]:1g}\n')
-            else:        
-                f.write(line)
-        f.close()
+    if template is None:
+        with open(filename,'w+') as f:
+            for row in a:
+                # for some reason, the first format string has had problems with the width definition,
+                #if using a different sized energy range (digits before decimal) this may become an issue
+                f.write(f'{row[0]:0<11.4f} {row[1]:0<10f} {row[2]:0<10f} {row[3]:0<10f} {row[4]:0<10f} ')
+                f.write(f'{row[5]:1g} {row[6]:1g} {row[7]:1g} {row[8]:1g} {row[9]:1g} {row[10]:1g}\n')
+            f.write(f'\n{initial_parameter_uncertainty}\n')
+            f.close()
+    elif template is not None:
+        raise NotImplementedError("Need to implement interface for template parameter file with particle pair data.")
+        # with open(template, 'r') as f:
+        #     template_lines = f.readlines()
+        # f.close()
+        # with open(filename,'w+') as f:
+        #     for line in template_lines:
+        #         if line.startswith("%%%ResParms%%%"):
+        #             for row in a:
+        #                 # for some reason, the first format string has had problems with the width definition,
+        #                 #if using a different sized energy range (digits before decimal) this may become an issue
+        #                 f.write(f'{row[0]:0<11.4f} {row[1]:0<10f} {row[2]:0<10f} {row[3]:0<10f} {row[4]:0<10f} ')
+        #                 f.write(f'{row[5]:1g} {row[6]:1g} {row[7]:1g} {row[8]:1g} {row[9]:1g} {row[10]:1g}\n')
+        #         else:        
+        #             f.write(line)
+        #     f.close()
         
     return
 
-def write_sampar(df, pair, vary_parm, filename, 
-                                    template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
-                                # template = os.path.join(os.path.dirname(module_dirname), "templates/sammy_template_RM_only.par") ):
+def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, template=None):
+                                    # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
     """
     Writes a formatted sammy.par file.
 
@@ -79,7 +137,7 @@ def write_sampar(df, pair, vary_parm, filename,
     filename : str
         Filepath/name of sammy.par file being created.
     template : str, optional
-        Filepath to template file for sammy.par. Included because of the different options for input to sammy, by default os.path.realpath("../templates/sammy_template_RM_only.par")
+        Filepath to template file for sammy.par. Included because of the different options for input to sammy, by default None and the SAMMY parameter file will only contain resonance parameters.
     """
 
     def gn2G(row):
@@ -116,7 +174,7 @@ def write_sampar(df, pair, vary_parm, filename,
         j_array = np.array([df.J_ID]).T
         samtools_array = np.hstack((samtools_array, j_array))
 
-    samtools_fmtpar(samtools_array, filename, template)
+    samtools_fmtpar(samtools_array, filename, template, initial_parameter_uncertainty)
     
     return
         
@@ -167,7 +225,9 @@ def write_samdat(exp_pw, exp_cov, filename):
         Experimental transmission uncertainty column not in DataFrame.
     """
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
-    exp_pw['exp_trans_unc'] = np.sqrt(np.diag(exp_cov))
+    if 'exp_trans_unc' not in exp_pw:
+        exp_pw['exp_trans_unc'] = np.sqrt(np.diag(exp_cov))
+    
     iterable = exp_pw.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
     cols = exp_pw.columns
     if 'E' not in cols:
@@ -351,25 +411,27 @@ def fill_runDIR_with_templates(sammy_runDIR, one_spingroup, experimental_correct
         copy_template_to_runDIR(experimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
     else:
         copy_template_to_runDIR(experimental_corrections, 'sammy.inp', sammy_runDIR)
-    copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
+    # copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
 
 
 from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
 
 
-def update_template_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     # write experimental data if you have it, else write using the estructure
     if sammy_INP.experimental_data is not None:
         write_samdat(sammy_INP.experimental_data, sammy_INP.experimental_cov, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
     elif sammy_INP.energy_grid is not None:
-        write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'estruct'))
+        write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
     else:
         raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
 
-    # edit copied runtime template files
+    # edit copied input template file
     write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
-    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR,"sammy.par"))
+
+    # write parameter file
+    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_RTO.solve_bayes, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"))
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
@@ -394,7 +456,7 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     # setup sammy runtime files
     make_runDIR(sammy_RTO.sammy_runDIR)
     fill_runDIR_with_templates(sammy_RTO.sammy_runDIR, sammy_RTO.one_spingroup, sammy_RTO.experimental_corrections)
-    update_template_files(sammy_INP, sammy_RTO)
+    update_input_files(sammy_INP, sammy_RTO)
     write_shell_script(sammy_INP, sammy_RTO)
 
     # run sammy and wait for completion with subprocess
@@ -403,13 +465,14 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
                                     cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                     capture_output=True
                                     )
-    # if len(runsammy_process.stderr) > 0:
-    #     raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
+    if len(runsammy_process.stderr) > 0:
+        raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
 
     # read output  and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
     if sammy_RTO.solve_bayes:
-        par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+        # par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+        par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
     else:
         par_df = sammy_INP.resonance_ladder
     if not sammy_RTO.keep_runDIR:

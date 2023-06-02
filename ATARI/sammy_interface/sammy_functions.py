@@ -52,8 +52,12 @@ def readpar(filepath):
     column_widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
     data = []
     with open(filepath, 'r') as file:
-        lines = file.readlines()[0:-3]
+        lines = file.readlines()
         for line in lines:
+
+            if line.isspace():
+                break # end of resonance region
+
             row = []
             start = 0
             for width in column_widths:
@@ -470,11 +474,11 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     # read output  and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
-    if sammy_RTO.solve_bayes:
+    # if sammy_RTO.solve_bayes:
         # par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
-        par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
-    else:
-        par_df = sammy_INP.resonance_ladder
+    par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
+    # else:
+    #     par_df = sammy_INP.resonance_ladder
     if not sammy_RTO.keep_runDIR:
         shutil.rmtree(sammy_RTO.sammy_runDIR)
 

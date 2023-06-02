@@ -24,7 +24,7 @@ sammyRTO = sammy_classes.SammyRunTimeOptions(
     path_to_SAMMY_exe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
     model = 'SLBW',
     reaction = 'transmission',
-    solve_bayes = True,
+    solve_bayes = False,
     experimental_corrections = 'no_exp',
     one_spingroup = False,
     energy_window = None,
@@ -48,5 +48,12 @@ lst, par = sammy_functions.run_sammy(sammyINP, sammyRTO)
 print(lst)
 print(par)
 
+assert(np.all(lst.E == pw_exp.E))
+assert(np.all(lst.exp_trans == pw_exp.exp_trans))
+assert(np.all(lst.exp_trans_unc == pw_exp.exp_trans_unc))
+
+assert(np.all(par.E == resonance_ladder.E))
+assert(np.all(par.Gg == resonance_ladder.Gg))
+assert(np.all(par.Gn1 == resonance_ladder.Gnx))
 
 # %%

@@ -27,4 +27,4 @@ class SammyInputData:
     experimental_data: Optional[DataFrame] = None
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[ndarray] = None
-    initial_parameter_uncertainty: Optional[float] = None
+    initial_parameter_uncertainty: Optional[float] = 1.0

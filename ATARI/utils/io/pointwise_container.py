@@ -82,21 +82,20 @@ class PointwiseContainer:
 
     @property
     def exp_models(self) -> list:
-        return [each.split('_')[0] for each in self.exp.columns]
+        return ['_'.join(each.split('_')[0:-1]) for each in self.exp.columns]
     @property
     def fine_models(self) -> list:
-        return [each.split('_')[0] for each in self.fine.columns]
+        return ['_'.join(each.split('_')[0:-1]) for each in self.fine.columns]
 
     ### methods for adding data to pointwise container
-
-    def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters):
-        if theoretical_parameters.label in self.exp_models:
-            print("Model label already exists in this instance, no action was taken")
+    def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters, overwrite=False):
+        if theoretical_parameters.label in self.exp_models and not overwrite:
+            print(f"Model '{theoretical_parameters.label}' already exists in pw.exp, bypassing pointwise reconstruction")
         else:
             self.exp[f'{theoretical_parameters.label}_xs'], self.exp[f'{theoretical_parameters.label}_trans'] = calculate_model(self.exp.E, theoretical_parameters, experimental_parameters)
         if self.mem == 'full':
-            if theoretical_parameters.label in self.fine_models:
-                print("Model label already exists in this instance, no action was taken")
+            if theoretical_parameters.label in self.fine_models and not overwrite:
+                print(f"Model '{theoretical_parameters.label}' already exists in pw.fine, bypassing pointwise reconstruction")
             else:
                 self.fine[f'{theoretical_parameters.label}_xs'], _ = calculate_model(self.fine.E, theoretical_parameters, experimental_parameters)
 
@@ -120,9 +119,6 @@ class PointwiseContainer:
         self.exp['exp_xs_unc'] = exp_xs_unc
         self.CovXS = CovXS
 
-    def mem_2_full(self):
-        #TODO: Implement
-        pass
     def mem_2_lite(self):
         #TODO: Implement
         pass

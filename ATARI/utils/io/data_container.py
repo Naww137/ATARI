@@ -1,5 +1,6 @@
 
-
+from ATARI.utils.misc import fine_egrid 
+from pandas import DataFrame
 
 from ATARI.utils.io.experimental_parameters import ExperimentalParameters, BuildExperimentalParameters
 from ATARI.utils.io.theoretical_parameters import TheoreticalParameters, BuildTheoreticalParameters
@@ -13,18 +14,33 @@ class DataContainer:
     def __init__(self) -> None:
         self.theoretical_parameters = {}
 
+    ### construction methods
     def set_pw(self, pw: PointwiseContainer) -> None: #, pw: PointwiseContainer, exp_par: ExperimentalParameters, theo_par: TheoreticalParameters, est_par: dict = {}
         self.pw = pw
     def set_experimental_parameters(self, experimental_parameters: ExperimentalParameters) -> None:
         self.experimental_parameters = experimental_parameters
 
+    ### Methods for adding data 
     def add_theoretical_parameters(self, theoretical_parameters: TheoreticalParameters) -> None:
         self.theoretical_parameters[theoretical_parameters.label] = theoretical_parameters
+        self.pw.add_model(theoretical_parameters, self.experimental_parameters, overwrite=False)
     
-    def fill_pw(self) -> None:
+    def models_to_pw(self) -> None:
         for key, theoretical_parameter_set in self.theoretical_parameters.items():
-            self.pw.add_model(theoretical_parameter_set, self.experimental_parameters)
+            self.pw.add_model(theoretical_parameter_set, self.experimental_parameters, overwrite=True)
 
+
+    ### Methods for filling or emptying the constainer
+    def mem_2_full(self, ppeV=100):
+        if self.pw.mem == 'full':
+            print("Pointwise Container already full")
+        else:
+            self.pw.mem = 'full'
+            self.pw.set_fine(DataFrame({'E':fine_egrid(self.pw.exp.E, ppeV)}))
+            self.models_to_pw()
+        
+
+    ### Methods for writing
     def to_hdf5(self, file: str, isample: int) -> None:
         self.pw.to_hdf5(file, isample)
         for key, theoretical_parameter_set in self.theoretical_parameters.items():

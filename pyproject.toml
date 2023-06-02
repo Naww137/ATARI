@@ -3,3 +3,7 @@
 # https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+
+[options.package_data]
+atari.sammy_interface.sammy_template = *

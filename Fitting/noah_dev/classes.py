@@ -94,7 +94,7 @@ class ProblemHandler:
 
     def get_FeatureBank(self, dc: DataContainer, ElFeatures:np.ndarray, GtFeatures: np.ndarray):
 
-        feature_matrix, potential_scattering, feature_pairs = fn.get_resonance_feature_bank(dc.pw.exp.E, dc.theo_par.particle_pair, ElFeatures, GtFeatures)
+        feature_matrix, potential_scattering, feature_pairs = fn.get_resonance_feature_bank(dc.pw.exp.E, dc.theoretical_parameters['true'].particle_pair, ElFeatures, GtFeatures)
         nfeatures = np.shape(feature_matrix)[1]
 
         return FeatureBank(feature_matrix, feature_pairs, potential_scattering.flatten(), nfeatures, [0,feature_pairs[:,1]*0.999] )
@@ -109,7 +109,7 @@ class ProblemHandler:
 
         # get bounds and constraints
         lb, ub = fn.get_bound_arrays(nfeatures, feature_bank.w_bounds)
-        G, h = fn.get_0Trans_constraint(np.array(dc.pw.exp.E), index_0T, dc.exp_par.max_xs, dc.theo_par.particle_pair, feature_bank.feature_pairs)
+        G, h = fn.get_0Trans_constraint(np.array(dc.pw.exp.E), index_0T, dc.experimental_parameters.max_xs, dc.theoretical_parameters['true'].particle_pair, feature_bank.feature_pairs)
 
         # Cast into quadratic program 
         P = A.T @ inv(cov) @ A

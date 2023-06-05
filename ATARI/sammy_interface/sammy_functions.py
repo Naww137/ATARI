@@ -62,65 +62,44 @@ def readpar(filepath):
             start = 0
             for width in column_widths:
                 value = line[start:start+width].strip()
-                try:
-                    value = float(value)
-                except:
+                if value == '':
                     value = None
+                else:
+                    try:
+                        value = float(value)
+                    except:
+                        value = float('e-'.join(value.split('-')))
                 row.append(value)
                 start += width
             data.append(row)
     df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
     return df.dropna(axis=1)
 
-# def readpar(filepath):
-
-#     data = []
-#     with open(filepath, 'r') as file:
-#         for line in file:
-#             row = []
-#             start = 0
-#             for width in column_widths:
-#                 value = line[start:start+width].strip()
-#                 row.append(value)
-#                 start += width
-#             data.append(row)
-#     df = pd.DataFrame(data)
-#     return df
 
 
 # =============================================================================
 # 
 # =============================================================================
-def samtools_fmtpar(a, filename, template, initial_parameter_uncertainty):
-    
-    # print("WARNING: check parameter file created - formatting in sammy_interface.samtools_fmtpar could be more robust")
-    if template is None:
-        with open(filename,'w+') as f:
-            for row in a:
-                # for some reason, the first format string has had problems with the width definition,
-                #if using a different sized energy range (digits before decimal) this may become an issue
-                f.write(f'{row[0]:0<11.4f} {row[1]:0<10f} {row[2]:0<10f} {row[3]:0<10f} {row[4]:0<10f} ')
-                f.write(f'{row[5]:1g} {row[6]:1g} {row[7]:1g} {row[8]:1g} {row[9]:1g} {row[10]:1g}\n')
-            f.write(f'\n{initial_parameter_uncertainty}\n')
-            f.close()
-    elif template is not None:
-        raise NotImplementedError("Need to implement interface for template parameter file with particle pair data.")
-        # with open(template, 'r') as f:
-        #     template_lines = f.readlines()
-        # f.close()
-        # with open(filename,'w+') as f:
-        #     for line in template_lines:
-        #         if line.startswith("%%%ResParms%%%"):
-        #             for row in a:
-        #                 # for some reason, the first format string has had problems with the width definition,
-        #                 #if using a different sized energy range (digits before decimal) this may become an issue
-        #                 f.write(f'{row[0]:0<11.4f} {row[1]:0<10f} {row[2]:0<10f} {row[3]:0<10f} {row[4]:0<10f} ')
-        #                 f.write(f'{row[5]:1g} {row[6]:1g} {row[7]:1g} {row[8]:1g} {row[9]:1g} {row[10]:1g}\n')
-        #         else:        
-        #             f.write(line)
-        #     f.close()
-        
-    return
+def format_float(value, width):
+    # Convert the value to a string with the desired precision
+    formatted_value = f'{abs(value):0<12f}'  # Adjust the precision as needed
+
+    # Check if the value is negative
+    if value < 0:
+        # If negative, add a negative sign to the formatted value
+        formatted_value = '-' + formatted_value
+    else:
+        # If positive, add a space to the left of the formatted value
+        formatted_value = ' ' + formatted_value
+
+    # Check if the formatted value exceeds the desired width
+    if len(formatted_value) > width:
+        # If the value is too large, truncate it to fit the width
+        formatted_value = formatted_value[:width]
+
+    return formatted_value
+
+
 
 def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -158,7 +137,7 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
         else:
             pass
         
-        # force to 0.001 if Gnx == 0
+        ### force to 0.001 if Gnx == 0
         df.loc[df['Gnx']==0.0, 'Gnx'] = 0.0001
 
         par_array = np.array([df.E, df.Gg, df.Gnx]).T
@@ -166,7 +145,6 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
         zero_neutron_array = np.zeros([len(par_array),zero_neutron_widths])
         par_array = np.insert(par_array, [5-zero_neutron_widths], zero_neutron_array, axis=1)
 
-        #vary_parm = True
         if vary_parm:
             binary_array = np.hstack((np.ones([len(par_array),5-zero_neutron_widths]), np.zeros([len(par_array),zero_neutron_widths])))
         else:
@@ -178,7 +156,16 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
         j_array = np.array([df.J_ID]).T
         samtools_array = np.hstack((samtools_array, j_array))
 
-    samtools_fmtpar(samtools_array, filename, template, initial_parameter_uncertainty)
+    widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+    with open(filename, 'w') as file:
+        for row in samtools_array:
+            for icol, val in enumerate(row):
+                column_width = widths[icol]
+                formatted_value = format_float(val, column_width)
+                file.write(formatted_value)
+            file.write('\n')
+        file.write(f'\n{initial_parameter_uncertainty}\n')
+        
     
     return
         
@@ -297,72 +284,72 @@ def create_sammyinp(filename='sammy.inp', \
 # =============================================================================
 # 
 # =============================================================================
-def read_sammy_par(filename, calculate_average):
-    """
-    Reads sammy.par file and calculates average parameters.
+# def read_sammy_par(filename, calculate_average):
+#     """
+#     Reads sammy.par file and calculates average parameters.
 
-    _extended_summary_
+#     _extended_summary_
 
-    Parameters
-    ----------
-    filename : _type_
-        _description_
-    calculate_average : bool
-        Whether or not to calculate average parameters.
+#     Parameters
+#     ----------
+#     filename : _type_
+#         _description_
+#     calculate_average : bool
+#         Whether or not to calculate average parameters.
 
-    Returns
-    -------
-    DataFrame
-        Contains the average parameters for each spin group
-    DataFrame
-        Contains all resonance parameters for all spin groups
-    """
+#     Returns
+#     -------
+#     DataFrame
+#         Contains the average parameters for each spin group
+#     DataFrame
+#         Contains all resonance parameters for all spin groups
+#     """
 
-    energies = []; spin_group = []; nwidth = []; gwidth = []
-    with open(filename,'r') as f:   
-        readlines = f.readlines()
-        in_res_dat = True
-        for line in readlines:   
+#     energies = []; spin_group = []; nwidth = []; gwidth = []
+#     with open(filename,'r') as f:   
+#         readlines = f.readlines()
+#         in_res_dat = True
+#         for line in readlines:   
 
-            try:
-                float(line.split()[0]) # if first line starts with a float, parameter file starts directly with resonance data
-            except:
-                in_res_dat = False # if that is not the case, parameter file has some keyword input before line "RESONANCES" then resonance parameters
+#             try:
+#                 float(line.split()[0]) # if first line starts with a float, parameter file starts directly with resonance data
+#             except:
+#                 in_res_dat = False # if that is not the case, parameter file has some keyword input before line "RESONANCES" then resonance parameters
 
-            if line.startswith(' '):
-                in_res_dat = False  
-            if in_res_dat:
-                if line.startswith('-'):
-                    continue #ignore negative resonances
-                else:
-                    splitline = line.split()
-                    energies.append(float(splitline[0]))
-                    gwidth.append(float(splitline[1]))
-                    nwidth.append(float(splitline[2]))
-                    spin_group.append(float(splitline[-1]))
-            if line.startswith('RESONANCE'):
-                in_res_dat = True
+#             if line.startswith(' '):
+#                 in_res_dat = False  
+#             if in_res_dat:
+#                 if line.startswith('-'):
+#                     continue #ignore negative resonances
+#                 else:
+#                     splitline = line.split()
+#                     energies.append(float(splitline[0]))
+#                     gwidth.append(float(splitline[1]))
+#                     nwidth.append(float(splitline[2]))
+#                     spin_group.append(float(splitline[-1]))
+#             if line.startswith('RESONANCE'):
+#                 in_res_dat = True
 
                 
                 
-    Gg = np.array(gwidth); Gn = np.array(nwidth); E = np.array(energies); jspin = np.array(spin_group)
-    df = pd.DataFrame([E, Gg, Gn, jspin], index=['E','Gg','Gn','jspin']); df = df.transpose()
+#     Gg = np.array(gwidth); Gn = np.array(nwidth); E = np.array(energies); jspin = np.array(spin_group)
+#     df = pd.DataFrame([E, Gg, Gn, jspin], index=['E','Gg','Gn','jspin']); df = df.transpose()
     
-    if calculate_average:
-        #avg_widths = df.groupby('jspin', as_index=False)['Gg','Gn'].mean() 
-        gb = df.groupby('jspin')    
-        list_of_dfs=[gb.get_group(x) for x in gb.groups]
+#     if calculate_average:
+#         #avg_widths = df.groupby('jspin', as_index=False)['Gg','Gn'].mean() 
+#         gb = df.groupby('jspin')    
+#         list_of_dfs=[gb.get_group(x) for x in gb.groups]
         
-        avg_df = pd.DataFrame(index=df['jspin'].unique(),columns=['dE','Gg','Gn'])
+#         avg_df = pd.DataFrame(index=df['jspin'].unique(),columns=['dE','Gg','Gn'])
 
-        for ij, jdf in enumerate(list_of_dfs):
-            avg_df['dE'][ij+1]=jdf['E'].diff().mean()
-            avg_df['Gg'][ij+1]=jdf['Gg'].mean()
-            avg_df['Gn'][ij+1]=jdf['Gn'].mean()
-    else:
-        avg_df = ''
+#         for ij, jdf in enumerate(list_of_dfs):
+#             avg_df['dE'][ij+1]=jdf['E'].diff().mean()
+#             avg_df['Gg'][ij+1]=jdf['Gg'].mean()
+#             avg_df['Gn'][ij+1]=jdf['Gn'].mean()
+#     else:
+#         avg_df = ''
 
-    return avg_df, df
+#     return avg_df, df
     
 
 

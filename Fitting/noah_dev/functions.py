@@ -118,7 +118,7 @@ def get_0Trans_constraint(exp_E, index_0T, max_xs, particle_pair, feature_pairs)
     for each_group in consecutive_ranges:
         Emin = exp_E[each_group[0]]
         Emax = exp_E[each_group[1]]
-        fineE = np.linspace(Emin, Emax, max(int((Emax-Emin)*5e1),1)  )
+        fineE = np.linspace(Emin, Emax, max(int(abs(Emax-Emin)*5e1),1)  )
         fineE_0T.extend(fineE)
     
     # calculate resonance matrix on fine E grid for constraint

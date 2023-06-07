@@ -66,9 +66,9 @@ def readpar(filepath):
                     value = None
                 else:
                     try:
-                        value = float(value)
+                        value = float(value[1::])
                     except:
-                        value = float('e-'.join(value.split('-')))
+                        value = float('e-'.join(value[1::].split('-')))
                 row.append(value)
                 start += width
             data.append(row)
@@ -138,7 +138,7 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
             pass
         
         ### force to 0.001 if Gnx == 0
-        df.loc[df['Gnx']==0.0, 'Gnx'] = 0.0001
+        df.loc[df['Gnx']<=1e-5, 'Gnx'] = 1e-5
 
         par_array = np.array([df.E, df.Gg, df.Gnx]).T
         zero_neutron_widths = 5-(len(par_array[0]))

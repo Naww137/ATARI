@@ -11,7 +11,7 @@ from numpy.linalg import inv
 from scipy.linalg import block_diag
 
 import functions as fn
-from ATARI.utils.io.datacontainer import DataContainer
+from ATARI.utils.io.data_container import DataContainer
 
 
 def get_resonance_ladder_from_feature_pairs(weights, feature_pairs):

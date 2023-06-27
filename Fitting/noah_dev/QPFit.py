@@ -2,21 +2,36 @@
 import numpy as np
 import pandas as pd
 import os
+import h5py
 import scipy.stats as sts
 
 from ATARI.syndat.particle_pair import Particle_Pair
+from ATARI.syndat.experiment import Experiment
+from ATARI.syndat.MMDA import generate
+from ATARI.theory.xs import SLBW
+from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.theory.scattering_params import gstat
 from ATARI.utils.datacontainer import DataContainer
-from ATARI.utils.atario import fill_resonance_ladder
+
+
+from ATARI.sammy_interface import sammy_functions, sammy_classes
 from ATARI.utils.stats import chi2_val
+from ATARI.atari_io.internal import fill_resonance_ladder
+from ATARI.sammy_interface import sammy_functions
+
+
 from numpy.linalg import inv
+from scipy.linalg import block_diag
+
+from scipy.optimize import lsq_linear
+from qpsolvers import solve_qp
+from scipy.optimize import linprog
 
 import functions as fn 
 
-
-
+# %%
 def main(casenum):
-
-    #%% Define experiment
+    # casenum = 110
 
     ac = 0.81271  # scattering radius in 1e-12 cm 
     M = 180.948030  # amu of target nucleus
@@ -36,7 +51,26 @@ def main(casenum):
                                     spin_groups=spin_groups,
                                     average_parameters=average_parameters )   
 
-    #%% initialize the data objects
+
+    E_min_max = [75, 125]
+    energy_grid = E_min_max
+
+    input_options = {'Add Noise': True,
+                    'Calculate Covariance': True,
+                    'Compression Points':[],
+                    'Grouping Factors':None}
+
+    # experiment_parameters = {'bw': {'val':0.0256,   'unc'   :   0},
+    #                          'n':  {'val':0.067166,     'unc'   :0}}
+    experiment_parameters = {'bw': {'val':0.1024,   'unc'   :   0},
+                            'n':  {'val':0.067166,     'unc'   :0}}
+
+    # initialize experimental setup
+    exp = Experiment(energy_grid, 
+                            input_options=input_options, 
+                            experiment_parameters=experiment_parameters)
+
+    # %% ### Build data objects from hdf5
 
     from ATARI.utils.misc import fine_egrid 
     from ATARI.utils.io.experimental_parameters import BuildExperimentalParameters_fromDIRECT, DirectExperimentalParameters
@@ -44,28 +78,33 @@ def main(casenum):
     from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, BuildPointwiseContainer_fromATARI, DirectPointwiseContainer
     from ATARI.utils.io.data_container import BuildDataContainer_fromBUILDERS, BuildDataContainer_fromOBJECTS, DirectDataContainer
 
-    # read hdf
-    case_file = "/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/Ta181_500samples_E75_125.hdf5"
 
-    ### Build from hdf5
+    case_file = "/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/Ta181_500samples_E75_125/Ta181_500samples_E75_125.hdf5"
+    
     builder_exppar = BuildExperimentalParameters_fromDIRECT(0.067166, 0, 1e-2)
     exppar = builder_exppar.construct()
+
     builder_theopar = BuildTheoreticalParameters_fromHDF5('true', case_file, casenum, Ta_pair)
     truepar = builder_theopar.construct()
+
     builder_pw = BuildPointwiseContainer_fromHDF5(case_file, casenum)
     pw = builder_pw.construct_lite_w_CovT()
+
     builder_dc = BuildDataContainer_fromOBJECTS( pw, exppar, [truepar])
     dc = builder_dc.construct()
+
     dc.pw.fill_exp_xs(dc.experimental_parameters)
 
-    # %% Step 0, reduce initial feature bank for computational speed
+
+
+    # %% Step 0 build feature bank and reduce with LP
 
     import classes as cls
 
     average_parameters.loc[:,['Gn']] = average_parameters['gn2']/12.5
-    Elam_features, Gtot_features = fn.get_parameter_grid(pw.exp.E, average_parameters, '3.0', 1e0, 2e0)
-    Gtot_features = np.append(Gtot_features, np.round(np.array(truepar.resonance_ladder.Gt),1)*1e-3 )
-    Elam_features = np.append(Elam_features, np.round(np.array(truepar.resonance_ladder.E),1))
+    Elam_features, Gtot_features = fn.get_parameter_grid(dc.pw.exp.E, average_parameters, '3.0', 2e-1, 3e0)
+    # Gtot_features = np.append(Gtot_features, np.round(np.array(dc.theoretical_parameters['true'].resonance_ladder.Gt),1)*1e-3 )
+    # Elam_features = np.append(Elam_features, np.round(np.array(dc.theoretical_parameters['true'].resonance_ladder.E),1))
     # Elam_features = np.round(np.array(theo_resladder.E),1)
     # Gtot_features = np.array(theo_resladder.Gt)*1e-3
     # Elam_features = np.array(theo_resladder.E)
@@ -75,12 +114,9 @@ def main(casenum):
 
     fb0 = prob.get_FeatureBank(dc, Elam_features, Gtot_features)
     inp0 = prob.get_MatrixInputs(dc, fb0)
-
     sol_lp0 = cls.Solvers.solve_linear_program(inp0)
     print(f'Features before: {fb0.nfeatures}')
     print(f'Features reduced with LP: {np.count_nonzero(sol_lp0>0)}')
-
-
 
     # %%  Step 1, solve unconstrained problem
 
@@ -88,7 +124,7 @@ def main(casenum):
                     abstol = 1e-8,
                     reltol = 1e-8,
                     feastol=1e-7,
-                    maxiters = 200)
+                        maxiters = 200)
 
     fb1, sol_lp0_ereduced = prob.reduce_FeatureBank(fb0, sol_lp0)
     inp1 = prob.get_MatrixInputs(dc, fb1)
@@ -98,13 +134,12 @@ def main(casenum):
 
     # %% [markdown]
     # ## Step 2, run bisection routine
+
     def solve_qp_w_constraint(inp_uncon, wcon, qpopt: cls.QPopt):
         inp_con = prob.get_ConstrainedMatrixInputs(inp_uncon, wcon)
         sol = cls.Solvers.solve_quadratic_program(inp_con, qpopt)
         return sol
 
-
-    ### Bisection Routine
     def bisect(x0,x1):
         return (x0+x1)/2
 
@@ -189,18 +224,14 @@ def main(casenum):
             sol_ws = np.append(sol_ws, np.zeros((np.shape(sol_ws)[0], elements_to_add)), axis=1)
         return target_wcon, sol_ws
 
-    # %%
 
-    # determine mins and maxes
-    # qpopt.verbose=True; qpopt.maxiters=200
+    w_threshold = 1e-6
     min_wcon = prob.get_MinSolvableWeight(fb1.nfeatures, inp1)
     max_wcon = np.sum(fb1.solution_ws)
     max_numres = np.count_nonzero(fb1.solution_ws>prob.w_threshold)
-    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.01, qpopt)
+    min_wcon_solw = solve_qp_w_constraint(inp1, min_wcon*1.001, qpopt)
     min_numres = np.count_nonzero(min_wcon_solw>prob.w_threshold)
 
-
-    # solve_qp_w_constraint(inp1, min_wcon*1.001, qpopt)
     print(f'Minimum Resonance Solution: {min_numres}')
     print(f'Maximum Resonance Solution: {max_numres}')
 
@@ -220,12 +251,10 @@ def main(casenum):
                                                                     minwcon, maxwcon,
                                                                     target_numres, target_wcon, target_sol_ws, save_all)
 
-    # print(target_numres)
-    # print(target_wcon)
-
-    # %%  Step 3, Solve reduced, unconstrained solution for each integer number of resonances
+    # %% Step 3, Solve reduced, unconstrained solution for each integer number of resonances
 
     print("Solving unconstrained, reduced problem for each target number of resonances.")
+
     integer_feature_solutions = {key: cls.FeatureBank for key in target_numres[target_wcon!=0]}
     for numres in target_numres[target_wcon!=0]:
         inumres = numres-min(target_numres)
@@ -238,10 +267,7 @@ def main(casenum):
 
         integer_feature_solutions[numres] = fb3
 
-
-    # %% [markdown]
-
-    # ### to just combine if E are the exact same
+    #%%  combine if E are the exact same
     def calculate_combined_parameters(x):
         if len(x) == 1:
             return x #[['Gt', 'Gnx', 'Gg', 'w']]
@@ -255,7 +281,7 @@ def main(casenum):
             Gg = np.average(x['Gg'], weights=x['w'])
             Gt = Gnx+Gg
         return pd.DataFrame({'E':x['E'].unique(), 'Gt':Gt, 'Gnx':Gnx, 'Gg':Gg, 'w':w}, index=[0]) # pd.DataFrame({'Gt':Gt, 'Gnx':Gnx, 'Gg':Gg, 'w':w}, index=[0])
-
+        
     print('Combining features at the same energy location')
 
     ### Here's where I handle resonances at the same energies and those with weights very small
@@ -272,30 +298,59 @@ def main(casenum):
         integer_resonance_solutions[new_numres] = {'prior':ires_resladder_combined}
 
         # add prior to dc
-        est_par = TheoreticalParameters(Ta_pair, ires_resladder_combined, label=f'{new_numres}_prior')
-        dc.add_estimate(est_par)
+        est_par_builder = BuildTheoreticalParameters_fromATARI(f'{new_numres}_prior', ires_resladder_combined, Ta_pair)
+        est_par = est_par_builder.construct()
+        dc.add_theoretical_parameters(est_par)
 
     print(f'Surviving integer number of resonance solutions: {list(integer_resonance_solutions.keys())}')
 
-    # %% [markdown] Step 4, run GLLS on transmission with reduced, unconstrained solution from 3 as prior
+    # %% Step 4, run GLLS on transmission with reduced, unconstrained solution from 3 as prior
 
+    def run_sammy_return_full_ladder(sammyINP, sammyRTO):
+        pw_posterior, par_posterior = sammy_functions.run_sammy(sammyINP, sammyRTO)
+        par_posterior.rename(columns={'Gn1':'Gnx'}, inplace=True)
+        par_posterior = fill_resonance_ladder(par_posterior, Ta_pair, J=3.0,
+                                                        chs=1.0,
+                                                        lwave=0.0,
+                                                        J_ID= 1.0  )
+        return pw_posterior, par_posterior
 
-    from ATARI.sammy_interface import sammy_functions, sammy_classes
+    def run_recursive_sammy(sammyINP, sammyRTO, exp_df, CovT, Dchi2_threshold = 0.1):
+        Dchi2 = 100
+        pw_posterior_new = None
+        par_posterior_new = sammyINP.resonance_ladder
+        while Dchi2 > Dchi2_threshold:
+            pw_posterior = pw_posterior_new
+            par_posterior = par_posterior_new
+            sammyINP.resonance_ladder = par_posterior
+            pw_posterior_new, par_posterior_new = run_sammy_return_full_ladder(sammyINP, sammyRTO)
+            [df.sort_values('E', axis=0, ascending=True, inplace=True) for df in [pw_posterior_new, exp_df]]
+            [df.reset_index(drop=True, inplace=True) for df in [pw_posterior_new, exp_df]]
+            CovT.sort_index(axis='index', inplace=True)
+            CovT.sort_index(axis='columns', inplace=True)
+            chi2_prior = chi2_val(pw_posterior_new.theo_trans, exp_df.exp_trans, CovT)
+            chi2_posterior = chi2_val(pw_posterior_new.theo_trans_bayes, exp_df.exp_trans, CovT)
+            Dchi2 = chi2_prior - chi2_posterior
+            # if chi2_posterior/len(pw_posterior_new) < 100:
+            #     sammyINP.initial_parameter_uncertainty = 0.3
+            # elif chi2_posterior/len(pw_posterior_new) < 1:
+            #     sammyINP.initial_parameter_uncertainty = 0.2
+        return pw_posterior, par_posterior
+
     sammyRTO = sammy_classes.SammyRunTimeOptions(
         path_to_SAMMY_exe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
         model = 'SLBW',
         reaction = 'transmission',
         solve_bayes = True,
         experimental_corrections = 'no_exp',
-        one_spingroup = False,
+        one_spingroup = True,
         energy_window = None,
-        sammy_runDIR = 'SAMMY_runDIR',
-        keep_runDIR = False,
+        sammy_runDIR = 'SAMMY_runDIR_1',
+        keep_runDIR = True,
         shell = 'zsh'
         )
 
-    print(f'Now running SAMMY Bayes for each integer resonance solution')
-
+    print("Running GLLS from feature bank solution")
     ### Run GLLS
     for numres in integer_resonance_solutions.keys():
         if numres == 0:
@@ -307,29 +362,32 @@ def main(casenum):
             resonance_ladder = prior, 
             experimental_data = dc.pw.exp, 
             experimental_cov = dc.pw.CovT, 
-            initial_parameter_uncertainty = 0.1
+            initial_parameter_uncertainty = 0.2
         )
 
+        lst, posterior = run_recursive_sammy(sammyINP, sammyRTO, dc.pw.exp, dc.pw.CovT, Dchi2_threshold=0.01)
         # lst, posterior = sammy_functions.run_sammy(sammyINP, sammyRTO)
-        pw_posterior, par_posterior = run_recursive_sammy(sammyINP, sammyRTO, exp.trans, exp.CovT, df_true, Dchi2_threshold=0.001)
 
-        posterior = fill_resonance_ladder(posterior, Ta_pair, J=3.0, chs=1, lwave=0.0, J_ID=1)
+        # posterior.rename(columns={"Gn1":"Gnx"},inplace=True)
+        # posterior = fill_resonance_ladder(posterior, Ta_pair, J=3.0, chs=1, lwave=0.0, J_ID=1)
         integer_resonance_solutions[numres]['posterior'] = posterior
 
-        est_par = TheoreticalParameters(Ta_pair, posterior, label=f'{numres}_post')
-        dc.add_estimate(est_par)
+        est_par_builder = BuildTheoreticalParameters_fromATARI(f'{numres}_post', posterior, Ta_pair)
+        est_par = est_par_builder.construct()
+        dc.add_theoretical_parameters(est_par)
 
-    # %% LRT
+    dc.models_to_pw()
 
-    ### Calculate Chi2 on trans
-    # [ (chi2_val(dc.pw.exp[f'{numres}_trans'], dc.pw.exp.exp_trans, dc.pw.CovT), numres) for numres in dc.est_par.keys()]
+    # %% Step 5, Likelihood ratio test on each of the posterior solutions to determine which number of resonances we should have
 
     print('Now running recursive likelihood ratio test')
+
     posterior_ires_chi2 = [ (int(key.split('_')[0]),
                             chi2_val(dc.pw.exp[f'{key}_trans'], dc.pw.exp.exp_trans, dc.pw.CovT))
-                                for key in dc.est_par.keys() if key.split('_')[1]=='post']
+                                for key in dc.theoretical_parameters.keys() if key!='true' and key.split('_')[1]=='post']
     posterior_ires_chi2 = np.array(posterior_ires_chi2)
     posterior_ires_chi2 = posterior_ires_chi2[posterior_ires_chi2[:, 0].argsort()]
+
 
     from scipy.stats import chi2
 
@@ -354,76 +412,89 @@ def main(casenum):
     def likelihood_val(fit):
         return sts.multivariate_normal.pdf( np.array(dc.pw.exp.exp_trans), fit, np.array(dc.pw.CovT) )
         
+
     ### Find first plausible model
     for i in range(len(posterior_ires_chi2)):
-        likelihood = likelihood_val( np.array(dc.pw.exp[f'{int(posterior_ires_chi2[i][0])}_post_trans']) )
+        likelihood = likelihood_val( np.array(dc.pw.exp[f'{int(posterior_ires_chi2[i,0])}_post_trans']) )
 
         print(np.log(likelihood))
         if np.log(likelihood) >= -100:
             istart = i
             break
-
-
-    inull = istart 
-    ialt = inull
-    iend = np.shape(posterior_ires_chi2)[0]
-
-    significance_level = 0.05
-
-    while ialt < iend:
-
-        # reset p_value
-        p_value = 1.0
-
-        while p_value > significance_level:
-
-            ialt += 1
-            if ialt == iend:
-                break
-            df_diff = posterior_ires_chi2[ialt][0]*3 - posterior_ires_chi2[inull][0]*3
-            lrt_stat, p_value = likelihood_ratio_test(posterior_ires_chi2[inull][1], posterior_ires_chi2[ialt][1], df_diff)
-            print(f"Model {posterior_ires_chi2[inull][0]} vs. Model {posterior_ires_chi2[ialt][0]}:\n p={p_value} D={lrt_stat}")
-            # print(f"D: {lrt_stat}")
-            # print(f"P-value: {p_value}")
-
-        if ialt == iend:
-            selected_model_ires = int(posterior_ires_chi2[inull][0])
+        elif i == len(posterior_ires_chi2)-1:
+            istart = 0
             break
-        else:
-            inull = ialt
 
-    print(f'Model Selected: {posterior_ires_chi2[inull][0]}')
+    ### Loop over different sig levels
+    siglevels = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2, 0.5]
+    for sig in siglevels:
+        print(f"Running LRT for significance level: {sig}")
+        
+        inull = istart 
+        ialt = inull
+        iend = np.shape(posterior_ires_chi2)[0]
+        while ialt < iend:
+            p_value = 1.0
+            while p_value > sig:
+                ialt += 1
+                if ialt == iend:
+                    break
+                df_diff = posterior_ires_chi2[ialt][0]*3 - posterior_ires_chi2[inull][0]*3
+                lrt_stat, p_value = likelihood_ratio_test(posterior_ires_chi2[inull][1], posterior_ires_chi2[ialt][1], df_diff)
+                print(f"Model {posterior_ires_chi2[inull][0]} vs. Model {posterior_ires_chi2[ialt][0]}:\n p={p_value} D={lrt_stat}")
+            if ialt == iend:
+                selected_model_ires = int(posterior_ires_chi2[inull][0])
+                break
+            else:
+                inull = ialt
 
-    final_estimate = dc.est_par[f'{selected_model_ires}_post'].resonance_ladder
-    final_par = TheoreticalParameters(Ta_pair, final_estimate, 'final')
-    dc.add_estimate(final_par)
-    est_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.final_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.final_trans).T
-    sol_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.theo_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.theo_trans).T
-    from scipy import integrate
-    est_sol_MSE = integrate.trapezoid((dc.pw.fine.theo_xs-dc.pw.fine.final_xs)**2, dc.pw.fine.E)
+        print(f'Model Selected: {posterior_ires_chi2[inull][0]}')
 
-    return est_sol_MSE #final_estimate
-    
+        # save final estimate
+        # print("Analyzing final solution and saving values")
+        print("Saving")
 
+        final_estimate = dc.theoretical_parameters[f'{selected_model_ires}_post'].resonance_ladder
+        sig_str = str(sig).split('.')[1]
+        final_estimate.to_csv(f'./par_est_{casenum}_pv_{sig_str}.csv')
+        
+        # final_par = BuildTheoreticalParameters_fromATARI(f'final_pv_{sig}', final_estimate, Ta_pair)
+        # dc.add_theoretical_parameters(final_par)
+        # dc.mem_2_full()
+        # dc.models_to_pw()
 
+        # est_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.final_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.final_trans).T
+        # sol_chi_square = (dc.pw.exp.exp_trans-dc.pw.exp.true_trans) @ inv(dc.pw.CovT) @ (dc.pw.exp.exp_trans-dc.pw.exp.true_trans).T
+        # from scipy import integrate
+        # est_sol_MSE = integrate.trapezoid((dc.pw.fine.true_xs-dc.pw.fine.final_xs)**2, dc.pw.fine.E)
 
-#%% Command line interface
+        # print(f'Chi2 estimate to data: {est_chi_square}')
+        # print(f'Chi2 true to data: {sol_chi_square}')
+        # print(f'Integral SE estimate to true: {est_sol_MSE}')
+
+    return # est_sol_MSE
+
+#%%
+
 
 
 import sys
-args = 110 # sys.argv[1]
+args = sys.argv[1]
 import time
+
+
 
 start_time = time.time()
 final_estimate = main(args)
 end_time = time.time()
 elapsed_time = end_time - start_time
 
+# MSEs.append(final_estimate)
 
-# final_estimate['tfit'] = np.ones(len(final_estimate))*elapsed_time
-# final_estimate.to_csv(f'./par_est_{casenum}.csv')
-print()
-print(f'Case: {args}')
-print(f'Final MSE: {final_estimate}')
-print(f'Time: {elapsed_time}')
-print()
+# # final_estimate['tfit'] = np.ones(len(final_estimate))*elapsed_time
+# # final_estimate.to_csv(f'./par_est_{casenum}.csv')
+
+# print()
+# print(f'Case: {siglevels}')
+# print(f'Final MSE: {MSEs}')
+# print()

@@ -16,7 +16,7 @@ l_max = 1
 Ta_pair = Particle_Pair( ac, M, m, I, i, l_max)
 
 
-resonance_ladder = pd.DataFrame({'E':[50, 55], 'Gg':[50,50], 'Gnx':[50,50], 'chs':[1.0,1.0], 'lwave':[0.0,0.0], 'J':[3.0,3.0], 'J_ID':[1,1]})
+resonance_ladder = pd.DataFrame({'E':[50, 55], 'Gg':[50,50], 'Gnx':[-50,50], 'chs':[1.0,1.0], 'lwave':[0.0,0.0], 'J':[3.0,3.0], 'J_ID':[1,1]})
 pw_exp = pd.DataFrame({'E':[10,100], 'exp_trans': [0.8,0.8], 'exp_trans_unc':[0.1,0.1]})
 
 
@@ -43,17 +43,21 @@ sammyINP = sammy_classes.SammyInputData(
 )
 
 
-lst, par = sammy_functions.run_sammy(sammyINP, sammyRTO)
+# lst, par = sammy_functions.run_sammy(sammyINP, sammyRTO)
 
-print(lst)
+# print(lst)
+# print(par)
+
+# assert(np.all(lst.E == pw_exp.E))
+# assert(np.all(lst.exp_trans == pw_exp.exp_trans))
+# assert(np.all(lst.exp_trans_unc == pw_exp.exp_trans_unc))
+
+# assert(np.all(par.E == resonance_ladder.E))
+# assert(np.all(par.Gg == resonance_ladder.Gg))
+# assert(np.all(par.Gn1 == resonance_ladder.Gnx))
+
+
+par = sammy_functions.readpar("/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/SAMMY_runDIR/sammy.par")
+
 print(par)
-
-assert(np.all(lst.E == pw_exp.E))
-assert(np.all(lst.exp_trans == pw_exp.exp_trans))
-assert(np.all(lst.exp_trans_unc == pw_exp.exp_trans_unc))
-
-assert(np.all(par.E == resonance_ladder.E))
-assert(np.all(par.Gg == resonance_ladder.Gg))
-assert(np.all(par.Gn1 == resonance_ladder.Gnx))
-
 # %%

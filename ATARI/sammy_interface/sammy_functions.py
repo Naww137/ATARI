@@ -66,7 +66,7 @@ def readpar(filepath):
                     value = None
                 else:
                     try:
-                        value = float(value[1::])
+                        value = abs(float(value))
                     except:
                         value = float('e-'.join(value[1::].split('-')))
                 row.append(value)

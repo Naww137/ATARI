@@ -456,8 +456,8 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
                                     cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                     capture_output=True
                                     )
-    if len(runsammy_process.stderr) > 82:
-        raise ValueError(f'SAMMY did not run correctly\n\nSAMMY error given was: {runsammy_process.stderr}')
+    if len(runsammy_process.stderr) > 0:
+        print(f'SAMMY gave the following warning or error: {runsammy_process.stderr}')
 
     # read output  and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))

@@ -1,6 +1,6 @@
 from ATARI.syndat.particle_pair import Particle_Pair
 import pandas as pd
-
+import numpy as np
 from dataclasses import dataclass
 from ATARI.utils.misc import fine_egrid 
 from ATARI.utils.atario import fill_resonance_ladder
@@ -17,6 +17,7 @@ class TheoreticalParameters:
         # self.resonance_ladder = None
         # self.label = None
 
+    ### Setter functions
     def set_label(self, label: str) -> None:
         self.label = label
     def set_particle_pair(self, particle_pair: Particle_Pair) -> None:
@@ -24,11 +25,39 @@ class TheoreticalParameters:
     def set_resonance_ladder(self, resonance_ladder: pd.DataFrame) -> None:
         self.resonance_ladder = resonance_ladder
     
+    ### data manipulator functions
     def fill(self) -> None:
         self.resonance_ladder = fill_resonance_ladder(self.resonance_ladder, self.particle_pair)
 
     def to_hdf5(self, file: str, isample: int) -> None:
         h5io.write_par(file, isample, self.resonance_ladder, self.label)
+
+
+    ### properties
+    @property
+    def NumRes(self) -> int:
+        return len(self.resonance_ladder)
+    @property
+    def avg_gnx2(self) -> float:
+        return np.mean(self.resonance_ladder.gnx2)
+    @property
+    def avg_Gg(self) -> float:
+        return np.mean(self.resonance_ladder.Gg)
+    @property
+    def min_gnx2(self) -> float:
+        return min(self.resonance_ladder.gnx2)
+    @property
+    def min_Gg(self) -> float:
+        return min(self.resonance_ladder.Gg)
+    @property
+    def max_gnx2(self) -> float:
+        return max(self.resonance_ladder.gnx2)
+    @property
+    def max_Gg(self) -> float:
+        return max(self.resonance_ladder.Gg)
+
+
+
 
 
 ### Builders

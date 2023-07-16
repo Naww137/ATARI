@@ -14,13 +14,15 @@ class DataContainer:
     def __init__(self) -> None:
         self.theoretical_parameters = {}
 
+
     ### construction methods
     def set_pw(self, pw: PointwiseContainer) -> None: #, pw: PointwiseContainer, exp_par: ExperimentalParameters, theo_par: TheoreticalParameters, est_par: dict = {}
         self.pw = pw
     def set_experimental_parameters(self, experimental_parameters: ExperimentalParameters) -> None:
         self.experimental_parameters = experimental_parameters
 
-    ### Methods for adding data 
+
+    ### Methods for adding or manipulating the data in data_container
     def add_theoretical_parameters(self, theoretical_parameters: TheoreticalParameters) -> None:
         self.theoretical_parameters[theoretical_parameters.label] = theoretical_parameters
         self.pw.add_model(theoretical_parameters, self.experimental_parameters, overwrite=False)

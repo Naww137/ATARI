@@ -81,20 +81,20 @@ class PointwiseContainer:
     
 
     @property
-    def exp_models(self) -> list:
-        return ['_'.join(each.split('_')[0:-1]) for each in self.exp.columns]
+    def exp_columns(self) -> list:
+        return np.unique(['_'.join(each.split('_')[0:-1]) for each in self.exp.columns])
     @property
-    def fine_models(self) -> list:
-        return ['_'.join(each.split('_')[0:-1]) for each in self.fine.columns]
+    def fine_columns(self) -> list:
+        return np.unique(['_'.join(each.split('_')[0:-1]) for each in self.fine.columns])
 
     ### methods for adding data to pointwise container
     def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters, overwrite=False):
-        if theoretical_parameters.label in self.exp_models and not overwrite:
+        if theoretical_parameters.label in self.exp_columns and not overwrite:
             print(f"Model '{theoretical_parameters.label}' already exists in pw.exp, bypassing pointwise reconstruction")
         else:
             self.exp[f'{theoretical_parameters.label}_xs'], self.exp[f'{theoretical_parameters.label}_trans'] = calculate_model(self.exp.E, theoretical_parameters, experimental_parameters)
         if self.mem == 'full':
-            if theoretical_parameters.label in self.fine_models and not overwrite:
+            if theoretical_parameters.label in self.fine_columns and not overwrite:
                 print(f"Model '{theoretical_parameters.label}' already exists in pw.fine, bypassing pointwise reconstruction")
             else:
                 self.fine[f'{theoretical_parameters.label}_xs'], _ = calculate_model(self.fine.E, theoretical_parameters, experimental_parameters)

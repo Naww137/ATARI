@@ -11,7 +11,8 @@ import pandas as pd
 import numpy as np
 import h5py
 from ATARI.theory.xs import SLBW
-import ATARI.atari_io.hdf5 as io
+# import ATARI.utils.atario as io
+import ATARI.utils.io.hdf5 as h5io
 
 
 ###
@@ -119,7 +120,8 @@ def sample_syndat(particle_pair, experiment, solver,
     # Build data frame for export
     pw_df = pd.DataFrame({  'E':experiment.trans.E, 
                             'theo_trans':experiment.theo.theo_trans,
-                            'exp_trans':experiment.trans.exp_trans
+                            'exp_trans':experiment.trans.exp_trans,
+                            'exp_trans_unc':experiment.trans.exp_trans_unc
                                                                     })
     
     CoV = experiment.CovT
@@ -130,18 +132,20 @@ def sample_syndat(particle_pair, experiment, solver,
 def sample_and_write_syndat(case_file, isample, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5):
 
     # sample theoretical parameters and compute transmission on experimentaal fine-grid theoretical pw cross section
-    resonance_ladder, exp_pw_df, CovT = sample_syndat(particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange)
-    theo_pw_df = compute_theoretical(solver, experiment, particle_pair, resonance_ladder, True)
+    resonance_ladder, pw_exp_df, CovT = sample_syndat(particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange)
+    # theo_pw_df = compute_theoretical(solver, experiment, particle_pair, resonance_ladder, True)
 
     # write data
     if use_hdf5:
-        io.write_experimental(case_file, isample, exp_pw_df, pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E))
-        io.write_theoretical(case_file, isample, theo_pw_df, resonance_ladder)
+        # io.h5write_experimental(case_file, isample, exp_pw_df, pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E))
+        h5io.write_pw_exp(case_file, isample, pw_exp_df, CovT, CovXS=None)
+        h5io.write_par(case_file, isample, resonance_ladder, 'true')
+        # io.h5write_theoretical(case_file, isample, theo_pw_df, resonance_ladder)
     else:
-        exp_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','exp_pw'), index=False)
-        theo_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','theo_pw'), index=False) 
-        resonance_ladder.to_csv(os.path.join(case_file,f'sample_{isample}','theo_par'), index=False)
-        pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_csv(os.path.join(case_file,f'sample_{isample}','exp_cov'))
+        exp_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','pw_exp'), index=False)
+        # theo_pw_df.to_csv(os.path.join(case_file,f'sample_{isample}','pw_fine'), index=False) 
+        resonance_ladder.to_csv(os.path.join(case_file,f'sample_{isample}','par_true'), index=False)
+        pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_csv(os.path.join(case_file,f'sample_{isample}','CovT'))
 
     return
 
@@ -200,7 +204,7 @@ def generate(particle_pair, experiment,
             h5f = h5py.File(case_file, "a")
             sample_group = f'sample_{i}'
             if sample_group in h5f:
-                if ('exp_pw' in h5f[sample_group]) and ('theo_pw' in h5f[sample_group]) and ('theo_par' in h5f[sample_group]):
+                if ('pw_exp' in h5f[sample_group]) and ('par_true' in h5f[sample_group]):
                     if overwrite:
                         h5f.close()
                         sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5)

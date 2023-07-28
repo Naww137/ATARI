@@ -1,5 +1,6 @@
 import numpy as np
 from ATARI.theory import scattering_params
+from ATARI.utils.atario import fill_resonance_ladder
 
 
 def SLBW(E, pair, resonance_ladder):
@@ -37,6 +38,8 @@ def SLBW(E, pair, resonance_ladder):
         xs_scat = potential_scattering
         xs_tot = xs_scat + xs_cap
         return xs_tot, xs_scat, xs_cap
+    
+    resonance_ladder = fill_resonance_ladder(resonance_ladder, pair)
         
     xs_cap = 0; xs_scat = 0
     group_by_J = dict(tuple(resonance_ladder.groupby('J')))
@@ -61,11 +64,11 @@ def SLBW(E, pair, resonance_ladder):
             E_lambda = row.E
             Gg = row.Gg * 1e-3
             # gnx2 = sum([row[ign] for ign in range(2,len(row))]) * 1e-3  # Not sampling multiple, single-channel particle widths
-            gnx2 = row.gnx2 * 1e-3 
-            Gnx = 2*penetration*gnx2
+            gn2 = row.gn2 * 1e-3 
+            Gn = 2*penetration*gn2
 
-            d = (E-E_lambda)**2 + ((Gg+Gnx)/2)**2 
-            sum1 += (Gg*Gnx) / ( d )
+            d = (E-E_lambda)**2 + ((Gg+Gn)/2)**2 
+            sum1 += (Gg*Gn) / ( d )
 
         xs_cap += (np.pi*g/(k**2))*sum1
 
@@ -78,14 +81,14 @@ def SLBW(E, pair, resonance_ladder):
             E_lambda = row.E
             Gg = row.Gg * 1e-3
             # gnx2 = sum([row[ign] for ign in range(2,len(row))]) * 1e-3 # Not sampling multiple, single-channel particle widths
-            gnx2 = row.gnx2 * 1e-3 
-            Gnx = 2*penetration*gnx2
+            gn2 = row.gn2 * 1e-3 
+            Gn = 2*penetration*gn2
 
-            Gtot = Gnx+Gg
-            d = (E-E_lambda)**2 + ((Gg+Gnx)/2)**2 
-            sum1 += Gnx*Gtot/d
-            sum2 += Gnx*(E-E_lambda)/d
-            sum3 += (Gnx*(E-E_lambda)/d)**2 + (Gnx*Gtot/d/2)**2
+            Gtot = Gn+Gg
+            d = (E-E_lambda)**2 + ((Gg+Gn)/2)**2 
+            sum1 += Gn*Gtot/d
+            sum2 += Gn*(E-E_lambda)/d
+            sum3 += (Gn*(E-E_lambda)/d)**2 + (Gn*Gtot/d/2)**2
 
         xs_scat += (np.pi*g/(k**2))* ( (1-np.cos(2*phi))*(2-sum1) + 2*np.sin(2*phi)*sum2 + sum3 )
 

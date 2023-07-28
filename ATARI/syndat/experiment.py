@@ -439,13 +439,15 @@ class Experiment:
                                                                                     self.redpar.val.ks, self.redpar.val.ko, self.Bi, self.redpar.val.b0s,
                                                                                     self.redpar.val.b0o, monitor_array, sys_unc, self.redpar.val.ab_cov, self.calc_cov)
         
-        self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
         if self.calc_cov:
+            self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
             self.trans['exp_trans_unc'] = np.sqrt(np.diag(self.CovT))
+            self.CovT = pd.DataFrame(self.CovT, columns=self.trans.E, index=self.trans.E)
+            self.CovT.index.name = None
         else:
-            self.trans['exp_trans_unc'] = np.sqrt(self.CovT)
-        self.CovT = pd.DataFrame(self.CovT, columns=self.trans.E, index=self.trans.E)
-        self.CovT.index.name = None
+            diag_tot, diag_stat, diag_sys = unc_data
+            self.trans['exp_trans_unc'] = np.sqrt(diag_tot)
+            self.CovT = None
 
         # define data cps
         self.odat['cps'] = rates[0]

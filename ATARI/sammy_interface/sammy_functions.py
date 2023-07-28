@@ -7,6 +7,8 @@ from pathlib import Path
 from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
+from ATARI.utils.atario import fill_resonance_ladder
+
 
 # module_dirname = os.path.dirname(__file__)
 
@@ -123,24 +125,15 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
         Filepath to template file for sammy.par. Included because of the different options for input to sammy, by default None and the SAMMY parameter file will only contain resonance parameters.
     """
 
-    def gn2G(row):
-        S, P, phi, k = scattering_params.FofE_recursive([row.E], pair.ac, pair.M, pair.m, row.lwave)
-        Gnx = 2*np.sum(P)*row.gnx2
-        return Gnx.item()
-
     if df.empty:
         samtools_array = []
     else:
-        
-        if "Gnx" not in df:
-            df['Gnx'] = df.apply(lambda row: gn2G(row), axis=1)
-        else:
-            pass
-        
-        ### force to 0.001 if Gnx == 0
-        df.loc[df['Gnx']<=1e-5, 'Gnx'] = 1e-5
+        df = fill_resonance_ladder(df, pair)
 
-        par_array = np.array([df.E, df.Gg, df.Gnx]).T
+        ### force to 0.001 if Gnx == 0
+        df.loc[df['Gn']<=1e-5, 'Gn'] = 1e-5
+
+        par_array = np.array([df.E, df.Gg, df.Gn]).T
         zero_neutron_widths = 5-(len(par_array[0]))
         zero_neutron_array = np.zeros([len(par_array),zero_neutron_widths])
         par_array = np.insert(par_array, [5-zero_neutron_widths], zero_neutron_array, axis=1)

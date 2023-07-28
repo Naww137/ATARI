@@ -38,10 +38,10 @@ class TheoreticalParameters:
     def NumRes(self) -> int:
         return len(self.resonance_ladder)
     @property
-    def avg_gnx2(self) -> float:
+    def avg_gnx2(self) :
         return np.mean(self.resonance_ladder.gnx2)
     @property
-    def avg_Gg(self) -> float:
+    def avg_Gg(self) :
         return np.mean(self.resonance_ladder.Gg)
     @property
     def min_gnx2(self) -> float:

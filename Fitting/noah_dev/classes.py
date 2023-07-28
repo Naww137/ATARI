@@ -17,11 +17,12 @@ from ATARI.utils.io.data_container import DataContainer
 def get_resonance_ladder_from_feature_pairs(weights, feature_pairs):
     Elam = feature_pairs[:,0]
     Gt = feature_pairs[:,1]*1e3
+    weights = weights.flatten()
     # Gnx = Gt*weights
-    Gnx = weights*1e3
-    Gg = Gt-Gnx
-    resonances = np.array([Elam, Gt, Gnx, Gg, weights])
-    resonance_ladder = pd.DataFrame(resonances.T, columns=['E', 'Gt', 'Gnx', 'Gg', 'w'])
+    Gn = weights*1e3
+    Gg = Gt-Gn
+    resonances = np.array([Elam, Gt, Gn, Gg, weights])
+    resonance_ladder = pd.DataFrame(resonances.T, columns=['E', 'Gt', 'Gn', 'Gg', 'w'])
     return resonance_ladder
 
 @dataclass
@@ -73,7 +74,8 @@ class Solvers:
                                                                                                     feastol=qpopt.feastol,
                                                                                                     maxiters=qpopt.maxiters
                                                                                                     )
-        return sol_w
+                                                                                                
+        return sol_w.reshape(-1,1)
     
     @staticmethod
     def solve_linear_program(inputs: MatrixInputs):
@@ -97,7 +99,7 @@ class ProblemHandler:
         feature_matrix, potential_scattering, feature_pairs = fn.get_resonance_feature_bank(dc.pw.exp.E, dc.theoretical_parameters['true'].particle_pair, ElFeatures, GtFeatures)
         nfeatures = np.shape(feature_matrix)[1]
 
-        return FeatureBank(feature_matrix, feature_pairs, potential_scattering.flatten(), nfeatures, [0,feature_pairs[:,1]*0.999] )
+        return FeatureBank(feature_matrix, feature_pairs, potential_scattering.reshape((-1,1)), nfeatures, [0,feature_pairs[:,1]*0.999] )
 
 
     def get_MatrixInputs(self, dc: DataContainer, feature_bank: FeatureBank):
@@ -105,7 +107,7 @@ class ProblemHandler:
 
         # remove nan values in xs and cov for solver
         b, cov, pscat, A, index_0T = fn.remove_nan_values(np.array(dc.pw.exp.exp_xs), np.array(dc.pw.CovXS), feature_bank.potential_scattering, feature_bank.feature_matrix)
-        b = b-pscat
+        b = b.reshape((-1,1))-pscat
 
         # get bounds and constraints
         lb, ub = fn.get_bound_arrays(nfeatures, feature_bank.w_bounds)

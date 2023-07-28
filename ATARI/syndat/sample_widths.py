@@ -124,7 +124,10 @@ def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF):
     reduced_widths_square : numpy.ndarray
         Array of reduced widths squared, this is what is sampled directly.
     """
-    reduced_widths_square = avg_reduced_width_square*sample_chisquare(len(level_vector), DOF)
+    reduced_widths_square = avg_reduced_width_square*sample_chisquare(len(level_vector), DOF)/DOF
+    
+    # vlads code:
+    # res_par_avg['<Gg>']*np.random.chisquare(df=res_par_avg['g_dof'],size=sample_size)/res_par_avg['g_dof'] 
     
     return np.array(reduced_widths_square)
 

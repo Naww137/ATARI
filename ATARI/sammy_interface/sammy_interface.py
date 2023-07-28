@@ -13,6 +13,7 @@ from pathlib import Path
 from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
+from ATARI.utils.atario import fill_resonance_ladder
 
 # module_dirname = os.path.dirname(__file__)
 
@@ -88,24 +89,15 @@ def write_sampar(df, pair, vary_parm, filename,
         Filepath to template file for sammy.par. Included because of the different options for input to sammy, by default os.path.realpath("../templates/sammy_template_RM_only.par")
     """
 
-    def gn2G(row):
-        S, P, phi, k = scattering_params.FofE_recursive([row.E], pair.ac, pair.M, pair.m, row.lwave)
-        Gnx = 2*np.sum(P)*row.gnx2
-        return Gnx.item()
-
     if df.empty:
         samtools_array = []
-    else:
-        
-        if "Gnx" not in df:
-            df['Gnx'] = df.apply(lambda row: gn2G(row), axis=1)
-        else:
-            pass
-        
-        # force to 0.001 if Gnx == 0
-        df.loc[df['Gnx']==0.0, 'Gnx'] = 0.0001
 
-        par_array = np.array([df.E, df.Gg, df.Gnx]).T
+    else:
+        df = fill_resonance_ladder(df, pair)
+        # force to 0.001 if Gnx == 0
+        df.loc[df['Gn']==0.0, 'Gn'] = 0.0001
+
+        par_array = np.array([df.E, df.Gg, df.Gn]).T
         zero_neutron_widths = 5-(len(par_array[0]))
         zero_neutron_array = np.zeros([len(par_array),zero_neutron_widths])
         par_array = np.insert(par_array, [5-zero_neutron_widths], zero_neutron_array, axis=1)
@@ -510,7 +502,7 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
     # read output lst and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
     # par_df = read_sammy_par(os.path.join(sammy_runDIR, 'sammy.par'))
-    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
+    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gn','J_ID'], engine='python')
     
     if not keep_runDIR:
         shutil.rmtree(sammy_runDIR)

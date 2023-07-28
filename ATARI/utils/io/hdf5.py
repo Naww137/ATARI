@@ -6,7 +6,10 @@ import numpy as np
 
 def read_pw_exp(case_file, isample):
     pw_exp = pd.read_hdf(case_file, f'/sample_{isample}/pw_exp')
-    CovT = pd.read_hdf(case_file, f'/sample_{isample}/CovT')
+    try:
+        CovT = pd.read_hdf(case_file, f'/sample_{isample}/CovT')
+    except:
+        CovT = None
     return pw_exp, CovT
 
 
@@ -26,7 +29,8 @@ def read_par(case_file, isample, label):
 
 def write_pw_exp(case_file, isample, pw_exp_df, CovT, CovXS=None):
     pw_exp_df.to_hdf(case_file, f"sample_{isample}/pw_exp")
-    CovT.to_hdf(case_file, f"sample_{isample}/CovT")
+    if CovT is not None:
+        CovT.to_hdf(case_file, f"sample_{isample}/CovT")
     if CovXS is not None:
         CovXS.to_hdf(case_file, f"sample_{isample}/CovXS")
 

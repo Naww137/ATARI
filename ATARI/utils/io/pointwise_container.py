@@ -5,6 +5,7 @@ from pandas import DataFrame, Series, merge
 from typing import Protocol
 import numpy as np
 
+
 from ATARI.theory.xs import SLBW
 from ATARI.utils.misc import fine_egrid 
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
@@ -230,9 +231,12 @@ class BuildPointwiseContainer_fromHDF5(BuildPointwiseContainer):
         self._product.set_exp(df)
 
     def build_CovT(self) -> None:
-        _, cov = h5io.read_pw_exp(self.hdf5_file, self.isample)
+        pwdf, cov = h5io.read_pw_exp(self.hdf5_file, self.isample)
         if isinstance(cov, Series):
             cov = cov.to_frame().T
+        if cov is None:
+            cov = DataFrame(np.diag(pwdf["exp_trans_unc"]**2) , columns=pwdf.E, index=pwdf.E)
+            cov.index.name = None
         self._product.set_CovT(cov)
     
     def build_mem(self,mem) -> None:

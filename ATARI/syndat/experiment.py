@@ -352,6 +352,10 @@ class Experiment:
             for par in theo_redpar:
                 if par == 'ab_cov':
                     continue
+                elif par == 'a':
+                    continue
+                elif par == 'b':
+                    continue
                 # TODO: determine if I should be sampling monitor corrections
                 # if par == 'm1':
                 #     continue
@@ -362,6 +366,13 @@ class Experiment:
                 # if par == 'm4':
                 #     continue
                 theo_redpar[par]['val'] = np.random.default_rng().normal(theo_redpar[par]['val'], theo_redpar[par]['unc'])
+            
+            # sample correlated values for a and b!
+            cov = np.diag([theo_redpar["a"]["unc"], theo_redpar["b"]["unc"]])
+            cov[0,1] = theo_redpar["ab_cov"]["val"]
+            cov[1,0] = theo_redpar["ab_cov"]["val"]
+            a,b = np.random.default_rng().multivariate_normal([theo_redpar["a"]["val"], theo_redpar["b"]["val"]], list(cov))
+            theo_redpar["a"]['val'] = a; theo_redpar["b"]['val'] = b
         
         self.theo_redpar = pd.DataFrame.from_dict(theo_redpar, orient='index')
 

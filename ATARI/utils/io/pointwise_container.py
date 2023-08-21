@@ -9,8 +9,7 @@ import numpy as np
 from ATARI.theory.xs import SLBW
 from ATARI.utils.misc import fine_egrid 
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
-from ATARI.utils.stats import chi2_val
-
+# from ATARI.utils.stats import chi2_val
 from ATARI.syndat.particle_pair import Particle_Pair
 from ATARI.utils.io.theoretical_parameters import TheoreticalParameters
 from ATARI.utils.io.experimental_parameters import ExperimentalParameters
@@ -83,10 +82,10 @@ class PointwiseContainer:
 
     @property
     def exp_columns(self) -> list:
-        return np.unique(['_'.join(each.split('_')[0:-1]) for each in self.exp.columns])
+        return np.unique(np.array(['_'.join(each.split('_')[0:-1]) for each in self.exp.columns]))
     @property
     def fine_columns(self) -> list:
-        return np.unique(['_'.join(each.split('_')[0:-1]) for each in self.fine.columns])
+        return np.unique(np.array(['_'.join(each.split('_')[0:-1]) for each in self.fine.columns]))
 
     ### methods for adding data to pointwise container
     def add_model(self, theoretical_parameters: TheoreticalParameters, experimental_parameters: ExperimentalParameters, overwrite=False):
@@ -156,7 +155,7 @@ class BuildPointwiseContainer(ABC):
 
 class BuildPointwiseContainer_fromATARI(BuildPointwiseContainer):
 
-    def __init__(self, exp: DataFrame, CovT: DataFrame = DataFrame(), ppeV: int = 100) -> None:
+    def __init__(self, exp: DataFrame, CovT: DataFrame = None, ppeV: int = 100) -> None:
         """Fresh builder should be a clean slate"""
         self.reset()
         self.exp = exp
@@ -176,7 +175,11 @@ class BuildPointwiseContainer_fromATARI(BuildPointwiseContainer):
     def build_exp(self) -> None:
         self._product.set_exp(self.exp)
     def build_CovT(self) -> None:
-        self._product.set_CovT(self.CovT)
+        cov = self.CovT
+        if cov is None:
+            cov = DataFrame(np.diag(self.exp["exp_trans_unc"]**2) , columns=self.exp.E, index=self.exp.E)
+            cov.index.name = None
+        self._product.set_CovT(cov)
     def build_mem(self,mem) -> None:
         self._product.set_mem(mem)
     def build_fine(self) -> None:

@@ -42,11 +42,11 @@ exp = Experiment(energy_grid,
                         experiment_parameters=experiment_parameters)
 
 
-for Gg_DOF in [10,100,1000,10000]:
+for Gg_DOF in [1, 50]: #[10,100,1000,10000]:
 
 
     res_par_avg = make_res_par_avg(D_avg = 8.79, 
-                                Gn_avg= 46.4, 
+                                Gn_avg= 1.617, 
                                 n_dof = 1, 
                                 Gg_avg = 64.0, 
                                 g_dof = Gg_DOF, 
@@ -63,7 +63,7 @@ for Gg_DOF in [10,100,1000,10000]:
                                     spin_groups=spin_groups,
                                     average_parameters=average_parameters )   
 
-    case_file = f'/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/varyGg/GgDOF_{Gg_DOF}.hdf5'
+    case_file = f'/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/varyGg_correctGn/GgDOF_{Gg_DOF}.hdf5'
     dataset_range = (0, 500)
     samples_not_generated = generate(Ta_pair, exp, 
                                             'syndat_SLBW', 
@@ -74,6 +74,5 @@ for Gg_DOF in [10,100,1000,10000]:
                                             vary_Erange=None,
                                             use_hdf5=True,
                                             overwrite = False)
-
 
 # %%

@@ -335,7 +335,7 @@ def main(isample):
                     pass
 
 # args = sys.argv[1]
-main(7)
+main(1)
 
 # import time
 

@@ -40,10 +40,39 @@ def get_parameter_grid(energy_grid, average_parameters, spin_group, dE, dGt):
 
     return Elam_features, Gtot_features
 
+def get_parameter_grid_new(energy_grid, res_par_avg, num_Er, num_Gt, option=0):
 
+    # allow Elambda to be just outside of the window
+    max_Elam = max(energy_grid) + res_par_avg['Gt99']/10e3
+    min_Elam = min(energy_grid) - res_par_avg['Gt99']/10e3
+
+    if option < 2:
+        num_Gn = 1
+    else:
+        num_Gn = num_Gt
+                
+    Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+    Gt = np.logspace(np.log10(res_par_avg['Gt01']), np.log10(res_par_avg['Gt99']), num_Gt)    
+    Gn = np.logspace(np.log10(res_par_avg['Gn01']), np.log10(res_par_avg['Gn99']), num_Gn)
+    
+    return Er, Gt, Gn
+
+    return Elam_features, Gtot_features
+
+
+def get_feature(E, Elam, Gtot, particle_pair, kinematic_constant, phi, lwave, P, Gn=1):
+    _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
+    PPElam = P/PElam
+    # A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+    #                                         -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+    A_column =  kinematic_constant* ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
+                                    - (Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
+    return A_column
+            
 def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
     
     E = np.array(E)
+    Gtot_features = Gtot_features*1e-3
     number_of_resonances = len(Elam_features)*len(Gtot_features)
     Resonance_Matrix = np.zeros((len(E), number_of_resonances))
     feature_pairs = []
@@ -56,20 +85,11 @@ def get_resonance_feature_bank(E, particle_pair, Elam_features, Gtot_features):
 
     for iElam, Elam in enumerate(Elam_features):
         for iGtot, Gtot in enumerate(Gtot_features):
-            # Gtot = Gtot/1e3*1e3 
             feature_pairs.append([Elam,Gtot])
-
-            _, PElam, _, _ = FofE_recursive([Elam], particle_pair.ac, particle_pair.M, particle_pair.m, lwave)
-            PPElam = P/PElam
-            # A_column =  kinematic_constant * Gtot * ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
-            #                                         -(Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
-            A_column =  kinematic_constant* ( Gtot*PPElam**2*np.cos(2*phi) /4 /((Elam-E)**2+(Gtot*PPElam/2)**2) 
-                                            - (Elam-E)*PPElam*np.sin(2*phi) /2 /((Elam-E)**2+(Gtot*PPElam/2)**2) )  
-            
             vertical_index = (iElam)*len(Gtot_features) + iGtot
-            Resonance_Matrix[:, vertical_index] = A_column
+            Resonance_Matrix[:, vertical_index] = get_feature(E, Elam, Gtot, particle_pair, kinematic_constant, phi, lwave, P, Gn=1)
 
-    return Resonance_Matrix, potential_scattering, np.array(feature_pairs)
+    return Resonance_Matrix, potential_scattering.flatten(), np.array(feature_pairs)
 
 
 # 

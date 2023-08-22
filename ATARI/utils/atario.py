@@ -8,25 +8,25 @@ from ATARI.theory.scattering_params import FofE_recursive
 # HDF5 utilities
 # ----------------------------------------------------------------------------------
 def h5read_experimental(case_file, isample):
-    exp_pw = pd.read_hdf(case_file, f'/sample_{isample}/exp_pw')
-    exp_cov = pd.read_hdf(case_file, f'/sample_{isample}/exp_cov')
+    exp_pw = pd.read_hdf(case_file, f'/sample_{isample}/pw_exp')
+    exp_cov = pd.read_hdf(case_file, f'/sample_{isample}/CovT')
     return exp_pw, exp_cov
 
 def h5read_theoretical(case_file, isample):
     theo_pw = pd.read_hdf(case_file, f'/sample_{isample}/theo_pw')
-    theo_par = pd.read_hdf(case_file, f'/sample_{isample}/theo_par')
+    theo_par = pd.read_hdf(case_file, f'/sample_{isample}/par_true')
     return theo_pw, theo_par
 
 
 ### Write data
 def h5write_experimental(case_file, isample, exp_pw_df, exp_cov):
-    exp_pw_df.to_hdf(case_file, f"sample_{isample}/exp_pw")
-    pd.DataFrame(exp_cov, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_hdf(case_file, f"sample_{isample}/exp_cov")
+    exp_pw_df.to_hdf(case_file, f"sample_{isample}/pw_exp")
+    pd.DataFrame(exp_cov, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_hdf(case_file, f"sample_{isample}/CovT")
     return
 
 def h5write_theoretical(case_file, isample, theo_pw_df, theo_par):
-    theo_pw_df.to_hdf(case_file, f"sample_{isample}/theo_pw")
-    theo_par.to_hdf(case_file, f"sample_{isample}/theo_par") 
+    theo_pw_df.to_hdf(case_file, f"sample_{isample}/pw_fine")
+    theo_par.to_hdf(case_file, f"sample_{isample}/par_true") 
     return
         
 
@@ -99,13 +99,13 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     def gn2G(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
-        Gnx = 2*np.sum(P)*row.gnx2
-        return Gnx.item()
+        Gn = 2*np.sum(P)*row.gn2
+        return Gn.item()
 
     def G2gn(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
-        gnx2 = row.Gnx/2/np.sum(P)
-        return gnx2.item()
+        gn2 = row.Gn/2/np.sum(P)
+        return gn2.item()
 
     # check spin group information
     for item, key in zip([J,chs,lwave,J_ID], ['J', 'chs', 'lwave', 'J_ID']):
@@ -113,14 +113,15 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     if len(resonance_ladder.index) == 0:
         return resonance_ladder
-    else:
-        # calculate other missing widths
-        if 'Gnx' not in resonance_ladder:
-            resonance_ladder['Gnx'] = resonance_ladder.apply(lambda row: gn2G(row), axis=1)
-        if 'gnx' not in resonance_ladder:
-            resonance_ladder['gnx2'] = resonance_ladder.apply(lambda row: G2gn(row), axis=1)
+    else: # calculate other missing widths
+        if 'Gn' not in resonance_ladder:
+            resonance_ladder['Gn'] = resonance_ladder.apply(lambda row: gn2G(row), axis=1)
+        if 'gn2' not in resonance_ladder:
+            resonance_ladder['gn2'] = resonance_ladder.apply(lambda row: G2gn(row), axis=1)
         if 'Gt' not in resonance_ladder:
-            resonance_ladder['Gt'] = resonance_ladder['Gnx'] + resonance_ladder['Gg']
+            resonance_ladder['Gt'] = resonance_ladder['Gn'] + resonance_ladder['Gg']
+        if 'Gg' not in resonance_ladder:
+            resonance_ladder['Gg'] = resonance_ladder['Gt'] - resonance_ladder['Gn']
 
     return resonance_ladder
 

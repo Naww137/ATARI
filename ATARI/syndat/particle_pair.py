@@ -8,10 +8,9 @@ Created on Thu Jun 16 12:18:04 2022
 
 import os
 import numpy as np
-from ATARI.syndat import sample_widths
-from ATARI.syndat import sample_levels
-from ATARI.theory import xs
+
 import pandas as pd
+from ATARI.syndat.sample_resparms import sample_resonance_ladder, sample_resonance_ladder_old
 
 
 class Particle_Pair:
@@ -33,10 +32,8 @@ class Particle_Pair:
     def __init__(self, ac, M, m, I, i, l_max,
                     input_options={},   
                     spin_groups=None, 
-                    average_parameters=pd.DataFrame({   'dE'    :   {'3.0':8.79, '4.0':4.99},
-                                                        'Gg'    :   {'3.0':46.4, '4.0':35.5},
-                                                        'gn2'   :   {'3.0':64.0, '4.0':64.0}  })
-                                                                                                    ):
+                    average_parameters={}
+                    ):
         """
         Initialization of particle pair object for a given reaction.
 
@@ -267,38 +264,12 @@ class Particle_Pair:
         DataFrame
             Resonance ladder information.
         """
-
-        # TODO implement option to use Fudge for resonance sampling. Calling a single function would be nice. I will clean up the 'else' option to also be a single function
-        if use_fudge:
-            raise ValueError("Need to implement this option")
+        if isinstance(average_parameters, dict):
+            resonance_ladder = sample_resonance_ladder(Erange, spin_groups, average_parameters, use_fudge)
+        elif isinstance(average_parameters, pd.DataFrame):
+            resonance_ladder = sample_resonance_ladder_old(Erange, spin_groups, average_parameters, use_fudge)
         else:
-            # resonance_ladder = pd.DataFrame()
-            resonance_ladder = pd.DataFrame({'E':[], 'Gg':[], 'gnx2':[], 'J':[], 'chs':[], 'lwave':[], 'J_ID':[]})
-            J_ID = 0
-            for ij, j in enumerate(spin_groups):
-                J_ID += 1
-
-                # sample resonance levels for each spin group with negative parity
-                [levels, level_spacing] = sample_levels.sample_RRR_levels(Erange, average_parameters.dE[f'{j[0]}'])
-                
-                # if no resonance levels sampled
-                if len(levels) == 0:
-                    continue
-                # elif len(levels) == 1:
-
-
-                # a single radiative capture width is sampled w/large DOF because of many 'partial' radiative transitions to ground state
-                # must divide average by the 2*DOF in order to maintain proper magnitude
-                red_gwidth = sample_widths.sample_RRR_widths(levels, average_parameters.Gg[f'{j[0]}']/2000, 1000)
-                Gwidth = 2*red_gwidth # Gbar = 2*gbar b/c P~1 for gamma channels
-
-                # sample observable width as sum of multiple single-channel width with the same average (chi2, DOF=channels)
-                red_nwidth = sample_widths.sample_RRR_widths(levels, average_parameters.gn2[f'{j[0]}']/j[1], j[1])
-                E_Gn_gnx2 = pd.DataFrame([levels, Gwidth, red_nwidth, [j[0]]*len(levels), [j[1]]*len(levels), [j[2]]*len(levels), [J_ID]*len(levels)], index=['E','Gg', 'gnx2', 'J', 'chs', 'lwave', 'J_ID'])  
-                # assert len(np.unique(j[2]))==1, "Code cannot consider different l-waves contributing to a spin group"
-                resonance_ladder = pd.concat([resonance_ladder, E_Gn_gnx2.T])
-
-            resonance_ladder.reset_index(inplace=True, drop=True)
+            raise ValueError("Do not recognize the supplied average parameter type")
     
         return resonance_ladder
 

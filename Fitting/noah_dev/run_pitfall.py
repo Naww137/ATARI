@@ -11,6 +11,7 @@ from ATARI.syndat.experiment import Experiment
 import h5py
 import scipy.stats as sts
 
+from scipy import integrate
 import ATARI.utils.io.hdf5 as h5io
 
 #%% Initialize particle pair and quantup spin groups of interest
@@ -51,7 +52,8 @@ exp = Experiment(E_min_max,
 # %%
 # run a performance test with the PiTFAll module
 
-case_file = '/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/Ta181_500samples_E75_125_1.hdf5'
+case_file = '/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/Ta181_500samples_E75_125/Ta181_500samples_E75_125_1.hdf5'
+# case_file = '/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/TestFMReduction2.hdf5'
 
 dataset_range = (0, 480)
 input_options = {   'Overwrite Syndats'    :   False, 
@@ -71,50 +73,92 @@ perf_test = Performance_Test(dataset_range,
 
 import ATARI.atari_io.hdf5 as io
 from ATARI.utils.misc import fine_egrid 
-from ATARI.utils.io.datacontainer import DataContainer
-from ATARI.utils.io.pointwise import PointwiseContainer
-from ATARI.utils.io.parameters import TheoreticalParameters, ExperimentalParameters
+from ATARI.utils.io.experimental_parameters import BuildExperimentalParameters_fromDIRECT, DirectExperimentalParameters
+from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, BuildTheoreticalParameters_fromATARI, DirectTheoreticalParameters
+from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, BuildPointwiseContainer_fromATARI, DirectPointwiseContainer
+from ATARI.utils.io.data_container import BuildDataContainer_fromBUILDERS, BuildDataContainer_fromOBJECTS, DirectDataContainer
 
-residual_list = []
+# build experimental parameters
+builder_exppar = BuildExperimentalParameters_fromDIRECT(0.067166, 0, 1e-2)
+exppar = builder_exppar.construct()
 
-for isample in range(min(dataset_range), max(dataset_range)):
+# siglevels = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.2, 0.5]
+# siglevels = np.linspace(0.001, 0.9, 50)
+siglevels = np.logspace(-4,-2, 10)
+siglevels[0] = np.round(siglevels[0], 4)
+# siglevels = np.concatenate( [siglevels, np.linspace(0.001, 0.9, 50)] )
 
-    pw_exp, CovT = h5io.read_pw_exp(case_file, isample)
-    ladder_true = h5io.read_par(case_file, isample, 'true')
-    ladder_fit = h5io.read_par(case_file, isample, 'fit')
+residual_dict = {}
+MSE_dict = {}
+for sig in siglevels:
+    residual_dict[sig]= []
+    MSE_dict[sig] = []
 
-    threshold_0T = 1e-2
-    exppar = ExperimentalParameters(0.067166, 0, threshold_0T)
-    theopar_true = TheoreticalParameters(Ta_pair, ladder_true, 'true')
-    theopar_fit = TheoreticalParameters(Ta_pair, ladder_fit, 'fit_pv_0p07')
+for isample in range(0,480):
 
-    pwfine = pd.DataFrame({'E':fine_egrid(pw_exp.E,100)})
-    pw = PointwiseContainer(pw_exp, pwfine)
+    # build true model parameter object
+    builder_theopar = BuildTheoreticalParameters_fromHDF5('true', case_file, isample, Ta_pair)
+    truepar = builder_theopar.construct()
 
-    pw.add_experimental(pw_exp, CovT, exppar)
-    pw.add_model(theopar_true, exppar)
-    pw.add_model(theopar_fit, exppar)
+    # build pointwise data 
+    builder_pw = BuildPointwiseContainer_fromHDF5(case_file, isample)
+    pw = builder_pw.construct_full()
 
-    dc = DataContainer(pw, exppar, theopar_true, {'fit_pv_0p07':theopar_fit})
+    builder_dc = BuildDataContainer_fromOBJECTS( pw, exppar, [truepar])
+    dc = builder_dc.construct()
 
-    residual_list.append( dc.pw.fine.fit_pv_0p07_xs-dc.pw.fine.true_xs )
+    for sig in siglevels:
+        sig_str = str(sig).split('.')[1][0:7]
+        est_par_builder = BuildTheoreticalParameters_fromHDF5(f'par_est_iFB_{isample}_pv_{sig_str}', case_file, isample, Ta_pair)
+        est_par = est_par_builder.construct()
+        dc.add_theoretical_parameters(est_par)
 
-print(residual_list)
-residual_matrix = np.array(residual_list)
-print(np.shape(residual_matrix))
+    dc.models_to_pw()
 
-# %%
+    for sig in siglevels:
+        sig_str = str(sig).split('.')[1][0:7]
+        residual_dict[sig].append( np.array(dc.pw.fine[f'par_est_iFB_{isample}_pv_{sig_str}_xs']-dc.pw.fine.true_xs) )
 
-fnorm = np.linalg.norm(residual_matrix)
-fnorm_normed = fnorm/residual_matrix.size
+        # print(np.sum( (dc.pw.fine[f'par_est_iFB_{isample}_pv_{sig_str}_xs']-dc.pw.fine.true_xs)**2))
+        MSE = integrate.trapezoid((dc.pw.fine.true_xs-dc.pw.fine[f'par_est_iFB_{isample}_pv_{sig_str}_xs'])**2, dc.pw.fine.E)
+        print(MSE)
+        MSE_dict[sig].append(MSE)
+    
+    print(f"Completed sample: {isample}")
+    # print(dc.pw.fine_columns)
+#%%
+fnns = []
+for sig in siglevels:
+    residual_matrix = np.array(residual_dict[sig])
 
-print(fnorm)
-print(fnorm_normed)
-# %%
+    fnorm = np.linalg.norm(residual_matrix)
+    fnorm_normed = fnorm/residual_matrix.size
+    fnns.append(fnorm_normed)
 
-# test = np.load('/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/pvals_pv_0p03.npy')
-
-# figure()
-# hist(np.log10(test[test >0]), bins=50)
+    print()
+    print(sig)
+    print(fnorm)
+    print(fnorm_normed)
 
 #%%
+MSEs = []
+for residual in residual_dict[0.0001]:
+    MSEs.append(integrate.trapezoid(residual**2, dc.pw.fine.E))
+
+
+# %%
+
+figure()
+plot(siglevels, fnns, 'o')
+xlabel('Significance Level')
+ylabel(r'$\frac{||R||_F}{R.size}$')
+title('Informed Feature Bank')
+
+
+# %%
+
+# test = np.load('/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/SLBW_noexp/lasso/pvals_pv_0p07.npy')
+
+# figure()
+# hist(np.log10(test[test >0]), bins=100)
+# xlim([-4,0])

@@ -352,6 +352,10 @@ class Experiment:
             for par in theo_redpar:
                 if par == 'ab_cov':
                     continue
+                elif par == 'a':
+                    continue
+                elif par == 'b':
+                    continue
                 # TODO: determine if I should be sampling monitor corrections
                 # if par == 'm1':
                 #     continue
@@ -362,6 +366,13 @@ class Experiment:
                 # if par == 'm4':
                 #     continue
                 theo_redpar[par]['val'] = np.random.default_rng().normal(theo_redpar[par]['val'], theo_redpar[par]['unc'])
+            
+            # sample correlated values for a and b!
+            cov = np.diag([theo_redpar["a"]["unc"], theo_redpar["b"]["unc"]])
+            cov[0,1] = theo_redpar["ab_cov"]["val"]
+            cov[1,0] = theo_redpar["ab_cov"]["val"]
+            a,b = np.random.default_rng().multivariate_normal([theo_redpar["a"]["val"], theo_redpar["b"]["val"]], list(cov))
+            theo_redpar["a"]['val'] = a; theo_redpar["b"]['val'] = b
         
         self.theo_redpar = pd.DataFrame.from_dict(theo_redpar, orient='index')
 
@@ -439,13 +450,15 @@ class Experiment:
                                                                                     self.redpar.val.ks, self.redpar.val.ko, self.Bi, self.redpar.val.b0s,
                                                                                     self.redpar.val.b0o, monitor_array, sys_unc, self.redpar.val.ab_cov, self.calc_cov)
         
-        self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
         if self.calc_cov:
+            self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
             self.trans['exp_trans_unc'] = np.sqrt(np.diag(self.CovT))
+            self.CovT = pd.DataFrame(self.CovT, columns=self.trans.E, index=self.trans.E)
+            self.CovT.index.name = None
         else:
-            self.trans['exp_trans_unc'] = np.sqrt(self.CovT)
-        self.CovT = pd.DataFrame(self.CovT, columns=self.trans.E, index=self.trans.E)
-        self.CovT.index.name = None
+            diag_tot, diag_stat, diag_sys = unc_data
+            self.trans['exp_trans_unc'] = np.sqrt(diag_tot)
+            self.CovT = None
 
         # define data cps
         self.odat['cps'] = rates[0]

@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
-
+import scipy.stats as sts
 
 def chi2_val(a,b,cov):
     """
@@ -37,3 +37,28 @@ def chi2_val(a,b,cov):
         raise ValueError("Covariance matrix is not the same length as the vectors.")
     
     return ((b-a) @ inv(cov) @ (b-a).T).item()
+
+
+
+
+def likelihood_ratio_test(X2_null, X2_alt, df):
+    """
+    Perform a likelihood ratio test for nested models.
+
+    Args:
+        LLmin: Log-likelihood of the null (restricted) model.
+        LLmax: Log-likelihood of the alternative (unrestricted) model.
+        df: Degrees of freedom difference between the two models.
+
+    Returns:
+        lrt_stat: Likelihood ratio test statistic.
+        p_value: p-value associated with the test statistic.
+    """
+    # lrt_stat = 2 * (LLalt - LLnull)
+    lrt_stat = X2_null - X2_alt
+    p_value = 1 - sts.chi2.cdf(lrt_stat, df)
+    return lrt_stat, p_value
+
+
+def likelihood_val(fit, exp, cov):
+    return sts.multivariate_normal.pdf( exp, fit, cov )

@@ -8,74 +8,164 @@ import matplotlib.pyplot as plt
 from ATARI.theory.xs import SLBW
 from numpy.linalg import inv
 
+from ATARI.utils.stats import chi2_val
+
 # ===========================================================================================
 #   METHODS FOR READING DATA
 # ===========================================================================================
 
-###
-def check_case_file_or_dir(case_file):
-    if os.path.isfile(case_file):
-        use_hdf5 = True
-    else:
-        use_hdf5 = False
-    return use_hdf5
+# ###
+# def check_case_file_or_dir(case_file):
+#     if os.path.isfile(case_file):
+#         use_hdf5 = True
+#     else:
+#         use_hdf5 = False
+#     return use_hdf5
 
-###
-def read_par_datasets(case_file, i, fit_name):
-    use_hdf5 = check_case_file_or_dir(case_file)
-    if use_hdf5:
-        # TODO: allow for multiple fit_names to be given
-        theo_par_df = pd.read_hdf(case_file, f'sample_{i}/theo_par')
-        if fit_name is not None:
-            est_par_df = pd.read_hdf(case_file, f'sample_{i}/est_par_{fit_name}')
-        else:
-            est_par_df = None
-    else:
-        if os.path.isfile(os.path.join(case_file, f'sample_{i}', f'est_par_{fit_name}.csv')):
-            est_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', f'est_par_{fit_name}.csv'))
-        else:
-            est_par_df = None
-        theo_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', f'theo_par.csv'))
-    return theo_par_df, est_par_df
+# ###
+# def read_par_datasets(case_file, i, fit_name):
+#     use_hdf5 = check_case_file_or_dir(case_file)
+#     if use_hdf5:
+#         # TODO: allow for multiple fit_names to be given
+#         theo_par_df = pd.read_hdf(case_file, f'sample_{i}/theo_par')
+#         if fit_name is not None:
+#             est_par_df = pd.read_hdf(case_file, f'sample_{i}/est_par_{fit_name}')
+#         else:
+#             est_par_df = None
+#     else:
+#         if os.path.isfile(os.path.join(case_file, f'sample_{i}', f'est_par_{fit_name}.csv')):
+#             est_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', f'est_par_{fit_name}.csv'))
+#         else:
+#             est_par_df = None
+#         theo_par_df = pd.read_csv(os.path.join(case_file, f'sample_{i}', f'theo_par.csv'))
+#     return theo_par_df, est_par_df
 
-###
-def read_pw_datasets(case_file, i):
-    use_hdf5 = check_case_file_or_dir(case_file)
-    if use_hdf5:
-        exp_pw_df = pd.read_hdf(case_file, f'sample_{i}/exp_pw')
-        theo_pw_df = pd.read_hdf(case_file, f'sample_{i}/theo_pw')
-    else:
-        exp_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/exp_pw.csv'))
-        try:
-            theo_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/theo_pw.csv'))
-        except: 
-            theo_pw_df = pd.DataFrame()
+# ###
+# def read_pw_datasets(case_file, i):
+#     use_hdf5 = check_case_file_or_dir(case_file)
+#     if use_hdf5:
+#         exp_pw_df = pd.read_hdf(case_file, f'sample_{i}/exp_pw')
+#         theo_pw_df = pd.read_hdf(case_file, f'sample_{i}/theo_pw')
+#     else:
+#         exp_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/exp_pw.csv'))
+#         try:
+#             theo_pw_df = pd.read_csv(os.path.join(case_file, f'sample_{i}/theo_pw.csv'))
+#         except: 
+#             theo_pw_df = pd.DataFrame()
 
-    return exp_pw_df, theo_pw_df
+#     return exp_pw_df, theo_pw_df
 
-###
-def read_sample_case_data(case_file, isample, fit_name):
-    # read in data
-    exp_pw_df, theo_pw_df = read_pw_datasets(case_file, isample)
-    theo_par_df, est_par_df = read_par_datasets(case_file, isample, fit_name)
-    try:
-        exp_cov = pd.read_hdf(case_file, f'sample_{isample}/exp_cov')
-    except:
-        with h5py.File(case_file, 'r') as f:
-            exp_cov= f[f'sample_{isample}/exp_cov'][()]
-            f.close()   
+# ###
+# def read_sample_case_data(case_file, isample, fit_name):
+#     # read in data
+#     exp_pw_df, theo_pw_df = read_pw_datasets(case_file, isample)
+#     theo_par_df, est_par_df = read_par_datasets(case_file, isample, fit_name)
+#     try:
+#         exp_cov = pd.read_hdf(case_file, f'sample_{isample}/exp_cov')
+#     except:
+#         with h5py.File(case_file, 'r') as f:
+#             exp_cov= f[f'sample_{isample}/exp_cov'][()]
+#             f.close()   
 
-    # sort parameter data
-    theo_par_df.sort_values('E', inplace=True)
-    if est_par_df is not None:
-        est_par_df.sort_values('E', inplace=True)
-    # exp_pw_df.sort_values('E', inplace=True)
-    # theo_pw_df.sort_values('E', inplace=True)
+#     # sort parameter data
+#     theo_par_df.sort_values('E', inplace=True)
+#     if est_par_df is not None:
+#         est_par_df.sort_values('E', inplace=True)
+#     # exp_pw_df.sort_values('E', inplace=True)
+#     # theo_pw_df.sort_values('E', inplace=True)
 
-    return exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov
+#     return exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov
+
+from ATARI.syndat.particle_pair import Particle_Pair
+from ATARI.utils.io.experimental_parameters import ExperimentalParameters
+from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, TheoreticalParameters
+from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, PointwiseContainer
+from ATARI.utils.io.data_container import BuildDataContainer_fromOBJECTS, DataContainer
 
 
+def get_dc_for_isample_fromHDF5(case_file: str, isample: int, model_labels: list, Ta_pair: Particle_Pair, exppar: ExperimentalParameters):
 
+    # build pointwise data 
+    builder_pw = BuildPointwiseContainer_fromHDF5(case_file, isample)
+    # check for fine data
+    pw = builder_pw.construct_lite_w_CovT()
+
+    # build dc
+    builder_dc = BuildDataContainer_fromOBJECTS( pw, exppar, [])
+    dc = builder_dc.construct()
+
+    # add models you want to analyze
+    for label in model_labels:
+        est_par_builder = BuildTheoreticalParameters_fromHDF5(f'{label}', case_file, isample, Ta_pair)
+        est_par = est_par_builder.construct()
+        dc.add_theoretical_parameters(est_par)
+
+    # reconstruct pointwise models, this function should not perform the reconstruction if the pw data already exists
+    dc.models_to_pw()
+
+    return dc
+
+
+# All samples all models
+
+# for each sample
+    
+    # for each model
+        # return Obj = Single Sample FoMs (model)
+    # dict {model: FOM Obj} 
+    
+    # sample
+
+class SingleSampleFoMs:
+    def __init__(self):
+        pass
+    
+    # setters
+    def set_average_parameters(self, avg_Gg, avg_Gn, avg_Gt):
+        self.avg_Gg = avg_Gg
+        self.avg_Gn = avg_Gn
+        self.avg_Gt = avg_Gt
+    # def set_bound_parameters(self, minmax_Gg, minm)
+    def set_chi2(self, chi2):
+        self.chi2 = chi2
+    def set_MSE(self, MSE):
+        self.MSE = MSE
+    def set_residual(self, residual):
+        self.residual = residual
+
+
+# class BuildSingleSampleFoMs_fromDC:
+
+#     def __init__(self, dc: DataContainer) -> None:
+#         """Fresh builder should be a clean slate"""
+#         self.reset()
+#         self.dc = dc
+
+#     def reset(self) -> None:
+#         self._product = SingleSampleFoMs()
+
+#     @property
+#     def product(self) -> SingleSampleFoMs:
+#         product = self._product
+#         self.reset()
+#         return product
+
+#     def build_chi2(self) -> None:
+
+#         self._product.set_chi2(chi2)
+#     def build_MSE(self) -> None:
+#         # self._product.set_MSE(self.experimental_parameters)
+
+#     def build_residual(self) -> None:
+#         self._product.set_residual(residual)
+
+    # def construct(self) -> DataContainer:
+
+
+    # This class will hold figures of merit for a single sample. 
+    # In similar fashion to the datacontainer and pointwisecontainer, it will hold these FoMs for different models
+
+    # I would like to use th builder pattern here as well to make this class robust and flexible
 
 # ===========================================================================================
 #   METHODS FOR ANLYZING SYNTHETIC DATA
@@ -83,21 +173,19 @@ def read_sample_case_data(case_file, isample, fit_name):
 
 
 ###
-def analyze_syndat(case_file, isample):
+def analyze_model(theo_par: TheoreticalParameters, pw: PointwiseContainer):
     
-    exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov = read_sample_case_data(case_file, isample, None)
+    # analyze parameters
+    # now these are properties of theoretical parameters object
 
-    theo_exp_SE = np.sum((exp_pw_df.exp_trans-exp_pw_df.theo_trans)**2)
-    NumRes = len(theo_par_df)
-    NumEpts = len(exp_pw_df)
-    avg_gnx2 = np.mean(theo_par_df.gnx2)
-    avg_Gg = np.mean(theo_par_df.Gg)
-    min_gnx2 = min(theo_par_df.gnx2)
-    min_Gg = min(theo_par_df.Gg)
-    max_gnx2 = max(theo_par_df.gnx2)
-    max_Gg = max(theo_par_df.Gg)
+    # analyze exp pointwise
+    NumEpts = len(pw.exp.E)
+    Chi2 = chi2_val(pw.exp[f'{theo_par.label}_trans'], pw.exp.exp_trans, pw.CovT)
 
-    return [isample, NumRes, NumEpts, theo_exp_SE, avg_gnx2, avg_Gg, min_gnx2, min_Gg, max_gnx2, max_Gg]
+    # analyze fine pointwise
+
+
+    return NumEpts, Chi2# , NumRes, avg_gnx2, avg_Gg, min_gnx2, min_Gg, max_gnx2, max_Gg
 
 
 

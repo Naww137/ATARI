@@ -420,7 +420,7 @@ def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     with open(os.path.join(sammy_RTO.sammy_runDIR, 'pipe.sh'), 'w') as f:
-        f.write('sammy.inp\nsammy.par\nsammy.dat')
+        f.write('sammy.inp\nSAMMY.PAR\nsammy.dat')
         if sammy_RTO.energy_window is None:
             f.write('\n')
         elif sammy_INP.experimental_data is not None:

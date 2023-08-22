@@ -113,18 +113,15 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     if len(resonance_ladder.index) == 0:
         return resonance_ladder
-    else:
-        # if "Gnx" in resonance_ladder:
-        #     resonance_ladder['Gn'] = resonance_ladder["Gnx"]
-        # if "gnx2" in resonance_ladder:
-        #     resonance_ladder['gn2'] = resonance_ladder["gnx2"]
-        # calculate other missing widths
+    else: # calculate other missing widths
         if 'Gn' not in resonance_ladder:
             resonance_ladder['Gn'] = resonance_ladder.apply(lambda row: gn2G(row), axis=1)
         if 'gn2' not in resonance_ladder:
             resonance_ladder['gn2'] = resonance_ladder.apply(lambda row: G2gn(row), axis=1)
         if 'Gt' not in resonance_ladder:
             resonance_ladder['Gt'] = resonance_ladder['Gn'] + resonance_ladder['Gg']
+        if 'Gg' not in resonance_ladder:
+            resonance_ladder['Gg'] = resonance_ladder['Gt'] - resonance_ladder['Gn']
 
     return resonance_ladder
 

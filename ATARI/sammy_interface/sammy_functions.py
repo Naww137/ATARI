@@ -374,7 +374,7 @@ def write_saminp(model, particle_pair, reaction, bayes, filepath):
                 if bayes:
                     f.write('SOLVE BAYES EQUATIONS\n')
                 elif not bayes:
-                    f.write('DO NOT SOLVE BAYES EQUATIONS')
+                    f.write('DO NOT SOLVE BAYES EQUATIONS\n')
             else:
                 f.write(line)
            

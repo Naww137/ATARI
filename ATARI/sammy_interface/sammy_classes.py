@@ -1,10 +1,9 @@
 
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ATARI.syndat.particle_pair import Particle_Pair
 from pandas import DataFrame
 from numpy import ndarray
-
 
 @dataclass
 class SammyRunTimeOptions:
@@ -18,6 +17,10 @@ class SammyRunTimeOptions:
     sammy_runDIR: str = 'SAMMY_runDIR'
     keep_runDIR: bool = False
     shell: str = 'zsh'
+    recursive: bool = False
+    recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
+                                                        "iterations": 5,
+                                                        "print":False}      )
 
 
 @dataclass
@@ -28,3 +31,10 @@ class SammyInputData:
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[ndarray] = None
     initial_parameter_uncertainty: Optional[float] = 1.0
+
+
+# @dataclass
+# class SammyOutputData:
+#     pw: DataFrame
+#     par: DataFrame
+#     chi2:

@@ -7,7 +7,9 @@ from pathlib import Path
 from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
-from ATARI.utils.atario import fill_resonance_ladder
+# from ATARI.utils.atario import fill_resonance_ladder
+from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.utils.stats import chi2_val
 
 
 # module_dirname = os.path.dirname(__file__)
@@ -102,6 +104,29 @@ def format_float(value, width):
     return formatted_value
 
 
+def fill_sammy_ladder(df, particle_pair):
+
+    def gn2G(row):
+        _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
+        Gn = 2*np.sum(P)*row.gn2
+        return Gn.item()
+
+    cols = df.columns.values
+    if "Gn1" not in cols:
+        if "Gn" not in cols:
+            if "gn2" not in cols:
+                raise ValueError("Neutron width (Gn1, Gn, gn2) not in parameter dataframe.")
+            else:
+                df["Gn1"] = df.apply(lambda row: gn2G(row), axis=1)
+        else:
+            df.rename(columns={"Gn":"Gn1"}, inplace=True)
+    if "Gg" not in cols:
+        if "Gt" not in cols:
+            raise ValueError("Gg nor Gt in parameter dataframe")
+        else:
+            df['Gg'] = df['Gt'] - df['Gn1']
+
+    return df
 
 def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -128,12 +153,13 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
     if df.empty:
         samtools_array = []
     else:
-        df = fill_resonance_ladder(df, pair)
+        # df = fill_resonance_ladder(df, pair)
+        df = fill_sammy_ladder(df, pair)
 
         ### force to 0.001 if Gnx == 0
-        df.loc[df['Gn']<=1e-5, 'Gn'] = 1e-5
+        df.loc[df['Gn1']<=1e-5, 'Gn1'] = 1e-5
 
-        par_array = np.array([df.E, df.Gg, df.Gn]).T
+        par_array = np.array([df.E, df.Gg, df.Gn1]).T
         zero_neutron_widths = 5-(len(par_array[0]))
         zero_neutron_array = np.zeros([len(par_array),zero_neutron_widths])
         par_array = np.insert(par_array, [5-zero_neutron_widths], zero_neutron_array, axis=1)
@@ -435,13 +461,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
             raise ValueError("An energy window input was provided but no experimental data.")
 
 
-def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
-
-    # setup sammy runtime files
-    make_runDIR(sammy_RTO.sammy_runDIR)
-    fill_runDIR_with_templates(sammy_RTO.sammy_runDIR, sammy_RTO.one_spingroup, sammy_RTO.experimental_corrections)
-    update_input_files(sammy_INP, sammy_RTO)
-    write_shell_script(sammy_INP, sammy_RTO)
+def execute_sammy(sammy_RTO:SammyRunTimeOptions):
 
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
@@ -457,8 +477,52 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     # if sammy_RTO.solve_bayes:
         # par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
     par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
-    # else:
-    #     par_df = sammy_INP.resonance_ladder
+
+    return lst_df, par_df
+
+
+
+def delta_chi2(lst_df):
+    chi2_prior = chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
+    chi2_posterior = chi2_val(lst_df.theo_xs_bayes, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
+    return chi2_prior - chi2_posterior
+
+
+def recursive_sammy(pw_prior, par_prior, sammy_INP: SammyInputData, sammy_RTO: SammyRunTimeOptions, itter=0):
+
+    if itter >= sammy_RTO.recursive_opt["iterations"]:
+        return pw_prior, par_prior
+    
+    # sammy_INP.resonance_ladder = par_posterior
+    write_sampar(par_prior, sammy_INP.particle_pair, sammy_RTO.solve_bayes, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"))
+    pw_posterior, par_posterior = execute_sammy(sammy_RTO)
+    
+    Dchi2 = delta_chi2(pw_posterior)
+    if sammy_RTO.recursive_opt["print"]:
+        print(Dchi2)
+
+    if Dchi2 <= sammy_RTO.recursive_opt["threshold"]:
+        return pw_prior, par_prior
+    
+    return recursive_sammy(pw_posterior, par_posterior, sammy_INP, sammy_RTO, itter + 1)
+
+
+
+def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+
+    # setup sammy runtime files
+    make_runDIR(sammy_RTO.sammy_runDIR)
+    fill_runDIR_with_templates(sammy_RTO.sammy_runDIR, sammy_RTO.one_spingroup, sammy_RTO.experimental_corrections)
+    update_input_files(sammy_INP, sammy_RTO)
+    write_shell_script(sammy_INP, sammy_RTO)
+
+    lst_df, par_df = execute_sammy(sammy_RTO)
+
+    if sammy_RTO.recursive == True:
+        if sammy_RTO.solve_bayes == False:
+            raise ValueError("Cannot run recursive sammy with solve bayes set to false")
+        lst_df, par_df = recursive_sammy(lst_df, par_df, sammy_INP, sammy_RTO)
+
     if not sammy_RTO.keep_runDIR:
         shutil.rmtree(sammy_RTO.sammy_runDIR)
 

@@ -305,7 +305,7 @@ class Experiment:
         # filter to energy limits
         if len(odat.E) != len(self.energy_domain):
             # must round to match .LST precision                    # round to the same digits as max(self.energy_domain)
-            odat = odat[(round(odat.E,6)>=min(round(self.energy_domain, 6)))&(round(odat.E,6)<=max(round(self.energy_domain, 6)))].reset_index(drop=True)
+            odat = odat[(round(odat.E,6)>=min(np.round(self.energy_domain, 6)))&(round(odat.E,6)<=max(np.round(self.energy_domain, 6)))].reset_index(drop=True)
         if np.allclose(np.array(odat.E), np.array(self.energy_domain)):
             pass
         else:

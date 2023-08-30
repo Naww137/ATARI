@@ -9,7 +9,7 @@ workspace/
 */.bar*
 *.dat
 fort*
-SAMMY_runDIR/
+*SAMMY_runDIR*
 
 
 # Byte-compiled / optimized / DLL files

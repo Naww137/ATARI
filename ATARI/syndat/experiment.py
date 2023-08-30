@@ -368,7 +368,7 @@ class Experiment:
                 theo_redpar[par]['val'] = np.random.default_rng().normal(theo_redpar[par]['val'], theo_redpar[par]['unc'])
             
             # sample correlated values for a and b!
-            cov = np.diag([theo_redpar["a"]["unc"], theo_redpar["b"]["unc"]])**2
+            cov = np.diag(np.array([theo_redpar["a"]["unc"], theo_redpar["b"]["unc"]], dtype=float))**2
             cov[0,1] = theo_redpar["ab_cov"]["val"]
             cov[1,0] = theo_redpar["ab_cov"]["val"]
             a,b = np.random.default_rng().multivariate_normal([theo_redpar["a"]["val"], theo_redpar["b"]["val"]], list(cov))

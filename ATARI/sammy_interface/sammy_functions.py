@@ -450,7 +450,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
         if sammy_RTO.energy_window is None:
             f.write('\n')
         elif sammy_INP.experimental_data is not None:
-            iter = np.arange(np.floor(min(sammy_INP.experimental_data.E)),np.ceil(max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
+            iter = np.arange(np.floor(np.min(sammy_INP.experimental_data.E)),np.ceil(np.max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
             if len(iter) >= 50:
                 raise ValueError("To many energy windows supplied, please solve in less sections")
             string = ''

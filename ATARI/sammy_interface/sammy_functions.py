@@ -220,8 +220,10 @@ def write_samdat(exp_pw, exp_cov, filename):
 
     Parameters
     ----------
-    transmission_data : DataFrame
-        DataFrame containing experimental transmission data, requires columns ["E", "exp_trans", and "exp_trans_unc"].
+    exp_pw : DataFrame
+        DataFrame containing experimental measurement data, requires columns ["E", "exp"].
+    exp_cov: DataFrame or None
+        DataFrame containting experimental measurement covariance.
     filename : str
         Filepath/name for the sammy.dat file being created.
 
@@ -230,24 +232,31 @@ def write_samdat(exp_pw, exp_cov, filename):
     ValueError
         Energy column not in DataFrame.
     ValueError
-        Experimental transmission column not in DataFrame.
+        Experimental measurement column not in DataFrame.
     ValueError
-        Experimental transmission uncertainty column not in DataFrame.
+        Experimental measurement uncertainty column not in DataFrame.
     """
+
+    if 'exp' not in exp_pw:
+        try:
+            exp_pw.rename(columns={'exp_trans':'exp', 'exp_trans_unc': 'exp_unc'}, inplace=True)
+        except:
+            ValueError("Data passed to 'write_expdat_file' does not have the column 'exp'")
+
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
-    if 'exp_trans_unc' not in exp_pw:
-        exp_pw['exp_trans_unc'] = np.sqrt(np.diag(exp_cov))
+    if 'exp_unc' not in exp_pw:
+        exp_pw['exp_unc'] = np.sqrt(np.diag(exp_cov))
     
     iterable = exp_pw.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
     cols = exp_pw.columns
     if 'E' not in cols:
-        raise ValueError("transmission data passed to 'write_expdat_file' does not have the column 'E'")
-    if 'exp_trans' not in cols:
-        raise ValueError("transmission data passed to 'write_expdat_file' does not have the column 'exp'")
+        raise ValueError("Data passed to 'saammy_functions.write_expdat_file' does not have the column 'E'")
+    if 'exp' not in cols:
+        raise ValueError("Data passed to 'saammy_functions.write_expdat_file' does not have the column 'exp'")
 
     iE = cols.get_loc('E')
-    iexp = cols.get_loc('exp_trans')
-    idT = cols.get_loc('exp_trans_unc')
+    iexp = cols.get_loc('exp')
+    idT = cols.get_loc('exp_unc')
     
 
     with open(filename,'w') as f:

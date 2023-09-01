@@ -11,6 +11,8 @@ import subprocess
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.stats import chi2_val
 
+from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData
+
 
 # module_dirname = os.path.dirname(__file__)
 
@@ -144,6 +146,8 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
         The pair object is of the particle_pair class in Syndat describing the incident and target particles.
     vary_parm : Bool
         Option to set vary parameters (0 or 1) in sammy.par file.
+    initial_parameter_uncertainty : float
+        Global initial parameter uncertainty for Bayes solve.
     filename : str
         Filepath/name of sammy.par file being created.
     template : str, optional
@@ -250,9 +254,9 @@ def write_samdat(exp_pw, exp_cov, filename):
     iterable = exp_pw.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
     cols = exp_pw.columns
     if 'E' not in cols:
-        raise ValueError("Data passed to 'saammy_functions.write_expdat_file' does not have the column 'E'")
+        raise ValueError("Data passed to 'sammy_functions.write_expdat_file' does not have the column 'E'")
     if 'exp' not in cols:
-        raise ValueError("Data passed to 'saammy_functions.write_expdat_file' does not have the column 'exp'")
+        raise ValueError("Data passed to 'sammy_functions.write_expdat_file' does not have the column 'exp'")
 
     iE = cols.get_loc('E')
     iexp = cols.get_loc('exp')
@@ -384,32 +388,60 @@ def create_sammyinp(filename='sammy.inp', \
 # =============================================================================
 # 
 # ============================================================================= 
-def copy_template_to_runDIR(exp, file, target_dir):
-    if os.path.splitext(file)[0] != 'sammy':
-        file_out = ''.join(('sammy', os.path.splitext(file)[1]))
-    else:
-        file_out = file
-    shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', f'{exp}', file), 
-                os.path.join(target_dir,file_out))
-    return
+# def copy_template_to_runDIR(experimental_corrections, filename, target_dir):
+#     if os.path.splitext(filename)[0] != 'sammy':
+#         file_out = ''.join(('sammy', os.path.splitext(filename)[1]))
+#     else:
+#         file_out = filename
+#     shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', f'{experimental_corrections}', filename), 
+#                 os.path.join(target_dir,file_out))
+#     return
 
-def write_saminp(model, particle_pair, reaction, bayes, filepath):
-    ac = particle_pair.ac*10
+def write_saminp(filepath, 
+                model, bayes, 
+                reaction, 
+                sammy_INP: SammyInputData,
+                alphanumeric = [],
+                alphanumeric_base = ["TWENTY", 
+                                    "EV", 
+                                    "GENERATE PLOT FILE AUTOMATICALLY"]):
+    
+    ac = sammy_INP.particle_pair.ac*10
+    broadening = True
+    
+    if bayes:
+        bayes_cmd = "SOLVE BAYES EQUATIONS"
+    else:
+        bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    alphanumeric = [model, bayes_cmd] + alphanumeric_base + alphanumeric
+
     with open(filepath,'r') as f:
         old_lines = f.readlines()
+
     with open(filepath,'w') as f:
         for line in old_lines:
-            if line.startswith("%%%formalism%%%"):
-                f.write(f'{model}\n')
-            elif line.startswith('%%%scattering_radius%%%'):
-                f.write(f'  {ac: <8}  0.067166                       0.00000          \n')
-            elif line.startswith('%%%reaction%%%'):
+
+            if "broadening is not wa" in line.lower():
+                broadening = False
+
+            if line.startswith("%%%alphanumeric%%%"):
+                for cmd in alphanumeric:
+                    f.write(f'{cmd}\n')
+
+            elif line.startswith('%%%card5/6%%%'):
+                if broadening:
+                    assert(np.any(np.isfinite(np.array([sammy_INP.temp, sammy_INP.FP, sammy_INP.frac_res_FP]))))
+                    f.write(f'  {sammy_INP.temp: <8}  {sammy_INP.FP: <8}  {sammy_INP.frac_res_FP: <8}        \n')
+                else:
+                    pass
+
+            elif line.startswith('%%%card7%%%'):
+                assert(isinstance(sammy_INP.target_thickness, float))
+                f.write(f'  {ac: <8}  {sammy_INP.target_thickness: <8}                       0.00000          \n')
+
+            elif line.startswith('%%%card8%%%'):
                 f.write(f'{reaction}\n')
-            elif line.startswith('%%%bayes%%%'):
-                if bayes:
-                    f.write('SOLVE BAYES EQUATIONS\n')
-                elif not bayes:
-                    f.write('DO NOT SOLVE BAYES EQUATIONS\n')
+
             else:
                 f.write(line)
            
@@ -424,12 +456,20 @@ def make_runDIR(sammy_runDIR):
     else:
         os.mkdir(sammy_runDIR)
 
-def fill_runDIR_with_templates(sammy_runDIR, one_spingroup, experimental_corrections):
-    # fill temporary sammy_runDIR with runtime appropriate template files
-    if one_spingroup:
-        copy_template_to_runDIR(experimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
+def fill_runDIR_with_templates(sammy_RTO: SammyRunTimeOptions):
+
+    if os.path.basename(sammy_RTO.inptemplate) == sammy_RTO.inptemplate:
+        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', sammy_RTO.inptemplate)
     else:
-        copy_template_to_runDIR(experimental_corrections, 'sammy.inp', sammy_runDIR)
+        template_path = sammy_RTO.inptemplate
+
+    shutil.copy(template_path, os.path.join(sammy_RTO.sammy_runDIR, sammy_RTO.inpname))
+    
+    # fill temporary sammy_runDIR with runtime appropriate template files
+    # if one_spingroup:
+    #     copy_template_to_runDIR(experimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
+    # else:
+    #     copy_template_to_runDIR(experimental_corrections, 'sammy.inp', sammy_runDIR)
     # copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
 
 
@@ -447,7 +487,10 @@ def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
         raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
 
     # edit copied input template file
-    write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
+    # write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
+    write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
+                sammy_RTO.model, sammy_RTO.solve_bayes, 
+                sammy_RTO.reaction, sammy_INP)
 
     # write parameter file
     write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_RTO.solve_bayes, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"))
@@ -521,18 +564,26 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     # setup sammy runtime files
     make_runDIR(sammy_RTO.sammy_runDIR)
-    fill_runDIR_with_templates(sammy_RTO.sammy_runDIR, sammy_RTO.one_spingroup, sammy_RTO.experimental_corrections)
+    fill_runDIR_with_templates(sammy_RTO)
     update_input_files(sammy_INP, sammy_RTO)
     write_shell_script(sammy_INP, sammy_RTO)
 
     lst_df, par_df = execute_sammy(sammy_RTO)
+
+    sammy_OUT = SammyOutputData(pw=lst_df, 
+                        par=sammy_INP.resonance_ladder)#,
+                        # chi2=chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc)))
 
     if sammy_RTO.recursive == True:
         if sammy_RTO.solve_bayes == False:
             raise ValueError("Cannot run recursive sammy with solve bayes set to false")
         lst_df, par_df = recursive_sammy(lst_df, par_df, sammy_INP, sammy_RTO)
 
+    if sammy_RTO.solve_bayes:
+        # sammy_OUT.chi2_post = chi2_val(lst_df.theo_xs_bayes, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
+        sammy_OUT.par_post = par_df
+
     if not sammy_RTO.keep_runDIR:
         shutil.rmtree(sammy_RTO.sammy_runDIR)
 
-    return lst_df, par_df
+    return sammy_OUT

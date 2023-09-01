@@ -1,20 +1,12 @@
 Tantalum produce PAR file
 Ta181     180.948434  1.00000 6.0E7     0    0 0  0 0  0         0
-TWENTY
-EV
-GENERATE PLOT FILE AUTOMATICALLY
-%%%bayes%%%
-PUT QUANTUM NUMBERS INTO PARAMETER FILE
-BROADENING IS WANTED
-%%%formalism%%%
+%%%alphanumeric%%%
 
-304.50000  35.185   0.049600               
-%%%scattering_radius%%%
-%%%reaction%%%                                                                
+%%%card5/6%%%              
+%%%card7%%%
+%%%card8%%%                                                                
   1      1    0  3.0       1.0  3.5
     1    1    0    0       3.0
-  2      1    0  4.0       1.0  3.5
-    1    1    0    0       4.0
 
 ORRESolution function parameters follow
 BURST 0    10.000000  0.10000

@@ -69,7 +69,7 @@ def fine_egrid(energy):
     return new_egrid
 
 ###
-def compute_theoretical(solver, experiment, particle_pair, resonance_ladder, theo_pw, sammy_RTO):
+def compute_theoretical(solver, experiment, particle_pair, resonance_ladder, theo_pw, sammy_RTO, sammy_INP):
 
     if theo_pw:
         energy_grid = fine_egrid(experiment.energy_domain)
@@ -82,13 +82,10 @@ def compute_theoretical(solver, experiment, particle_pair, resonance_ladder, the
         trans = np.exp(-n*xs_tot)
 
     elif solver == 'sammy':
-        sammy_INP = sammy_classes.SammyInputData(
-            particle_pair = particle_pair,
-            resonance_ladder = resonance_ladder,
-            energy_grid = energy_grid)
-        pw, par = sammy_functions.run_sammy(sammy_INP, sammy_RTO)
-        xs_tot = pw.theo_xs
-        trans = pw.theo_trans
+        sammy_INP.resonance_ladder = resonance_ladder
+        sammyOUT = sammy_functions.run_sammy(sammy_INP, sammy_RTO)
+        xs_tot = sammyOUT.pw.theo_xs
+        trans = sammyOUT.pw.theo_trans
     else:
         raise ValueError("Solver not recognized")
     
@@ -101,7 +98,7 @@ def compute_theoretical(solver, experiment, particle_pair, resonance_ladder, the
 
 ###
 def sample_syndat(particle_pair, experiment, solver,
-                    open_data, fixed_resonance_ladder, vary_Erange, sammy_RTO):
+                    open_data, fixed_resonance_ladder, vary_Erange, sammy_RTO,sammy_INP):
 
     # either sample resonance ladder or set it to fixed resonance ladder
     if fixed_resonance_ladder is None:
@@ -117,7 +114,7 @@ def sample_syndat(particle_pair, experiment, solver,
         resonance_ladder = fixed_resonance_ladder
 
     # Compute expected xs or transmission
-    theoretical_df = compute_theoretical(solver, experiment, particle_pair, resonance_ladder, False, sammy_RTO)
+    theoretical_df = compute_theoretical(solver, experiment, particle_pair, resonance_ladder, False, sammy_RTO,sammy_INP)
 
     # run the experiment
     experiment.run(theoretical_df, open_data)
@@ -134,10 +131,10 @@ def sample_syndat(particle_pair, experiment, solver,
     return resonance_ladder, pw_df, CoV
 
 ###
-def sample_and_write_syndat(case_file, isample, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO):
+def sample_and_write_syndat(case_file, isample, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO,sammy_INP):
 
     # sample theoretical parameters and compute transmission on experimentaal fine-grid theoretical pw cross section
-    resonance_ladder, pw_exp_df, CovT = sample_syndat(particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, sammy_RTO)
+    resonance_ladder, pw_exp_df, CovT = sample_syndat(particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, sammy_RTO,sammy_INP)
     # theo_pw_df = compute_theoretical(solver, experiment, particle_pair, resonance_ladder, True, sammy_RTO)
 
     # write data
@@ -166,7 +163,8 @@ def generate(particle_pair, experiment,
                 vary_Erange = None,
                 use_hdf5=True,
                 overwrite=True, 
-                sammy_RTO = None
+                sammy_RTO = None, 
+                sammy_INP = None
                                                             ):
     """
     Generate multiple synthetic experimental datasets in a convenient directory structure. 
@@ -220,16 +218,16 @@ def generate(particle_pair, experiment,
                 if ('pw_exp' in h5f[sample_group]) and ('par_true' in h5f[sample_group]):
                     if overwrite:
                         h5f.close()
-                        sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO)
+                        sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
                     else:
                         h5f.close()
                         samples_not_being_generated.append(i)
                 else:
                     h5f.close()
-                    sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO)
+                    sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
             else:
                 h5f.close()
-                sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO)
+                sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
 
     # use nested directory structure and csv's to store data
     else:
@@ -244,11 +242,11 @@ def generate(particle_pair, experiment,
             syndat_par = os.path.join(sample_directory, 'theo_par.csv')
             if os.path.isfile(syndat_pw) and os.path.isfile(syndat_par):
                 if overwrite:
-                    sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO)
+                    sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
                 else:
                     samples_not_being_generated.append(i)
             else:
-                sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO)
+                sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
 
 
 

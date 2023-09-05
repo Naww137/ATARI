@@ -83,9 +83,11 @@ def compute_theoretical(solver, experiment, particle_pair, resonance_ladder, the
 
     elif solver == 'sammy':
         sammy_INP.resonance_ladder = resonance_ladder
+        sammy_INP.energy_grid = energy_grid
         sammyOUT = sammy_functions.run_sammy(sammy_INP, sammy_RTO)
-        xs_tot = sammyOUT.pw.theo_xs
-        trans = sammyOUT.pw.theo_trans
+        xs_tot = sammyOUT.pw.sort_values("E", ascending=False).theo_xs.values
+        trans = sammyOUT.pw.sort_values("E", ascending=False).theo_trans.values
+        assert(energy_grid[-1] < energy_grid[0])
     else:
         raise ValueError("Solver not recognized")
     

@@ -1,5 +1,3 @@
-
-from matplotlib.pyplot import *
 import numpy as np
 import pandas as pd
 import os
@@ -10,6 +8,7 @@ from ATARI.syndat.experiment import Experiment
 from ATARI.syndat.MMDA import generate
 from ATARI.theory.xs import SLBW
 from ATARI.sammy_interface import sammy_interface, sammy_classes, sammy_functions
+from ATARI.theory.resonance_statistics import make_res_par_avg
 
 
 
@@ -56,8 +55,8 @@ sammyRTO = sammy_classes.SammyRunTimeOptions(
     solve_bayes = False,
     inptemplate= "allexptot_1sg.inp",
     energy_window = None,
-    sammy_runDIR = 'SAMMY_runDIR_1',
-    keep_runDIR = True,
+    sammy_runDIR = 'SAMMY_runDIR',
+    keep_runDIR = False,
     shell = 'zsh'
     )
 

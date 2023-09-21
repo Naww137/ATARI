@@ -13,13 +13,15 @@ import pandas as pd
 from ATARI.syndat import exp_effects
 from ATARI.sammy_interface import sammy_interface
 from copy import deepcopy
+from typing import Optional, Union
     
 
+arraytype_id = Union[pd.Series, np.ndarray, list]
 
 class Experiment:
     
     def __init__(self,
-                    energy_domain=None,
+                    energy_domain: Optional[arraytype_id] = None,
                     experiment_parameters = {} , 
                     input_options = {}, 
                                                      ):

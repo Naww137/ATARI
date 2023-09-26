@@ -7,6 +7,7 @@ from pathlib import Path
 from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
+from copy import copy
 # from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.stats import chi2_val
@@ -38,7 +39,7 @@ def readlst(filepath):
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
         df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
     else:
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_dat','exp_dat_unc'])
+        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):
@@ -74,7 +75,18 @@ def readpar(filepath):
                     try:
                         value = abs(float(value))
                     except:
-                        value = float('e-'.join(value[1::].split('-')))
+                        try:
+                            # value = float('e-'.join(value.split('-')))
+                            value = value.split('-')
+                            joiner = 'e-'
+                        except:
+                            # value = float('e+'.join(value.split('+')))
+                            value = value.split('+')
+                            joiner = 'e+'
+                        if value[0] == '':
+                            value = float(joiner.join(value[1::]))
+                        else:
+                            value = float(joiner.join(value))
                 row.append(value)
                 start += width
             data.append(row)
@@ -106,12 +118,18 @@ def format_float(value, width):
     return formatted_value
 
 
-def fill_sammy_ladder(df, particle_pair):
+def fill_sammy_ladder(df, particle_pair, vary_parm=False):
 
     def gn2G(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
         Gn = 2*np.sum(P)*row.gn2
         return Gn.item()
+    
+    def nonzero_ifvary(row):
+        for par in ["E", "Gg", "Gn1", "Gn2", "Gn3"]:
+            if row[f"vary{par}"] == 1.0 and row[par] < 1e-5:
+                row[par] = 1e-5
+        return row
 
     cols = df.columns.values
     if "Gn1" not in cols:
@@ -128,9 +146,27 @@ def fill_sammy_ladder(df, particle_pair):
         else:
             df['Gg'] = df['Gt'] - df['Gn1']
 
+    for vary in ["varyE", "varyGg", "varyGn1", "varyGn2", "varyGn3"]:
+        if vary not in cols:
+            if vary_parm:
+                df[vary] = np.ones(len(df))
+            else:
+                df[vary] = np.zeros(len(df))
+
+    if "Gn2" not in cols:
+        df["Gn2"] = np.zeros(len(df))
+        df["varyGn2"] = np.zeros(len(df))
+    if "Gn3" not in cols:
+        df["Gn3"] = np.zeros(len(df))
+        df["varyGn3"] = np.zeros(len(df))
+
+    # if a parameter (width) is zero and it is varied then make it 1e-5
+    df = df.apply(nonzero_ifvary, axis=1)
+
+
     return df
 
-def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, template=None):
+def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
     """
     Writes a formatted sammy.par file.
@@ -155,33 +191,17 @@ def write_sampar(df, pair, vary_parm, initial_parameter_uncertainty, filename, t
     """
 
     if df.empty:
-        samtools_array = []
+        par_array = []
     else:
-        # df = fill_resonance_ladder(df, pair)
-        df = fill_sammy_ladder(df, pair)
+        df = fill_sammy_ladder(df, pair, vary_parm)
+        par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
-        ### force to 0.001 if Gnx == 0
-        df.loc[df['Gn1']<=1e-5, 'Gn1'] = 1e-5
-
-        par_array = np.array([df.E, df.Gg, df.Gn1]).T
-        zero_neutron_widths = 5-(len(par_array[0]))
-        zero_neutron_array = np.zeros([len(par_array),zero_neutron_widths])
-        par_array = np.insert(par_array, [5-zero_neutron_widths], zero_neutron_array, axis=1)
-
-        if vary_parm:
-            binary_array = np.hstack((np.ones([len(par_array),5-zero_neutron_widths]), np.zeros([len(par_array),zero_neutron_widths])))
-        else:
-            binary_array = np.zeros([len(par_array),5])
-
-        samtools_array = np.insert(par_array, [5], binary_array, axis=1)
         if np.any([each is None for each in df.J_ID]):
             raise ValueError("NoneType was passed as J_ID in the resonance ladder")
-        j_array = np.array([df.J_ID]).T
-        samtools_array = np.hstack((samtools_array, j_array))
 
     widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
     with open(filename, 'w') as file:
-        for row in samtools_array:
+        for row in par_array:
             for icol, val in enumerate(row):
                 column_width = widths[icol]
                 formatted_value = format_float(val, column_width)
@@ -242,9 +262,11 @@ def write_samdat(exp_pw, exp_cov, filename):
     """
 
     if 'exp' not in exp_pw:
-        try:
+        if 'exp_trans' in exp_pw:
             exp_pw.rename(columns={'exp_trans':'exp', 'exp_trans_unc': 'exp_unc'}, inplace=True)
-        except:
+        elif 'exp_dat' in exp_pw:
+            exp_pw.rename(columns={'exp_dat':'exp', 'exp_dat_unc': 'exp_unc'}, inplace=True)
+        else:
             ValueError("Data passed to 'write_expdat_file' does not have the column 'exp'")
 
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
@@ -267,32 +289,6 @@ def write_samdat(exp_pw, exp_cov, filename):
         for each in iterable:
             f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
         f.close()
-
-
-
-# =============================================================================
-#         
-# =============================================================================
-def create_samtools_array_from_J(Jn_ladders, Jp_ladders):
-    
-    J = Jn_ladders + Jp_ladders
-    samtools_array = np.empty((0,11))
-    for ij, j_df in enumerate(J):
-        
-        j_array = np.array(j_df)
-    
-        levels = j_array.shape[0]
-        zero_neutron_widths = 5-j_array.shape[1] # accepts 3 neutron widths
-        
-        # zeros for additional neutron widths plus zeros for all binary "vary parameter options
-        j_inp_array = np.concatenate( [j_array, np.zeros((levels, zero_neutron_widths+5)), np.full((levels,1),ij+1)] , axis=1)
-        
-        samtools_array  = np.concatenate([samtools_array, j_inp_array], axis=0)
-    
-    
-    return samtools_array
-
-
 
 
 
@@ -410,7 +406,7 @@ def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
                 sammy_RTO.reaction, sammy_INP)
 
     # write parameter file
-    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_RTO.solve_bayes, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"))
+    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
@@ -463,7 +459,7 @@ def recursive_sammy(pw_prior, par_prior, sammy_INP: SammyInputData, sammy_RTO: S
         return pw_prior, par_prior
     
     # sammy_INP.resonance_ladder = par_posterior
-    write_sampar(par_prior, sammy_INP.particle_pair, sammy_RTO.solve_bayes, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"))
+    write_sampar(par_prior, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
     pw_posterior, par_posterior = execute_sammy(sammy_RTO)
     
     Dchi2 = delta_chi2(pw_posterior)
@@ -479,6 +475,7 @@ def recursive_sammy(pw_prior, par_prior, sammy_INP: SammyInputData, sammy_RTO: S
 
 def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
+    sammy_INP.resonance_ladder = copy(sammy_INP.resonance_ladder)
     # setup sammy runtime files
     make_runDIR(sammy_RTO.sammy_runDIR)
     fill_runDIR_with_templates(sammy_RTO)
@@ -524,39 +521,56 @@ def make_inputs_for_YW(sammyINP, sammyRTO, datasets, reactions, templates):
 
         sammyRTO.template = tem
 
-        sammyRTO.inpname = os.path.join(sammyRTO.sammy_runDIR, f"{ds}_initial.inp")
+        sammyRTO.inpname = f"{ds}_initial.inp"# os.path.join(sammyRTO.sammy_runDIR, f"{ds}_initial.inp")
         fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_initial.inp"), sammyRTO.model, sammyRTO.solve_bayes, rxn, sammyINP, 
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_initial.inp"), sammyRTO.model, True, rxn, sammyINP, 
                                     alphanumeric=["yw"])
 
-        sammyRTO.inpname = os.path.join(sammyRTO.sammy_runDIR, f"{ds}_iter.inp")
+        sammyRTO.inpname = f"{ds}_iter.inp"# os.path.join(sammyRTO.sammy_runDIR, f"{ds}_iter.inp")
         fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_iter.inp"), sammyRTO.model, sammyRTO.solve_bayes, rxn, sammyINP, 
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_iter.inp"), sammyRTO.model, True, rxn, sammyINP, 
                                     alphanumeric=["yw","Use remembered original parameter values"])
 
-        sammyRTO.inpname = os.path.join(sammyRTO.sammy_runDIR, f"{ds}_plot.inp")
+        sammyRTO.inpname = f"{ds}_plot.inp"# os.path.join(sammyRTO.sammy_runDIR, f"{ds}_plot.inp")
         fill_runDIR_with_templates(sammyRTO)
         write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_plot.inp"), sammyRTO.model, False, rxn, sammyINP, 
                                     alphanumeric=[])
 
     # copy_inptemp_to_runDIR("/Users/noahwalton/Documents/GitHub/ATARI/examples/sammy_template.inp", os.path.join(sammyRTO.sammy_runDIR, "solvebayes_initial.inp"))
-    sammyRTO.inpname = os.path.join(sammyRTO.sammy_runDIR, "solvebayes_initial.inp")
+    sammyRTO.inpname = "solvebayes_initial.inp"# os.path.join(sammyRTO.sammy_runDIR, "solvebayes_initial.inp")
     fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyRTO.model, sammyRTO.solve_bayes, "reaction", sammyINP, 
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyRTO.model, True, "reaction", sammyINP, 
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "USE LEAST SQUARES TO GIVE COVARIANCE MATRIX", "Remember original parameter values", "Take baby steps with Least-Squares method"])#, "Broadening is not wanted"])
 
 
     # copy_inptemp_to_runDIR("/Users/noahwalton/Documents/GitHub/ATARI/examples/sammy_template.inp", os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"))
-    sammyRTO.inpname = os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp")
+    sammyRTO.inpname = "solvebayes_iter.inp" #os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp")
     fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyRTO.model, sammyRTO.solve_bayes, "reaction", sammyINP, 
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyRTO.model, True, "reaction", sammyINP, 
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "USE LEAST SQUARES TO GIVE COVARIANCE MATRIX", "Use remembered original parameter values", "Take baby steps with Least-Squares method"])#, "Broadening is not wanted"])
 
 
 
-def make_bash_script_iterate(iterations, dataset_titles, rundir, sammyexe, save_each_step=True):
+def make_bash_script_iterate(iterations, dataset_titles, rundir, sammyexe, shell, save_each_step=True):
 
-    with open(os.path.join(rundir, "iterate.zsh"), 'w+') as f:
+    with open(os.path.join(rundir, f"iterate.{shell}"), 'w+') as f:
+            f.write("""### Filter out resonances with Gn < 1e-4 meV
+par_file=results/step$1.par
+temp_file=results/temp.par
+
+awk '{
+  # Replace "-" with "e-" in the third column
+  gsub(/-/, "e-", $3)
+
+  column3 = $3 + 0
+
+  if (column3 <= -1e-4 || column3 >= 1e-4) {
+    print $0
+  }
+}' "$par_file" > "$temp_file"
+
+mv $temp_file $par_file
+\n""")
 
             for i in range(1, iterations+1):
 
@@ -584,22 +598,32 @@ def make_bash_script_iterate(iterations, dataset_titles, rundir, sammyexe, save_
                 f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
                 f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
 
-            f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 3)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\n")
+            f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 3)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
             
             ### After all steps, write commands to make plot for step
             for ds in dataset_titles:
-                f.write(f"rm REMORI.PAR\n#######################################################\n# Plotting for {ds} final iteration \n#\n#######################################################\n")
+                f.write(f"\n#######################################################\n# Plotting for {ds} final iteration \n#\n#######################################################\n")
                 f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$plus_one.par\n{ds}.dat\n\nEOF\n\n")
 
                 # write lines to grep chi2
-                f.write("""line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)
-    chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
-    echo "step $plus_one chi2: $chi2_string" >> chi2.txt\n\n""")
+                f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+                f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
                 
                 if save_each_step:
-                    f.write(f"mv -f SAMMY.LST results/{ds}_step$plus_one.lst\nmv -f SAMMY.LPT results/trans1_step$plus_one.lpt\n")
+                    f.write(f"mv -f SAMMY.LST results/{ds}_step$plus_one.lst\nmv -f SAMMY.LPT results/{ds}_step$plus_one.lpt\n\n")
+            
+            f.write("rm -f SAM*\n\n")
 
-                f.write("rm -f SAM*\n\n")
+            # log an return chi2 values
+            f.write("""echo "$plus_one""")
+            for ds in dataset_titles:
+                f.write(f" $chi2_string_{ds}")
+            f.write("""" >> chi2.txt\n""")
+
+            f.write("""echo " """)
+            for ds in dataset_titles:
+                f.write(f" $chi2_string_{ds}")
+            f.write(""""\n""")
 
                 # f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\ninitial.par\n{ds}.dat\n\nEOF\n")
                 # f.write(f"mv -f SAMMY.LST {ds}_initial.lst\nrm -f SAM*\n")
@@ -610,104 +634,106 @@ def make_data_for_YW(datasets, dataset_titles, rundir):
         write_samdat(d, None, os.path.join(rundir,f"{dt}.dat"))
         write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
 
+def make_bash_script_run(steps, dataset_titles, threshold, sammyexe, shell, rundir):
+    with open(os.path.join(rundir, f"run.{shell}"), 'w+') as f:
 
-def make_bash_script_run(steps, rundir):
-    with open(os.path.join(rundir, "run.zsh"), 'w+') as f:
-        f.write("""# change cwd
-cd "$(dirname "$0")"\n
-# remove existing chi2 log
-rm chi2.txt\n\n
-#### plot prior
-/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-trans1_plot.inp
+        ### change cwd and setup chi2 log
+        f.write(f"""
+# change cwd
+cd "$(dirname "$0")"
+#### remove existing chi2 log and write new
+rm chi2.txt\n""")
+        f.write("""echo "chi2" >> chi2.txt\necho "step""")
+        for ds in dataset_titles:
+            f.write(f" {ds}") 
+        f.write("""" >> chi2.txt\n""")
+
+        ### plot prior for each dataset and grep chi2
+        for ds in dataset_titles:
+            f.write(f"""\n\n#### plot prior for {ds}
+out=$({sammyexe}<<EOF
+{ds}_plot.inp
 results/step0.par
-trans1.dat
+{ds}.dat
 
 EOF
-mv -f SAMMY.LST results/trans1_step0.lst
-mv -f SAMMY.LPT results/trans1_step0.lpt
-rm -f SAM*
-#### For each step
+)
+mv -f SAMMY.LST results/{ds}_step0.lst
+mv -f SAMMY.LPT results/{ds}_step0.lpt
+rm -f SAM*\n""")
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}_step0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+
+        ### Echo prior to chi2 log
+        f.write("""echo "0""")
+        for ds in dataset_titles:
+            f.write(f" $chi2_string_{ds}")
+        f.write("""" >> chi2.txt\n""")
+
+        ### now write iteration script 
+        f.write(f"""
+\n\n\n#### For each step
 #   1. run iteration for nonlinearities 
-#   2. OPTIONAL: Generate plot for step\n""")
+#   2. OPTIONAL: Generate plot for step
 
-        f.write( "for number in {0..$steps$}".replace("$steps$",str(steps)) )
-
-        f.write("""\ndo
-    ./iterate.zsh $number
-
-    # #######################################################
-    # # Plotting for step - don't need to do each time
-    # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-    # trans1_plot.inp
-    # results/step$number.par
-    # trans1.dat
-
-    # EOF
-    # mv -f SAMMY.LST results/trans1_step$plus_one.lst
-    # mv -f SAMMY.LPT results/trans1_step$plus_one.lpt
-    # rm -f SAM*
-
-
-        # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/trans1_step$number.lpt)
-        # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
-        # chi2=$(echo "$chi2_string" | bc -l)
-        # # echo "chi2 (float): $chi2"
-        # # # Example: Perform arithmetic operations with chi2
-        # # result=$(echo "$chi2 * 2" | bc -l)
-        # # echo "Result of chi2 * 2: $result"
-
-        # echo "step $number chi2: $chi2_string" >> chi2.txt
-
-    done
-
-    # ./iterate.zsh 0
-
-    # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)
-    # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
-    # chi2=$(echo "$chi2_string" | bc -l)
-    # # echo "chi2 (float): $chi2"
-    # # # Example: Perform arithmetic operations with chi2
-    # # result=$(echo "$chi2 * 2" | bc -l)
-    # # echo "Result of chi2 * 2: $result"
-
-    # echo "step 0 chi2: $chi2_string" >> chi2.txt
-    # # echo  "$chi2"
-
-
-
-
-
-    # ############## Copy Final Result ###########
-    # head -$(($(wc -l < results/bayes_step50.par) - 3)) results/bayes_step50.par > final.par
-
-    # #######################################################
-    # # Plotting for trans1 Final/Initial
-    # #
-    # #######################################################
-    # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-    # trans1_plot.inp
-    # final.par
-    # trans1.dat
-
-    # EOF
-    # mv -f SAMMY.LST trans1_final.lst
-    # rm -f SAM*
-
-    # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-    # trans1_plot.inp
-    # initial.par
-    # trans1.dat
-
-    # EOF
-    # mv -f SAMMY.LST trans1_initial.lst
-    # rm -f SAM*""")
+max_iterations={steps}
+threshold={threshold}
         
+iteration=0
+criteria_met=false
+criteria="max iterations"
+echo "\nIterating until convergence\nchi2 values\n""")
+        
+        f.write("step ")
+        for ds in dataset_titles:
+            f.write(f" {ds}") 
+        f.write(""" sum"\n""")
+        
+        # write while loop
+        f.write(f"""
+while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
+
+    # new chi2 is output from step
+    output=$(./iterate.{shell} $iteration)\n""")
+    f.write(r"""newchi2_str=$(echo "$output" | tail -n 1)
+    newchi2_str=$(echo "$newchi2_str" | sed 's/E/e/g; s/+//g')
+    newchi2_sum=$(echo "$newchi2_str" | tr -s ' ' '\n' | grep -E '[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?' | paste -sd+ - | bc -l)  
+
+    # oldchi2 is read from chi2 log
+    line_with_oldchi2=$(grep -E "^$iteration " chi2.txt)
+    line_with_oldchi2=$(echo "$line_with_oldchi2" | awk '{$1=""; sub(/^[[:space:]]+/, "")}1')
+    oldchi2_str=$(echo "$line_with_oldchi2" | sed 's/E/e/g; s/+//g')
+    oldchi2_sum=$(echo "$oldchi2_str" | tr -s ' ' '\n' | grep -E '[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?' | paste -sd+ - | bc -l)
+
+    # termination criteria on change in chi2
+    diff=$(echo "$oldchi2_sum - $newchi2_sum" | bc) 
+
+    # print 
+    echo $iteration $oldchi2_str $oldchi2_sum
+
+    # Check if the termination criteria is met (e.g., based on some condition)
+    if (( $(echo "$diff < $threshold" |bc -l) )); then # || (( $(echo "$diff > $threshold" | bc -l) )); then
+        criteria_met=true
+        criteria="improvement below threshold"
+    fi
+    
+    # Increment the iteration counter
+    ((iteration++))
+    
+done
+
+echo "Loop terminated after $iteration iterations because $criteria."
+echo $iteration
+""")
+
+
+
 
 
 def setup_YW_scheme(sammyRTO, sammyINP, datasets, dataset_titles, reactions, templates, 
                                                                                 steps=10,
-                                                                                iterations=5):
+                                                                                iterations=5,
+                                                                                threshold=0.01):
 
     ### clean and make directories
     try:
@@ -721,11 +747,11 @@ def setup_YW_scheme(sammyRTO, sammyINP, datasets, dataset_titles, reactions, tem
     #     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "results", ds))
 
     make_data_for_YW(datasets, dataset_titles, sammyRTO.sammy_runDIR)
-    write_sampar(sammyINP.resonance_ladder, sammyINP.particle_pair, True, 0.1, os.path.join(sammyRTO.sammy_runDIR, "results/step0.par"))
+    write_sampar(sammyINP.resonance_ladder, sammyINP.particle_pair, 0.1, os.path.join(sammyRTO.sammy_runDIR, "results/step0.par"))
 
     make_inputs_for_YW(sammyINP, sammyRTO, dataset_titles, reactions, templates)
-    make_bash_script_iterate(iterations, dataset_titles, sammyRTO.sammy_runDIR, sammyRTO.path_to_SAMMY_exe)
-    make_bash_script_run(steps, sammyRTO.sammy_runDIR)
+    make_bash_script_iterate(iterations, dataset_titles, sammyRTO.sammy_runDIR, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell )
+    make_bash_script_run(steps, dataset_titles, threshold, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell,  sammyRTO.sammy_runDIR)
 
 
 
@@ -746,7 +772,98 @@ def setup_YW_scheme(sammyRTO, sammyINP, datasets, dataset_titles, reactions, tem
 
 
 
+# def make_bash_script_run(steps, rundir):
+#     with open(os.path.join(rundir, "run.zsh"), 'w+') as f:
+#         f.write("""# change cwd
+# cd "$(dirname "$0")"\n
+# # remove existing chi2 log
+# rm chi2.txt\n\n
+# #### plot prior
+# /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
+# trans1_plot.inp
+# results/step0.par
+# trans1.dat
 
+# EOF
+# mv -f SAMMY.LST results/trans1_step0.lst
+# mv -f SAMMY.LPT results/trans1_step0.lpt
+# rm -f SAM*
+# #### For each step
+# #   1. run iteration for nonlinearities 
+# #   2. OPTIONAL: Generate plot for step\n""")
+
+#         f.write( "for number in {0..$steps$}".replace("$steps$",str(steps)) )
+
+#         f.write("""\ndo
+#     ./iterate.zsh $number
+
+#     # #######################################################
+#     # # Plotting for step - don't need to do each time
+#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
+#     # trans1_plot.inp
+#     # results/step$number.par
+#     # trans1.dat
+
+#     # EOF
+#     # mv -f SAMMY.LST results/trans1_step$plus_one.lst
+#     # mv -f SAMMY.LPT results/trans1_step$plus_one.lpt
+#     # rm -f SAM*
+
+
+#         # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/trans1_step$number.lpt)
+#         # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
+#         # chi2=$(echo "$chi2_string" | bc -l)
+#         # # echo "chi2 (float): $chi2"
+#         # # # Example: Perform arithmetic operations with chi2
+#         # # result=$(echo "$chi2 * 2" | bc -l)
+#         # # echo "Result of chi2 * 2: $result"
+
+#         # echo "step $number chi2: $chi2_string" >> chi2.txt
+
+#     done
+
+#     # ./iterate.zsh 0
+
+#     # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)
+#     # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
+#     # chi2=$(echo "$chi2_string" | bc -l)
+#     # # echo "chi2 (float): $chi2"
+#     # # # Example: Perform arithmetic operations with chi2
+#     # # result=$(echo "$chi2 * 2" | bc -l)
+#     # # echo "Result of chi2 * 2: $result"
+
+#     # echo "step 0 chi2: $chi2_string" >> chi2.txt
+#     # # echo  "$chi2"
+
+
+
+
+
+#     # ############## Copy Final Result ###########
+#     # head -$(($(wc -l < results/bayes_step50.par) - 3)) results/bayes_step50.par > final.par
+
+#     # #######################################################
+#     # # Plotting for trans1 Final/Initial
+#     # #
+#     # #######################################################
+#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
+#     # trans1_plot.inp
+#     # final.par
+#     # trans1.dat
+
+#     # EOF
+#     # mv -f SAMMY.LST trans1_final.lst
+#     # rm -f SAM*
+
+#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
+#     # trans1_plot.inp
+#     # initial.par
+#     # trans1.dat
+
+#     # EOF
+#     # mv -f SAMMY.LST trans1_initial.lst
+#     # rm -f SAM*""")
+        
 
 
 # =============================================================================

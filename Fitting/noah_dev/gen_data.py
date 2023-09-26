@@ -62,7 +62,7 @@ sammyRTO = sammy_classes.SammyRunTimeOptions(
 
 sammyINP = sammy_classes.SammyInputData(
     particle_pair = Ta_pair,
-    resonance_ladder = resonance_ladder,
+    resonance_ladder = pd.DataFrame(),
     energy_grid = exp.energy_domain,
     temp = 304.5,
     FP=35.185,

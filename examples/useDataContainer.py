@@ -2,14 +2,14 @@
 import numpy as np
 import pandas as pd
 import os
-from matplotlib.pyplot import *
 
 from ATARI.syndat.particle_pair import Particle_Pair
 from ATARI.syndat.experiment import Experiment
 from ATARI.syndat.MMDA import generate
 from ATARI.theory.xs import SLBW
-# %%
 
+
+# %%
 
 ac = 0.81271  # scattering radius in 1e-12 cm 
 M = 180.948030  # amu of target nucleus
@@ -78,6 +78,7 @@ pw_exp.add_experimental_data(exp.trans, exp.CovT, 1e-2, exp.redpar.val.n, 0)
 #                                         use_hdf5=True,
 #                                         overwrite = False
 #                                                                     )
+
 
 #%%
 

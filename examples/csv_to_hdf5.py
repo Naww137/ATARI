@@ -36,7 +36,8 @@ for fit in os.listdir():
                             f.write(line)
 
                 print(f'Re-run fit {fit} case {i}')
-
+                
+                   
 
 
 # %%

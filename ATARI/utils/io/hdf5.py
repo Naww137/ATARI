@@ -4,8 +4,8 @@ import numpy as np
 
 ### Read data
 
-def read_pw_exp(case_file, isample):
-    pw_exp = pd.read_hdf(case_file, f'/sample_{isample}/pw_exp')
+def read_pw_exp(case_file, isample, title="exp"):
+    pw_exp = pd.read_hdf(case_file, f'/sample_{isample}/pw_{title}')
     try:
         CovT = pd.read_hdf(case_file, f'/sample_{isample}/CovT')
     except:
@@ -18,8 +18,9 @@ def read_pw_fine(case_file, isample):
     return pw_fine
 
 
-def read_par(case_file, isample, label):
+def read_par(case_file:str, isample:int, label:str) -> pd.DataFrame: 
     par = pd.read_hdf(case_file, f"sample_{isample}/par_{label}")
+    assert(isinstance(par, pd.DataFrame))
     return par
 
 
@@ -27,8 +28,8 @@ def read_par(case_file, isample, label):
 
 ### Write data
 
-def write_pw_exp(case_file, isample, pw_exp_df, CovT, CovXS=None):
-    pw_exp_df.to_hdf(case_file, f"sample_{isample}/pw_exp")
+def write_pw_exp(case_file, isample, pw_exp_df, title="exp", CovT=None, CovXS=None):
+    pw_exp_df.to_hdf(case_file, f"sample_{isample}/pw_{title}")
     if CovT is not None:
         CovT.to_hdf(case_file, f"sample_{isample}/CovT")
     if CovXS is not None:

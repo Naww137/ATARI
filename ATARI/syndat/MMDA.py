@@ -189,6 +189,10 @@ def generate(particle_pair, experiment,
         If a DataFrame is given, resonance parameters will not be sampled. Must be given in proper Syndat format.
     open_data : DataFrame or None
         If a DataFrame is given, this sample out spectra (open) will be fixed for each generated sample. Must be given in proper Syndat format.
+    vary_Erange: Dict or None
+        If a dict is give, it must contain the keys {'fullrange':, 'maxres':, 'prob':}. 
+        This will cause the generated data to be in varying energy windows across 'fullrange'. 
+        The window size will be determined by the probability 'prob' of sampling more than 'maxres' resonances.
     use_hdf5 : bool
         If True, generated data will be stored in an hdf5 case file. If False, generated data will be stored in csv's in a nested directory structure.
     overwrite : bool

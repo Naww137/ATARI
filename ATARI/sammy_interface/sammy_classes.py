@@ -20,16 +20,20 @@ class SammyRunTimeOptions:
     There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
     """
     path_to_SAMMY_exe: str
+    shell: str = 'zsh'
+    sammy_runDIR: str = 'SAMMY_runDIR'
+    keep_runDIR: bool = False
+
     model: str = 'XCT'
     reaction: str = 'total'
     solve_bayes: bool = False
     inptemplate: str = "noexp_1sg.inp"
     inpname: str = "sammy.inp"
     title: str = "default title"
+    get_ECSCM: bool = False
+
+    alphanumeric: list = field(default_factory=lambda: [])
     energy_window: Optional[float] = None
-    sammy_runDIR: str = 'SAMMY_runDIR'
-    keep_runDIR: bool = False
-    shell: str = 'zsh'
     recursive: bool = False
     recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
                                                         "iterations": 5,
@@ -60,6 +64,34 @@ class SammyInputData:
 
 
 @dataclass
+class SammyInputDataYW:
+    """
+    Input data for sammy run using YW scheme.
+
+    This object holds at minimum the particle pair description and a resonance ladder.
+    An appropriate energy grid must also be supplied either in a DataFrame with experimental data or standalone as a series or array.
+    The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
+    """
+    particle_pair: Particle_Pair
+    resonance_ladder: DataFrame
+
+    datasets : list
+    dataset_titles : list
+    reactions : list
+    templates : list
+
+    steps: int = 200
+    iterations: int = 2
+    threshold: float = 0.001
+
+    target_thickness: Optional[float] = None
+    temp: Optional[float] = None
+    FP: Optional[float] = None
+    frac_res_FP: Optional[float] = None
+    initial_parameter_uncertainty: Optional[float] = 1.0
+
+
+@dataclass
 class SammyOutputData:
     pw: DataFrame
     par: DataFrame
@@ -67,6 +99,11 @@ class SammyOutputData:
     par_post: Optional[DataFrame] = None
     # chi2_post: Optional[float] = None
     derivatives: Optional[ndarray] = None
+
+    ECSCM: Optional[DataFrame] = None 
+    est_df: Optional[DataFrame] = None
+    
+
 
     # @property
     # def chi2(self, rxn, post):

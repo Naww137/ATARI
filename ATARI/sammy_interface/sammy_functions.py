@@ -12,7 +12,7 @@ from copy import copy
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.stats import chi2_val
 
-from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData
+from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData, SammyInputDataYW
 
 
 # module_dirname = os.path.dirname(__file__)
@@ -314,13 +314,13 @@ def write_saminp(filepath,
                 model, bayes, 
                 reaction, 
                 sammy_INP: SammyInputData,
-                alphanumeric = [],
-                alphanumeric_base = ["TWENTY", 
-                                    "EV", 
-                                    "GENERATE PLOT FILE AUTOMATICALLY"]):
+                alphanumeric = []):
     
-    ac = sammy_INP.particle_pair.ac*10
+    ac = sammy_INP.particle_pair.ac*10  
     broadening = True
+    alphanumeric_base = ["TWENTY", 
+                        "EV", 
+                        "GENERATE PLOT FILE AUTOMATICALLY"]
     
     if bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
@@ -403,17 +403,23 @@ def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
     # write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
     write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
                 sammy_RTO.model, sammy_RTO.solve_bayes, 
-                sammy_RTO.reaction, sammy_INP)
+                sammy_RTO.reaction, sammy_INP, alphanumeric=sammy_RTO.alphanumeric)
 
     # write parameter file
     write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
 
 
-def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False):
     with open(os.path.join(sammy_RTO.sammy_runDIR, 'pipe.sh'), 'w') as f:
-        f.write('sammy.inp\nSAMMY.PAR\nsammy.dat')
+        f.write('sammy.inp\nSAMMY.PAR\nsammy.dat\n')
+
         if sammy_RTO.energy_window is None:
-            f.write('\n')
+            if use_RPCM:
+                f.write("SAMMY.COV")
+            else:
+                pass
+        
+        # energy windowed solves
         elif sammy_INP.experimental_data is not None:
             iter = np.arange(np.floor(np.min(sammy_INP.experimental_data.E)),np.ceil(np.max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
             if len(iter) >= 50:
@@ -422,12 +428,43 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
             for ie in range(len(iter)-1):
                 string += f'{int(iter[ie])}. {int(iter[ie+1])}.\n'
             f.write(f' {string}')
+
         else:
             raise ValueError("An energy window input was provided but no experimental data.")
 
 
-def execute_sammy(sammy_RTO:SammyRunTimeOptions):
+def read_ECSCM(file_path):
+    """
+    Reads a sammy generated ECSCM in as a pandas dataframe.
 
+    Parameters
+    ----------
+    file_path : str
+        Path to the sammy generated SAMCOV.PUB file.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
+    df_tdte = data.iloc[:,0:3]
+    df_tdte.columns = ["theo", "theo_unc", "E"]
+
+    # assert top rows == left columns
+    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
+    dftest=dftest.T
+    dftest.columns = ["theo", "theo_unc", "E"]
+    assert(np.all(dftest == df_tdte))
+
+    dfcov = data.iloc[:, 3:]
+
+    return df_tdte, dfcov
+
+
+
+def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
                                     [f"{sammy_RTO.shell}", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
@@ -437,12 +474,40 @@ def execute_sammy(sammy_RTO:SammyRunTimeOptions):
     if len(runsammy_process.stderr) > 0:
         print(f'SAMMY gave the following warning or error: {runsammy_process.stderr}')
 
-    # read output  and delete sammy_runDIR
-    lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
-    # if sammy_RTO.solve_bayes:
-        # par_df = pd.read_csv(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gnx','J_ID'], engine='python')
-    par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
+    return
 
+# ###############################################
+# run sammy with NV or IQ scheme
+# ###############################################
+
+
+
+def get_ECSCM(sammy_RTO, sammy_INP):
+
+    # update_input_files(sammy_INP, sammy_RTO)
+    fill_runDIR_with_templates(sammy_RTO)
+    energy_grid = np.linspace(min(sammy_INP.energy_grid), max(sammy_INP.energy_grid), 498)
+    write_estruct_file(energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
+    write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
+                sammy_RTO.model, False, 
+                sammy_RTO.reaction, sammy_INP, 
+                alphanumeric=sammy_RTO.alphanumeric + ["CROSS SECTION COVARIance matrix is wanted"])
+    
+    write_shell_script(sammy_INP, sammy_RTO, use_RPCM=True)
+    runsammy_shellpipe(sammy_RTO)
+
+    df, cov = read_ECSCM(os.path.join(sammy_RTO.sammy_runDIR, "SAMCOV.PUB"))
+
+    return df, cov
+    
+
+
+
+
+def execute_sammy(sammy_RTO:SammyRunTimeOptions):
+    runsammy_shellpipe(sammy_RTO)
+    lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
+    par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
     return lst_df, par_df
 
 
@@ -476,6 +541,7 @@ def recursive_sammy(pw_prior, par_prior, sammy_INP: SammyInputData, sammy_RTO: S
 def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     sammy_INP.resonance_ladder = copy(sammy_INP.resonance_ladder)
+
     # setup sammy runtime files
     make_runDIR(sammy_RTO.sammy_runDIR)
     fill_runDIR_with_templates(sammy_RTO)
@@ -495,7 +561,13 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
     if sammy_RTO.solve_bayes:
         # sammy_OUT.chi2_post = chi2_val(lst_df.theo_xs_bayes, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
+        sammy_OUT.pw=lst_df
         sammy_OUT.par_post = par_df
+
+        if sammy_RTO.get_ECSCM:
+            est_df, ecscm = get_ECSCM(sammy_RTO, sammy_INP)
+            sammy_OUT.ECSCM = ecscm
+            sammy_OUT.est_df = est_df
 
     if not sammy_RTO.keep_runDIR:
         shutil.rmtree(sammy_RTO.sammy_runDIR)
@@ -695,7 +767,8 @@ while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
 
     # new chi2 is output from step
     output=$(./iterate.{shell} $iteration)\n""")
-    f.write(r"""newchi2_str=$(echo "$output" | tail -n 1)
+        f.write(r"""
+    newchi2_str=$(echo "$output" | tail -n 1)
     newchi2_str=$(echo "$newchi2_str" | sed 's/E/e/g; s/+//g')
     newchi2_sum=$(echo "$newchi2_str" | tr -s ' ' '\n' | grep -E '[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?' | paste -sd+ - | bc -l)  
 
@@ -754,6 +827,21 @@ def setup_YW_scheme(sammyRTO, sammyINP, datasets, dataset_titles, reactions, tem
     make_bash_script_run(steps, dataset_titles, threshold, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell,  sammyRTO.sammy_runDIR)
 
 
+
+def run_YW_scheme(sammyINP_YW: SammyInputDataYW, sammyRTO: SammyRunTimeOptions, resonance_ladder: pd.DataFrame):
+    sammyINP_YW.resonance_ladder = resonance_ladder
+
+    setup_YW_scheme(sammyRTO, sammyINP_YW, sammyINP_YW.datasets, sammyINP_YW.dataset_titles, sammyINP_YW.reactions, sammyINP_YW.templates, 
+                                                                                    steps=sammyINP_YW.steps,
+                                                                                    iterations=sammyINP_YW.iterations,
+                                                                                    threshold=sammyINP_YW.threshold)
+
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.{sammyRTO.shell}')}")
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}')}")
+
+    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}'), shell=True, text=True)
+    ifinal = int(result.splitlines()[-1]) -1
+    return ifinal
 
 
 

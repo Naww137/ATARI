@@ -56,10 +56,12 @@ class SammyInputData:
     experimental_data: Optional[DataFrame] = None
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[arraytype_id] = None
+
     target_thickness: Optional[float] = None
     temp: Optional[float] = None
     FP: Optional[float] = None
     frac_res_FP: Optional[float] = None
+
     initial_parameter_uncertainty: Optional[float] = 1.0
 
 
@@ -80,15 +82,21 @@ class SammyInputDataYW:
     reactions : list
     templates : list
 
-    steps: int = 200
+    steps: int = 1
     iterations: int = 2
-    threshold: float = 0.001
+    step_threshold: float = 0.01
+    autoelim_threshold: Optional[float] = None
+
+    LS: bool = False
+    initial_parameter_uncertainty: float = 1.0
+
 
     target_thickness: Optional[float] = None
     temp: Optional[float] = None
     FP: Optional[float] = None
     frac_res_FP: Optional[float] = None
-    initial_parameter_uncertainty: Optional[float] = 1.0
+
+    
 
 
 @dataclass

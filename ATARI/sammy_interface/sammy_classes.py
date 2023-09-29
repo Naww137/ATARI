@@ -40,7 +40,8 @@ class SammyRunTimeOptions:
                                                         "print":False}      )
 
 
-arraytype_id = Union[Series, ndarray]
+arraytype_id = Union[Series, ndarray, list]
+arraytype_broadparm = Union[str, float]
 
 @dataclass
 class SammyInputData:
@@ -57,10 +58,10 @@ class SammyInputData:
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[arraytype_id] = None
 
-    target_thickness: Optional[float] = None
-    temp: Optional[float] = None
-    FP: Optional[float] = None
-    frac_res_FP: Optional[float] = None
+    target_thickness: Optional[arraytype_broadparm] = ''
+    temp: Optional[arraytype_broadparm] = ''
+    FP: Optional[arraytype_broadparm] = ''
+    frac_res_FP: Optional[arraytype_broadparm] = ''
 
     initial_parameter_uncertainty: Optional[float] = 1.0
 

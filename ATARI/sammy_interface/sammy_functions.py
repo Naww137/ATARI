@@ -122,8 +122,8 @@ def format_float(value, width):
     return formatted_value
 
 
-def fill_sammy_ladder(df, particle_pair, vary_parm=False):
-
+def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
+    df = copy(df)
     def gn2G(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
         Gn = 2*np.sum(P)*row.gn2
@@ -167,6 +167,12 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False):
     # if a parameter (width) is zero and it is varied then make it 1e-5
     df = df.apply(nonzero_ifvary, axis=1)
 
+    # must have J_ID
+    if "J_ID" not in cols:
+        if J_ID is None:
+            raise ValueError("J_ID not in ladder nor provided as input")
+        else:
+            df["J_ID"] = J_ID
 
     return df
 
@@ -347,13 +353,13 @@ def write_saminp(filepath,
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    assert(np.any(np.isfinite(np.array([sammy_INP.temp, sammy_INP.FP, sammy_INP.frac_res_FP]))))
+                    # assert(np.any(np.isfinite(np.array([sammy_INP.temp, sammy_INP.FP, sammy_INP.frac_res_FP]))))
                     f.write(f'  {sammy_INP.temp: <8}  {sammy_INP.FP: <8}  {sammy_INP.frac_res_FP: <8}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'):
-                assert(isinstance(sammy_INP.target_thickness, float))
+                # assert(isinstance(sammy_INP.target_thickness, float))
                 f.write(f'  {ac: <8}  {sammy_INP.target_thickness: <8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
@@ -827,21 +833,17 @@ echo $iteration
 
 
 
-def setup_YW_scheme(sammyRTO: SammyRunTimeOptions, sammyINPyw: SammyInputDataYW): #sammyINP, datasets, dataset_titles, reactions, templates, 
-                                                                                # steps=10,
-                                                                                # iterations=5,
-                                                                                # threshold=0.01):
+def setup_YW_scheme(sammyRTO: SammyRunTimeOptions, sammyINPyw: SammyInputDataYW): 
 
     ### clean and make directories
     try:
         shutil.rmtree(sammyRTO.sammy_runDIR)
     except:
         pass
+
     os.mkdir(sammyRTO.sammy_runDIR)
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "results"))
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "iterate"))
-    # for ds in datasets:
-    #     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "results", ds))
 
     make_data_for_YW(sammyINPyw.datasets, sammyINPyw.dataset_titles, sammyRTO.sammy_runDIR)
     write_sampar(sammyINPyw.resonance_ladder, sammyINPyw.particle_pair, sammyINPyw.initial_parameter_uncertainty, os.path.join(sammyRTO.sammy_runDIR, "results/step0.par"))
@@ -850,6 +852,30 @@ def setup_YW_scheme(sammyRTO: SammyRunTimeOptions, sammyINPyw: SammyInputDataYW)
     make_bash_script_iterate(sammyINPyw.iterations, sammyINPyw.dataset_titles, sammyRTO.sammy_runDIR, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell, autoelim_thresh=sammyINPyw.autoelim_threshold, save_each_step=True)  # if not saving each step - at least plot the final step!
     make_bash_script_run(sammyINPyw.steps, sammyINPyw.dataset_titles, sammyINPyw.step_threshold, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell,  sammyRTO.sammy_runDIR)
 
+
+
+def run_sammy_YW(sammyINPyw, sammyRTO):
+    
+    setup_YW_scheme(sammyRTO, sammyINPyw)
+
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.{sammyRTO.shell}')}")
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}')}")
+
+    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}'), shell=True, text=True)
+    ifinal = int(result.splitlines()[-1]) - 1
+
+    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{ifinal}.par"))
+    lsts = []
+    for dt in sammyINPyw.dataset_titles:
+        lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}_step{ifinal}.lst")) )
+
+
+    if not sammyRTO.keep_runDIR:
+        shutil.rmtree(sammyRTO.sammy_runDIR)
+
+
+
+    return par, lsts
 
 
 # def run_YW_scheme(sammyINPyw: SammyInputDataYW, sammyRTO: SammyRunTimeOptions, resonance_ladder: pd.DataFrame):

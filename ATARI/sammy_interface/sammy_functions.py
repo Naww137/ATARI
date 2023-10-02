@@ -780,7 +780,7 @@ rm -f SAM*\n""")
 
 max_iterations={steps}
 threshold={threshold}
-min_iterations=5
+min_iterations=3
 iteration=0
 criteria_met=false
 criteria="max iterations"
@@ -793,7 +793,7 @@ echo "\nIterating until convergence\nchi2 values\n""")
         
         # write while loop
         f.write(f"""
-while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ] && [ $iteration -gt $min_iterations ]; do
+while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
 
     # new chi2 is output from step
     output=$(./iterate.{shell} $iteration)\n""")
@@ -815,9 +815,13 @@ while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ] && [ $it
     echo $iteration $oldchi2_str $oldchi2_sum
 
     # Check if the termination criteria is met (e.g., based on some condition)
-    if (( $(echo "$diff < $threshold" |bc -l) )); then # || (( $(echo "$diff > $threshold" | bc -l) )); then
+    if (( $(echo "$diff < $threshold" |bc -l) )) && [ $iteration -gt $min_iterations ]; then
         criteria_met=true
         criteria="improvement below threshold"
+    fi
+    if (( $(echo "$diff < -10" |bc -l) )); then
+        criteria_met=true
+        criteria="Stopped due to instability"
     fi
     
     # Increment the iteration counter

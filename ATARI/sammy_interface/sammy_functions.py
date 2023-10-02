@@ -780,7 +780,7 @@ rm -f SAM*\n""")
 
 max_iterations={steps}
 threshold={threshold}
-        
+min_iterations=5
 iteration=0
 criteria_met=false
 criteria="max iterations"
@@ -793,7 +793,7 @@ echo "\nIterating until convergence\nchi2 values\n""")
         
         # write while loop
         f.write(f"""
-while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
+while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ] && [ $iteration -gt $min_iterations ]; do
 
     # new chi2 is output from step
     output=$(./iterate.{shell} $iteration)\n""")

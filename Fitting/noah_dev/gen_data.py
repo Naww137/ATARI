@@ -77,7 +77,7 @@ sammyINP = sammy_classes.SammyInputData(
 
 case_file = '/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/data.hdf5'  # if using hdf5
 
-dataset_range = (0, 10)
+dataset_range = (10, 500)
 
 # samples_not_generated = generate(Ta_pair, exp, 
 #                                         'sammy', 
@@ -105,9 +105,9 @@ for isample in range(max(dataset_range)):
     sammyOUT = sammy_functions.run_sammy(sammyINP, sammyRTO)
     exp.run(sammyOUT.pw)
 
-    exp.trans.sort_values(by=["E"], ascending=True, inplace=True, drop=True)
-    exp.trans.reset_index(inplace=True)
-    exp.trans.drop("tof", inplace=True)
+    exp.trans.sort_values(by=["E"], ascending=True, inplace=True)
+    exp.trans.reset_index(inplace=True, drop=True)
+    exp.trans.drop("tof", axis=1, inplace=True)
 
     exp.trans.rename(columns={"exp_trans":"exp", "exp_trans_unc":"exp_unc"}, inplace=True)
     exp.trans["true"] = sammyOUT.pw["theo_trans"]

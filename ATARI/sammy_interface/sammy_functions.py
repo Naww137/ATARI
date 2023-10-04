@@ -22,7 +22,7 @@ from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOpti
 # module_dirname = os.path.dirname(__file__)
 
 # =============================================================================
-# 
+#  readers
 # =============================================================================
 def readlst(filepath):
     """
@@ -71,26 +71,29 @@ def readpar(filepath):
 
             row = []
             start = 0
-            for width in column_widths:
+            for iw, width in enumerate(column_widths):
                 value = line[start:start+width].strip()
                 if value == '':
                     value = None
                 else:
-                    try:
-                        value = abs(float(value))
-                    except:
+                    if iw == 0: # energy can be negative
+                        value = float(value)
+                    else: # widths cannots
                         try:
-                            # value = float('e-'.join(value.split('-')))
-                            value = value.split('-')
-                            joiner = 'e-'
+                            value = abs(float(value))
                         except:
-                            # value = float('e+'.join(value.split('+')))
-                            value = value.split('+')
-                            joiner = 'e+'
-                        if value[0] == '':
-                            value = float(joiner.join(value[1::]))
-                        else:
-                            value = float(joiner.join(value))
+                            try:
+                                # value = float('e-'.join(value.split('-')))
+                                value = value.split('-')
+                                joiner = 'e-'
+                            except:
+                                # value = float('e+'.join(value.split('+')))
+                                value = value.split('+')
+                                joiner = 'e+'
+                            if value[0] == '':
+                                value = float(joiner.join(value[1::]))
+                            else:
+                                value = float(joiner.join(value))
                 row.append(value)
                 start += width
             data.append(row)
@@ -100,7 +103,7 @@ def readpar(filepath):
 
 
 # =============================================================================
-# 
+# writers
 # =============================================================================
 def format_float(value, width):
     # Convert the value to a string with the desired precision
@@ -319,7 +322,6 @@ def create_sammyinp(filename='sammy.inp', \
         
     return
 
-
 def write_saminp(filepath, 
                 model, bayes, 
                 reaction, 
@@ -483,6 +485,44 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
 
 
 
+# ################################################ ###############################################
+# Read endf files
+# ################################################ ###############################################
+
+
+def replace_matnum(filepath, matnum):
+    with open(filepath, 'r') as f:
+        s = f.read()
+        s = s.replace("%%%MAT%%%", str(matnum))
+    with open(filepath, 'w') as f:
+        f.write(s)
+
+def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
+
+    make_runDIR(sammyRTO.sammy_runDIR)
+    fill_runDIR_with_templates(sammyRTO)
+
+    shutil.copy(endf_file, os.path.join(sammyRTO.sammy_runDIR, os.path.basename(endf_file)))
+
+    write_estruct_file([10,100,1000], os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
+    replace_matnum(os.path.join(sammyRTO.sammy_runDIR,'sammy.inp'), matnum)
+
+    with open(os.path.join(sammyRTO.sammy_runDIR, "pipe.sh"), 'w') as f:
+        f.write(f"sammy.inp\n{os.path.basename(endf_file)}\nsammy.dat\n\n")
+
+    runsammy_shellpipe(sammyRTO)
+    resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
+    # could also read endf spin groups here! 
+
+    if not sammyRTO.keep_runDIR:
+        shutil.rmtree(sammyRTO.sammy_runDIR)
+
+    with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.INP"), 'r') as f:
+        s = f.read()
+    with open("SAMNDF.INP", 'w') as f:
+        f.write(s) 
+
+    return resonance_ladder
 
 
 

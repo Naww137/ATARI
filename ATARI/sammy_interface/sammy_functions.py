@@ -686,7 +686,8 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
 
 def make_bash_script_iterate(iterations, dataset_titles, rundir, sammyexe, shell, autoelim_thresh=None, save_each_step=False):
     
-    autoelim_string = """### Filter out resonances with Gn < $$$thresh$$$ meV
+    autoelim_string = """#!/bin/bash\n
+### Filter out resonances with Gn < $$$thresh$$$ meV
 par_file=results/step$1.par
 temp_file=results/temp.par
 
@@ -704,7 +705,7 @@ awk '{
 mv $temp_file $par_file
 \n"""
 
-    with open(os.path.join(rundir, f"iterate.{shell}"), 'w+') as f:
+    with open(os.path.join(rundir, f"iterate.sh"), 'w+') as f:
             
             ### auto-resonance elimination 
             if autoelim_thresh is not None:
@@ -777,10 +778,10 @@ def make_data_for_YW(datasets, dataset_titles, rundir):
 
 
 def make_bash_script_run(steps, dataset_titles, threshold, sammyexe, shell, rundir):
-    with open(os.path.join(rundir, f"run.{shell}"), 'w+') as f:
+    with open(os.path.join(rundir, f"run.sh"), 'w+') as f:
 
         ### change cwd and setup chi2 log
-        f.write(f"""
+        f.write(f"""#!/bin/bash\n
 # change cwd
 cd "$(dirname "$0")"
 #### remove existing chi2 log and write new
@@ -836,7 +837,7 @@ echo "\nIterating until convergence\nchi2 values\n""")
 while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
 
     # new chi2 is output from step
-    output=$(./iterate.{shell} $iteration)\n""")
+    output=$(./iterate.sh $iteration)\n""")
         f.write(r"""
     newchi2_str=$(echo "$output" | tail -n 1)
     newchi2_str=$(echo "$newchi2_str" | sed 's/E/e/g; s/+//g')
@@ -902,10 +903,10 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     
     setup_YW_scheme(sammyRTO, sammyINPyw)
 
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.{sammyRTO.shell}')}")
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}')}")
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.sh')}")
+    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.sh')}")
 
-    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}'), shell=True, text=True)
+    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.sh'), shell=True, text=True)
     ifinal = int(result.splitlines()[-1]) - 1
 
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{ifinal}.par"))

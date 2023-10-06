@@ -75,9 +75,9 @@ sammyINP = sammy_classes.SammyInputData(
 
 
 
-case_file = '/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/data.hdf5'  # if using hdf5
+case_file = '/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/data_capcorr.hdf5'  # if using hdf5
 
-dataset_range = (10, 500)
+dataset_range = (0, 10)
 
 # samples_not_generated = generate(Ta_pair, exp, 
 #                                         'sammy', 

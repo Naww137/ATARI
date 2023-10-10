@@ -3,7 +3,7 @@
 workspace/
 *.hdf5
 *.png
-*.csv
+# *.csv
 *.asv
 *.bar*
 */.bar*

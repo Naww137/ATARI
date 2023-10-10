@@ -20,23 +20,28 @@ class SammyRunTimeOptions:
     There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
     """
     path_to_SAMMY_exe: str
+    shell: str = 'zsh'
+    sammy_runDIR: str = 'SAMMY_runDIR'
+    keep_runDIR: bool = False
+
     model: str = 'XCT'
     reaction: str = 'total'
     solve_bayes: bool = False
     inptemplate: str = "noexp_1sg.inp"
     inpname: str = "sammy.inp"
     title: str = "default title"
+    get_ECSCM: bool = False
+
+    alphanumeric: list = field(default_factory=lambda: [])
     energy_window: Optional[float] = None
-    sammy_runDIR: str = 'SAMMY_runDIR'
-    keep_runDIR: bool = False
-    shell: str = 'zsh'
     recursive: bool = False
     recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
                                                         "iterations": 5,
                                                         "print":False}      )
 
 
-arraytype_id = Union[Series, ndarray]
+arraytype_id = Union[Series, ndarray, list]
+arraytype_broadparm = Union[str, float]
 
 @dataclass
 class SammyInputData:
@@ -52,11 +57,47 @@ class SammyInputData:
     experimental_data: Optional[DataFrame] = None
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[arraytype_id] = None
+
+    target_thickness: Optional[arraytype_broadparm] = ''
+    temp: Optional[arraytype_broadparm] = ''
+    FP: Optional[arraytype_broadparm] = ''
+    frac_res_FP: Optional[arraytype_broadparm] = ''
+
+    initial_parameter_uncertainty: Optional[float] = 1.0
+
+
+@dataclass
+class SammyInputDataYW:
+    """
+    Input data for sammy run using YW scheme.
+
+    This object holds at minimum the particle pair description and a resonance ladder.
+    An appropriate energy grid must also be supplied either in a DataFrame with experimental data or standalone as a series or array.
+    The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
+    """
+    particle_pair: Particle_Pair
+    resonance_ladder: DataFrame
+
+    datasets : list
+    dataset_titles : list
+    reactions : list
+    templates : list
+
+    steps: int = 1
+    iterations: int = 2
+    step_threshold: float = 0.01
+    autoelim_threshold: Optional[float] = None
+
+    LS: bool = False
+    initial_parameter_uncertainty: float = 1.0
+
+
     target_thickness: Optional[float] = None
     temp: Optional[float] = None
     FP: Optional[float] = None
     frac_res_FP: Optional[float] = None
-    initial_parameter_uncertainty: Optional[float] = 1.0
+
+    
 
 
 @dataclass
@@ -67,6 +108,11 @@ class SammyOutputData:
     par_post: Optional[DataFrame] = None
     # chi2_post: Optional[float] = None
     derivatives: Optional[ndarray] = None
+
+    ECSCM: Optional[DataFrame] = None 
+    est_df: Optional[DataFrame] = None
+    
+
 
     # @property
     # def chi2(self, rxn, post):

@@ -38,7 +38,7 @@ def sample_resonance_ladder(Erange, spin_groups, average_parameters,
             raise ValueError("Need to implement this option")
         else:
             # resonance_ladder = pd.DataFrame()
-            resonance_ladder = pd.DataFrame({'E':[], 'Gg':[], 'Gn':[], 'J':[], 'chs':[], 'lwave':[], 'J_ID':[]})
+            resonance_ladder = pd.DataFrame({'E':[], 'Gg':[], 'Gn1':[], 'J':[], 'chs':[], 'lwave':[], 'J_ID':[]})
             J_ID = 0
             for ij, j in enumerate(spin_groups):
                 
@@ -60,7 +60,7 @@ def sample_resonance_ladder(Erange, spin_groups, average_parameters,
 
                 # sample observable width as sum of multiple single-channel width with the same average (chi2, DOF=channels)
                 nwidth = sample_RRR_widths(levels, average_parameters[str(j[0])]["<Gn>"], average_parameters[str(j[0])]["n_dof"])
-                E_Gn_gnx2 = pd.DataFrame([levels, Gwidth, nwidth, [j[0]]*len(levels), [j[1]]*len(levels), [j[2]]*len(levels), [J_ID]*len(levels)], index=['E','Gg', 'Gn', 'J', 'chs', 'lwave', 'J_ID'])  
+                E_Gn_gnx2 = pd.DataFrame([levels, Gwidth, nwidth, [j[0]]*len(levels), [j[1]]*len(levels), [j[2]]*len(levels), [J_ID]*len(levels)], index=['E','Gg', 'Gn1', 'J', 'chs', 'lwave', 'J_ID'])  
                 # assert len(np.unique(j[2]))==1, "Code cannot consider different l-waves contributing to a spin group"
                 resonance_ladder = pd.concat([resonance_ladder, E_Gn_gnx2.T])
 

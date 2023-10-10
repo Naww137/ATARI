@@ -46,26 +46,6 @@ def reduce_ladder(par, threshold, varyE=1, varyGg=1, varyGn1=1):
 
     return par
 
-
-def run_YW_scheme(sammyINPyw, sammyRTO, resonance_ladder):
-    
-    sammyINPyw.resonance_ladder = resonance_ladder
-    sammy_functions.setup_YW_scheme(sammyRTO, sammyINPyw)
-
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.{sammyRTO.shell}')}")
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}')}")
-
-    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}'), shell=True, text=True)
-    ifinal = int(result.splitlines()[-1]) -1
-
-    par = sammy_functions.readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{ifinal}.par"))
-    lsts = []
-    for dt in sammyINPyw.dataset_titles:
-        lsts.append(sammy_functions.readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}_step{ifinal}.lst")) )
-
-    return par, lsts
-
-
 ### setup physics
 Gg_DOF = 10
 spin_groups = [ (3.0,1,0) ]
@@ -111,6 +91,7 @@ sammyINPyw = sammy_classes.SammyInputDataYW(
     steps = 200,
     iterations = 2,
     step_threshold = 0.01,
+    autoelim_threshold = None,
 
     LS = False,
     initial_parameter_uncertainty = 0.01,
@@ -121,7 +102,7 @@ sammyINPyw = sammy_classes.SammyInputDataYW(
     target_thickness=0.067166)
 
 
-def fit(isample, num_Er, case_file, Gn1_opt=0):
+def fit(isample, num_Er, case_file, elim_threshold=1e-5, Gn1_opt=0):
         
     ### Import data    
     dataset_titles = ["trans1", "cap1"]
@@ -129,11 +110,13 @@ def fit(isample, num_Er, case_file, Gn1_opt=0):
     for dt in dataset_titles:
         exp_pw, _ = h5io.read_pw_exp(case_file, isample, title=dt)
         datasets.append(exp_pw)
-    theo_par = h5io.read_par(case_file, isample, 'true') 
+    # theo_par = h5io.read_par(case_file, isample, 'true') 
     trans = datasets[0]
     cap = datasets[1]
 
     ### Setup simultaneous least squares
+    # sammyINPyw.autoelim_threshold = elim_threshold  # cant do eliminations every step because the awk commands wont format correctly if threshold >1e-4
+    sammyRTO.sammy_runDIR = f"SAMMY_runDIR_{isample}"
     sammyINPyw.datasets = datasets
     sammyINPyw.dataset_titles = dataset_titles
     sammyINPyw.reactions = ["transmission", "capture"]
@@ -142,15 +125,18 @@ def fit(isample, num_Er, case_file, Gn1_opt=0):
     ### step 1
     Er, Gg, Gn = get_parameter_grid(trans.E, res_par_avg, num_Er, option=Gn1_opt)
     initial_reslad = get_resonance_ladder(Er, Gg, Gn, varyE=0, varyGg=0, varyGn1=1)
-    P1, _ = run_YW_scheme(sammyINPyw, sammyRTO, initial_reslad)
+    
+    sammyINPyw.resonance_ladder = initial_reslad
+    P1, _ = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
 
     # step 2
-    P2 = reduce_ladder(P1, 1e-5, varyE=1, varyGg=1, varyGn1=1)
-    # sammyINPyw.initial_parameter_uncertainty = 0.0
+    P2 = reduce_ladder(P1, elim_threshold, varyE=1, varyGg=1, varyGn1=1)
     sammyINPyw.step_threshold = 0.001
-    par, _ = run_YW_scheme(sammyINPyw, sammyRTO, P2)
+    sammyINPyw.resonance_ladder = P2
+    par, _ = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
 
-    return par
+    final_par = reduce_ladder(par, elim_threshold, varyE=1, varyGg=1, varyGn1=1)
+    return final_par
 
 
 #%%
@@ -162,57 +148,31 @@ def main(i):
     # case_file = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/data.hdf5"
     case_file = "~/reg_perf_tests/sammy/data.hdf5"
 
-    # root_folder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
-    basefolder = "/home/nwalton1/reg_perf_tests/sammy/SAMMY_runDIR_Gnavg"
+
+    ## fit with gavg
+    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
+        # root_folder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
+        basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnavg_fits_{title}"
     
-    for iE in [25, 50, 75, 100]:
-        par = fit(i, iE, case_file, Gn1_opt=0)
-        par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
+        for iE in [25, 50, 75, 100]:
+            par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=0)
+            par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
-
-
-
-
-
-
-#%% plotting functions
-
-# def plot_trans(exp_pw, T1):
+    ## fit with gmin
+    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
+        # root_folder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
+        basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnmin_fits_{title}"
     
-#     figure()
-#     # plot(exp_pw.E, exp_pw.theo_trans, ms=1, color='g')
-#     # plot(sammyOUT.pw.E, sammyOUT.pw.theo_trans, 'r', alpha=0.2, lw=3)
-#     # plot(sammyOUT_bayes.pw.E, sammyOUT_bayes.pw.theo_trans_bayes, 'b-')
-#     plot(T1.E, T1.theo_trans, 'b')
-#     errorbar(exp_pw.E, exp_pw.exp, yerr=exp_pw.exp_unc, zorder=0, 
-#                                             fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
-#     ylim([-.1, 1])
+        for iE in [25, 50, 75, 100]:
+            if os.path.isfile(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv")):
+                pass
+            else:
+                par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=1)
+                par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
-# def plot_trans_cap(exp_pw, cap_pw, T1=None,C1=None):
 
-#     fig, axes = subplots(2,1, figsize=(8,6), sharex=True)
-#     axes[0].errorbar(exp_pw.E, exp_pw.exp, yerr=exp_pw.exp_unc, zorder=0, 
-#                                             fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
-    
-#     axes[1].errorbar(cap_pw.E, cap_pw.exp, yerr=cap_pw.exp_unc, zorder=0, 
-#                                             fmt='.', color='k', linewidth=1, markersize=3, capsize=2, label='exp')
-    
-#     if C1 is not None and T1 is not None:
-#         axes[0].plot(T1.E, T1.theo_trans, 'b')
-#         axes[1].plot(C1.E, C1.theo_xs, 'b')
-#     else:
-#         axes[0].plot(exp_pw.E, exp_pw.theo_trans, 'g')
-#         axes[1].plot(cap_pw.E, cap_pw.theo_xs, 'g')
-        
-
-#     axes[0].set_ylabel("T")
-#     axes[1].set_yscale('log')
-#     axes[1].set_ylabel(r'$\sigma_{\gamma}$ (barns)')
-#     axes[1].set_ylim(bottom=5e-4)
-
-#     # legend()
-#     fig.supxlabel('Energy (eV)')
-#     fig.tight_layout()
-#     return fig
+import sys
+i = sys.argv[1]
+main(i)

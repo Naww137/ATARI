@@ -62,3 +62,23 @@ def likelihood_ratio_test(X2_null, X2_alt, df):
 
 def likelihood_val(fit, exp, cov):
     return sts.multivariate_normal.pdf( exp, fit, cov )
+
+
+
+def cov2corr(cov):
+    """
+    Converts a covariance matrix to a correlation matrix
+
+    Parameters
+    ----------
+    cov : array-like
+        Covariance matrix as np array or pd dataframe
+
+    Returns
+    -------
+    ndarray 
+        Correlation matrix
+    """
+    std_deviations = np.atleast_2d(np.sqrt(np.diag(cov)))
+    corr_matrix = cov/(std_deviations.T @ std_deviations)
+    return corr_matrix

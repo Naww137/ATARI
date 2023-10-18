@@ -159,8 +159,8 @@ def calculate_fnorms(ResidualMatrixDict, reactions):
     Rf = {}
     for rxn in reactions:
         R = ResidualMatrixDict[rxn]
-        Rf[rxn] = np.linalg.norm(R, ord='fro')
-    ResidualMatrix_allrxns = np.concatenate([ResidualMatrixDict[rxn] for rxn in reactions])
-    Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')
+        Rf[rxn] = np.linalg.norm(R, ord='fro')/R.size
+    # ResidualMatrix_allrxns = np.concatenate([ResidualMatrixDict[rxn] for rxn in reactions])
+    # Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')/ResidualMatrix_allrxns.size
 
     return Rf

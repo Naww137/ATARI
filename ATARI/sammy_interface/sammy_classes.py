@@ -23,6 +23,7 @@ class SammyRunTimeOptions:
     shell: str = 'zsh'
     sammy_runDIR: str = 'SAMMY_runDIR'
     keep_runDIR: bool = False
+    Print: bool = False
 
     model: str = 'XCT'
     reaction: str = 'total'
@@ -83,12 +84,14 @@ class SammyInputDataYW:
     reactions : list
     templates : list
 
-    steps: int = 1
+    max_steps: int = 1
     iterations: int = 2
     step_threshold: float = 0.01
     autoelim_threshold: Optional[float] = None
 
     LS: bool = False
+    LevMar: bool = True
+    LevMarV: float = 2.0
     initial_parameter_uncertainty: float = 1.0
 
 

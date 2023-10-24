@@ -142,7 +142,7 @@ def sample_and_write_syndat(case_file, isample, particle_pair, experiment, solve
     # write data
     if use_hdf5:
         # io.h5write_experimental(case_file, isample, exp_pw_df, pd.DataFrame(CovT, index=np.array(exp_pw_df.E), columns=exp_pw_df.E))
-        h5io.write_pw_exp(case_file, isample, pw_exp_df, CovT, CovXS=None)
+        h5io.write_pw_exp(case_file, isample, pw_exp_df, CovT=CovT, CovXS=None)
         h5io.write_par(case_file, isample, resonance_ladder, 'true')
         # io.h5write_theoretical(case_file, isample, theo_pw_df, resonance_ladder)
     else:

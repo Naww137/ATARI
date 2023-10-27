@@ -847,7 +847,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     fudge = min(fudge,sammyINPyw.maxF)
                 else:
                     if sammyRTO.Print:
-                        print(f"decrease fudge, repeat step {int(i)}:")
+                        print(f"Repeat step {int(i)}, \tfudge: {sammyINPyw.dataset_titles+['sum']}")
 
                     while True:
                         fudge /= sammyINPyw.LevMarV
@@ -857,7 +857,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t{float(fudge):<5}: {chi2_list}")
+                            print(f"\t\t{float(fudge):<5}: {chi2_list}")
 
                         if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
                             break

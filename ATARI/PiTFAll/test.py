@@ -4,7 +4,7 @@ import pandas as pd
 import os
 # import ATARI
 from ATARI.PiTFAll.performance_test import Performance_Test
-from theory.particle_pair import Particle_Pair
+from ATARI.models.particle_pair import Particle_Pair
 from ATARI.syndat.experiment import Experiment
 import h5py
 import scipy.stats as sts

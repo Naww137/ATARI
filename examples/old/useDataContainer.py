@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 
-from theory.particle_pair import Particle_Pair
+from models.particle_pair import Particle_Pair
 from ATARI.syndat.experiment import Experiment
 from ATARI.syndat.MMDA import generate
 from ATARI.theory.xs import SLBW

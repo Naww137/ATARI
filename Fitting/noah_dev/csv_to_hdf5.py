@@ -42,7 +42,7 @@ from ATARI.utils.misc import fine_egrid
 from ATARI.utils.io.datacontainer import DataContainer
 from ATARI.utils.io.pointwise import PointwiseContainer
 from ATARI.utils.io.parameters import TheoreticalParameters, ExperimentalParameters
-from theory.particle_pair import Particle_Pair
+from ATARI.models.particle_pair import Particle_Pair
 
 
 ac = 0.81271    # scattering radius in 1e-12 cm 

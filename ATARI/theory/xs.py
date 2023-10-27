@@ -1,6 +1,6 @@
 import numpy as np
 from ATARI.theory import scattering_params
-from ATARI.utils.io.atario import fill_resonance_ladder
+from ATARI.utils.atario import fill_resonance_ladder
 
 
 def SLBW(E, pair, resonance_ladder):

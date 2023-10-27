@@ -76,7 +76,7 @@ from ATARI.utils.stats import chi2_val
 
 #     return exp_pw_df, theo_pw_df, theo_par_df, est_par_df, exp_cov
 
-from ATARI.theory.particle_pair import Particle_Pair
+from ATARI.models.particle_pair import Particle_Pair
 from ATARI.utils.io.experimental_parameters import ExperimentalParameters
 from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, TheoreticalParameters
 from ATARI.utils.io.pointwise_container import BuildPointwiseContainer_fromHDF5, PointwiseContainer

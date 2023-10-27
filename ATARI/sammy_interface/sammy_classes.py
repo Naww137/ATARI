@@ -1,7 +1,7 @@
 
 from typing import Optional, Union
 from dataclasses import dataclass, field
-from ATARI.theory.particle_pair import Particle_Pair
+from ATARI.models.particle_pair import Particle_Pair
 from pandas import DataFrame, Series
 from numpy import ndarray
 # from ATARI.utils.stats import chi2_val

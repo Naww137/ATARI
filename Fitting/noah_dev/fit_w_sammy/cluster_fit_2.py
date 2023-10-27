@@ -7,7 +7,7 @@ import importlib
 import subprocess
 import time
 
-from theory.particle_pair import Particle_Pair
+from models.particle_pair import Particle_Pair
 from ATARI.sammy_interface import sammy_interface, sammy_classes, sammy_functions
 
 import ATARI.utils.io.hdf5 as h5io

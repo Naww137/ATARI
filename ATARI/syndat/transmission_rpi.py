@@ -372,7 +372,7 @@ class syndat_T:
         self.raw_data = self.generate_raw_data(self.true_neutron_spectrum, self.true_reduction_parameters)
 
         ### reduce the raw count data
-        self.exp_dat = self.reduce(self.raw_data, self.neutron_spectrum, self.reduction_parameters)
+        self.data = self.reduce(self.raw_data, self.neutron_spectrum, self.reduction_parameters)
 
 
 

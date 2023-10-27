@@ -109,7 +109,7 @@ class syndat_Y:
         Yg["exp"] = abs(np.random.default_rng().normal(Yg['true'],  Yg_std))
         Yg['exp_unc'] = Yg_std
 
-        self.exp_dat = Yg
+        self.data = Yg
 
 
 

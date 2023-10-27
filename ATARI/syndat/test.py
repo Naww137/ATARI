@@ -21,10 +21,10 @@ def test_mean_converges_to_true():
 
     for i in range(ipert):
         exp.run(df_true)
-        exp_trans[i,:] = np.array(exp.trans.exp)
-        exp_trans_unc[i,:] = np.array(exp.trans.exp_unc)
+        exp_trans[i,:] = np.array(exp.data.exp)
+        exp_trans_unc[i,:] = np.array(exp.data.exp_unc)
 
-    true_trans = np.array(exp.trans.sort_values('E', ascending=False)["true"])
+    true_trans = np.array(exp.data.sort_values('E', ascending=False)["true"])
     assert (np.all(np.isclose(np.mean(exp_trans, axis=0), true_trans, rtol=1e-2)))
     assert (np.all(normaltest((exp_trans-true_trans)/exp_trans_unc).pvalue>1e-5))
 

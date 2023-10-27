@@ -70,11 +70,12 @@ class SammyInputData:
 
 @dataclass
 class SammyOutputData:
-    pw: DataFrame
+    pw: Union[DataFrame, list]
     par: DataFrame
-    # chi2: float
+    chi2: Union[float, list[float]]
+    pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
-    # chi2_post: Optional[float] = None
+    chi2_post: Optional[Union[float, list[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 

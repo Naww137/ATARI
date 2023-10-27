@@ -1,6 +1,6 @@
 import numpy as np
 from ATARI.theory.xs import SLBW
-from utils.io.atario import fill_resonance_ladder
+from ATARI.utils.atario import fill_resonance_ladder
 
 
 

@@ -605,7 +605,8 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     lst_df, par_df = execute_sammy(sammy_RTO)
 
     sammy_OUT = SammyOutputData(pw=lst_df, 
-                        par=sammy_INP.resonance_ladder)#,
+                        par=sammy_INP.resonance_ladder,
+                        chi2=[])#,
                         # chi2=chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc)))
 
     if sammy_RTO.recursive == True:
@@ -746,7 +747,14 @@ def make_final_plot_bash(dataset_titles, sammyexe, rundir):
             f.write(f"##################################\n# Plot for {ds}\n")
             f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n\nEOF\n")
             f.write(f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""")    
-     
+        f.write("################# read chi2 #######################\n#\n")
+        for ds in dataset_titles:
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $chi2_string_{ds}")
+        f.write(""""\n""")
     
 
 def setup_YW_scheme(sammyRTO, sammyINPyw): 
@@ -820,7 +828,6 @@ mv "results/temp" "results/step{step}.par" """],
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     istep = 0
-    V = 2
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
@@ -850,7 +857,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t{float(fudge)}: {chi2_list}")
+                            print(f"\t{float(fudge):<5}: {chi2_list}")
 
                         if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
                             break
@@ -865,14 +872,14 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 else:
                     criteria = "Chi2 improvement below threshold"
                 if sammyRTO.Print:
-                    print(f"{int(i)} {float(fudge)}: {chi2_list}")
+                    print(f"{int(i)}    {float(fudge):<5}: {chi2_list}")
                 break
             elif fudge == sammyINPyw.minF:
                 break
         
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
-            print(f"{int(i)} {chi2_list} {float(fudge)}")
+            print(f"{int(i)}    {float(fudge):<5}: {chi2_list}")
         
         update_fudge_in_parfile(rundir, istep, fudge)
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
@@ -882,6 +889,19 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     print(criteria)
     return istep
 
+
+
+def plot_YW(sammyRTO, sammyINPyw, i):
+    out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True
+                        )
+    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
+    lsts = []
+    for dt in sammyINPyw.dataset_titles:
+        lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
+    i_chi2s = [float(s) for s in out.stdout.split('\n')[-2].split()]
+    i=i_chi2s[0]; chi2s=i_chi2s[1:] 
+    return par, lsts, chi2s
 
 
 
@@ -894,23 +914,19 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
+    ### get prior
+    par, lsts, chi2list = plot_YW(sammyRTO, sammyINPyw, 0)
+    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list)
+    
     if sammyRTO.bayes:
         ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-    else:
-        ifinal = 0
+        par_post, lsts_post, chi2list_post = plot_YW(sammyRTO, sammyINPyw, ifinal)
+        sammy_OUT.pw_post = lsts_post
+        sammy_OUT.par_post = par_post
+        sammy_OUT.chi2_post = chi2list_post
 
-    out = subprocess.run(["sh", "-c", f"./plot.sh {ifinal}"], 
-                        cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True
-                            )
-
-    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{ifinal}.par"))
-    lsts = []
-    for dt in sammyINPyw.dataset_titles:
-        lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
 
     if not sammyRTO.keep_runDIR:
         shutil.rmtree(sammyRTO.sammy_runDIR)
 
-
-    return par, lsts
-
+    return sammy_OUT

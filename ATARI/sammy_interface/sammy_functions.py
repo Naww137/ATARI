@@ -639,7 +639,7 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions):
 
     #### make files for each dataset YW generation
-    for ds, rxn, tem in zip(sammyINPYW.dataset_titles, sammyINPYW.reactions, sammyINPYW.templates):
+    for ds, rxn, tem in zip(sammyINPYW.dataset_titles, sammyINPYW.reactions, sammyINPYW.templates):   #type: ignore
         sammyRTO.inptemplate = tem
 
         sammyRTO.inpname = f"{ds}_initial.inp"

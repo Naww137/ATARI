@@ -1,9 +1,9 @@
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
 from ATARI.utils.misc import fine_egrid 
-from ATARI.utils.atario import fill_resonance_ladder
+from utils.io.atario import fill_resonance_ladder
 import ATARI.utils.io.hdf5 as h5io 
 
 from abc import ABC, abstractmethod 

@@ -75,7 +75,7 @@ class Experiment:
         self.calc_cov = options['Calculate Covariance']
         self.cpts = options['Compression Points']
         self.gfactors = options['Grouping Factors']
-
+        
         ### Default experiment parameter dictionary
         default_exp = {
                         'n'         :   {'val'  :   0.067166,            'unc'  :   0},

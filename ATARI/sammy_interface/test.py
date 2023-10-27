@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 from ATARI.sammy_interface import sammy_functions, sammy_classes
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 
 
 ac = 0.81271 

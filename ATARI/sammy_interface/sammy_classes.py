@@ -1,7 +1,7 @@
 
 from typing import Optional, Union
 from dataclasses import dataclass, field
-from ATARI.syndat.particle_pair import Particle_Pair
+from ATARI.theory.particle_pair import Particle_Pair
 from pandas import DataFrame, Series
 from numpy import ndarray
 # from ATARI.utils.stats import chi2_val
@@ -65,41 +65,6 @@ class SammyInputData:
     frac_res_FP: Optional[arraytype_broadparm] = ''
 
     initial_parameter_uncertainty: Optional[float] = 1.0
-
-
-@dataclass
-class SammyInputDataYW:
-    """
-    Input data for sammy run using YW scheme.
-
-    This object holds at minimum the particle pair description and a resonance ladder.
-    An appropriate energy grid must also be supplied either in a DataFrame with experimental data or standalone as a series or array.
-    The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
-    """
-    particle_pair: Particle_Pair
-    resonance_ladder: DataFrame
-
-    datasets : list
-    dataset_titles : list
-    reactions : list
-    templates : list
-
-    max_steps: int = 1
-    iterations: int = 2
-    step_threshold: float = 0.01
-    autoelim_threshold: Optional[float] = None
-
-    LS: bool = False
-    LevMar: bool = True
-    LevMarV: float = 2.0
-    initial_parameter_uncertainty: float = 1.0
-
-
-    target_thickness: Optional[float] = None
-    temp: Optional[float] = None
-    FP: Optional[float] = None
-    frac_res_FP: Optional[float] = None
-
     
 
 
@@ -117,23 +82,98 @@ class SammyOutputData:
     
 
 
-    # @property
-    # def chi2(self, rxn, post):
-    #     theo = self.pw[f"theo_{rxn}"]
+
+
+### New scheme
+
+
+def update_dict(old, additional):
+    new = old
+    for key in old:
+        if key in additional:
+            new.update({key:additional[key]})
+    return new
+
+
+
+class sammyRTO:
+
+    def __init__(self, sammyexe: str, options={}):
+        default_options = {
+            'sh'            :   'zsh',
+            'sammy_runDIR'  :   'SAMMY_runDIR',
+            'keep_runDIR'   :   False,
+            'Print'         :   False,
+
+            'bayes'         :   False,
+            'iterations'    :   2
+        }
+        options = update_dict(default_options, options)
+        self.options = options
+
+        self.path_to_SAMMY_exe = sammyexe
+        self.shell =  options["sh"]
+        self.sammy_runDIR =  options["sammy_runDIR"]
+        self.keep_runDIR = options["keep_runDIR"]
+        self.Print =  options["Print"]
         
+        self.bayes = options["bayes"]
+        self.iterations = options["iterations"]
+
+    def __repr__(self):
+        return str(self.options)
 
 
 
+
+class theory:
     
+    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
+        self.isotope = isotope
+        self.amu = amu
+        self.ac = ac
+        self.resonance_ladder = resonance_ladder
+        self.formalism = formalism
+        self.spin_groups = """
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+"""
 
 
-    # @property
-    # def chi2(self):
-    #     return chi2_val(self.pw.theo)
-        
 
-# @dataclass
-# class SammyOutputData:
-#     pw: DataFrame
-#     par: DataFrame
-#     chi2:
+
+
+@dataclass
+class SammyInputDataYW:
+    """
+    Input data for sammy run using YW scheme.
+
+    This object holds at minimum the particle pair description and a resonance ladder.
+    An appropriate energy grid must also be supplied either in a DataFrame with experimental data or standalone as a series or array.
+    The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
+    """
+    particle_pair: Particle_Pair
+    model: theory
+    resonance_ladder: DataFrame
+
+    datasets : list
+    templates : list
+    experiments: list
+
+    max_steps: int = 1
+    iterations: int = 2
+    step_threshold: float = 0.01
+    autoelim_threshold: Optional[float] = None
+
+    LS: bool = False
+    LevMar: bool = True
+    LevMarV: float = 2.0
+    minF:   float = 1e-5
+    maxF:   float = 10
+    initial_parameter_uncertainty: float = 1.0
+
+
+
+

@@ -6,14 +6,14 @@ import sys
 
 import scipy.stats as sts
 
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 from ATARI.syndat.experiment import Experiment
 from ATARI.syndat.MMDA import generate
 from ATARI.theory.resonance_statistics import make_res_par_avg
 from ATARI.theory.scattering_params import FofE_recursive, FofE_explicit
 from ATARI.utils.stats import likelihood_ratio_test, likelihood_val, chi2_val
-from ATARI.utils.atario import fill_resonance_ladder
-import ATARI.utils.atario as io
+from utils.io.atario import fill_resonance_ladder
+import utils.io.atario as io
 from ATARI.sammy_interface import sammy_functions
 from ATARI.sammy_interface import sammy_functions, sammy_classes
 

@@ -1,0 +1,23 @@
+Title
+Ta181     180.94803 180.0     270.0          2     
+XCT
+SOLVE BAYES EQUATIONS
+BROADENING IS WANTED
+DO NOT SHIFT RPI RESOLUTION
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+%%%alphanumeric%%%
+
+  294.261   100.14    0.0             
+  8.1271    0.00566                        0.00000          
+transmission
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+
+RPI T
+BURST 0   8.0       0.0      
+CHANN 0   216.16    204.7     1.6      
+CHANN 0   613.02    102.4     1.6      

@@ -5,7 +5,7 @@ import h5py
 import os
 
 from ATARI.utils.io.theoretical_parameters import BuildTheoreticalParameters_fromHDF5, BuildTheoreticalParameters_fromATARI, DirectTheoreticalParameters
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 
 
 ac = 0.81271    # scattering radius in 1e-12 cm 

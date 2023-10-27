@@ -1,34 +1,27 @@
 import pandas as pd
 import numpy as np
 from ATARI.theory.scattering_params import FofE_recursive
-# from ATARI.theory.scattering_params import gstat
+from copy import deepcopy
 
 
 # ----------------------------------------------------------------------------------
-# HDF5 utilities
+# User interface functions
 # ----------------------------------------------------------------------------------
-def h5read_experimental(case_file, isample):
-    exp_pw = pd.read_hdf(case_file, f'/sample_{isample}/pw_exp')
-    exp_cov = pd.read_hdf(case_file, f'/sample_{isample}/CovT')
-    return exp_pw, exp_cov
 
-def h5read_theoretical(case_file, isample):
-    theo_pw = pd.read_hdf(case_file, f'/sample_{isample}/theo_pw')
-    theo_par = pd.read_hdf(case_file, f'/sample_{isample}/par_true')
-    return theo_pw, theo_par
+def update_dict(old, additional):
+    new = deepcopy(old)
+    for key in old:
+        if key in additional:
+            new.update({key:additional[key]})
+    for key in additional:
+        if key not in old:
+            raise ValueError("User provided an unrecognized input option")
+    return new
 
 
-### Write data
-def h5write_experimental(case_file, isample, exp_pw_df, exp_cov):
-    exp_pw_df.to_hdf(case_file, f"sample_{isample}/pw_exp")
-    pd.DataFrame(exp_cov, index=np.array(exp_pw_df.E), columns=exp_pw_df.E).to_hdf(case_file, f"sample_{isample}/CovT")
-    return
 
-def h5write_theoretical(case_file, isample, theo_pw_df, theo_par):
-    theo_pw_df.to_hdf(case_file, f"sample_{isample}/pw_fine")
-    theo_par.to_hdf(case_file, f"sample_{isample}/par_true") 
-    return
-        
+
+
 
 
 # ----------------------------------------------------------------------------------
@@ -125,14 +118,5 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     return resonance_ladder
 
-
-
-
-
-# ----------------------------------------------------------------------------------
-# Try factory method
-# ----------------------------------------------------------------------------------
-
-# class ObjectStorer
 
 

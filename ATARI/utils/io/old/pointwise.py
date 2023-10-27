@@ -5,7 +5,7 @@ import numpy as np
 
 from ATARI.theory.xs import SLBW
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 from ATARI.utils.io.parameters import ExperimentalParameters
 from ATARI.utils.io.parameters import TheoreticalParameters
 import ATARI.utils.io.hdf5 as h5io

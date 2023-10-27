@@ -1,6 +1,5 @@
 
-from ATARI.syndat.sample_levels import sample_RRR_levels
-from ATARI.syndat.sample_widths import sample_RRR_widths
+from ATARI.theory.resonance_statistics import sample_RRR_levels, sample_RRR_widths
 import numpy as np
 import pandas as pd
 

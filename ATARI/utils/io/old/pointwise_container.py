@@ -10,7 +10,7 @@ from ATARI.theory.xs import SLBW
 from ATARI.utils.misc import fine_egrid 
 from ATARI.theory.experimental import trans_2_xs, xs_2_trans
 # from ATARI.utils.stats import chi2_val
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 from ATARI.utils.io.theoretical_parameters import TheoreticalParameters
 from ATARI.utils.io.experimental_parameters import ExperimentalParameters
 import ATARI.utils.io.hdf5 as h5io

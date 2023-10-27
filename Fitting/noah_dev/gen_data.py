@@ -4,7 +4,7 @@ import os
 # import nuctools
 from copy import copy
 
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 from ATARI.syndat.experiment import Experiment
 from ATARI.syndat.MMDA import generate
 from ATARI.theory.xs import SLBW

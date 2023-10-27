@@ -7,7 +7,7 @@ import importlib
 import subprocess
 import time
 
-from ATARI.syndat.particle_pair import Particle_Pair
+from theory.particle_pair import Particle_Pair
 from ATARI.sammy_interface import sammy_interface, sammy_classes, sammy_functions
 
 import ATARI.utils.io.hdf5 as h5io
@@ -43,7 +43,7 @@ def reduce_ladder(par, threshold, varyE=1, varyGg=1, varyGn1=1):
     par = par[par.Gn1 > threshold]
     par["varyE"] = np.ones(len(par))
     par["varyGg"] = np.ones(len(par))
-    par["varyGn"] = np.ones(len(par))
+    par["varyGn1"] = np.ones(len(par))
 
     return par
 
@@ -133,7 +133,7 @@ def fit(isample, num_Er, case_file, elim_threshold=1e-5, Gn1_opt=0):
 
     # step 2
     P2 = reduce_ladder(P1, elim_threshold, varyE=1, varyGg=1, varyGn1=1)
-    sammyINPyw.step_threshold = 0.001
+    sammyINPyw.step_threshold = 0.01
     sammyINPyw.resonance_ladder = P2
     par, _ = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
 
@@ -152,17 +152,20 @@ def main(i):
 
 
     ## fit with gavg
-    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
+    for thresh, title in zip([1e-1, 1e-5], ["1en4", "1en5"]):
         basefolder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
         # basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnavg_fits_{title}"
     
         for iE in [25, 50, 75, 100]:
+            t0 = time.time()
             par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=0)
+            t1 = time.time()
+            par["time"] = np.ones(len(par))*(t1-t0)
             par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
     ## fit with gmin
-    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
+    for thresh, title in zip([1e-1, 1e-5], ["1en4", "1en5"]):
         basefolder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
         # basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnmin_fits_{title}"
     
@@ -170,7 +173,10 @@ def main(i):
             if os.path.isfile(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv")):
                 pass
             else:
+                t0 = time.time()
                 par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=1)
+                t1 = time.time()
+                par["time"] = np.ones(len(par))*(t1-t0)
                 par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
@@ -178,3 +184,5 @@ def main(i):
 import sys
 i = sys.argv[1]
 main(i)
+
+# %%

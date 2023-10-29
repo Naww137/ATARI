@@ -76,24 +76,34 @@ def readpar(filepath):
                 if value == '':
                     value = None
                 else:
-                    if iw == 0: # energy can be negative
+                    # if iw == 0: # energy can be negative
+                        # value = float(value)
+                    # else: # widths cannots
+                    try:
                         value = float(value)
-                    else: # widths cannots
-                        try:
-                            value = abs(float(value))
-                        except:
-                            try:
-                                # value = float('e-'.join(value.split('-')))
-                                value = value.split('-')
-                                joiner = 'e-'
-                            except:
-                                # value = float('e+'.join(value.split('+')))
-                                value = value.split('+')
-                                joiner = 'e+'
-                            if value[0] == '':
-                                value = float(joiner.join(value[1::]))
-                            else:
-                                value = float(joiner.join(value))
+                    except:
+                        sign='+'
+                        splitvals = value.split('-')
+                        if splitvals[0] == '':
+                            splitvals = splitvals[1::]
+                            sign = '-'
+
+                        if len(splitvals) == 1:
+                            splitvals = splitvals[0].split('+')
+                            if splitvals[0] == '':
+                                splitvals = splitvals[1::]
+                                sign = '+'
+                            joiner = 'e+'
+
+                        else:
+                            joiner = 'e-'
+
+                        if sign == '-':
+                            value = -float(joiner.join(splitvals))
+                        else:
+                            value = float(joiner.join(splitvals))
+                            
+
                 row.append(value)
                 start += width
             data.append(row)
@@ -857,7 +867,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t\t{float(fudge):<5}: {chi2_list}")
+                            print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
 
                         if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
                             break
@@ -872,14 +882,14 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 else:
                     criteria = "Chi2 improvement below threshold"
                 if sammyRTO.Print:
-                    print(f"{int(i)}    {float(fudge):<5}: {chi2_list}")
+                    print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                 break
             elif fudge == sammyINPyw.minF:
                 break
         
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
-            print(f"{int(i)}    {float(fudge):<5}: {chi2_list}")
+            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         update_fudge_in_parfile(rundir, istep, fudge)
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)

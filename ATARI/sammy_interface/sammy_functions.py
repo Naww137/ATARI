@@ -360,20 +360,19 @@ def create_sammyinp(filename='sammy.inp', \
     return
 
 def write_saminp(filepath, 
-                model, bayes, 
-                reaction, 
-                sammy_INP: Union[SammyInputData, SammyInputDataYW],
+                model,
+                experiment,
+                rto,
                 alphanumeric = []):
     
     # ac = sammy_INP.particle_pair.ac*10  
-    # broadening = True
+    broadening = True
     
-    # if bayes:
-    #     bayes_cmd = "SOLVE BAYES EQUATIONS"
-    # else:
-    #     bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
-    # alphanumeric = [model, bayes_cmd] + alphanumeric
-    # alphanumeric = np.unique(alphanumeric)
+    if rto.options["bayes"]:
+        bayes_cmd = "SOLVE BAYES EQUATIONS"
+    else:
+        bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    alphanumeric = [model.formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -381,26 +380,28 @@ def write_saminp(filepath,
     with open(filepath,'w') as f:
         for line in old_lines:
 
-            # if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
-            #     broadening = False
+            if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
+                broadening = False
 
             if line.startswith("%%%alphanumeric%%%"):
                 for cmd in alphanumeric:
                     f.write(f'{cmd}\n')
+            
+            elif line.startswith("%%%card2%%%"):
+                f.write(f"{model.isotope: <9} {model.amu: <9} {float(min(experiment.energy_range)): <9} {float(max(experiment.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
-            # elif line.startswith('%%%card5/6%%%'):
-            #     if broadening:
-            #         # assert(np.any(np.isfinite(np.array([sammy_INP.temp, sammy_INP.FP, sammy_INP.frac_res_FP]))))
-            #         f.write(f'  {sammy_INP.temp: <8}  {sammy_INP.FP: <8}  {sammy_INP.frac_res_FP: <8}        \n')
-            #     else:
-            #         pass
 
-            # elif line.startswith('%%%card7%%%'):
-            #     # assert(isinstance(sammy_INP.target_thickness, float))
-            #     f.write(f'  {ac: <8}  {sammy_INP.target_thickness: <8}                       0.00000          \n')
+            elif line.startswith('%%%card5/6%%%'):
+                if broadening:
+                    f.write(f'  {float(experiment.parameters["temp"][0]):<8}  {float(experiment.parameters["FP"][0]):<8}  {float(experiment.parameters["FP"][1]):<8}        \n')
+                else:
+                    pass
 
-            # elif line.startswith('%%%card8%%%'):
-            #     f.write(f'{reaction}\n')
+            elif line.startswith('%%%card7%%%'):
+                f.write(f'  {float(model.ac):<8}  {float(experiment.parameters["n"][0]):<8}                       0.00000          \n')
+
+            elif line.startswith('%%%card8%%%'):
+                f.write(f'{experiment.reaction}\n')
 
             else:
                 f.write(line)
@@ -414,14 +415,14 @@ def make_runDIR(sammy_runDIR):
     else:
         os.mkdir(sammy_runDIR)
 
-def fill_runDIR_with_templates(sammy_RTO: SammyRunTimeOptions):
+def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 
-    if os.path.basename(sammy_RTO.inptemplate) == sammy_RTO.inptemplate:
-        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', sammy_RTO.inptemplate)
+    if os.path.basename(input_template) == input_template:
+        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', input_template)
     else:
-        template_path = sammy_RTO.inptemplate
+        template_path = input_template
 
-    shutil.copy(template_path, os.path.join(sammy_RTO.sammy_runDIR, sammy_RTO.inpname))
+    shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
 
 
 
@@ -507,7 +508,7 @@ def replace_matnum(filepath, matnum):
 def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 
     make_runDIR(sammyRTO.sammy_runDIR)
-    fill_runDIR_with_templates(sammyRTO)
+    fill_runDIR_with_templates("readendf.inp", "sammy.inp", sammyRTO.sammy_runDIR)
 
     shutil.copy(endf_file, os.path.join(sammyRTO.sammy_runDIR, os.path.basename(endf_file)))
 
@@ -650,22 +651,20 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions):
 
     #### make files for each dataset YW generation
-    for ds, rxn, tem in zip(sammyINPYW.dataset_titles, sammyINPYW.reactions, sammyINPYW.templates):   #type: ignore
-        sammyRTO.inptemplate = tem
+    for exp, tem in zip(sammyINPYW.experiments, sammyINPYW.templates):  # fix this !!
 
-        sammyRTO.inpname = f"{ds}_initial.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_initial.inp"), sammyINPYW.model.formalism, True, rxn, sammyINPYW, 
+        sammyRTO.options["bayes"] = True
+        fill_runDIR_with_templates(tem, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_initial.inp"), sammyINPYW.model, exp, sammyRTO, 
                                     alphanumeric=["yw"])
 
-        sammyRTO.inpname = f"{ds}_iter.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_iter.inp"), sammyINPYW.model.formalism, True, rxn, sammyINPYW, 
+        fill_runDIR_with_templates(tem, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
                                     alphanumeric=["yw","Use remembered original parameter values"])
 
-        sammyRTO.inpname = f"{ds}_plot.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_plot.inp"), sammyINPYW.model.formalism, False, rxn, sammyINPYW, 
+        sammyRTO.options["bayes"] = False
+        fill_runDIR_with_templates(tem, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_plot.inp"), sammyINPYW.model, exp, sammyRTO,  
                                     alphanumeric=[])
     
     ### options for least squares
@@ -674,32 +673,31 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     else:
         alphanumeric_LS_opts = []
 
-    #### make files for solving bayes reading in each WY matrix
-    sammyRTO.inpname = "solvebayes_initial.inp"
-    fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.model.formalism, True, "reaction", sammyINPYW, 
+    #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
+    fill_runDIR_with_templates(tem, "solvebayes_initial.inp", sammyRTO.sammy_runDIR)
+    sammyRTO.options["bayes"] = True
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.model, exp, sammyRTO,   
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
 
-    sammyRTO.inpname = "solvebayes_iter.inp" 
-    fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyINPYW.model.formalism, True, "reaction", sammyINPYW, 
+    fill_runDIR_with_templates(tem, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
 
 
 
-def make_data_for_YW(datasets, dataset_titles, rundir):
+def make_data_for_YW(datasets, experiments, rundir):
     if np.all([isinstance(i, pd.DataFrame) for i in datasets]):
         real = True
     else:
         if np.any([isinstance(i,pd.DataFrame) for i in datasets]):
             raise ValueError("It looks like you''ve mixed dummy energy-grid data and real data")
         real = False
-    for d, dt in zip(datasets, dataset_titles):
+    for d, exp in zip(datasets, experiments):
         if real:
-            write_samdat(d, None, os.path.join(rundir,f"{dt}.dat"))
+            write_samdat(d, None, os.path.join(rundir,f"{exp.title}.dat"))
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
         else:
-            write_estruct_file(d, os.path.join(rundir,f"{dt}.dat"))
+            write_estruct_file(d, os.path.join(rundir,f"{exp.title}.dat"))
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
 
 
@@ -778,13 +776,14 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "results"))
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "iterate"))
 
-    make_data_for_YW(sammyINPyw.datasets, sammyINPyw.dataset_titles, sammyRTO.sammy_runDIR)
+    make_data_for_YW(sammyINPyw.datasets, sammyINPyw.experiments, sammyRTO.sammy_runDIR)
     write_sampar(sammyINPyw.resonance_ladder, sammyINPyw.particle_pair, sammyINPyw.initial_parameter_uncertainty, os.path.join(sammyRTO.sammy_runDIR, "results/step0.par"))
 
     make_inputs_for_YW(sammyINPyw, sammyRTO)
-    make_YWY0_bash(sammyINPyw.dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
-    make_YWYiter_bash(sammyINPyw.dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
-    make_final_plot_bash(sammyINPyw.dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
     
 
 
@@ -843,7 +842,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
     if sammyRTO.Print:
-        print(f"Stepping until convergence\nchi2 values\nstep fudge: {sammyINPyw.dataset_titles+['sum']}")
+        print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
     while istep<sammyINPyw.max_steps:
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
@@ -857,7 +856,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     fudge = min(fudge,sammyINPyw.maxF)
                 else:
                     if sammyRTO.Print:
-                        print(f"Repeat step {int(i)}, \tfudge: {sammyINPyw.dataset_titles+['sum']}")
+                        print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
 
                     while True:
                         fudge /= sammyINPyw.LevMarV
@@ -883,8 +882,10 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     criteria = "Chi2 improvement below threshold"
                 if sammyRTO.Print:
                     print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                # istep += 1
                 break
             elif fudge == sammyINPyw.minF:
+                # istep += 1
                 break
         
         chi2_log.append(chi2_list)
@@ -901,13 +902,13 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 
 
-def plot_YW(sammyRTO, sammyINPyw, i):
+def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
                 cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True
                         )
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []
-    for dt in sammyINPyw.dataset_titles:
+    for dt in dataset_titles:
         lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
     i_chi2s = [float(s) for s in out.stdout.split('\n')[-2].split()]
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
@@ -917,20 +918,21 @@ def plot_YW(sammyRTO, sammyINPyw, i):
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
-    sammyINPyw.dataset_titles = [exp.title for exp in sammyINPyw.experiments]
-    sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
+    ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
     ### get prior
-    par, lsts, chi2list = plot_YW(sammyRTO, sammyINPyw, 0)
+    par, lsts, chi2list = plot_YW(sammyRTO, dataset_titles, 0)
     sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list)
     
     if sammyRTO.bayes:
         ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-        par_post, lsts_post, chi2list_post = plot_YW(sammyRTO, sammyINPyw, ifinal)
+        par_post, lsts_post, chi2list_post = plot_YW(sammyRTO, dataset_titles, ifinal)
         sammy_OUT.pw_post = lsts_post
         sammy_OUT.par_post = par_post
         sammy_OUT.chi2_post = chi2list_post

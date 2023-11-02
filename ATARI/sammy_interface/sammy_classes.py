@@ -6,39 +6,66 @@ from pandas import DataFrame, Series
 from numpy import ndarray
 # from ATARI.utils.stats import chi2_val
 
-@dataclass
+# @dataclass
+# class SammyRunTimeOptions:
+#     """
+#     Runtime options for sammy. 
+
+#     This object holds many options for how sammy should be used.
+#     Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
+#     The options here fall into two primary categories:
+#     1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
+#     2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
+
+#     There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
+#     """
+#     path_to_SAMMY_exe: str
+#     shell: str = 'zsh'
+#     sammy_runDIR: str = 'SAMMY_runDIR'
+#     keep_runDIR: bool = False
+#     Print: bool = False
+
+#     model: str = 'XCT'
+#     reaction: str = 'total'
+#     solve_bayes: bool = False
+#     inptemplate: str = "noexp_1sg.inp"
+#     inpname: str = "sammy.inp"
+#     title: str = "default title"
+#     get_ECSCM: bool = False
+
+#     alphanumeric: list = field(default_factory=lambda: [])
+#     energy_window: Optional[float] = None
+#     recursive: bool = False
+#     recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
+#                                                         "iterations": 5,
+#                                                         "print":False}      )
+
 class SammyRunTimeOptions:
-    """
-    Runtime options for sammy. 
 
-    This object holds many options for how sammy should be used.
-    Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
-    The options here fall into two primary categories:
-    1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
-    2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
+    def __init__(self, sammyexe: str, options={}):
+        default_options = {
+            'sh'            :   'zsh',
+            'sammy_runDIR'  :   'SAMMY_runDIR',
+            'keep_runDIR'   :   False,
+            'Print'         :   False,
 
-    There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
-    """
-    path_to_SAMMY_exe: str
-    shell: str = 'zsh'
-    sammy_runDIR: str = 'SAMMY_runDIR'
-    keep_runDIR: bool = False
-    Print: bool = False
+            'bayes'         :   False,
+            'iterations'    :   2
+        }
+        options = update_dict(default_options, options)
+        self.options = options
 
-    model: str = 'XCT'
-    reaction: str = 'total'
-    solve_bayes: bool = False
-    inptemplate: str = "noexp_1sg.inp"
-    inpname: str = "sammy.inp"
-    title: str = "default title"
-    get_ECSCM: bool = False
+        self.path_to_SAMMY_exe = sammyexe
+        self.shell =  options["sh"]
+        self.sammy_runDIR =  options["sammy_runDIR"]
+        self.keep_runDIR = options["keep_runDIR"]
+        self.Print =  options["Print"]
+        
+        self.bayes = options["bayes"]
+        self.iterations = options["iterations"]
 
-    alphanumeric: list = field(default_factory=lambda: [])
-    energy_window: Optional[float] = None
-    recursive: bool = False
-    recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
-                                                        "iterations": 5,
-                                                        "print":False}      )
+    def __repr__(self):
+        return str(self.options)
 
 
 arraytype_id = Union[Series, ndarray, list]
@@ -94,35 +121,6 @@ def update_dict(old, additional):
         if key in additional:
             new.update({key:additional[key]})
     return new
-
-
-
-class sammyRTO:
-
-    def __init__(self, sammyexe: str, options={}):
-        default_options = {
-            'sh'            :   'zsh',
-            'sammy_runDIR'  :   'SAMMY_runDIR',
-            'keep_runDIR'   :   False,
-            'Print'         :   False,
-
-            'bayes'         :   False,
-            'iterations'    :   2
-        }
-        options = update_dict(default_options, options)
-        self.options = options
-
-        self.path_to_SAMMY_exe = sammyexe
-        self.shell =  options["sh"]
-        self.sammy_runDIR =  options["sammy_runDIR"]
-        self.keep_runDIR = options["keep_runDIR"]
-        self.Print =  options["Print"]
-        
-        self.bayes = options["bayes"]
-        self.iterations = options["iterations"]
-
-    def __repr__(self):
-        return str(self.options)
 
 
 

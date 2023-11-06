@@ -20,7 +20,7 @@ def gstat(J, I, i):
 
     Parameters
     ----------
-    J : Float or int
+    J : float or int
         Total angular momentum of the channel.
     I : float or int
         Spin and parity of the target particle.
@@ -101,7 +101,7 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
         
         Examples
         --------
-        >>> from scattering_theor import FofE_recursive
+        >>> from theory.scattering_params import FofE_recursive
         >>> FofE_recursive(np.array([10.4]), 0.786, 180.948030, 1, 2)
         (array([[ 0.        ],
                 [-0.99996933],

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import eigvalsh_tridiagonal
 
 from scipy.stats.distributions import chi2
 
@@ -38,9 +39,10 @@ def make_res_par_avg(J_ID, D_avg, Gn_avg, n_dof, Gg_avg, g_dof, print):
 # Resonance level sampling
 # =====================================================================
 
-def sample_wigner_invCDF(N_samples):
+def sample_wigner_invCDF(N_samples:int,
+                         rng=None, seed=None):
     """
-    Sample the wigner distribution.
+    Sample the wigner distribution using inverse CDF sampling.
 
     This function simply samples from the wigner distribution using inverse
     CDF sampling and is used by other functions for generating resonance level spacing.
@@ -49,6 +51,10 @@ def sample_wigner_invCDF(N_samples):
     ----------
     N_samples : int
         Number of samples and/or length of sample vector.
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
 
     Returns
     -------
@@ -57,33 +63,192 @@ def sample_wigner_invCDF(N_samples):
 
     Notes
     -----
-    See preliminary methods for sampling resonance level spacing from GOE.
+    
     
     Examples
     --------
-    >>> from sample_resparm import sample_levels
+    >>> from theory import resonance_statistics
     >>> np.random.seed(7)
-    >>> sample_levels.sample_wigner_invCDF(2,10)
+    >>> resonance_statistics.sample_wigner_invCDF(2,10)
     array([1.7214878 , 1.31941784])
     """
-    samples = np.sqrt(-4/np.pi*np.log(np.random.default_rng().uniform(low=0.0,high=1.0,size=N_samples)))
-    #samples = np.sqrt(-4*np.log(np.random.default_rng().uniform(low=0.0,high=1.0,size=N_samples)))      # remove the pi terms to match GOE
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
+    samples = np.sqrt(-4/np.pi*np.log(rng.uniform(low=0.0,high=1.0,size=N_samples)))
     if N_samples == 1:
         samples = np.ndarray.item(samples)
     return samples
 
-def generate_GOE(N):
-    A = np.random.default_rng().standard_normal(size=(N,N))/np.sqrt(2*N)
-    X = A + np.transpose(A)
-    return X
+def sample_NNE_energies(E_range, avg_level_spacing:float,
+                        rng=None, seed=None):
+    """
+    Sample resonance energies for the ladder using inverse CDF sampling.
+
+    Parameters
+    ----------
+    E_range : array-like
+        The energy range for sampling.
+    avg_level_spacing : float
+        The mean level spacing.
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
+
+    Returns
+    -------
+    np.ndarray
+        Array of resonance energies sampled from the Wigner distribution.
+
+    Notes
+    -----
+    See sample_GE_energies for sampling energies from Gaussian Ensembles.
+    """
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+    
+    E_limits = (min(E_range), max(E_range))
+    num_res_est = round((E_limits[1] - E_limits[0]) / avg_level_spacing)
+    num_res_tot = num_res_est + round(3.3252*np.sqrt(num_res_est)) # there will only be more resonances than this once in 1e10 samples.
+    
+    level_spacings = np.zeros((num_res_tot+1,))
+    level_spacings[0] = avg_level_spacing * np.sqrt(2/np.pi) * np.abs(rng.normal())
+    level_spacings[1:] = avg_level_spacing * sample_wigner_invCDF(num_res_tot, rng=rng)
+    res_E = E_limits[0] + np.cumsum(level_spacings)
+    res_E = res_E[res_E < E_limits[1]]
+    return res_E
+
+def wigner_semicircle_CDF(x):
+    """
+    CDF of Wigner's semicircle law distribution.
+    """
+    return (x/np.pi) * np.sqrt(1.0 - x**2) + np.arcsin(x)/np.pi + 0.5
+
+def sample_GE_eigs(num_eigs:int, beta:int=1,
+                   rng=None, seed:int=None):
+    """
+    Samples the eigenvalues of n by n Gaussian Ensemble random matrices efficiently using the
+    tridiagonal representation. The time complexity of this method is O( n**2 ) using scipy's
+    eigvalsh_tridiagonal function. However, there exist O( n log(n) ) algorithms that have more
+    low n cost and higher error. Unfortunately, no implementation of that algorithm has been made
+    in Python.
+
+    Parameters
+    ----------
+    num_eigs : int
+        The rank of the random matrix. This is also the number of eigenvalues to sample.
+    beta : 1, 2, or 4
+        The ensemble to consider, corresponding to GOE, GUE, and GSE respectively.
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
+
+    Returns
+    -------
+    np.ndarray
+        The eigenvalues of the random matrix.
+
+    Notes
+    -----
+    The theory for the tridiagonal eigenvalue sampling can be found in
+    https://people.math.wisc.edu/~valko/courses/833/2009f/lec_8_9.pdf.
+    """
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
+    # Tridiagonal Matrix Coefficients:
+    # Using Householder transformations (orthogonal transformations), we can
+    # transform GOE-sampled matrices into a tridiagonal symmetric matrix.
+    # Instead of performing the transformation, we can sample the transformed matrix directly.
+    # Let `a` be the central diagonal elements and `b` be the offdiagonal diagonal elements.
+    # We can define the following:
+    a = np.sqrt(2) * rng.normal(size=(num_eigs,))
+    b = np.sqrt(rng.chisquare(beta*np.arange(1,num_eigs)))
+
+    # Now we sample the eigenvalues of the tridiagonal symmetric matrix:
+    eigs = eigvalsh_tridiagonal(a, b)
+    eigs /= np.sqrt(beta)
+    eigs.sort()
+    return eigs
+
+def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
+                       rng=None, seed:int=None):
+    """
+    Samples GOE (β = 1), GUE (β = 2), or GSE (β = 4) resonance energies within a given energy
+    range, `EB` and with a specified mean level-density, `freq`.
+
+    Parameters
+    ----------
+    E_range : array-like
+        The energy range for sampling.
+    avg_level_spacing : float
+        The mean level spacing.
+    beta : 1, 2, or 4
+        The ensemble parameter, where β = 1 is GOE, β = 2 is GUE, and β = 4 is GSE.
+        Default is β = 1.
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
+
+    Returns
+    -------
+    np.ndarray
+        The sampled resonance energies.
+
+    Notes
+    -----
+    The semicircle law inverse CDF method was found by David Brown. The original source code can be
+    found at https://github.com/LLNL/fudge/blob/master/brownies/BNL/restools/level_generator.py.
+    """
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
+    margin = 0.1 # a margin of safety where we consider the GOE samples to properly follow the semicircle law. This removes tails that diverge from the semicircle law.
+    E_limits = (min(E_range), max(E_range))
+    num_res_est = (E_limits[1]-E_limits[0]) / avg_level_spacing # estimate number of resonances
+    num_res_tot = round((1 + 2*margin) * num_res_est) # number of resonances sampled (estimate + buffer)
+
+    eigs = sample_GE_eigs(num_res_tot, beta=beta, rng=rng)
+    eigs /= 2*np.sqrt(num_res_tot)
+    eigs = eigs[eigs > -1.0+margin]
+    eigs = eigs[eigs <  1.0-margin]
+
+    # Using semicircle law CDF to make the resonances uniformly spaced:
+    # Source: https://github.com/LLNL/fudge/blob/master/brownies/BNL/restools/level_generator.py
+    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (wigner_semicircle_CDF(eigs) - wigner_semicircle_CDF(-1.0+margin))
+    E_res = E_res[E_res < E_limits[1]]
+    E_res = np.sort(E_res)
+    return E_res
 
 def wigner_PDF(x, avg_level_spacing):
     x = x/avg_level_spacing
     y = (np.pi/2) * x * np.exp(-np.pi*(x**2)/4)
-    #y = (1/2) * x * np.exp(-(x**2)/4)   # remove the pi terms to match GOE
     y = y/avg_level_spacing
     return y
 
+# def generate_GOE(N):
+#     A = np.random.default_rng().standard_normal(size=(N,N))/np.sqrt(2*N)
+#     X = A + np.transpose(A)
+#     return X
 
 # def sample_resonance_levels(E0, N_levels, avg_level_spacing, method):
     
@@ -111,7 +276,8 @@ def wigner_PDF(x, avg_level_spacing):
 
 
 
-def sample_RRR_levels(E_range, avg_level_spacing):
+def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
+                      rng=None, seed=None):
     """
     Sample the resonance energy levels.
 
@@ -126,13 +292,24 @@ def sample_RRR_levels(E_range, avg_level_spacing):
         Array energies in RRR, only need min/max.
     avg_level_spacing : float
         Average level spacing value to scale wigner distribution.
+    ensemble : 'NNE', 'GOE', 'GUE', 'GSE', or 'Poisson'
+        The level-spacing distribution to sample from:
+        NNE : Nearest Neighbor Ensemble
+        GOE : Gaussian Orthogonal Ensemble
+        GUE : Gaussian Unitary Ensemble
+        GSE : Gaussian Symplectic Ensemble
+        Poisson : Poisson Ensemble
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
 
     Returns
     -------
     levels : numpy.ndarray
         Array of resonance energy levels.
     spacings : numpy.ndarray
-        Array of i.i.d. resonance level spacing samples.
+        Array of resonance level spacing samples.
 
     See Also
     --------
@@ -144,9 +321,9 @@ def sample_RRR_levels(E_range, avg_level_spacing):
     
     Examples
     --------
-    >>> from sample_resparm import sample_levels
+    >>> from theory import resonance_statistics
     >>> np.random.seed(7)
-    >>> sample_levels.sample_RRR_levels([0.1,10], 2)
+    >>> resonance_statistics.sample_RRR_levels([0.1,10], 2)
     ([array([6.31322239]),
       array([6.56223504]),
       array([8.65279185]),
@@ -156,25 +333,29 @@ def sample_RRR_levels(E_range, avg_level_spacing):
       array([2.09055681]),
       array([1.62413789])])
     """
-    # randomly offset starting point so we are not just finding the distribution fixed to this point with ML
-    # is this necessary?
-    # sample a ladder 5-6 average level spacings before and 5-6 average level spacings after window
-    E0 = min(E_range)-avg_level_spacing*np.random.default_rng().uniform(low=5.0,high=6.0)     
-    E_end = max(E_range)+avg_level_spacing*np.random.default_rng().uniform(low=5.0,high=6.0)   
-    
-    levels = []; spacings = []
-    spacing = avg_level_spacing*sample_wigner_invCDF(1)
-    spacings.append(spacing)
-    level = E0+spacing
-    
-    while level < E_end:
-        levels.append(level)
-        spacing = avg_level_spacing*sample_wigner_invCDF(1)
-        spacings.append(spacing)
-        level = levels[-1] + spacing
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    levels = list(filter(lambda l: l<max(E_range) and l>min(E_range), levels))
+    if ensemble == 'NNE': # Nearest Neighbor Ensemble
+        levels = sample_NNE_energies(E_range, avg_level_spacing, rng=rng)
+    elif ensemble == 'GOE': # Gaussian Orthogonal Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=1, rng=rng)
+    elif ensemble == 'GUE': # Gaussian Unitary Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=2, rng=rng)
+    elif ensemble == 'GSE': # Gaussian Symplectic Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=4, rng=rng)
+    elif ensemble == 'Poisson': # Poisson Ensemble (i.i.d. resonances)
+        E_limits = (min(E_range), max(E_range))
+        num_samples = rng.poisson((E_limits[1] - E_limits[0]) / avg_level_spacing)
+        levels = rng.uniform(*E_limits, size=num_samples)
+    else:
+        raise NotImplementedError(f'The {ensemble} ensemble has not been implemented yet.')
             
+    spacings = np.diff(levels) # I do not think this output is used anywhere
     return levels, spacings
 
 
@@ -220,7 +401,8 @@ def sample_RRR_levels(E_range, avg_level_spacing):
 # =====================================================================
 
 
-def sample_chisquare(N_samples, DOF):
+def sample_chisquare(N_samples, DOF,
+                     rng=None, seed=None):
     """
     Sample the chi-squared distribution.
 
@@ -233,6 +415,10 @@ def sample_chisquare(N_samples, DOF):
         Number of samples and/or length of sample vector.
     DOF : float
         Degrees of freedom for the chi-squared distribution.
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
 
     Returns
     -------
@@ -245,19 +431,22 @@ def sample_chisquare(N_samples, DOF):
 
     Notes
     -----
-    A more robust/recomended way to set seed for examples would be to create a
-    random number generator and pass it to the function. The example included
-    in this documentation sets a global random number seed. See this article
-    for more information on why this could be improved:
-    https://towardsdatascience.com/stop-using-numpy-random-seed-581a9972805f.
+    
     
     Examples
     --------
-    >>> from sample_resparm import sample_widths
+    >>> from theory import resonance_statistics
     >>> np.random.seed(7)
-    >>> sample_widths.sample_chisquare(2,10)
+    >>> resonance_statistics.sample_chisquare(2,10)
     array([18.7081546 ,  7.46151704])
     """
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
     samples = np.random.chisquare(DOF, size=N_samples)
     # if N_samples == 1:
     #     samples = samples.item()
@@ -292,9 +481,9 @@ def chisquare_PDF(x, DOF, avg_reduced_width_square):
     
     Examples
     --------
-    >>> from sample_resparm import sample_widths
+    >>> from theory import resonance_statistics
     >>> import scipy.stats as stats
-    >>> sample_widths.chisquare_PDF(np.array([1.0, 2.5, 3.0]), 2, 1)
+    >>> resonance_statistics.chisquare_PDF(np.array([1.0, 2.5, 3.0]), 2, 1)
     array([0.30326533, 0.1432524 , 0.11156508])
     """
     x = x/avg_reduced_width_square
@@ -311,7 +500,8 @@ def chisquare_PDF(x, DOF, avg_reduced_width_square):
 #     return reduced_widths_square, partial_widths
 
 
-def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF):
+def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF,
+                      rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
 
@@ -326,13 +516,24 @@ def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF):
         Average value for the reduced width for rescale of the PT distribution.
     DOF : float or int
         Degrees of freedom applied to the PT distiribution (chi-square).
+    rng : np.random.Generator or None
+        Numpy random number generator object. Default is None.
+    seed : int or None
+        Random number generator seed. Only used when rng is None. Default is None.
 
     Returns
     -------
     reduced_widths_square : numpy.ndarray
         Array of reduced widths squared, this is what is sampled directly.
     """
-    reduced_widths_square = avg_reduced_width_square*sample_chisquare(len(level_vector), DOF)/DOF
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
+    reduced_widths_square = avg_reduced_width_square*sample_chisquare(len(level_vector), DOF, rng=rng)/DOF
     
     # vlads code:
     # res_par_avg['<Gg>']*np.random.chisquare(df=res_par_avg['g_dof'],size=sample_size)/res_par_avg['g_dof'] 

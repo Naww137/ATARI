@@ -241,7 +241,8 @@ class Particle_Pair:
 
 
     def sample_resonance_ladder(self, Erange, spin_groups, average_parameters, 
-                                                                        use_fudge=False):
+                                ensemble='NNE',
+                                rng=None, seed=None):
         """
         Samples a full resonance ladder.
 
@@ -255,19 +256,34 @@ class Particle_Pair:
             List of tuples defining the spin groups being considered.
         average_parameters : DataFrame
             DataFrame containing the average resonance parameters for each spin group.
-        use_fudge : bool, optional
-            Option to use Syndat for resonance sampling or the higher-fidelity implementation in Fudge.
-            The latter option is dependent on a user install of the Fudge code, by default False.
+        ensemble : "NNE", "GOE", "GUE", "GSE", or "Poisson"
+            The level-spacing distribution to sample from:
+            NNE : Nearest Neighbor Ensemble
+            GOE : Gaussian Orthogonal Ensemble
+            GUE : Gaussian Unitary Ensemble
+            GSE : Gaussian Symplectic Ensemble
+            Poisson : Poisson Ensemble
+        rng : np.random.Generator or None
+            Numpy random number generator object. Default is None.
+        seed : int or None
+            Random number generator seed. Only used when rng is None. Default is None.
 
         Returns
         -------
         DataFrame
             Resonance ladder information.
         """
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
+                
         if isinstance(average_parameters, dict):
-            resonance_ladder = sample_resonance_ladder(Erange, spin_groups, average_parameters, use_fudge)
+            resonance_ladder = sample_resonance_ladder(Erange, spin_groups, average_parameters, ensemble=ensemble, rng=rng)
         elif isinstance(average_parameters, pd.DataFrame):
-            resonance_ladder = sample_resonance_ladder_old(Erange, spin_groups, average_parameters, use_fudge)
+            resonance_ladder = sample_resonance_ladder_old(Erange, spin_groups, average_parameters, ensemble=ensemble, rng=rng)
         else:
             raise ValueError("Do not recognize the supplied average parameter type")
     

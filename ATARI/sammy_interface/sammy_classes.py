@@ -1,43 +1,71 @@
 
 from typing import Optional, Union
 from dataclasses import dataclass, field
-from ATARI.syndat.particle_pair import Particle_Pair
+from ATARI.models.particle_pair import Particle_Pair
 from pandas import DataFrame, Series
 from numpy import ndarray
 # from ATARI.utils.stats import chi2_val
 
-@dataclass
+# @dataclass
+# class SammyRunTimeOptions:
+#     """
+#     Runtime options for sammy. 
+
+#     This object holds many options for how sammy should be used.
+#     Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
+#     The options here fall into two primary categories:
+#     1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
+#     2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
+
+#     There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
+#     """
+#     path_to_SAMMY_exe: str
+#     shell: str = 'zsh'
+#     sammy_runDIR: str = 'SAMMY_runDIR'
+#     keep_runDIR: bool = False
+#     Print: bool = False
+
+#     model: str = 'XCT'
+#     reaction: str = 'total'
+#     solve_bayes: bool = False
+#     inptemplate: str = "noexp_1sg.inp"
+#     inpname: str = "sammy.inp"
+#     title: str = "default title"
+#     get_ECSCM: bool = False
+
+#     alphanumeric: list = field(default_factory=lambda: [])
+#     energy_window: Optional[float] = None
+#     recursive: bool = False
+#     recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
+#                                                         "iterations": 5,
+#                                                         "print":False}      )
+
 class SammyRunTimeOptions:
-    """
-    Runtime options for sammy. 
 
-    This object holds many options for how sammy should be used.
-    Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
-    The options here fall into two primary categories:
-    1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
-    2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
+    def __init__(self, sammyexe: str, options={}):
+        default_options = {
+            'sh'            :   'zsh',
+            'sammy_runDIR'  :   'SAMMY_runDIR',
+            'keep_runDIR'   :   False,
+            'Print'         :   False,
 
-    There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
-    """
-    path_to_SAMMY_exe: str
-    shell: str = 'zsh'
-    sammy_runDIR: str = 'SAMMY_runDIR'
-    keep_runDIR: bool = False
+            'bayes'         :   False,
+            'iterations'    :   2
+        }
+        options = update_dict(default_options, options)
+        self.options = options
 
-    model: str = 'XCT'
-    reaction: str = 'total'
-    solve_bayes: bool = False
-    inptemplate: str = "noexp_1sg.inp"
-    inpname: str = "sammy.inp"
-    title: str = "default title"
-    get_ECSCM: bool = False
+        self.path_to_SAMMY_exe = sammyexe
+        self.shell =  options["sh"]
+        self.sammy_runDIR =  options["sammy_runDIR"]
+        self.keep_runDIR = options["keep_runDIR"]
+        self.Print =  options["Print"]
+        
+        self.bayes = options["bayes"]
+        self.iterations = options["iterations"]
 
-    alphanumeric: list = field(default_factory=lambda: [])
-    energy_window: Optional[float] = None
-    recursive: bool = False
-    recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
-                                                        "iterations": 5,
-                                                        "print":False}      )
+    def __repr__(self):
+        return str(self.options)
 
 
 arraytype_id = Union[Series, ndarray, list]
@@ -64,6 +92,56 @@ class SammyInputData:
     frac_res_FP: Optional[arraytype_broadparm] = ''
 
     initial_parameter_uncertainty: Optional[float] = 1.0
+    
+
+
+@dataclass
+class SammyOutputData:
+    pw: Union[DataFrame, list]
+    par: DataFrame
+    chi2: Union[float, list[float]]
+    pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
+    par_post: Optional[DataFrame] = None
+    chi2_post: Optional[Union[float, list[float]]] = None
+    derivatives: Optional[ndarray] = None
+
+    ECSCM: Optional[DataFrame] = None 
+    est_df: Optional[DataFrame] = None
+    
+
+
+
+
+### New scheme
+
+
+def update_dict(old, additional):
+    new = old
+    for key in old:
+        if key in additional:
+            new.update({key:additional[key]})
+    return new
+
+
+
+
+class theory:
+    
+    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
+        self.isotope = isotope
+        self.amu = amu
+        self.ac = ac
+        self.resonance_ladder = resonance_ladder
+        self.formalism = formalism
+        self.spin_groups = """
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+"""
+
+
+
 
 
 @dataclass
@@ -76,61 +154,25 @@ class SammyInputDataYW:
     The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
     """
     particle_pair: Particle_Pair
+    model: theory
     resonance_ladder: DataFrame
 
     datasets : list
-    dataset_titles : list
-    reactions : list
     templates : list
+    experiments: list
 
-    steps: int = 1
+    max_steps: int = 1
     iterations: int = 2
     step_threshold: float = 0.01
     autoelim_threshold: Optional[float] = None
 
     LS: bool = False
+    LevMar: bool = True
+    LevMarV: float = 2.0
+    minF:   float = 1e-5
+    maxF:   float = 10
     initial_parameter_uncertainty: float = 1.0
 
 
-    target_thickness: Optional[float] = None
-    temp: Optional[float] = None
-    FP: Optional[float] = None
-    frac_res_FP: Optional[float] = None
-
-    
 
 
-@dataclass
-class SammyOutputData:
-    pw: DataFrame
-    par: DataFrame
-    # chi2: float
-    par_post: Optional[DataFrame] = None
-    # chi2_post: Optional[float] = None
-    derivatives: Optional[ndarray] = None
-
-    ECSCM: Optional[DataFrame] = None 
-    est_df: Optional[DataFrame] = None
-    
-
-
-    # @property
-    # def chi2(self, rxn, post):
-    #     theo = self.pw[f"theo_{rxn}"]
-        
-
-
-
-    
-
-
-    # @property
-    # def chi2(self):
-    #     return chi2_val(self.pw.theo)
-        
-
-# @dataclass
-# class SammyOutputData:
-#     pw: DataFrame
-#     par: DataFrame
-#     chi2:

@@ -5,8 +5,9 @@ import os
 from matplotlib.pyplot import *
 import importlib
 import subprocess
+import time
 
-from ATARI.syndat.particle_pair import Particle_Pair
+from models.particle_pair import Particle_Pair
 from ATARI.sammy_interface import sammy_interface, sammy_classes, sammy_functions
 
 import ATARI.utils.io.hdf5 as h5io
@@ -42,14 +43,15 @@ def reduce_ladder(par, threshold, varyE=1, varyGg=1, varyGn1=1):
     par = par[par.Gn1 > threshold]
     par["varyE"] = np.ones(len(par))
     par["varyGg"] = np.ones(len(par))
-    par["varyGn"] = np.ones(len(par))
+    par["varyGn1"] = np.ones(len(par))
 
     return par
 
 ### setup physics
 Gg_DOF = 10
 spin_groups = [ (3.0,1,0) ]
-res_par_avg = make_res_par_avg(D_avg = 8.79, 
+res_par_avg = make_res_par_avg(J_ID=1,
+                               D_avg = 8.79, 
                             Gn_avg= 0.658, #0.658, 
                             n_dof = 1, 
                             Gg_avg = 64.0, 
@@ -65,8 +67,8 @@ Ta_pair = Particle_Pair( ac, M, m, I, i, l_max,
 
 ### setup sammy
 sammyRTO = sammy_classes.SammyRunTimeOptions(
-    # path_to_SAMMY_exe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
-    path_to_SAMMY_exe = '~/my_sammy/SAMMY/sammy/build/install/bin/sammy',
+    path_to_SAMMY_exe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
+    # path_to_SAMMY_exe = '~/my_sammy/SAMMY/sammy/build/install/bin/sammy',
     model = 'XCT',
     reaction = 'transmission',
     solve_bayes = False,
@@ -131,7 +133,7 @@ def fit(isample, num_Er, case_file, elim_threshold=1e-5, Gn1_opt=0):
 
     # step 2
     P2 = reduce_ladder(P1, elim_threshold, varyE=1, varyGg=1, varyGn1=1)
-    sammyINPyw.step_threshold = 0.001
+    sammyINPyw.step_threshold = 0.01
     sammyINPyw.resonance_ladder = P2
     par, _ = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
 
@@ -145,30 +147,36 @@ def fit(isample, num_Er, case_file, elim_threshold=1e-5, Gn1_opt=0):
 
 def main(i):
 
-    # case_file = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/data.hdf5"
-    case_file = "~/reg_perf_tests/sammy/data.hdf5"
+    case_file = "/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/RM_allexp/sammy/data.hdf5"
+    # case_file = "~/reg_perf_tests/sammy/data.hdf5"
 
 
     ## fit with gavg
-    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
-        # root_folder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
-        basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnavg_fits_{title}"
+    for thresh, title in zip([1e-1, 1e-5], ["1en4", "1en5"]):
+        basefolder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
+        # basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnavg_fits_{title}"
     
         for iE in [25, 50, 75, 100]:
+            t0 = time.time()
             par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=0)
+            t1 = time.time()
+            par["time"] = np.ones(len(par))*(t1-t0)
             par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
     ## fit with gmin
-    for thresh, title in zip([1e-4, 1e-5], ["1en4", "1en5"]):
-        # root_folder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
-        basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnmin_fits_{title}"
+    for thresh, title in zip([1e-1, 1e-5], ["1en4", "1en5"]):
+        basefolder = "/Users/noahwalton/Documents/GitHub/ATARI/Fitting/noah_dev/fit_w_sammy/SAMMY_runDIR_Gnavg"
+        # basefolder = f"/home/nwalton1/reg_perf_tests/sammy/Gnmin_fits_{title}"
     
         for iE in [25, 50, 75, 100]:
             if os.path.isfile(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv")):
                 pass
             else:
+                t0 = time.time()
                 par = fit(i, iE, case_file, elim_threshold=thresh, Gn1_opt=1)
+                t1 = time.time()
+                par["time"] = np.ones(len(par))*(t1-t0)
                 par.to_csv(os.path.join(basefolder, f"par_i{i}_iE{iE}.csv"))
 
 
@@ -176,3 +184,5 @@ def main(i):
 import sys
 i = sys.argv[1]
 main(i)
+
+# %%

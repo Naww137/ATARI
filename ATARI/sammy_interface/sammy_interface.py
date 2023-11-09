@@ -10,7 +10,7 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-from ATARI.theory import scattering_params
+# from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
 from ATARI.utils.atario import fill_resonance_ladder

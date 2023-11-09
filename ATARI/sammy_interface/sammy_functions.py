@@ -4,7 +4,7 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-from ATARI.theory import scattering_params
+# from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
 from copy import copy
@@ -22,7 +22,7 @@ from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOpti
 # module_dirname = os.path.dirname(__file__)
 
 # =============================================================================
-#  readers
+#  Readers
 # =============================================================================
 def readlst(filepath):
     """
@@ -76,24 +76,34 @@ def readpar(filepath):
                 if value == '':
                     value = None
                 else:
-                    if iw == 0: # energy can be negative
+                    # if iw == 0: # energy can be negative
+                        # value = float(value)
+                    # else: # widths cannots
+                    try:
                         value = float(value)
-                    else: # widths cannots
-                        try:
-                            value = abs(float(value))
-                        except:
-                            try:
-                                # value = float('e-'.join(value.split('-')))
-                                value = value.split('-')
-                                joiner = 'e-'
-                            except:
-                                # value = float('e+'.join(value.split('+')))
-                                value = value.split('+')
-                                joiner = 'e+'
-                            if value[0] == '':
-                                value = float(joiner.join(value[1::]))
-                            else:
-                                value = float(joiner.join(value))
+                    except:
+                        sign='+'
+                        splitvals = value.split('-')
+                        if splitvals[0] == '':
+                            splitvals = splitvals[1::]
+                            sign = '-'
+
+                        if len(splitvals) == 1:
+                            splitvals = splitvals[0].split('+')
+                            if splitvals[0] == '':
+                                splitvals = splitvals[1::]
+                                sign = '+'
+                            joiner = 'e+'
+
+                        else:
+                            joiner = 'e-'
+
+                        if sign == '-':
+                            value = -float(joiner.join(splitvals))
+                        else:
+                            value = float(joiner.join(splitvals))
+                            
+
                 row.append(value)
                 start += width
             data.append(row)
@@ -101,9 +111,37 @@ def readpar(filepath):
     return df.dropna(axis=1)
 
 
+def read_ECSCM(file_path):
+    """
+    Reads a sammy generated ECSCM in as a pandas dataframe.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the sammy generated SAMCOV.PUB file.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
+    df_tdte = data.iloc[:,0:3]
+    df_tdte.columns = ["theo", "theo_unc", "E"]
+
+    # assert top rows == left columns
+    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
+    dftest=dftest.T
+    dftest.columns = ["theo", "theo_unc", "E"]
+    assert(np.all(dftest == df_tdte))
+
+    dfcov = data.iloc[:, 3:]
+
+    return df_tdte, dfcov
 
 # =============================================================================
-# writers
+# Sammy Parameter File
 # =============================================================================
 def format_float(value, width):
     # Convert the value to a string with the desired precision
@@ -226,9 +264,11 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
     return
         
       
-# =============================================================================
-# 
-# =============================================================================
+
+# ################################################ ###############################################
+# sammy data file
+# ################################################ ###############################################
+
 def write_estruct_file(Energies, filename):
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
     if np.all([isinstance(E,float) for E in Energies]):
@@ -241,10 +281,6 @@ def write_estruct_file(Energies, filename):
         f.close()
     return
 
-
-# =============================================================================
-# 
-# =============================================================================
 def write_samdat(exp_pw, exp_cov, filename):
     """
     Writes a formatted sammy.dat file.
@@ -305,9 +341,10 @@ def write_samdat(exp_pw, exp_cov, filename):
 
 
 
-# =============================================================================
-# Could update this to do more to the input file, i.e. input energy range
-# =============================================================================
+# ################################################ ###############################################
+# Sammy Input file
+# ################################################ ###############################################
+
 def create_sammyinp(filename='sammy.inp', \
                     template=os.path.join(Path(os.path.dirname(__file__)).parents[0],'templates/sammy_template.inp') ):
     
@@ -323,22 +360,19 @@ def create_sammyinp(filename='sammy.inp', \
     return
 
 def write_saminp(filepath, 
-                model, bayes, 
-                reaction, 
-                sammy_INP: Union[SammyInputData, SammyInputDataYW],
+                model,
+                experiment,
+                rto,
                 alphanumeric = []):
     
-    ac = sammy_INP.particle_pair.ac*10  
+    # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
-    alphanumeric_base = ["TWENTY", 
-                        "EV", 
-                        "GENERATE PLOT FILE AUTOMATICALLY"]
     
-    if bayes:
+    if rto.options["bayes"]:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
-    alphanumeric = [model, bayes_cmd] + alphanumeric_base + alphanumeric
+    alphanumeric = [model.formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -352,23 +386,27 @@ def write_saminp(filepath,
             if line.startswith("%%%alphanumeric%%%"):
                 for cmd in alphanumeric:
                     f.write(f'{cmd}\n')
+            
+            elif line.startswith("%%%card2%%%"):
+                f.write(f"{model.isotope: <9} {model.amu: <9} {float(min(experiment.energy_range)): <9} {float(max(experiment.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    # assert(np.any(np.isfinite(np.array([sammy_INP.temp, sammy_INP.FP, sammy_INP.frac_res_FP]))))
-                    f.write(f'  {sammy_INP.temp: <8}  {sammy_INP.FP: <8}  {sammy_INP.frac_res_FP: <8}        \n')
+                    f.write(f'  {float(experiment.parameters["temp"][0]):<8}  {float(experiment.parameters["FP"][0]):<8}  {float(experiment.parameters["FP"][1]):<8}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'):
-                # assert(isinstance(sammy_INP.target_thickness, float))
-                f.write(f'  {ac: <8}  {sammy_INP.target_thickness: <8}                       0.00000          \n')
+                f.write(f'  {float(model.ac):<8}  {float(experiment.parameters["n"][0]):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
-                f.write(f'{reaction}\n')
+                f.write(f'{experiment.reaction}\n')
 
             else:
                 f.write(line)
+
+
            
 
 def make_runDIR(sammy_runDIR):
@@ -377,22 +415,22 @@ def make_runDIR(sammy_runDIR):
     else:
         os.mkdir(sammy_runDIR)
 
-def fill_runDIR_with_templates(sammy_RTO: SammyRunTimeOptions):
+def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 
-    if os.path.basename(sammy_RTO.inptemplate) == sammy_RTO.inptemplate:
-        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', sammy_RTO.inptemplate)
+    if os.path.basename(input_template) == input_template:
+        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', input_template)
     else:
-        template_path = sammy_RTO.inptemplate
+        template_path = input_template
 
-    shutil.copy(template_path, os.path.join(sammy_RTO.sammy_runDIR, sammy_RTO.inpname))
-    
-    # fill temporary sammy_runDIR with runtime appropriate template files
-    # if one_spingroup:
-    #     copy_template_to_runDIR(experimental_corrections, 'sammy_1spin.inp', sammy_runDIR)
-    # else:
-    #     copy_template_to_runDIR(experimental_corrections, 'sammy.inp', sammy_runDIR)
-    # copy_template_to_runDIR(experimental_corrections, 'sammy.par', sammy_runDIR)
+    shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
 
+
+
+
+
+# ################################################ ###############################################
+# Workflow
+# ################################################ ###############################################
 
 
 def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
@@ -406,7 +444,6 @@ def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions)
         raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
 
     # edit copied input template file
-    # write_saminp(sammy_RTO.model, sammy_INP.particle_pair, sammy_RTO.reaction, sammy_RTO.solve_bayes, os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'))
     write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
                 sammy_RTO.model, sammy_RTO.solve_bayes, 
                 sammy_RTO.reaction, sammy_INP, alphanumeric=sammy_RTO.alphanumeric)
@@ -438,35 +475,6 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
         else:
             raise ValueError("An energy window input was provided but no experimental data.")
 
-
-def read_ECSCM(file_path):
-    """
-    Reads a sammy generated ECSCM in as a pandas dataframe.
-
-    Parameters
-    ----------
-    file_path : str
-        Path to the sammy generated SAMCOV.PUB file.
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-
-    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
-    df_tdte = data.iloc[:,0:3]
-    df_tdte.columns = ["theo", "theo_unc", "E"]
-
-    # assert top rows == left columns
-    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
-    dftest=dftest.T
-    dftest.columns = ["theo", "theo_unc", "E"]
-    assert(np.all(dftest == df_tdte))
-
-    dfcov = data.iloc[:, 3:]
-
-    return df_tdte, dfcov
 
 
 
@@ -500,7 +508,7 @@ def replace_matnum(filepath, matnum):
 def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 
     make_runDIR(sammyRTO.sammy_runDIR)
-    fill_runDIR_with_templates(sammyRTO)
+    fill_runDIR_with_templates("readendf.inp", "sammy.inp", sammyRTO.sammy_runDIR)
 
     shutil.copy(endf_file, os.path.join(sammyRTO.sammy_runDIR, os.path.basename(endf_file)))
 
@@ -514,13 +522,13 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
     # could also read endf spin groups here! 
 
-    if not sammyRTO.keep_runDIR:
-        shutil.rmtree(sammyRTO.sammy_runDIR)
-
     with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.INP"), 'r') as f:
         s = f.read()
     with open("SAMNDF.INP", 'w') as f:
         f.write(s) 
+
+    if not sammyRTO.keep_runDIR:
+        shutil.rmtree(sammyRTO.sammy_runDIR)
 
     return resonance_ladder
 
@@ -608,7 +616,8 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
     lst_df, par_df = execute_sammy(sammy_RTO)
 
     sammy_OUT = SammyOutputData(pw=lst_df, 
-                        par=sammy_INP.resonance_ladder)#,
+                        par=sammy_INP.resonance_ladder,
+                        chi2=[])#,
                         # chi2=chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc)))
 
     if sammy_RTO.recursive == True:
@@ -639,30 +648,23 @@ def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 # run sammy with the YW scheme
 ########################################################## ###############################################
 
-
-# def copy_inptemp_to_runDIR(template_path, target_path):
-#     shutil.copy(template_path, target_path)
-
-
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions):
 
     #### make files for each dataset YW generation
-    for ds, rxn, tem in zip(sammyINPYW.dataset_titles, sammyINPYW.reactions, sammyINPYW.templates):
-        sammyRTO.inptemplate = tem
+    for exp, tem in zip(sammyINPYW.experiments, sammyINPYW.templates):  # fix this !!
 
-        sammyRTO.inpname = f"{ds}_initial.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_initial.inp"), sammyRTO.model, True, rxn, sammyINPYW, 
+        sammyRTO.options["bayes"] = True
+        fill_runDIR_with_templates(tem, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_initial.inp"), sammyINPYW.model, exp, sammyRTO, 
                                     alphanumeric=["yw"])
 
-        sammyRTO.inpname = f"{ds}_iter.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_iter.inp"), sammyRTO.model, True, rxn, sammyINPYW, 
+        fill_runDIR_with_templates(tem, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
                                     alphanumeric=["yw","Use remembered original parameter values"])
 
-        sammyRTO.inpname = f"{ds}_plot.inp"
-        fill_runDIR_with_templates(sammyRTO)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{ds}_plot.inp"), sammyRTO.model, False, rxn, sammyINPYW, 
+        sammyRTO.options["bayes"] = False
+        fill_runDIR_with_templates(tem, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_plot.inp"), sammyINPYW.model, exp, sammyRTO,  
                                     alphanumeric=[])
     
     ### options for least squares
@@ -671,216 +673,100 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     else:
         alphanumeric_LS_opts = []
 
-    #### make files for solving bayes reading in each WY matrix
-    sammyRTO.inpname = "solvebayes_initial.inp"
-    fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyRTO.model, True, "reaction", sammyINPYW, 
+    #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
+    fill_runDIR_with_templates(tem, "solvebayes_initial.inp", sammyRTO.sammy_runDIR)
+    sammyRTO.options["bayes"] = True
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.model, exp, sammyRTO,   
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
 
-    sammyRTO.inpname = "solvebayes_iter.inp" 
-    fill_runDIR_with_templates(sammyRTO)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyRTO.model, True, "reaction", sammyINPYW, 
+    fill_runDIR_with_templates(tem, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
 
 
 
-def make_bash_script_iterate(iterations, dataset_titles, rundir, sammyexe, shell, autoelim_thresh=None, save_each_step=False):
-    
-    autoelim_string = """#!/bin/bash\n
-### Filter out resonances with Gn < $$$thresh$$$ meV
-par_file=results/step$1.par
-temp_file=results/temp.par
-
-awk '{
-  # Replace "-" with "e-" in the third column
-  gsub(/-/, "e-", $3)
-
-  column3 = $3 + 0
-
-  if (column3 <= -$$$thresh$$$ || column3 >= $$$thresh$$$) {
-    print $0
-  }
-}' "$par_file" > "$temp_file"
-
-mv $temp_file $par_file
-\n"""
-
-    with open(os.path.join(rundir, f"iterate.sh"), 'w+') as f:
-            
-            ### auto-resonance elimination 
-            if autoelim_thresh is not None:
-                f.write(autoelim_string.replace("$$$thresh$$$", f"{autoelim_thresh}"))
-
-            ### setup initial and iterative variables
-            for i in range(1, iterations+1):
-
-                stepstr_prior = f'iter{i-1}'
-                if i == 1:
-                    cov = ''
-                    par = 'results/step$1.par'
-                    inp_ext = 'initial'
-                else:
-                    cov = f"iterate/bayes_{stepstr_prior}.cov"
-                    par = f"iterate/bayes_{stepstr_prior}.par"
-                    inp_ext = 'iter'
-
-                ### Write commands for each dataset
-                for ds in dataset_titles:
-                    title = f"{ds}_{stepstr_prior}"#step{i}
-                    f.write(f"##################################\n# Generate YW for {ds}\n")
-                    f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
-                    f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
-
-                ### write commands for bayes solve using all datasets
-                dataset_inserts = "\n".join([f"iterate/{ds}_{stepstr_prior}.ywy" for ds in dataset_titles])
-                title = f"bayes_iter{i}"
-                f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
-                f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
-                f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
-            
-            ### Copy final iteration result to step + 1 result
-            f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 3)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
-            
-            ### After all iterations, write commands to make plot for step + 1
-            for ds in dataset_titles:
-                f.write(f"\n#######################################################\n# Plotting for {ds} final iteration \n#\n#######################################################\n")
-                f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$plus_one.par\n{ds}.dat\n\nEOF\n\n")
-
-                # write lines to grep chi2
-                f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-                f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-                
-                if save_each_step:
-                    f.write(f"mv -f SAMMY.LST results/{ds}_step$plus_one.lst\nmv -f SAMMY.LPT results/{ds}_step$plus_one.lpt\n\n")
-            
-            f.write("rm -f SAM*\n\n")
-
-            ### log and return chi2 values
-            f.write("""echo "$plus_one""")
-            for ds in dataset_titles:
-                f.write(f" $chi2_string_{ds}")
-            f.write("""" >> chi2.txt\n""")
-
-            f.write("""echo " """)
-            for ds in dataset_titles:
-                f.write(f" $chi2_string_{ds}")
-            f.write(""""\n""")
-
-                # f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\ninitial.par\n{ds}.dat\n\nEOF\n")
-                # f.write(f"mv -f SAMMY.LST {ds}_initial.lst\nrm -f SAM*\n")
+def make_data_for_YW(datasets, experiments, rundir):
+    if np.all([isinstance(i, pd.DataFrame) for i in datasets]):
+        real = True
+    else:
+        if np.any([isinstance(i,pd.DataFrame) for i in datasets]):
+            raise ValueError("It looks like you''ve mixed dummy energy-grid data and real data")
+        real = False
+    for d, exp in zip(datasets, experiments):
+        if real:
+            write_samdat(d, None, os.path.join(rundir,f"{exp.title}.dat"))
+            write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
+        else:
+            write_estruct_file(d, os.path.join(rundir,f"{exp.title}.dat"))
+            # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
 
 
-def make_data_for_YW(datasets, dataset_titles, rundir):
-    for d, dt in zip(datasets, dataset_titles):
-        write_samdat(d, None, os.path.join(rundir,f"{dt}.dat"))
-        write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
-
-
-
-def make_bash_script_run(steps, dataset_titles, threshold, sammyexe, shell, rundir):
-    with open(os.path.join(rundir, f"run.sh"), 'w+') as f:
-
-        ### change cwd and setup chi2 log
-        f.write(f"""#!/bin/bash\n
-# change cwd
-cd "$(dirname "$0")"
-#### remove existing chi2 log and write new
-rm chi2.txt\n""")
-        f.write("""echo "chi2" >> chi2.txt\necho "step""")
+def make_YWY0_bash(dataset_titles, sammyexe, rundir):
+    cov = ''
+    par = 'results/step$1.par'
+    inp_ext = 'initial'
+    with open(os.path.join(rundir, "YWY0.sh") , 'w') as f:
+        ### Copy final iteration result to step + 1 result
+        # f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
         for ds in dataset_titles:
-            f.write(f" {ds}") 
-        f.write("""" >> chi2.txt\n""")
-
-        ### plot prior for each dataset and grep chi2
+            title = f"{ds}_iter0"
+            f.write(f"##################################\n# Generate YW for {ds}\n")
+            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
+            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
+        f.write("################# read chi2 #######################\n#\n")
         for ds in dataset_titles:
-            f.write(f"""\n\n#### plot prior for {ds}
-out=$({sammyexe}<<EOF
-{ds}_plot.inp
-results/step0.par
-{ds}.dat
-
-EOF
-)
-mv -f SAMMY.LST results/{ds}_step0.lst
-mv -f SAMMY.LPT results/{ds}_step0.lpt
-rm -f SAM*\n""")
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}_step0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
             f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-
-        ### Echo prior to chi2 log
-        f.write("""echo "0""")
+        f.write("""\necho "$1""")
         for ds in dataset_titles:
             f.write(f" $chi2_string_{ds}")
-        f.write("""" >> chi2.txt\n""")
-
-        ### now write iteration script 
-        f.write(f"""
-\n\n\n#### For each step
-#   1. run iteration for nonlinearities 
-#   2. OPTIONAL: Generate plot for step
-
-max_iterations={steps}
-threshold={threshold}
-min_iterations=3
-iteration=0
-criteria_met=false
-criteria="max iterations"
-echo "\nIterating until convergence\nchi2 values\n""")
+        f.write(""""\n""")
         
-        f.write("step ")
+    with open(os.path.join(rundir, "BAY0.sh") , 'w') as f:
+        dataset_inserts = "\n".join([f"iterate/{ds}_iter0.ywy" for ds in dataset_titles])
+        title = f"bayes_iter1"
+        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
+        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
+        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
+
+
+def make_YWYiter_bash(dataset_titles, sammyexe, rundir):
+    cov = f"iterate/bayes_iter$1.cov"
+    par = f"iterate/bayes_iter$1.par"
+    inp_ext = 'iter'
+    with open(os.path.join(rundir,"YWYiter.sh"), 'w') as f:
         for ds in dataset_titles:
-            f.write(f" {ds}") 
-        f.write(""" sum"\n""")
-        
-        # write while loop
-        f.write(f"""
-while [ $iteration -lt $max_iterations ] && [ "$criteria_met" = false ]; do
+            title = f"{ds}_iter$1"
+            f.write(f"##################################\n# Generate YW for {ds}\n")
+            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
+            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
+    with open(os.path.join(rundir,"BAYiter.sh"), 'w') as f:
+        dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
+        title = f"bayes_iter$plus_one"
+        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
+        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
+        f.write("plus_one=$(( $1 + 1 ))\n")
+        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
 
-    # new chi2 is output from step
-    output=$(./iterate.sh $iteration)\n""")
-        f.write(r"""
-    newchi2_str=$(echo "$output" | tail -n 1)
-    newchi2_str=$(echo "$newchi2_str" | sed 's/E/e/g; s/+//g')
-    newchi2_sum=$(echo "$newchi2_str" | tr -s ' ' '\n' | grep -E '[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?' | paste -sd+ - | bc -l)  
 
-    # oldchi2 is read from chi2 log
-    line_with_oldchi2=$(grep -E "^$iteration " chi2.txt)
-    line_with_oldchi2=$(echo "$line_with_oldchi2" | awk '{$1=""; sub(/^[[:space:]]+/, "")}1')
-    oldchi2_str=$(echo "$line_with_oldchi2" | sed 's/E/e/g; s/+//g')
-    oldchi2_sum=$(echo "$oldchi2_str" | tr -s ' ' '\n' | grep -E '[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?' | paste -sd+ - | bc -l)
-
-    # termination criteria on change in chi2
-    diff=$(echo "$oldchi2_sum - $newchi2_sum" | bc) 
-
-    # print 
-    echo $iteration $oldchi2_str $oldchi2_sum
-
-    # Check if the termination criteria is met (e.g., based on some condition)
-    if (( $(echo "$diff < $threshold" |bc -l) )) && [ $iteration -gt $min_iterations ]; then
-        criteria_met=true
-        criteria="improvement below threshold"
-    fi
-    if (( $(echo "$diff < -10" |bc -l) )); then
-        criteria_met=true
-        criteria="Stopped due to instability"
-    fi
+def make_final_plot_bash(dataset_titles, sammyexe, rundir):
+    with open(os.path.join(rundir, "plot.sh") , 'w') as f:
+        for ds in dataset_titles:
+            f.write(f"##################################\n# Plot for {ds}\n")
+            f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n\nEOF\n")
+            f.write(f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""")    
+        f.write("################# read chi2 #######################\n#\n")
+        for ds in dataset_titles:
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $chi2_string_{ds}")
+        f.write(""""\n""")
     
-    # Increment the iteration counter
-    ((iteration++))
-    
-done
 
-echo "Loop terminated after $iteration iterations because $criteria."
-echo $iteration
-""")
+def setup_YW_scheme(sammyRTO, sammyINPyw): 
 
-
-
-
-
-def setup_YW_scheme(sammyRTO: SammyRunTimeOptions, sammyINPyw: SammyInputDataYW): 
-
-    ### clean and make directories
     try:
         shutil.rmtree(sammyRTO.sammy_runDIR)
     except:
@@ -890,245 +776,169 @@ def setup_YW_scheme(sammyRTO: SammyRunTimeOptions, sammyINPyw: SammyInputDataYW)
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "results"))
     os.mkdir(os.path.join(sammyRTO.sammy_runDIR, "iterate"))
 
-    make_data_for_YW(sammyINPyw.datasets, sammyINPyw.dataset_titles, sammyRTO.sammy_runDIR)
+    make_data_for_YW(sammyINPyw.datasets, sammyINPyw.experiments, sammyRTO.sammy_runDIR)
     write_sampar(sammyINPyw.resonance_ladder, sammyINPyw.particle_pair, sammyINPyw.initial_parameter_uncertainty, os.path.join(sammyRTO.sammy_runDIR, "results/step0.par"))
 
     make_inputs_for_YW(sammyINPyw, sammyRTO)
-    make_bash_script_iterate(sammyINPyw.iterations, sammyINPyw.dataset_titles, sammyRTO.sammy_runDIR, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell, autoelim_thresh=sammyINPyw.autoelim_threshold, save_each_step=True)  # if not saving each step - at least plot the final step!
-    make_bash_script_run(sammyINPyw.steps, sammyINPyw.dataset_titles, sammyINPyw.step_threshold, sammyRTO.path_to_SAMMY_exe, sammyRTO.shell,  sammyRTO.sammy_runDIR)
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    
+
+
+
+def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
+    runsammy_bay0 = subprocess.run(
+                            ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
+                            capture_output=True
+                            )
+
+    for i in range(1, iterations+1):
+        runsammy_ywy0 = subprocess.run(
+                                    ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
+                                    capture_output=True
+                                    )
+
+        runsammy_bay0 = subprocess.run(
+                                    ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
+                                    capture_output=True
+                                    )
+
+    # Move par file from final iteration 
+    out = subprocess.run(
+        ["sh", "-c", 
+        f"""head -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step{step+1}.par"""],
+        cwd=os.path.realpath(rundir), capture_output=True)
+    
+
+def run_YWY0_and_get_chi2(rundir, step):
+    runsammy_ywy0 = subprocess.run(
+                                ["sh", "-c", f"./YWY0.sh {step}"], 
+                                cwd=os.path.realpath(rundir),
+                                capture_output=True, text=True
+                                )
+    i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-2].split()]
+    i=i_chi2s[0]; chi2s=i_chi2s[1:] 
+    return i, [c for c in chi2s]+[np.sum(chi2s)]
+
+
+def update_fudge_in_parfile(rundir, step, fudge):
+    out = subprocess.run(
+        ["sh", "-c", 
+        f"""head -$(($(wc -l < results/step{step}.par) - 1)) results/step{step}.par > results/temp;
+echo "{np.round(fudge,11)}" >> "results/temp"
+mv "results/temp" "results/step{step}.par" """],
+        cwd=os.path.realpath(rundir), capture_output=True)
+
+
+
+
+
+def step_until_convergence_YW(sammyRTO, sammyINPyw):
+    istep = 0
+    chi2_log = []
+    fudge = sammyINPyw.initial_parameter_uncertainty
+    rundir = os.path.realpath(sammyRTO.sammy_runDIR)
+    criteria="max steps"
+    if sammyRTO.Print:
+        print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
+    while istep<sammyINPyw.max_steps:
+        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+        if istep>=1:
+
+            # Levenberg-Marquardt algorithm
+            if sammyINPyw.LevMar:
+                assert(sammyINPyw.LevMarV>1)
+
+                if chi2_list[-1] < chi2_log[istep-1][-1]:
+                    fudge *= sammyINPyw.LevMarV
+                    fudge = min(fudge,sammyINPyw.maxF)
+                else:
+                    if sammyRTO.Print:
+                        print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
+
+                    while True:
+                        fudge /= sammyINPyw.LevMarV
+                        fudge = max(fudge, sammyINPyw.minF)
+                        update_fudge_in_parfile(rundir, istep-1, fudge)
+                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
+                        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+
+                        if sammyRTO.Print:
+                            print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+
+                        if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
+                            break
+                        else:
+                            pass
+            
+            # convergence check
+            Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+            if Dchi2 < sammyINPyw.step_threshold:
+                if Dchi2 < 0:
+                    criteria = "Chi2 increased"
+                else:
+                    criteria = "Chi2 improvement below threshold"
+                if sammyRTO.Print:
+                    print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                # istep += 1
+                break
+            elif fudge == sammyINPyw.minF:
+                # istep += 1
+                break
+        
+        chi2_log.append(chi2_list)
+        if sammyRTO.Print:
+            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+        
+        update_fudge_in_parfile(rundir, istep, fudge)
+        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+
+        istep += 1
+
+    print(criteria)
+    return istep
+
+
+
+def plot_YW(sammyRTO, dataset_titles, i):
+    out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True
+                        )
+    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
+    lsts = []
+    for dt in dataset_titles:
+        lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
+    i_chi2s = [float(s) for s in out.stdout.split('\n')[-2].split()]
+    i=i_chi2s[0]; chi2s=i_chi2s[1:] 
+    return par, lsts, chi2s
 
 
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
-    
+
+    ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
+
     setup_YW_scheme(sammyRTO, sammyINPyw)
+    for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
+        os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.sh')}")
-    os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.sh')}")
-
-    result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.sh'), shell=True, text=True)
-    ifinal = int(result.splitlines()[-1]) - 1
-
-    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{ifinal}.par"))
-    lsts = []
-    for dt in sammyINPyw.dataset_titles:
-        lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}_step{ifinal}.lst")) )
+    ### get prior
+    par, lsts, chi2list = plot_YW(sammyRTO, dataset_titles, 0)
+    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list)
+    
+    if sammyRTO.bayes:
+        ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
+        par_post, lsts_post, chi2list_post = plot_YW(sammyRTO, dataset_titles, ifinal)
+        sammy_OUT.pw_post = lsts_post
+        sammy_OUT.par_post = par_post
+        sammy_OUT.chi2_post = chi2list_post
 
 
     if not sammyRTO.keep_runDIR:
         shutil.rmtree(sammyRTO.sammy_runDIR)
 
-
-
-    return par, lsts
-
-
-# def run_YW_scheme(sammyINPyw: SammyInputDataYW, sammyRTO: SammyRunTimeOptions, resonance_ladder: pd.DataFrame):
-#     sammyINP_YW.resonance_ladder = resonance_ladder
-
-#     setup_YW_scheme(sammyRTO, sammyINP_YW, sammyINP_YW.datasets, sammyINP_YW.dataset_titles, sammyINP_YW.reactions, sammyINP_YW.templates, 
-#                                                                                     steps=sammyINP_YW.steps,
-#                                                                                     iterations=sammyINP_YW.iterations,
-#                                                                                     threshold=sammyINP_YW.threshold)
-
-#     os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'iterate.{sammyRTO.shell}')}")
-#     os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}')}")
-
-#     result = subprocess.check_output(os.path.join(sammyRTO.sammy_runDIR, f'run.{sammyRTO.shell}'), shell=True, text=True)
-#     ifinal = int(result.splitlines()[-1]) -1
-#     return ifinal
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def make_bash_script_run(steps, rundir):
-#     with open(os.path.join(rundir, "run.zsh"), 'w+') as f:
-#         f.write("""# change cwd
-# cd "$(dirname "$0")"\n
-# # remove existing chi2 log
-# rm chi2.txt\n\n
-# #### plot prior
-# /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-# trans1_plot.inp
-# results/step0.par
-# trans1.dat
-
-# EOF
-# mv -f SAMMY.LST results/trans1_step0.lst
-# mv -f SAMMY.LPT results/trans1_step0.lpt
-# rm -f SAM*
-# #### For each step
-# #   1. run iteration for nonlinearities 
-# #   2. OPTIONAL: Generate plot for step\n""")
-
-#         f.write( "for number in {0..$steps$}".replace("$steps$",str(steps)) )
-
-#         f.write("""\ndo
-#     ./iterate.zsh $number
-
-#     # #######################################################
-#     # # Plotting for step - don't need to do each time
-#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-#     # trans1_plot.inp
-#     # results/step$number.par
-#     # trans1.dat
-
-#     # EOF
-#     # mv -f SAMMY.LST results/trans1_step$plus_one.lst
-#     # mv -f SAMMY.LPT results/trans1_step$plus_one.lpt
-#     # rm -f SAM*
-
-
-#         # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/trans1_step$number.lpt)
-#         # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
-#         # chi2=$(echo "$chi2_string" | bc -l)
-#         # # echo "chi2 (float): $chi2"
-#         # # # Example: Perform arithmetic operations with chi2
-#         # # result=$(echo "$chi2 * 2" | bc -l)
-#         # # echo "Result of chi2 * 2: $result"
-
-#         # echo "step $number chi2: $chi2_string" >> chi2.txt
-
-#     done
-
-#     # ./iterate.zsh 0
-
-#     # line_with_chi2=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT)
-#     # chi2_string=$(echo "$line_with_chi2" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
-#     # chi2=$(echo "$chi2_string" | bc -l)
-#     # # echo "chi2 (float): $chi2"
-#     # # # Example: Perform arithmetic operations with chi2
-#     # # result=$(echo "$chi2 * 2" | bc -l)
-#     # # echo "Result of chi2 * 2: $result"
-
-#     # echo "step 0 chi2: $chi2_string" >> chi2.txt
-#     # # echo  "$chi2"
-
-
-
-
-
-#     # ############## Copy Final Result ###########
-#     # head -$(($(wc -l < results/bayes_step50.par) - 3)) results/bayes_step50.par > final.par
-
-#     # #######################################################
-#     # # Plotting for trans1 Final/Initial
-#     # #
-#     # #######################################################
-#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-#     # trans1_plot.inp
-#     # final.par
-#     # trans1.dat
-
-#     # EOF
-#     # mv -f SAMMY.LST trans1_final.lst
-#     # rm -f SAM*
-
-#     # /Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy<<EOF
-#     # trans1_plot.inp
-#     # initial.par
-#     # trans1.dat
-
-#     # EOF
-#     # mv -f SAMMY.LST trans1_initial.lst
-#     # rm -f SAM*""")
-        
-
-
-# =============================================================================
-# 
-# =============================================================================
-# def read_sammy_par(filename, calculate_average):
-#     """
-#     Reads sammy.par file and calculates average parameters.
-
-#     _extended_summary_
-
-#     Parameters
-#     ----------
-#     filename : _type_
-#         _description_
-#     calculate_average : bool
-#         Whether or not to calculate average parameters.
-
-#     Returns
-#     -------
-#     DataFrame
-#         Contains the average parameters for each spin group
-#     DataFrame
-#         Contains all resonance parameters for all spin groups
-#     """
-
-#     energies = []; spin_group = []; nwidth = []; gwidth = []
-#     with open(filename,'r') as f:   
-#         readlines = f.readlines()
-#         in_res_dat = True
-#         for line in readlines:   
-
-#             try:
-#                 float(line.split()[0]) # if first line starts with a float, parameter file starts directly with resonance data
-#             except:
-#                 in_res_dat = False # if that is not the case, parameter file has some keyword input before line "RESONANCES" then resonance parameters
-
-#             if line.startswith(' '):
-#                 in_res_dat = False  
-#             if in_res_dat:
-#                 if line.startswith('-'):
-#                     continue #ignore negative resonances
-#                 else:
-#                     splitline = line.split()
-#                     energies.append(float(splitline[0]))
-#                     gwidth.append(float(splitline[1]))
-#                     nwidth.append(float(splitline[2]))
-#                     spin_group.append(float(splitline[-1]))
-#             if line.startswith('RESONANCE'):
-#                 in_res_dat = True
-
-                
-                
-#     Gg = np.array(gwidth); Gn = np.array(nwidth); E = np.array(energies); jspin = np.array(spin_group)
-#     df = pd.DataFrame([E, Gg, Gn, jspin], index=['E','Gg','Gn','jspin']); df = df.transpose()
-    
-#     if calculate_average:
-#         #avg_widths = df.groupby('jspin', as_index=False)['Gg','Gn'].mean() 
-#         gb = df.groupby('jspin')    
-#         list_of_dfs=[gb.get_group(x) for x in gb.groups]
-        
-#         avg_df = pd.DataFrame(index=df['jspin'].unique(),columns=['dE','Gg','Gn'])
-
-#         for ij, jdf in enumerate(list_of_dfs):
-#             avg_df['dE'][ij+1]=jdf['E'].diff().mean()
-#             avg_df['Gg'][ij+1]=jdf['Gg'].mean()
-#             avg_df['Gn'][ij+1]=jdf['Gn'].mean()
-#     else:
-#         avg_df = ''
-
-#     return avg_df, df
-    
-
-
-# =============================================================================
-# 
-# ============================================================================= 
-# def copy_template_to_runDIR(experimental_corrections, filename, target_dir):
-#     if os.path.splitext(filename)[0] != 'sammy':
-#         file_out = ''.join(('sammy', os.path.splitext(filename)[1]))
-#     else:
-#         file_out = filename
-#     shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', f'{experimental_corrections}', filename), 
-#                 os.path.join(target_dir,file_out))
-#     return
+    return sammy_OUT

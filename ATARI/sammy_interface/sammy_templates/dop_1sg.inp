@@ -1,5 +1,8 @@
 Tantalum produce PAR file
-Ta181     180.948434  1.00000 6.0E7     0    0 0  0 0  0         0
+%%%card2%%%
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
 %%%alphanumeric%%%
 
 %%%card5/6%%%              

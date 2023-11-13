@@ -350,7 +350,7 @@ class syndat_T:
         self.raw_data = pw_true
 
         ### sample true underlying resonance parameters from measured values - defines self.theo_redpar
-        self.true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, True)
+        self.true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, self.options["Sample TURP"])
 
         ### if no open spectra supplied, approximate it         #!!! Should I use true reduction parameters here?
         if neutron_spectrum.empty:          

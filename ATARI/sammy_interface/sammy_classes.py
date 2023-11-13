@@ -2,8 +2,11 @@
 from typing import Optional, Union
 from dataclasses import dataclass, field
 from ATARI.models.particle_pair import Particle_Pair
+from ATARI.models.experimental_model import experimental_model
 from pandas import DataFrame, Series
 from numpy import ndarray
+
+
 # from ATARI.utils.stats import chi2_val
 
 # @dataclass
@@ -44,19 +47,22 @@ class SammyRunTimeOptions:
 
     def __init__(self, sammyexe: str, options={}):
         default_options = {
-            'sh'            :   'zsh',
+            # 'sh'            :   'zsh',
             'sammy_runDIR'  :   'SAMMY_runDIR',
             'keep_runDIR'   :   False,
             'Print'         :   False,
 
             'bayes'         :   False,
-            'iterations'    :   2
+            'iterations'    :   2,
+
+            'energy_window' : None,
+            'get_ECSCM'     : False
         }
         options = update_dict(default_options, options)
         self.options = options
 
         self.path_to_SAMMY_exe = sammyexe
-        self.shell =  options["sh"]
+        # self.shell =  options["sh"]
         self.sammy_runDIR =  options["sammy_runDIR"]
         self.keep_runDIR = options["keep_runDIR"]
         self.Print =  options["Print"]
@@ -64,8 +70,28 @@ class SammyRunTimeOptions:
         self.bayes = options["bayes"]
         self.iterations = options["iterations"]
 
+        self.energy_window = options["energy_window"]
+        self.get_ECSCM = options["get_ECSCM"]
+
     def __repr__(self):
         return str(self.options)
+
+
+class theory:
+    
+    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
+        self.isotope = isotope
+        self.amu = amu
+        self.ac = ac
+        self.resonance_ladder = resonance_ladder
+        self.formalism = formalism
+        self.spin_groups = """
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+"""
+
 
 
 arraytype_id = Union[Series, ndarray, list]
@@ -82,14 +108,12 @@ class SammyInputData:
     """
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
-    experimental_data: Optional[DataFrame] = None
+    template: str
+    model: theory
+    experiment: experimental_model
+    experimental_data: Optional[Union[DataFrame,ndarray]] = None
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[arraytype_id] = None
-
-    target_thickness: Optional[arraytype_broadparm] = ''
-    temp: Optional[arraytype_broadparm] = ''
-    FP: Optional[arraytype_broadparm] = ''
-    frac_res_FP: Optional[arraytype_broadparm] = ''
 
     initial_parameter_uncertainty: Optional[float] = 1.0
     
@@ -125,22 +149,6 @@ def update_dict(old, additional):
 
 
 
-class theory:
-    
-    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
-        self.isotope = isotope
-        self.amu = amu
-        self.ac = ac
-        self.resonance_ladder = resonance_ladder
-        self.formalism = formalism
-        self.spin_groups = """
-  1      1    0  3.0       1.0  3.5
-    1    1    0    0       3.0
-  2      1    0  4.0       1.0  3.5
-    1    1    0    0       4.0
-"""
-
-
 
 
 
@@ -157,9 +165,9 @@ class SammyInputDataYW:
     model: theory
     resonance_ladder: DataFrame
 
-    datasets : list
-    templates : list
-    experiments: list
+    datasets : list[Union[DataFrame, ndarray]]
+    templates : list[str]
+    experiments: list[experimental_model]
 
     max_steps: int = 1
     iterations: int = 2

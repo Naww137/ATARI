@@ -368,7 +368,7 @@ def write_saminp(filepath,
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
     
-    if rto.options["bayes"]:
+    if rto.bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
@@ -433,23 +433,23 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 # ################################################ ###############################################
 
 
-def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+# def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
 
-    # write experimental data if you have it, else write using the estructure
-    if sammy_INP.experimental_data is not None:
-        write_samdat(sammy_INP.experimental_data, sammy_INP.experimental_cov, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
-    elif sammy_INP.energy_grid is not None:
-        write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
-    else:
-        raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
+#     # write experimental data if you have it, else write using the estructure
+#     if sammy_INP.experimental_data is not None:
+#         write_samdat(sammy_INP.experimental_data, sammy_INP.experimental_cov, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
+#     elif sammy_INP.energy_grid is not None:
+#         write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
+#     else:
+#         raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
 
-    # edit copied input template file
-    write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
-                sammy_RTO.model, sammy_RTO.solve_bayes, 
-                sammy_RTO.reaction, sammy_INP, alphanumeric=sammy_RTO.alphanumeric)
+#     # edit copied input template file
+#     write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
+#                 sammy_RTO.model, sammy_RTO.solve_bayes, 
+#                 sammy_RTO.reaction, sammy_INP, alphanumeric=sammy_RTO.alphanumeric)
 
-    # write parameter file
-    write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
+#     # write parameter file
+#     write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False):
@@ -481,7 +481,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
 def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
     # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
-                                    [f"{sammy_RTO.shell}", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
+                                    [f"sh", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                     capture_output=True
                                     )
@@ -547,21 +547,22 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 
 
 
-def get_ECSCM(sammy_RTO, sammy_INP):
+def get_ECSCM(sammyRTO, sammyINP):
 
     # update_input_files(sammy_INP, sammy_RTO)
-    fill_runDIR_with_templates(sammy_RTO)
-    energy_grid = np.linspace(min(sammy_INP.energy_grid), max(sammy_INP.energy_grid), 498) # if more than 498 datapoints then I need a new reader!
-    write_estruct_file(energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
-    write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
-                sammy_RTO.model, False, 
-                sammy_RTO.reaction, sammy_INP, 
-                alphanumeric=sammy_RTO.alphanumeric + ["CROSS SECTION COVARIance matrix is wanted"])
+    fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
+    write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
+                 sammyINP.model, 
+                 sammyINP.experiment, 
+                 sammyRTO,
+                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
     
-    write_shell_script(sammy_INP, sammy_RTO, use_RPCM=True)
-    runsammy_shellpipe(sammy_RTO)
+    write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
+    runsammy_shellpipe(sammyRTO)
 
-    df, cov = read_ECSCM(os.path.join(sammy_RTO.sammy_runDIR, "SAMCOV.PUB"))
+    df, cov = read_ECSCM(os.path.join(sammyRTO.sammy_runDIR, "SAMCOV.PUB"))
 
     return df, cov
     
@@ -603,40 +604,48 @@ def recursive_sammy(pw_prior, par_prior, sammy_INP: SammyInputData, sammy_RTO: S
 
 
 
-def run_sammy(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
+def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
-    sammy_INP.resonance_ladder = copy(sammy_INP.resonance_ladder)
+    sammyINP.resonance_ladder = copy(sammyINP.resonance_ladder)
 
-    # setup sammy runtime files
-    make_runDIR(sammy_RTO.sammy_runDIR)
-    fill_runDIR_with_templates(sammy_RTO)
-    update_input_files(sammy_INP, sammy_RTO)
-    write_shell_script(sammy_INP, sammy_RTO)
+    #### setup 
+    make_runDIR(sammyRTO.sammy_runDIR)
 
-    lst_df, par_df = execute_sammy(sammy_RTO)
+    if isinstance(sammyINP.experimental_data, pd.DataFrame):
+        write_samdat(sammyINP.experimental_data, sammyINP.experimental_cov, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
+    else:
+        write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
+
+    write_sampar(sammyINP.resonance_ladder, sammyINP.particle_pair, sammyINP.initial_parameter_uncertainty,os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
+    fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), sammyINP.model, sammyINP.experiment, sammyRTO)
+    write_shell_script(sammyINP, sammyRTO, use_RPCM=False)
+
+    lst_df, par_df = execute_sammy(sammyRTO)
 
     sammy_OUT = SammyOutputData(pw=lst_df, 
-                        par=sammy_INP.resonance_ladder,
+                        par=sammyINP.resonance_ladder,
                         chi2=[])#,
                         # chi2=chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc)))
 
-    if sammy_RTO.recursive == True:
-        if sammy_RTO.solve_bayes == False:
-            raise ValueError("Cannot run recursive sammy with solve bayes set to false")
-        lst_df, par_df = recursive_sammy(lst_df, par_df, sammy_INP, sammy_RTO)
+    #### need to update for recursive sammy
+    # if sammyRTO.recursive == True:
+    #     if sammyRTO.solve_bayes == False:
+    #         raise ValueError("Cannot run recursive sammy with solve bayes set to false")
+    #     lst_df, par_df = recursive_sammy(lst_df, par_df, sammyINP, sammyRTO)
 
-    if sammy_RTO.solve_bayes:
+    if sammyRTO.bayes:
         # sammy_OUT.chi2_post = chi2_val(lst_df.theo_xs_bayes, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
         sammy_OUT.pw=lst_df
         sammy_OUT.par_post = par_df
 
-        if sammy_RTO.get_ECSCM:
-            est_df, ecscm = get_ECSCM(sammy_RTO, sammy_INP)
+        if sammyRTO.get_ECSCM:
+            est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
             sammy_OUT.ECSCM = ecscm
             sammy_OUT.est_df = est_df
 
-    if not sammy_RTO.keep_runDIR:
-        shutil.rmtree(sammy_RTO.sammy_runDIR)
+    if not sammyRTO.keep_runDIR:
+        shutil.rmtree(sammyRTO.sammy_runDIR)
 
     return sammy_OUT
 
@@ -930,6 +939,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     par, lsts, chi2list = plot_YW(sammyRTO, dataset_titles, 0)
     sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list)
     
+    ### run bayes
     if sammyRTO.bayes:
         ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
         par_post, lsts_post, chi2list_post = plot_YW(sammyRTO, dataset_titles, ifinal)

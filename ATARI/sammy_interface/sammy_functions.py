@@ -892,10 +892,16 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 if sammyRTO.Print:
                     print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                 # istep += 1
-                break
-            elif fudge == sammyINPyw.minF:
+                # break
+                print(criteria)
+                return istep
+            elif sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                criteria = "Fudge below minimum value"
+                print(criteria)
+                return istep
                 # istep += 1
-                break
+                # break
+                
         
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
@@ -906,8 +912,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
         istep += 1
 
-    print(criteria)
-    return istep
+    # print(criteria)
+    # return istep
 
 
 

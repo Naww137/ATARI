@@ -388,7 +388,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{model.isotope: <9} {model.amu: <9} {float(min(experiment.energy_range)): <9} {float(max(experiment.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{model.isotope: <9} {model.M: <9} {float(min(experiment.energy_range)): <9} {float(max(experiment.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
@@ -431,25 +431,6 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 # ################################################ ###############################################
 # Workflow
 # ################################################ ###############################################
-
-
-# def update_input_files(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions):
-
-#     # write experimental data if you have it, else write using the estructure
-#     if sammy_INP.experimental_data is not None:
-#         write_samdat(sammy_INP.experimental_data, sammy_INP.experimental_cov, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
-#     elif sammy_INP.energy_grid is not None:
-#         write_estruct_file(sammy_INP.energy_grid, os.path.join(sammy_RTO.sammy_runDIR,'sammy.dat'))
-#     else:
-#         raise ValueError("Please provide either experimental data or an energy grid in SammyInputData")
-
-#     # edit copied input template file
-#     write_saminp(os.path.join(sammy_RTO.sammy_runDIR, 'sammy.inp'), 
-#                 sammy_RTO.model, sammy_RTO.solve_bayes, 
-#                 sammy_RTO.reaction, sammy_INP, alphanumeric=sammy_RTO.alphanumeric)
-
-#     # write parameter file
-#     write_sampar(sammy_INP.resonance_ladder, sammy_INP.particle_pair, sammy_INP.initial_parameter_uncertainty, os.path.join(sammy_RTO.sammy_runDIR,"SAMMY.PAR"), vary_parm=sammy_RTO.solve_bayes)
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False):
@@ -554,7 +535,7 @@ def get_ECSCM(sammyRTO, sammyINP):
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
-                 sammyINP.model, 
+                 sammyINP.particle_pair, 
                  sammyINP.experiment, 
                  sammyRTO,
                  alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
@@ -618,7 +599,7 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
     write_sampar(sammyINP.resonance_ladder, sammyINP.particle_pair, sammyINP.initial_parameter_uncertainty,os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
     fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), sammyINP.model, sammyINP.experiment, sammyRTO)
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), sammyINP.particle_pair, sammyINP.experiment, sammyRTO)
     write_shell_script(sammyINP, sammyRTO, use_RPCM=False)
 
     lst_df, par_df = execute_sammy(sammyRTO)
@@ -662,18 +643,20 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     #### make files for each dataset YW generation
     for exp, tem in zip(sammyINPYW.experiments, sammyINPYW.templates):  # fix this !!
 
+        sammyRTO.bayes = True
         sammyRTO.options["bayes"] = True
         fill_runDIR_with_templates(tem, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_initial.inp"), sammyINPYW.model, exp, sammyRTO, 
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_initial.inp"), sammyINPYW.particle_pair, exp, sammyRTO, 
                                     alphanumeric=["yw"])
 
         fill_runDIR_with_templates(tem, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
                                     alphanumeric=["yw","Use remembered original parameter values"])
 
+        sammyRTO.bayes = False
         sammyRTO.options["bayes"] = False
         fill_runDIR_with_templates(tem, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_plot.inp"), sammyINPYW.model, exp, sammyRTO,  
+        write_saminp(os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
                                     alphanumeric=[])
     
     ### options for least squares
@@ -684,12 +667,13 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
 
     #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
     fill_runDIR_with_templates(tem, "solvebayes_initial.inp", sammyRTO.sammy_runDIR)
+    sammyRTO.bayes = True
     sammyRTO.options["bayes"] = True
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.model, exp, sammyRTO,   
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.particle_pair, exp, sammyRTO,   
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
 
     fill_runDIR_with_templates(tem, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_iter.inp"), sammyINPYW.model, exp, sammyRTO, 
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
 
 
@@ -886,21 +870,19 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
             Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
             if Dchi2 < sammyINPyw.step_threshold:
                 if Dchi2 < 0:
-                    criteria = "Chi2 increased"
+                    criteria = f"Chi2 increased, taking solution {istep-1}"
+                    if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                        criteria = f"Fudge below minimum value, taking solution {istep-1}"
+                    if sammyRTO.Print:
+                        print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                        print(criteria)
+                    return istep-1
                 else:
                     criteria = "Chi2 improvement below threshold"
                 if sammyRTO.Print:
                     print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
-                # istep += 1
-                # break
-                print(criteria)
+                    print(criteria)
                 return istep
-            elif sammyINPyw.LevMar and fudge==sammyINPyw.minF:
-                criteria = "Fudge below minimum value"
-                print(criteria)
-                return istep
-                # istep += 1
-                # break
                 
         
         chi2_log.append(chi2_list)
@@ -913,7 +895,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         istep += 1
 
     # print(criteria)
-    # return istep
+    return istep-1
 
 
 

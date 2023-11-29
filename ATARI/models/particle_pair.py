@@ -8,9 +8,39 @@ Created on Thu Jun 16 12:18:04 2022
 
 import os
 import numpy as np
+from copy import copy 
 
 import pandas as pd
 from ATARI.syndat.sample_resparms import sample_resonance_ladder, sample_resonance_ladder_old
+from ATARI.theory.resonance_statistics import make_res_par_avg
+
+
+def quant_vec_sum(a,b):
+    """
+    Calculates a quantum vector sum.
+
+    This function performs a quantum vector sum, a.k.a. it maps the quantum 
+    triangular relationship between two integers or half integers.
+
+    Parameters
+    ----------
+    a : float or int
+        a variable.
+    b : float or int
+        a variable.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of all possible quantum values.
+    """
+    a = abs(a); b=abs(b)
+    vec = np.arange(abs(a-b), a+b+1, 1)
+    return vec
+
+
+
+
 
 
 class Particle_Pair:
@@ -29,10 +59,10 @@ class Particle_Pair:
         Samples a full resonance parameter ladder for each possible spin group.
     """
 
-    def __init__(self, ac, M, m, I, i, l_max,
+    def __init__(self, isotope, formalism,
+                 ac, M, m, I, i, l_max,
                     input_options={},   
-                    spin_groups=None, 
-                    average_parameters={}
+                 spin_groups={}
                     ):
         """
         Initialization of particle pair object for a given reaction.
@@ -80,12 +110,12 @@ class Particle_Pair:
             raise ValueError('Need to implement "Sample Physical Constants" capability')
 
         ### Gather other variables passed to __init__
-        self.spin_groups = spin_groups
-        self.average_parameters = average_parameters
+        self.spin_groups = copy(spin_groups)
+        self.isotope = isotope
+        self.formalism = formalism
 
 
         ### Gather physical constants until sampling function is implemented
-
         # assuming boundary condition selected s.t. shift factor is eliminated for s wave but not others!
         if ac < 1e-7:
             print("WARNING: scattering radius seems to be given in m rather than sqrt(barns) a.k.a. cm^-12")
@@ -103,31 +133,21 @@ class Particle_Pair:
         self.c = 2.99792458e8 # m/s
         self.m_eV = 939.565420e6 # eV/c^2
 
+        return 
 
 
 
-    def quant_vec_sum(self, a,b):
-        """
-        Calculates a quantum vector sum.
+    def add_spin_group(self, Jpi,J_ID, D_avg, Gn_avg, Gn_dof, Gg_avg, Gg_dof, print=False):
+        res_par_avg = make_res_par_avg(J_ID,
+                                    D_avg, 
+                                    Gn_avg,
+                                    Gn_dof, 
+                                    Gg_avg, 
+                                    Gg_dof, 
+                                    print = False)
+        self.spin_groups[Jpi] = res_par_avg
 
-        This function performs a quantum vector sum, a.k.a. it maps the quantum 
-        triangular relationship between two integers or half integers.
-
-        Parameters
-        ----------
-        a : float or int
-            a variable.
-        b : float or int
-            a variable.
-
-        Returns
-        -------
-        numpy.ndarray
-            Array of all possible quantum values.
-        """
-        a = abs(a); b=abs(b)
-        vec = np.arange(abs(a-b), a+b+1, 1)
-        return vec
+        return
 
 
     def map_quantum_numbers(self, print_out):
@@ -174,7 +194,7 @@ class Particle_Pair:
         # now perform calculations
         # Jn = []; Jp = []; 
         Jall = []
-        S = self.quant_vec_sum(I,i)
+        S = quant_vec_sum(I,i)
         L = range(l_wave_max+1)
 
         i_parity = (-1 if i<0 else 1)
@@ -191,7 +211,7 @@ class Particle_Pair:
             J_parity = S_parity*l_parity
             
             for i_s, s in enumerate(S):
-                js = self.quant_vec_sum(s,l)
+                js = quant_vec_sum(s,l)
                 this_l[f's={s}'] = js
                 for j in js:
                     if J_parity == 1:
@@ -240,7 +260,7 @@ class Particle_Pair:
         return
 
 
-    def sample_resonance_ladder(self, Erange, spin_groups, average_parameters, 
+    def sample_resonance_ladder(self, Erange,
                                 ensemble='NNE',
                                 rng=None, seed=None):
         """
@@ -279,17 +299,30 @@ class Particle_Pair:
                 rng = np.random # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
-                
-        if isinstance(average_parameters, dict):
-            resonance_ladder = sample_resonance_ladder(Erange, spin_groups, average_parameters, ensemble=ensemble, rng=rng)
-        elif isinstance(average_parameters, pd.DataFrame):
-            resonance_ladder = sample_resonance_ladder_old(Erange, spin_groups, average_parameters, ensemble=ensemble, rng=rng)
-        else:
-            raise ValueError("Do not recognize the supplied average parameter type")
-    
+
+        resonance_ladder = sample_resonance_ladder(Erange, self.spin_groups, ensemble=ensemble, rng=rng)
+        # self.resonance_ladder = resonance_ladder
         return resonance_ladder
 
 
+
+    def get_sammy_spingroups(self):
+        if len(self.spin_groups.keys()) == 2:
+            sgstring="""
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+"""
+        elif len(self.spin_groups.keys()) == 1:
+            sgstring = """
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+"""
+        else:
+            raise ValueError("Update sammy spin group formatter")
+        
+        return sgstring
 
 
 ### legacy code 

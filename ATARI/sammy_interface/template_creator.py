@@ -1,8 +1,9 @@
 import numpy as np
+from ATARI.models.particle_pair import Particle_Pair
 
 
 def make_input_template(filepath, 
-                model,
+                particle_pair: Particle_Pair,
                 experiment,
                 rto,#: Union[SammyInputData, SammyInputDataYW],
                 alphanumeric = []):
@@ -49,7 +50,7 @@ def make_input_template(filepath,
             f.write('%%%card8%%%')
 
             # spin groups
-            f.write(model.spin_groups)
+            f.write(particle_pair.get_sammy_spingroups())
 
             # ResFunc 
             if experiment.inputs['ResFunc'] is not None:

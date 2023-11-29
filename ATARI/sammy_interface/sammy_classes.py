@@ -109,7 +109,6 @@ class SammyInputData:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
     template: str
-    model: theory
     experiment: experimental_model
     experimental_data: Optional[Union[DataFrame,ndarray]] = None
     experimental_cov: Optional[DataFrame] = None
@@ -162,7 +161,7 @@ class SammyInputDataYW:
     The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
     """
     particle_pair: Particle_Pair
-    model: theory
+    # model: theory
     resonance_ladder: DataFrame
 
     datasets : list[Union[DataFrame, ndarray]]
@@ -177,6 +176,7 @@ class SammyInputDataYW:
     LS: bool = False
     LevMar: bool = True
     LevMarV: float = 2.0
+    # LevMarVd: float = 2.0
     minF:   float = 1e-5
     maxF:   float = 10
     initial_parameter_uncertainty: float = 1.0

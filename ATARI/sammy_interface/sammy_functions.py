@@ -639,24 +639,24 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 ########################################################## ###############################################
 
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions):
-
+    temp_RTO = copy(sammyRTO)
     #### make files for each dataset YW generation
     for exp, tem in zip(sammyINPYW.experiments, sammyINPYW.templates):  # fix this !!
 
-        sammyRTO.bayes = True
-        sammyRTO.options["bayes"] = True
-        fill_runDIR_with_templates(tem, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR,f"{exp.title}_initial.inp"), sammyINPYW.particle_pair, exp, sammyRTO, 
+        temp_RTO.bayes = True
+        temp_RTO.options["bayes"] = True
+        fill_runDIR_with_templates(tem, f"{exp.title}_initial.inp", temp_RTO.sammy_runDIR)
+        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
                                     alphanumeric=["yw"])
 
-        fill_runDIR_with_templates(tem, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
+        fill_runDIR_with_templates(tem, f"{exp.title}_iter.inp", temp_RTO.sammy_runDIR)
+        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
                                     alphanumeric=["yw","Use remembered original parameter values"])
 
-        sammyRTO.bayes = False
-        sammyRTO.options["bayes"] = False
-        fill_runDIR_with_templates(tem, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
-        write_saminp(os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
+        temp_RTO.bayes = False
+        temp_RTO.options["bayes"] = False
+        fill_runDIR_with_templates(tem, f"{exp.title}_plot.inp", temp_RTO.sammy_runDIR)
+        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
                                     alphanumeric=[])
     
     ### options for least squares
@@ -666,14 +666,14 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
         alphanumeric_LS_opts = []
 
     #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
-    fill_runDIR_with_templates(tem, "solvebayes_initial.inp", sammyRTO.sammy_runDIR)
-    sammyRTO.bayes = True
-    sammyRTO.options["bayes"] = True
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.particle_pair, exp, sammyRTO,   
+    fill_runDIR_with_templates(tem, "solvebayes_initial.inp", temp_RTO.sammy_runDIR)
+    temp_RTO.bayes = True
+    temp_RTO.options["bayes"] = True
+    write_saminp(os.path.join(temp_RTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,   
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
 
-    fill_runDIR_with_templates(tem, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, sammyRTO,
+    fill_runDIR_with_templates(tem, "solvebayes_iter.inp" , temp_RTO.sammy_runDIR)
+    write_saminp(os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
 
 

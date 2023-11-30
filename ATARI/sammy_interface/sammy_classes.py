@@ -77,20 +77,20 @@ class SammyRunTimeOptions:
         return str(self.options)
 
 
-class theory:
+# class theory:
     
-    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
-        self.isotope = isotope
-        self.amu = amu
-        self.ac = ac
-        self.resonance_ladder = resonance_ladder
-        self.formalism = formalism
-        self.spin_groups = """
-  1      1    0  3.0       1.0  3.5
-    1    1    0    0       3.0
-  2      1    0  4.0       1.0  3.5
-    1    1    0    0       4.0
-"""
+#     def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
+#         self.isotope = isotope
+#         self.amu = amu
+#         self.ac = ac
+#         self.resonance_ladder = resonance_ladder
+#         self.formalism = formalism
+#         self.spin_groups = """
+#   1      1    0  3.0       1.0  3.5
+#     1    1    0    0       3.0
+#   2      1    0  4.0       1.0  3.5
+#     1    1    0    0       4.0
+# """
 
 
 
@@ -161,7 +161,6 @@ class SammyInputDataYW:
     The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
     """
     particle_pair: Particle_Pair
-    # model: theory
     resonance_ladder: DataFrame
 
     datasets : list[Union[DataFrame, ndarray]]

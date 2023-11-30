@@ -92,6 +92,8 @@ def sampling_returns_different_values():
             print("Difference:   ",abs(exp_trans-np.array(df_true.true)))
 
 print("")
+test_mean_converges_to_true()
+print("")
 no_sampling_returns_same_values()
 print("")
 sampling_returns_different_values()

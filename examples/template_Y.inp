@@ -1,24 +1,20 @@
 Title
-Ta181     180.94803 200.0     250.0          2     
-XCT
-DO NOT SOLVE BAYES EQUATIONS
+%%%card2%%%
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+%%%alphanumeric%%%
 USE MULTIPLE SCATTERING
 INFINITE SLAB
 NORMALIZE AS YIELD Rather than cross section
 BROADENING IS WANTED
 DO NOT SHIFT RPI RESOLUTION
-TWENTY
-EV
-GENERATE PLOT FILE AUTOMATICALLY
-%%%alphanumeric%%%
 
-  300.0     100.14    0.01            
-  8.1271    0.067166                       0.00000          
-capture
+%%%card5/6%%%
+%%%card7%%%
+%%%card8%%%
   1      1    0  3.0       1.0  3.5
     1    1    0    0       3.0
-  2      1    0  4.0       1.0  3.5
-    1    1    0    0       4.0
 
 RPI C
 BURST 0   10.0      1.0      

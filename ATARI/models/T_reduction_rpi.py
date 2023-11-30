@@ -202,7 +202,7 @@ def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0,
     return Tn, unc_data, rates
 
 
-def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k,K, Bi, b0,B0, alpha):
+def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k,K, Bi, b0,B0, alpha, dm1):
     """
     Generates raw count data for sample-in given a theoretical tranmission. 
     
@@ -265,7 +265,7 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     c_cycle = theo_c/cycles
     
     if sample_turp:
-        monitor_factors = np.random.default_rng().normal(1,0.0174*2, size=cycles)
+        monitor_factors = np.random.default_rng().normal(1,dm1, size=cycles)
     else:
         monitor_factors = np.ones((cycles))
 
@@ -296,29 +296,15 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
 #            syndat_T class 
 # ========================================================================================
 
-class syndat_T:
+class transmission_rpi:
 
     def __init__(self, 
-                 options={}, 
-                 reduction_parameters={}, 
+                 reduction_parameters: dict = {}, 
                  ):
-
-        default_options = { 'Sample Counting Noise' : True, 
-                            'Sample TURP'           : True,
-                            'Sample TNCS'           : True, 
-                            'Smooth TNCS'           : False,
-                            'Calculate Covariance'  : True,
-                            'Compression Points'    : [],
-                            'Grouping Factors'      : None, 
-                            } 
         
         default_reduction_parameters = {
-                            'n'         :   (0.067166,            0),
                             'trigo'     :   (9758727,             0),
                             'trigs'     :   (18476117,            0),
-                            'FP'        :   (35.185,              0),
-                            't0'        :   (3.326,               0),
-                            'bw'        :   (0.0064,              0),
                             'm1'        :   (1,                   0.016),
                             'm2'        :   (1,                   0.008),
                             'm3'        :   (1,                   0.018),
@@ -334,54 +320,16 @@ class syndat_T:
                                                  [1.42659922e-1,   2.19135003e-05]]       )
                             }
 
-        self.options = update_dict(default_options, options)
         self.reduction_parameters = update_dict(default_reduction_parameters, reduction_parameters)
 
 
 
 
-    def run(self, 
-            pw_true,
-            neutron_spectrum=pd.DataFrame()
-            ):
-        
-        ### define raw data attribute as true_df
-        pw_true["tof"] = e_to_t(pw_true.E, self.reduction_parameters["FP"][0], True)*1e6+self.reduction_parameters["t0"][0]
-        self.raw_data = pw_true
-
-        ### sample true underlying resonance parameters from measured values - defines self.theo_redpar
-        self.true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, self.options["Sample TURP"])
-
-        ### if no open spectra supplied, approximate it         #!!! Should I use true reduction parameters here?
-        if neutron_spectrum.empty:          
-            self.neutron_spectrum = approximate_neutron_spectrum_Li6det(pw_true.E, 
-                                                            self.options["Smooth TNCS"], 
-                                                            self.reduction_parameters["FP"][0], 
-                                                            self.reduction_parameters["t0"][0], 
-                                                            self.reduction_parameters["trigo"][0])
-        else:
-            self.neutron_spectrum = neutron_spectrum
-        
-        ### sample a realization of the true, true-underlying open count spectra
-        if self.options["Sample TNCS"]:
-            self.true_neutron_spectrum = sample_true_neutron_spectrum(self.neutron_spectrum)
-        else:
-            self.true_neutron_spectrum = deepcopy(self.neutron_spectrum)
-
-        ### generate raw count data for sample in given theoretical transmission and assumed true reduction parameters/open count data
-        self.raw_data = self.generate_raw_data(self.true_neutron_spectrum, self.true_reduction_parameters)
-
-        ### reduce the raw count data
-        self.data = self.reduce(self.raw_data, self.neutron_spectrum, self.reduction_parameters)
-
-
-
-
-
     def generate_raw_data(self, 
-                          true_neutron_spectrum,
-                          true_reduction_parameters
-                          ):
+                          pw_true,
+                          neutron_spectrum,
+                          options
+                          ) -> pd.DataFrame:
         """
         Generates a set of noisy, sample in count data from a theoretical cross section via the novel un-reduction method (Walton, et al.).
 
@@ -396,29 +344,31 @@ class syndat_T:
             _description_
         """
 
-        if len(true_neutron_spectrum) != len(self.raw_data):
+        if len(neutron_spectrum) != len(pw_true):
             raise ValueError("Experiment open data and sample data are not of the same length, check energy domain")
+        
+        true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, options["Sample TURP"])
 
         monitor_array = [true_reduction_parameters["m1"][0], true_reduction_parameters["m2"][0], true_reduction_parameters["m3"][0], true_reduction_parameters["m4"][0]]
-        true_Bi = neutron_background_function(self.true_neutron_spectrum.tof, self.true_reduction_parameters["a_b"][0][0], self.true_reduction_parameters["a_b"][0][1])
+        true_Bi = neutron_background_function(neutron_spectrum.tof, true_reduction_parameters["a_b"][0][0], true_reduction_parameters["a_b"][0][1])
         
-        raw_data, true_c = inverse_reduction(self.raw_data, 
-                                                    true_neutron_spectrum,
-                                                    self.options["Sample Counting Noise"], 
-                                                    self.options["Sample TURP"],
-                                                    true_reduction_parameters["trigo"][0], 
-                                                    true_reduction_parameters["trigs"][0], 
-                                                    true_reduction_parameters["ks"][0],
-                                                    true_reduction_parameters["ko"][0], 
-                                                    true_Bi, 
-                                                    true_reduction_parameters["b0s"][0], 
-                                                    true_reduction_parameters["b0o"][0], 
-                                                    monitor_array)
+        raw_data, true_c = inverse_reduction(pw_true, 
+                                            neutron_spectrum,
+                                            options["Sample Counting Noise"], 
+                                            options["Sample TURP"],
+                                            true_reduction_parameters["trigo"][0], 
+                                            true_reduction_parameters["trigs"][0], 
+                                            true_reduction_parameters["ks"][0],
+                                            true_reduction_parameters["ko"][0], 
+                                            true_Bi, 
+                                            true_reduction_parameters["b0s"][0], 
+                                            true_reduction_parameters["b0o"][0], 
+                                            monitor_array, true_reduction_parameters["m1"][1])
         
         return raw_data
         
     
-    def reduce(self, raw_data, neutron_spectrum, reduction_parameters):
+    def reduce(self, raw_data, neutron_spectrum, options):
         """
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
@@ -448,35 +398,35 @@ class syndat_T:
         # self.odat['cps'], self.odat['dcps'] = exp_effects.cts_to_ctr(self.odat.c, self.odat.dc, self.odat.bw*1e-6, self.redpar.val.trigs)
 
         # estimated background function
-        Bi = neutron_background_function(self.neutron_spectrum.tof, reduction_parameters["a_b"][0][0], reduction_parameters["a_b"][0][1])
+        Bi = neutron_background_function(neutron_spectrum.tof, self.reduction_parameters["a_b"][0][0], self.reduction_parameters["a_b"][0][1])
 
         # define systematic uncertainties
         # sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)
-        sys_unc = [reduction_parameters[key][1] for key in ['ks','ko','b0s','b0o','m1','m2','m3','m4']]
+        sys_unc = [self.reduction_parameters[key][1] for key in ['ks','ko','b0s','b0o','m1','m2','m3','m4']]
             
         # monitor_array = [self.redpar.val.m1, self.redpar.val.m2, self.redpar.val.m3, self.redpar.val.m4]
-        monitor_array = [reduction_parameters["m1"][0], reduction_parameters["m2"][0], reduction_parameters["m3"][0], reduction_parameters["m4"][0]]
+        monitor_array = [self.reduction_parameters["m1"][0], self.reduction_parameters["m2"][0], self.reduction_parameters["m3"][0], self.reduction_parameters["m4"][0]]
         
 
         trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof,
                                                                     raw_data.c, neutron_spectrum.c, 
                                                                     raw_data.dc, neutron_spectrum.dc,
                                                                     neutron_spectrum.bw, 
-                                                                    reduction_parameters["trigo"][0], 
-                                                                    reduction_parameters["trigs"][0], 
-                                                                    reduction_parameters["a_b"][0][0],
-                                                                    reduction_parameters["a_b"][0][1], 
-                                                                    reduction_parameters["ks"][0], 
-                                                                    reduction_parameters["ko"][0], 
+                                                                    self.reduction_parameters["trigo"][0], 
+                                                                    self.reduction_parameters["trigs"][0], 
+                                                                    self.reduction_parameters["a_b"][0][0],
+                                                                    self.reduction_parameters["a_b"][0][1], 
+                                                                    self.reduction_parameters["ks"][0], 
+                                                                    self.reduction_parameters["ko"][0], 
                                                                     Bi, 
-                                                                    reduction_parameters["b0s"][0],
-                                                                    reduction_parameters["b0o"][0], 
+                                                                    self.reduction_parameters["b0s"][0],
+                                                                    self.reduction_parameters["b0o"][0], 
                                                                     monitor_array, 
                                                                     sys_unc, 
-                                                                    reduction_parameters["a_b"][1], 
-                                                                    self.options["Calculate Covariance"])
+                                                                    self.reduction_parameters["a_b"][1], 
+                                                                    options["Calculate Covariance"])
 
-        if self.options["Calculate Covariance"]:
+        if options["Calculate Covariance"]:
             self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
             trans['exp_unc'] = np.sqrt(np.diag(self.CovT))
             self.CovT = pd.DataFrame(self.CovT, columns=trans.E, index=trans.E)

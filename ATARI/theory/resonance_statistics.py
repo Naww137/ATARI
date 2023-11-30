@@ -7,6 +7,7 @@ from scipy.stats.distributions import chi2
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
 
+
 def make_res_par_avg(J_ID, D_avg, Gn_avg, n_dof, Gg_avg, g_dof, print):
 
     res_par_avg = {'J_ID':J_ID, '<D>':D_avg, '<Gn>':Gn_avg, 'n_dof':n_dof, '<Gg>':Gg_avg, 'g_dof':g_dof}
@@ -245,35 +246,6 @@ def wigner_PDF(x, avg_level_spacing):
     y = y/avg_level_spacing
     return y
 
-# def generate_GOE(N):
-#     A = np.random.default_rng().standard_normal(size=(N,N))/np.sqrt(2*N)
-#     X = A + np.transpose(A)
-#     return X
-
-# def sample_resonance_levels(E0, N_levels, avg_level_spacing, method):
-    
-#     if method == 'invCDF':
-#         level_spacing = avg_level_spacing*sample_wigner_invCDF(N_levels)
-            
-#     elif method == 'GOE':
-#         level_spacing = []
-#         for ilevel in range(N_levels):
-#             X = generate_GOE(2)
-#             eigenvalues = np.linalg.eigvals(X)
-#             spacing = avg_level_spacing*abs(np.diff(eigenvalues))/(np.pi/2)
-#             level_spacing.append(spacing.item())
-#     else:
-#         print('method for sampling resonance levels is not recognized')
-#         os.sys.exit()
-            
-#     E0 = E0+avg_level_spacing*np.random.default_rng().uniform(low=0.0,high=1.0) # offset starting point so we are not just finding the distribution each time
-#     levels = [E0+level_spacing[0]]
-    
-#     for ilevel in range(1,N_levels):
-#         levels.append(levels[ilevel-1]+level_spacing[ilevel])
-            
-#     return levels, level_spacing
-
 
 
 def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
@@ -357,34 +329,6 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
             
     spacings = np.diff(levels) # I do not think this output is used anywhere
     return levels, spacings
-
-
-# def compare_pdf_to_samples(level_spacing_vector, avg_level_spacing, method):
-    
-#     fig = plt.figure(num=1,frameon=True); ax = fig.gca()
-    
-#     x = np.linspace(0,max(level_spacing_vector),10000)
-#     plt.plot(x, wigner_PDF(x,avg_level_spacing), color='r', label='Wigner PDF', zorder=10)
-        
-#     if method == 'GOE':
-#         print(); print('WARNING: ')
-#         print('GOE sampling does not match wigner pdf exactly'); print()
-#         plt.hist(level_spacing_vector, bins=75, density=True, ec='k', linewidth=0.75,color='cornflowerblue', zorder=2, label='GOE')
-
-#     elif method == 'invCDF':
-#         plt.hist(level_spacing_vector, bins=75, density=True, ec='k', linewidth=0.75,color='cornflowerblue', zorder=2, label='invCDF')
-        
-#     else:
-#         print(); print('WARNING: ')
-#         print('no appropriate method selected for pdf comparison'); print()
-    
-#     ax.set_facecolor('whitesmoke'); ax.grid(color='w', linestyle='-', linewidth=2, zorder=1, alpha=1)
-#     ax.set_xlabel('Level Spacing'); ax.set_ylabel('Normalized Frequency'); plt.title('Distribution of Level Spacing Samples')
-#     plt.legend()
-#     plt.show(); plt.close()
-    
-#     return
-
 
 
 
@@ -491,13 +435,6 @@ def chisquare_PDF(x, DOF, avg_reduced_width_square):
     y_norm = y/avg_reduced_width_square
     return y_norm
 
-
-# def sample_resonance_widths(DOF, N_levels, avg_reduced_width_square):
-    
-#     reduced_widths_square = avg_reduced_width_square*sample_chisquare(N_levels, DOF)
-#     partial_widths = 0  # add function with penetrability =2*P(E)*red_wid_sqr
-    
-#     return reduced_widths_square, partial_widths
 
 
 def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF,

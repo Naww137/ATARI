@@ -361,7 +361,7 @@ def create_sammyinp(filename='sammy.inp', \
 
 def write_saminp(filepath, 
                 model,
-                experiment,
+                experimental_model,
                 rto,
                 alphanumeric = []):
     
@@ -388,20 +388,20 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{model.isotope: <9} {model.M: <9} {float(min(experiment.energy_range)): <9} {float(max(experiment.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{model.isotope: <9} {model.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(experiment.parameters["temp"][0]):<8}  {float(experiment.parameters["FP"][0]):<8}  {float(experiment.parameters["FP"][1]):<8}        \n')
+                    f.write(f'  {float(experimental_model.temp[0]):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'):
-                f.write(f'  {float(model.ac):<8}  {float(experiment.parameters["n"][0]):<8}                       0.00000          \n')
+                f.write(f'  {float(model.ac):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
-                f.write(f'{experiment.reaction}\n')
+                f.write(f'{experimental_model.reaction}\n')
 
             else:
                 f.write(line)

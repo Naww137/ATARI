@@ -1,16 +1,12 @@
 import numpy as np
 import pandas as pd
-from copy import deepcopy
-from ATARI.utils.atario import update_dict
 from ATARI.syndat.general_functions import *
-from ATARI.theory.experimental import e_to_t, t_to_e
-from ATARI.models import experimental_model
-
+from ATARI.models.reduction_parameters import transmission_rpi_parameters
 
 
 
 # ========================================================================================
-#            Transmission reduction equations at RPI
+#         Transmission reduction/generation functions for RPI methodology
 # ========================================================================================
 
 def transmission(cr,Cr, Bi, k,K, b0,B0, alpha):
@@ -118,7 +114,7 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
             data = [CovT, CovT_stat, CovT_sys, Jac_sys, Cov_sys]
             
         else:
-            
+            sys_unc = [ab_cov[0][0]]+[ab_cov[1][1]] + list(sys_unc)
             diag_sys = (sys_unc[0]**2)*(dTi_da**2) + (sys_unc[1]**2)*(dTi_db**2) + (sys_unc[2]**2)*(dTi_dk**2) + (sys_unc[3]**2)*(dTi_dK**2) + (sys_unc[4]**2)*(dTi_db0**2) \
                     + (sys_unc[5]**2)*(dTi_dB0**2) + (sys_unc[6]**2)*(dTi_dalpha[0]**2) + (sys_unc[7]**2)*(dTi_dalpha[1]**2) + (sys_unc[8]**2)*(dTi_dalpha[2]**2) + (sys_unc[9]**2)*(dTi_dalpha[3]**2)
 
@@ -289,43 +285,83 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
 
 
 
+class reduction_parameter:
+    def __set_name__(self, owner, name):
+        self._name = name
+
+    def __get__(self, instance, owner) -> tuple:
+        return instance.__dict__[self._name]
+
+    def __set__(self, instance, value):
+        # instance.__dict__[self._name] = date.fromisoformat(value)
+        if isinstance(value, tuple):
+            if len(value) != 2:
+                raise ValueError("Tuple for reduction parameter must be (value, uncertainty)")
+        else:
+            raise ValueError("Must supply tuple for reduction parameter value and uncertainty")
+        instance.__dict__[self._name] = value
+
+
+class transmission_rpi_parameters:
+
+    trigo = reduction_parameter()
+    trigs = reduction_parameter()
+    m1    = reduction_parameter()
+    m2    = reduction_parameter()
+    m3    = reduction_parameter()
+    m4    = reduction_parameter()
+    ks    = reduction_parameter()
+    ko    = reduction_parameter()
+    b0s   = reduction_parameter()
+    b0o   = reduction_parameter()
+    a_b   = reduction_parameter()
+
+    def __init__(self, **kwargs):
+
+        self.trigo  = (9758727,      0)
+        self.trigs  = (18476117,     0)
+        self.m1     = (1,            0.016)
+        self.m2     = (1,            0.008)
+        self.m3     = (1,            0.018)
+        self.m4     = (1,            0.005)
+        self.ks     = (0.563,        0.02402339737495515)
+        self.ko     = (1.471,        0.05576763648617445)
+        self.b0s    = (9.9,          0.1)
+        self.b0o    = (13.4,         0.7)
+        self.a_b    = ([582.7768594580712, 0.05149689096209191],
+                        [[1.14395753e+03,  1.42659922e-1],
+                         [1.42659922e-1,   2.19135003e-05]])
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 
 # ========================================================================================
-#            syndat_T class 
+#            Handler class
 # ========================================================================================
 
 class transmission_rpi:
+    """
+    Handler class for the rpi tranmission reduction model. This holds 
+    """
 
-    def __init__(self, 
-                 reduction_parameters: dict = {}, 
-                 ):
-        
-        default_reduction_parameters = {
-                            'trigo'     :   (9758727,             0),
-                            'trigs'     :   (18476117,            0),
-                            'm1'        :   (1,                   0.016),
-                            'm2'        :   (1,                   0.008),
-                            'm3'        :   (1,                   0.018),
-                            'm4'        :   (1,                   0.005),
-                            'ks'        :   (0.563,               0.02402339737495515),
-                            'ko'        :   (1.471,               0.05576763648617445),
-                            'b0s'       :   (9.9,                 0.1),
-                            'b0o'       :   (13.4,                0.7),
-                            'a_b'        :   (
-                                                [582.7768594580712, 0.05149689096209191],  
+    def __init__(self, **kwargs):
+        self._reduction_parameters = transmission_rpi_parameters(**kwargs)
 
-                                                [[1.14395753e+03,  1.42659922e-1 ],
-                                                 [1.42659922e-1,   2.19135003e-05]]       )
-                            }
+    @property
+    def reduction_parameters(self) -> transmission_rpi_parameters:
+        return self._reduction_parameters
 
-        self.reduction_parameters = update_dict(default_reduction_parameters, reduction_parameters)
+    @reduction_parameters.setter
+    def reduction_parameters(self, reduction_parameters):
+        self._reduction_parameters = reduction_parameters
 
+    @property
+    def neutron_spectrum_triggers(self) -> int:
+        return self.reduction_parameters.trigo[0]
 
-
-
-    def generate_raw_data(self, 
+    def generate_raw_data(self,
                           pw_true,
                           neutron_spectrum,
                           options
@@ -345,35 +381,36 @@ class transmission_rpi:
         """
 
         if len(neutron_spectrum) != len(pw_true):
-            raise ValueError("Experiment open data and sample data are not of the same length, check energy domain")
+            raise ValueError(
+                "Experiment open data and sample data are not of the same length, check energy domain")
         
-        true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, options["Sample TURP"])
+        true_parameter_dict = sample_true_underlying_parameters(vars(self.reduction_parameters), options.sampleTURP)
+        true_reduction_parameters = transmission_rpi_parameters(**true_parameter_dict)
 
-        monitor_array = [true_reduction_parameters["m1"][0], true_reduction_parameters["m2"][0], true_reduction_parameters["m3"][0], true_reduction_parameters["m4"][0]]
-        true_Bi = neutron_background_function(neutron_spectrum.tof, true_reduction_parameters["a_b"][0][0], true_reduction_parameters["a_b"][0][1])
-        
-        raw_data, true_c = inverse_reduction(pw_true, 
-                                            neutron_spectrum,
-                                            options["Sample Counting Noise"], 
-                                            options["Sample TURP"],
-                                            true_reduction_parameters["trigo"][0], 
-                                            true_reduction_parameters["trigs"][0], 
-                                            true_reduction_parameters["ks"][0],
-                                            true_reduction_parameters["ko"][0], 
-                                            true_Bi, 
-                                            true_reduction_parameters["b0s"][0], 
-                                            true_reduction_parameters["b0o"][0], 
-                                            monitor_array, true_reduction_parameters["m1"][1])
-        
+        monitor_array = [true_reduction_parameters.m1[0], true_reduction_parameters.m2[0], true_reduction_parameters.m3[0], true_reduction_parameters.m4[0]]
+        true_Bi = neutron_background_function(neutron_spectrum.tof, true_reduction_parameters.a_b[0][0], true_reduction_parameters.a_b[0][1])
+
+        raw_data, true_c = inverse_reduction(pw_true ,
+                                             neutron_spectrum ,
+                                             options.sample_counting_noise ,
+                                             options.sampleTURP ,
+                                             true_reduction_parameters.trigo[0],
+                                             true_reduction_parameters.trigs[0],
+                                             true_reduction_parameters.ks[0],
+                                             true_reduction_parameters.ko[0],
+                                             true_Bi,
+                                             true_reduction_parameters.b0s[0],
+                                             true_reduction_parameters.b0o[0],
+                                             monitor_array, true_reduction_parameters.m1[1])
+
         return raw_data
-        
-    
+
     def reduce(self, raw_data, neutron_spectrum, options):
         """
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
         """
-        ### Code for re-binning data
+        # Code for re-binning data
         # if self.gfactors is not None:
         #     # Re-bin the data according to new structure
         #     grouped_odat = exp_effects.regroup(self.odat.tof, self.odat.c, self.gfactors, self.cpts)
@@ -383,7 +420,7 @@ class transmission_rpi:
 
         #     # calculate energy and redefine experiment.odat/sdat with the regrouped data
         #     odat['E'] = exp_effects.t_to_e((odat.tof-self.redpar.val.t0)*1e-6, self.redpar.val.FP, True)
-        #     sdat['E'] = exp_effects.t_to_e((odat.tof-self.redpar.val.t0)*1e-6, self.redpar.val.FP, True) 
+        #     sdat['E'] = exp_effects.t_to_e((odat.tof-self.redpar.val.t0)*1e-6, self.redpar.val.FP, True)
         #     self.odat = odat
         #     self.sdat = sdat
 
@@ -398,35 +435,34 @@ class transmission_rpi:
         # self.odat['cps'], self.odat['dcps'] = exp_effects.cts_to_ctr(self.odat.c, self.odat.dc, self.odat.bw*1e-6, self.redpar.val.trigs)
 
         # estimated background function
-        Bi = neutron_background_function(neutron_spectrum.tof, self.reduction_parameters["a_b"][0][0], self.reduction_parameters["a_b"][0][1])
+        Bi = neutron_background_function(neutron_spectrum.tof, self.reduction_parameters.a_b[0][0], self.reduction_parameters.a_b[0][1])
 
         # define systematic uncertainties
         # sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)
-        sys_unc = [self.reduction_parameters[key][1] for key in ['ks','ko','b0s','b0o','m1','m2','m3','m4']]
-            
+        sys_unc = [getattr(self.reduction_parameters, attr)[1]for attr in ['ks', 'ko', 'b0s', 'b0o', 'm1', 'm2', 'm3', 'm4']]
+
         # monitor_array = [self.redpar.val.m1, self.redpar.val.m2, self.redpar.val.m3, self.redpar.val.m4]
-        monitor_array = [self.reduction_parameters["m1"][0], self.reduction_parameters["m2"][0], self.reduction_parameters["m3"][0], self.reduction_parameters["m4"][0]]
-        
+        monitor_array = [self.reduction_parameters.m1[0], self.reduction_parameters.m2[0], self.reduction_parameters.m3[0], self.reduction_parameters.m4[0]]
 
         trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof,
-                                                                    raw_data.c, neutron_spectrum.c, 
-                                                                    raw_data.dc, neutron_spectrum.dc,
-                                                                    neutron_spectrum.bw, 
-                                                                    self.reduction_parameters["trigo"][0], 
-                                                                    self.reduction_parameters["trigs"][0], 
-                                                                    self.reduction_parameters["a_b"][0][0],
-                                                                    self.reduction_parameters["a_b"][0][1], 
-                                                                    self.reduction_parameters["ks"][0], 
-                                                                    self.reduction_parameters["ko"][0], 
-                                                                    Bi, 
-                                                                    self.reduction_parameters["b0s"][0],
-                                                                    self.reduction_parameters["b0o"][0], 
-                                                                    monitor_array, 
-                                                                    sys_unc, 
-                                                                    self.reduction_parameters["a_b"][1], 
-                                                                    options["Calculate Covariance"])
+                                                              raw_data.c, neutron_spectrum.c,
+                                                              raw_data.dc, neutron_spectrum.dc,
+                                                              neutron_spectrum.bw,
+                                                              self.reduction_parameters.trigo[0],
+                                                              self.reduction_parameters.trigs[0],
+                                                              self.reduction_parameters.a_b[0][0],
+                                                              self.reduction_parameters.a_b[0][1],
+                                                              self.reduction_parameters.ks[0],
+                                                              self.reduction_parameters.ko[0],
+                                                              Bi,
+                                                              self.reduction_parameters.b0s[0],
+                                                              self.reduction_parameters.b0o[0],
+                                                              monitor_array,
+                                                              sys_unc,
+                                                              self.reduction_parameters.a_b[1],
+                                                              options.calculate_covariance)
 
-        if options["Calculate Covariance"]:
+        if options.calculate_covariance:
             self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
             trans['exp_unc'] = np.sqrt(np.diag(self.CovT))
             self.CovT = pd.DataFrame(self.CovT, columns=trans.E, index=trans.E)
@@ -443,3 +479,162 @@ class transmission_rpi:
         # self.neutron_spectrum['dcps'] = rates[3]
 
         return trans
+
+
+
+
+    # # def __init__(self, 
+    # #              reduction_parameters= None, #: Optional[T_rpi_parameters] = None,
+    # #              ):
+        
+    #     # default_reduction_parameters = {
+    #     #                     'trigo'     :   (9758727,             0),
+    #     #                     'trigs'     :   (18476117,            0),
+    #     #                     'm1'        :   (1,                   0.016),
+    #     #                     'm2'        :   (1,                   0.008),
+    #     #                     'm3'        :   (1,                   0.018),
+    #     #                     'm4'        :   (1,                   0.005),
+    #     #                     'ks'        :   (0.563,               0.02402339737495515),
+    #     #                     'ko'        :   (1.471,               0.05576763648617445),
+    #     #                     'b0s'       :   (9.9,                 0.1),
+    #     #                     'b0o'       :   (13.4,                0.7),
+    #     #                     'a_b'        :   (
+    #     #                                         [582.7768594580712, 0.05149689096209191],  
+
+    #     #                                         [[1.14395753e+03,  1.42659922e-1 ],
+    #     #                                          [1.42659922e-1,   2.19135003e-05]]       )
+    #     #                     }
+    #     # self.reduction_parameters = update_dict(default_reduction_parameters, reduction_parameters)
+
+    # def __init__(self, **kwargs):
+        
+    #     self._reduction_parameters = transmission_rpi_parameters(**kwargs)
+
+    # @property
+    # def reduction_parameters(self): # -> Optional[T_rpi_parameters]:
+    #     return self._reduction_parameters
+
+    # @reduction_parameters.setter
+    # def reduction_parameters(self, reduction_parameters):
+    #     # check_type('geometry', geometry, openmc.Geometry)
+    #     self._reduction_parameters = reduction_parameters
+
+
+    # def generate_raw_data(self, 
+    #                       pw_true,
+    #                       neutron_spectrum,
+    #                       options
+    #                       ) -> pd.DataFrame:
+    #     """
+    #     Generates a set of noisy, sample in count data from a theoretical cross section via the novel un-reduction method (Walton, et al.).
+
+    #     Parameters
+    #     ----------
+    #     add_noise : bool
+    #         Whether or not to add noise to the generated sample in data.
+
+    #     Raises
+    #     ------
+    #     ValueError
+    #         _description_
+    #     """
+
+    #     if len(neutron_spectrum) != len(pw_true):
+    #         raise ValueError("Experiment open data and sample data are not of the same length, check energy domain")
+        
+    #     true_reduction_parameters = sample_true_underlying_parameters(vars(self.reduction_parameters), options["Sample TURP"])
+
+    #     monitor_array = [true_reduction_parameters["m1"][0], true_reduction_parameters["m2"][0], true_reduction_parameters["m3"][0], true_reduction_parameters["m4"][0]]
+    #     true_Bi = neutron_background_function(neutron_spectrum.tof, true_reduction_parameters["a_b"][0][0], true_reduction_parameters["a_b"][0][1])
+        
+    #     raw_data, true_c = inverse_reduction(pw_true, 
+    #                                         neutron_spectrum,
+    #                                         options["Sample Counting Noise"], 
+    #                                         options["Sample TURP"],
+    #                                         true_reduction_parameters["trigo"][0], 
+    #                                         true_reduction_parameters["trigs"][0], 
+    #                                         true_reduction_parameters["ks"][0],
+    #                                         true_reduction_parameters["ko"][0], 
+    #                                         true_Bi, 
+    #                                         true_reduction_parameters["b0s"][0], 
+    #                                         true_reduction_parameters["b0o"][0], 
+    #                                         monitor_array, true_reduction_parameters["m1"][1])
+        
+    #     return raw_data
+        
+    
+    # def reduce(self, raw_data, neutron_spectrum, options):
+    #     """
+    #     Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
+
+    #     """
+    #     ### Code for re-binning data
+    #     # if self.gfactors is not None:
+    #     #     # Re-bin the data according to new structure
+    #     #     grouped_odat = exp_effects.regroup(self.odat.tof, self.odat.c, self.gfactors, self.cpts)
+    #     #     grouped_sdat = exp_effects.regroup(self.sdat.tof, self.sdat.c, self.gfactors, self.cpts)
+    #     #     odat = pd.DataFrame(grouped_odat, columns=['tof','bw','c','dc'])
+    #     #     sdat = pd.DataFrame(grouped_sdat, columns=['tof','bw','c','dc'])
+
+    #     #     # calculate energy and redefine experiment.odat/sdat with the regrouped data
+    #     #     odat['E'] = exp_effects.t_to_e((odat.tof-self.redpar.val.t0)*1e-6, self.redpar.val.FP, True)
+    #     #     sdat['E'] = exp_effects.t_to_e((odat.tof-self.redpar.val.t0)*1e-6, self.redpar.val.FP, True) 
+    #     #     self.odat = odat
+    #     #     self.sdat = sdat
+
+    #     # create transmission object
+    #     trans = pd.DataFrame()
+    #     trans['tof'] = raw_data.tof
+    #     trans['E'] = raw_data.E
+    #     trans['true'] = raw_data.true
+
+    #     # get count rates for sample in data
+    #     # self.sdat['cps'], self.sdat['dcps'] = exp_effects.cts_to_ctr(self.sdat.c, self.sdat.dc, self.sdat.bw*1e-6, self.redpar.val.trigs)
+    #     # self.odat['cps'], self.odat['dcps'] = exp_effects.cts_to_ctr(self.odat.c, self.odat.dc, self.odat.bw*1e-6, self.redpar.val.trigs)
+
+    #     # estimated background function
+    #     Bi = neutron_background_function(neutron_spectrum.tof, self.reduction_parameters["a_b"][0][0], self.reduction_parameters["a_b"][0][1])
+
+    #     # define systematic uncertainties
+    #     # sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)
+    #     sys_unc = [self.reduction_parameters[key][1] for key in ['ks','ko','b0s','b0o','m1','m2','m3','m4']]
+            
+    #     # monitor_array = [self.redpar.val.m1, self.redpar.val.m2, self.redpar.val.m3, self.redpar.val.m4]
+    #     monitor_array = [self.reduction_parameters["m1"][0], self.reduction_parameters["m2"][0], self.reduction_parameters["m3"][0], self.reduction_parameters["m4"][0]]
+        
+
+    #     trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof,
+    #                                                                 raw_data.c, neutron_spectrum.c, 
+    #                                                                 raw_data.dc, neutron_spectrum.dc,
+    #                                                                 neutron_spectrum.bw, 
+    #                                                                 self.reduction_parameters["trigo"][0], 
+    #                                                                 self.reduction_parameters["trigs"][0], 
+    #                                                                 self.reduction_parameters["a_b"][0][0],
+    #                                                                 self.reduction_parameters["a_b"][0][1], 
+    #                                                                 self.reduction_parameters["ks"][0], 
+    #                                                                 self.reduction_parameters["ko"][0], 
+    #                                                                 Bi, 
+    #                                                                 self.reduction_parameters["b0s"][0],
+    #                                                                 self.reduction_parameters["b0o"][0], 
+    #                                                                 monitor_array, 
+    #                                                                 sys_unc, 
+    #                                                                 self.reduction_parameters["a_b"][1], 
+    #                                                                 options["Calculate Covariance"])
+
+    #     if options["Calculate Covariance"]:
+    #         self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
+    #         trans['exp_unc'] = np.sqrt(np.diag(self.CovT))
+    #         self.CovT = pd.DataFrame(self.CovT, columns=trans.E, index=trans.E)
+    #         self.CovT.index.name = None
+    #     else:
+    #         diag_tot, diag_stat, diag_sys = unc_data
+    #         trans['exp_unc'] = np.sqrt(diag_tot)
+    #         self.CovT = None
+
+    #     # define data cps
+    #     # self.neutron_spectrum['cps'] = rates[0]
+    #     # self.neutron_spectrum['dcps'] = rates[1]
+    #     # self.neutron_spectrum['cps'] = rates[2]
+    #     # self.neutron_spectrum['dcps'] = rates[3]
+
+    #     return trans

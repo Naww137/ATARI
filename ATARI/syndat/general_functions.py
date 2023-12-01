@@ -116,12 +116,12 @@ def gamma_background_function():
 def approximate_neutron_spectrum_Li6det(energy_grid, smooth, FP, t0, trigo):
 
         def open_count_rate(tof):
-            return (2212.70180199 * np.exp(-3365.55134779*tof*1e-6) + 23.88486286) 
+            return (2212.70180199 * np.exp(-3365.55134779*tof*1e-9) + 23.88486286) 
 
         # calculate a tof count rate spectra, convert to counts 
-        tof = e_to_t(energy_grid, FP, True)*1e6 + t0 
+        tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
         cps_open_approx = open_count_rate(tof)
-        bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-6)
+        bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
         cts_open_approx = cps_open_approx * bin_width * trigo
 
         # add noise
@@ -135,7 +135,7 @@ def approximate_neutron_spectrum_Li6det(energy_grid, smooth, FP, t0, trigo):
                                         'c'     :   cts_open_measured,
                                         'dc'    :   np.sqrt(cts_open_measured)})
 
-        open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-6, FP, True) 
+        open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-9, FP, True) 
 
         return open_dataframe
 

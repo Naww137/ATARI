@@ -44,110 +44,120 @@ def quant_vec_sum(a,b):
 
 
 class Particle_Pair:
-    """
-    _summary_
+    def __init__(self, **kwargs):
+        self.isotope = "Ta181"
+        self.resonance_ladder = pd.DataFrame()
+        self.formalism = "XCT"
+        self.spin_groups = {}
 
-    _extended_summary_
+        self.ac = 8.127
+        self.M = 180.94803
+        self.m = 1
+        self.I = 3.5
+        self.i = 0.5
+        self.l_max = 2
 
-    Methods
-    -------
-    quant_vec_sum: 
-        Calculates the quantum vector sum of two angular momenta.
-    map_quantum_numbers:
-        Maps the possible quantum numbers for pair.
-    sample_all_Jpi:
-        Samples a full resonance parameter ladder for each possible spin group.
-    """
+        # define some constants
+        self._hbar = 6.582119569e-16  # eV-s
+        self._c = 2.99792458e8  # m/s
+        self._m_eV = 939.565420e6  # eV/c^2
+        ac_expected = (1.23*self.M**(1/3))+0.8  # fermi or femtometers
 
-    def __init__(self, isotope, formalism,
-                 ac, M, m, I, i, l_max,
-                    input_options={},   
-                 spin_groups={}
-                    ):
-        """
-        Initialization of particle pair object for a given reaction.
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
-        The particle_pair class houses information about the incident and target particle for a reaction of interest. 
-        The methods for this class include functions to calculate the open channels 
+    def __repr__(self):
+        string=''
+        for prop in dir(self):
+            if not callable(getattr(self, prop)) and not prop.startswith('_'):
+                string+= f"{prop}: {getattr(self, prop)}\n"
+        return string
 
-        Parameters
-        ----------
-        ac : float
-            Scattering channel radius in 1e-12 cm.
-        M : float or int
-            Mass of the target nucleus.
-        m : float or int
-            Mass of the incident particle.
-        I : float or int
-            Spin and parity of the target particle.
-        i : float or int
-            Spin and parity of the incident particle.
-        l_max : int
-            Highest order waveform to consider (l-value).
-        """
+    @property
+    def isotope(self):
+        return self._isotope
+    @isotope.setter
+    def isotope(self, isotope):
+        self._isotope = isotope
 
-        ### Default options
-        default_options = { 'Sample Physical Constants' :   False ,
-                            'Use FUDGE'                 :   False,
-                            'Sample Average Parameters' :   False  } 
-        
-        ### redefine options dictionary if any input options are given
-        options = default_options
-        for old_parameter in default_options:
-            if old_parameter in input_options:
-                options.update({old_parameter:input_options[old_parameter]})
-        for input_parameter in input_options:
-            if input_parameter not in default_options:
-                raise ValueError('User provided an unrecognized input option')
-        self.options = options
+    @property
+    def resonance_ladder(self):
+        return self._resonance_ladder
+    @resonance_ladder.setter
+    def resonance_ladder(self, resonance_ladder):
+        self._resonance_ladder = resonance_ladder
 
-        ### Gather options
-        self.sample_physical_constants = self.options['Sample Physical Constants']
-        self.use_fudge = self.options['Use FUDGE']
-        self.sample_average_parameters = self.options['Sample Average Parameters']
-        # TODO: implement 3 options above
-        if self.sample_physical_constants:
-            raise ValueError('Need to implement "Sample Physical Constants" capability')
+    @property
+    def formalism(self):
+        return self._formalism
+    @formalism.setter
+    def formalism(self, formalism):
+        self._formalism = formalism
 
-        ### Gather other variables passed to __init__
-        self.spin_groups = copy(spin_groups)
-        self.isotope = isotope
-        self.formalism = formalism
+    @property
+    def spin_groups(self):
+        return self._spin_groups
+    @spin_groups.setter
+    def spin_groups(self, spin_groups):
+        self._spin_groups = spin_groups
+
+    @property
+    def ac(self):
+        return self._ac
+    @ac.setter
+    def ac(self, ac):
+        self._ac = ac
+
+    @property
+    def M(self):
+        return self._M
+    @M.setter
+    def M(self, M):
+        self._M = M
+
+    @property
+    def m(self):
+        return self._m
+    @m.setter
+    def m(self, m):
+        self._m = m
+
+    @property
+    def I(self):
+        return self._I
+    @I.setter
+    def I(self, I):
+        self._I = I
+
+    @property
+    def i(self):
+        return self._i
+    @i.setter
+    def i(self, i):
+        self._i = i
+
+    @property
+    def l_max(self):
+        return self._l_max
+    @l_max.setter
+    def l_max(self, l_max):
+        self._l_max = l_max
 
 
-        ### Gather physical constants until sampling function is implemented
-        # assuming boundary condition selected s.t. shift factor is eliminated for s wave but not others!
-        if ac < 1e-7:
-            print("WARNING: scattering radius seems to be given in m rather than sqrt(barns) a.k.a. cm^-12")
-        self.ac = ac # sqrt(barns) == cm^-12
-        self.M = M # amu
-        self.m = m # 1
-        self.I = I
-        self.i = i
-        self.l_max = l_max
-        # generalized
-        ac_expected = (1.23*M**(1/3))+0.8 # fermi or femtometers
-
-        ### define some constants
-        self.hbar = 6.582119569e-16 # eV-s
-        self.c = 2.99792458e8 # m/s
-        self.m_eV = 939.565420e6 # eV/c^2
-
-        return 
 
 
-
-    def add_spin_group(self, Jpi,J_ID, D_avg, Gn_avg, Gn_dof, Gg_avg, Gg_dof, print=False):
+    def add_spin_group(self, Jpi, J_ID, D_avg, Gn_avg, Gn_dof, Gg_avg, Gg_dof, print=False):
         res_par_avg = make_res_par_avg(J_ID,
-                                    D_avg, 
-                                    Gn_avg,
-                                    Gn_dof, 
-                                    Gg_avg, 
-                                    Gg_dof, 
-                                    print = False)
+                                       D_avg,
+                                       Gn_avg,
+                                       Gn_dof,
+                                       Gg_avg,
+                                       Gg_dof,
+                                       print=False)
         self.spin_groups[Jpi] = res_par_avg
 
         return
+
 
 
     def map_quantum_numbers(self, print_out):
@@ -185,69 +195,70 @@ class Particle_Pair:
         (2.0, 2, [1.0, 1.0]),
         (3.0, 1, [1.0])])
         """
-        
+
         # define object atributes
         I = self.I
         i = self.i
         l_wave_max = self.l_max
 
         # now perform calculations
-        # Jn = []; Jp = []; 
+        # Jn = []; Jp = [];
         Jall = []
-        S = quant_vec_sum(I,i)
+        S = quant_vec_sum(I, i)
         L = range(l_wave_max+1)
 
-        i_parity = (-1 if i<0 else 1)
-        I_parity = (-1 if I<0 else 1)
+        i_parity = (-1 if i < 0 else 1)
+        I_parity = (-1 if I < 0 else 1)
         S_parity = i_parity*I_parity
 
         possible_Jpi = {}
-        J_negative = []; J_positive = []
+        J_negative = []
+        J_positive = []
         J_all = []
         for i_l, l in enumerate(L):
             this_l = {}
-            
+
             l_parity = (-1)**l
             J_parity = S_parity*l_parity
-            
+
             for i_s, s in enumerate(S):
-                js = quant_vec_sum(s,l)
+                js = quant_vec_sum(s, l)
                 this_l[f's={s}'] = js
                 for j in js:
                     if J_parity == 1:
                         # J_positive.append([l,s,j])
-                        J_all.append([l,s,j])
+                        J_all.append([l, s, j])
                     if J_parity == -1:
                         # J_negative.append([l,s,j])
-                        J_all.append([l,s,-j])
-                
+                        J_all.append([l, s, -j])
+
             possible_Jpi[f'l={l}'] = this_l
-                
+
         if len(J_all) > 0:
             J_total = np.array(J_all)
-            J_unique = np.unique(J_total[:,2])
+            J_unique = np.unique(J_total[:, 2])
 
             for j in J_unique:
-                entrance_channels = np.count_nonzero(J_total[:,2] == j)
-                
-                ls = []; ss = []
-                for i, jtot in enumerate(J_total[:,2]):
+                entrance_channels = np.count_nonzero(J_total[:, 2] == j)
+
+                ls = []
+                ss = []
+                for i, jtot in enumerate(J_total[:, 2]):
                     if jtot == j:
-                        ls.append(int(J_total[i,0]))
-                        ss.append(J_total[i,1])
-                        
-                Jall.append((j,entrance_channels,ls))
-            
-            
+                        ls.append(int(J_total[i, 0]))
+                        ss.append(J_total[i, 1])
+
+                Jall.append((j, entrance_channels, ls))
+
         if print_out:
-            print()
-            print('The following arrays describe all possible spin groups for a each parity.\n\
-    The data is given as a tuple where the first value is the integer \n\
-    or half integer total quantum spin J and the second value is the \n\
-    number of entrance channels for that spin group. \n\
-    * See the dictionary "possible_Jpi" for a nested packing structure.')
-        
-            print()
+    #         print()
+    #         print('The following arrays describe all possible spin groups for a each parity.\n\
+    # The data is given as a tuple where the first value is the integer \n\
+    # or half integer total quantum spin J and the second value is the \n\
+    # number of entrance channels for that spin group. \n\
+    # * See the dictionary "possible_Jpi" for a nested packing structure.')
+
+            # print()
             print('Spin group data for all parity\n(Jpi, #Chs, l-waves)')
             for each in Jall:
                 print(each)
@@ -255,12 +266,11 @@ class Particle_Pair:
         # define new attributes for particle_pair object
         # self.Jn = Jn
         # self.Jp = Jp
-        self.J = Jall # Jn + Jp
+        self.J = Jall  # Jn + Jp
 
         return
 
-
-    def sample_resonance_ladder(self, Erange,
+    def sample_resonance_ladder(self, energy_range,
                                 ensemble='NNE',
                                 rng=None, seed=None):
         """
@@ -296,19 +306,19 @@ class Particle_Pair:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random  # uses np.random.seed
             else:
-                rng = np.random.default_rng(seed) # generates rng from provided seed
+                # generates rng from provided seed
+                rng = np.random.default_rng(seed)
 
-        resonance_ladder = sample_resonance_ladder(Erange, self.spin_groups, ensemble=ensemble, rng=rng)
-        # self.resonance_ladder = resonance_ladder
+        resonance_ladder = sample_resonance_ladder(
+            energy_range, self.spin_groups, ensemble=ensemble, rng=rng)
+        self.resonance_ladder = resonance_ladder
         return resonance_ladder
-
-
 
     def get_sammy_spingroups(self):
         if len(self.spin_groups.keys()) == 2:
-            sgstring="""
+            sgstring = """
   1      1    0  3.0       1.0  3.5
     1    1    0    0       3.0
   2      1    0  4.0       1.0  3.5
@@ -321,8 +331,293 @@ class Particle_Pair:
 """
         else:
             raise ValueError("Update sammy spin group formatter")
-        
+
         return sgstring
+
+
+
+
+
+# class Particle_Pair:
+#     """
+#     _summary_
+
+#     _extended_summary_
+
+#     Methods
+#     -------
+#     quant_vec_sum: 
+#         Calculates the quantum vector sum of two angular momenta.
+#     map_quantum_numbers:
+#         Maps the possible quantum numbers for pair.
+#     sample_all_Jpi:
+#         Samples a full resonance parameter ladder for each possible spin group.
+#     """
+
+#     def __init__(self, isotope, formalism,
+#                  ac, M, m, I, i, l_max,
+#                     input_options={},   
+#                  spin_groups={}
+#                     ):
+#         """
+#         Initialization of particle pair object for a given reaction.
+
+#         The particle_pair class houses information about the incident and target particle for a reaction of interest. 
+#         The methods for this class include functions to calculate the open channels 
+
+#         Parameters
+#         ----------
+#         ac : float
+#             Scattering channel radius in 1e-12 cm.
+#         M : float or int
+#             Mass of the target nucleus.
+#         m : float or int
+#             Mass of the incident particle.
+#         I : float or int
+#             Spin and parity of the target particle.
+#         i : float or int
+#             Spin and parity of the incident particle.
+#         l_max : int
+#             Highest order waveform to consider (l-value).
+#         """
+
+#         ### Default options
+#         default_options = { 'Sample Physical Constants' :   False ,
+#                             'Use FUDGE'                 :   False,
+#                             'Sample Average Parameters' :   False  } 
+        
+#         ### redefine options dictionary if any input options are given
+#         options = default_options
+#         for old_parameter in default_options:
+#             if old_parameter in input_options:
+#                 options.update({old_parameter:input_options[old_parameter]})
+#         for input_parameter in input_options:
+#             if input_parameter not in default_options:
+#                 raise ValueError('User provided an unrecognized input option')
+#         self.options = options
+
+#         ### Gather options
+#         self.sample_physical_constants = self.options['Sample Physical Constants']
+#         self.use_fudge = self.options['Use FUDGE']
+#         self.sample_average_parameters = self.options['Sample Average Parameters']
+#         # TODO: implement 3 options above
+#         if self.sample_physical_constants:
+#             raise ValueError('Need to implement "Sample Physical Constants" capability')
+
+#         ### Gather other variables passed to __init__
+#         self.spin_groups = copy(spin_groups)
+#         self.isotope = isotope
+#         self.formalism = formalism
+
+
+#         ### Gather physical constants until sampling function is implemented
+#         # assuming boundary condition selected s.t. shift factor is eliminated for s wave but not others!
+#         if ac < 1e-7:
+#             print("WARNING: scattering radius seems to be given in m rather than sqrt(barns) a.k.a. cm^-12")
+#         self.ac = ac # sqrt(barns) == cm^-12
+#         self.M = M # amu
+#         self.m = m # 1
+#         self.I = I
+#         self.i = i
+#         self.l_max = l_max
+#         # generalized
+#         ac_expected = (1.23*M**(1/3))+0.8 # fermi or femtometers
+
+#         ### define some constants
+#         self.hbar = 6.582119569e-16 # eV-s
+#         self.c = 2.99792458e8 # m/s
+#         self.m_eV = 939.565420e6 # eV/c^2
+
+#         return 
+
+
+
+#     def add_spin_group(self, Jpi,J_ID, D_avg, Gn_avg, Gn_dof, Gg_avg, Gg_dof, print=False):
+#         res_par_avg = make_res_par_avg(J_ID,
+#                                     D_avg, 
+#                                     Gn_avg,
+#                                     Gn_dof, 
+#                                     Gg_avg, 
+#                                     Gg_dof, 
+#                                     print = False)
+#         self.spin_groups[Jpi] = res_par_avg
+
+#         return
+
+
+#     def map_quantum_numbers(self, print_out):
+#         """
+#         Maps the possible quantum numbers for pair.
+
+#         This function maps out the possible quantum spin numbers (Jpi) for a given
+#         particle pair up to some maximum considered incident waveform (l-wave).
+
+#         Parameters
+#         ----------
+#         particle_pair : syndat object
+#             Particle_pair object containing information about the reaction being studied.
+#         print_out : bool
+#             User option to print out quantum spin (J) mapping to console.
+
+#         Returns
+#         -------
+#         Jn : array-like
+#             List containing possible J, # of contibuting channels, and contibuting 
+#             waveforms for negative parity. Formatted as (J,#chs,[l-wave, l-wave])
+#         Jp : array-like
+#             List containing possible J, # of contibuting channels, and contibuting 
+#             waveforms for positive parity. Formatted as (J,#chs,[l-wave, l-wave])
+#         Notes
+#         -----
+        
+#         Examples
+#         --------
+#         >>> from sample_resparm import sample_spin_groups
+#         >>> sample_spin_groups.map_quantum_numbers(3/2,1/2,2, False)
+#         ([(1.0, 1, [0.0]), (2.0, 1, [0.0])],
+#         [(0.0, 1, [1.0]),
+#         (1.0, 2, [1.0, 1.0]),
+#         (2.0, 2, [1.0, 1.0]),
+#         (3.0, 1, [1.0])])
+#         """
+        
+#         # define object atributes
+#         I = self.I
+#         i = self.i
+#         l_wave_max = self.l_max
+
+#         # now perform calculations
+#         # Jn = []; Jp = []; 
+#         Jall = []
+#         S = quant_vec_sum(I,i)
+#         L = range(l_wave_max+1)
+
+#         i_parity = (-1 if i<0 else 1)
+#         I_parity = (-1 if I<0 else 1)
+#         S_parity = i_parity*I_parity
+
+#         possible_Jpi = {}
+#         J_negative = []; J_positive = []
+#         J_all = []
+#         for i_l, l in enumerate(L):
+#             this_l = {}
+            
+#             l_parity = (-1)**l
+#             J_parity = S_parity*l_parity
+            
+#             for i_s, s in enumerate(S):
+#                 js = quant_vec_sum(s,l)
+#                 this_l[f's={s}'] = js
+#                 for j in js:
+#                     if J_parity == 1:
+#                         # J_positive.append([l,s,j])
+#                         J_all.append([l,s,j])
+#                     if J_parity == -1:
+#                         # J_negative.append([l,s,j])
+#                         J_all.append([l,s,-j])
+                
+#             possible_Jpi[f'l={l}'] = this_l
+                
+#         if len(J_all) > 0:
+#             J_total = np.array(J_all)
+#             J_unique = np.unique(J_total[:,2])
+
+#             for j in J_unique:
+#                 entrance_channels = np.count_nonzero(J_total[:,2] == j)
+                
+#                 ls = []; ss = []
+#                 for i, jtot in enumerate(J_total[:,2]):
+#                     if jtot == j:
+#                         ls.append(int(J_total[i,0]))
+#                         ss.append(J_total[i,1])
+                        
+#                 Jall.append((j,entrance_channels,ls))
+            
+            
+#         if print_out:
+#             print()
+#             print('The following arrays describe all possible spin groups for a each parity.\n\
+#     The data is given as a tuple where the first value is the integer \n\
+#     or half integer total quantum spin J and the second value is the \n\
+#     number of entrance channels for that spin group. \n\
+#     * See the dictionary "possible_Jpi" for a nested packing structure.')
+        
+#             print()
+#             print('Spin group data for all parity\n(Jpi, #Chs, l-waves)')
+#             for each in Jall:
+#                 print(each)
+
+#         # define new attributes for particle_pair object
+#         # self.Jn = Jn
+#         # self.Jp = Jp
+#         self.J = Jall # Jn + Jp
+
+#         return
+
+
+#     def sample_resonance_ladder(self, Erange,
+#                                 ensemble='NNE',
+#                                 rng=None, seed=None):
+#         """
+#         Samples a full resonance ladder.
+
+#         _extended_summary_
+
+#         Parameters
+#         ----------
+#         Erange : array-like
+#             _description_
+#         spin_groups : list
+#             List of tuples defining the spin groups being considered.
+#         average_parameters : DataFrame
+#             DataFrame containing the average resonance parameters for each spin group.
+#         ensemble : "NNE", "GOE", "GUE", "GSE", or "Poisson"
+#             The level-spacing distribution to sample from:
+#             NNE : Nearest Neighbor Ensemble
+#             GOE : Gaussian Orthogonal Ensemble
+#             GUE : Gaussian Unitary Ensemble
+#             GSE : Gaussian Symplectic Ensemble
+#             Poisson : Poisson Ensemble
+#         rng : np.random.Generator or None
+#             Numpy random number generator object. Default is None.
+#         seed : int or None
+#             Random number generator seed. Only used when rng is None. Default is None.
+
+#         Returns
+#         -------
+#         DataFrame
+#             Resonance ladder information.
+#         """
+#         # Random number generator:
+#         if rng is None:
+#             if seed is None:
+#                 rng = np.random # uses np.random.seed
+#             else:
+#                 rng = np.random.default_rng(seed) # generates rng from provided seed
+
+#         resonance_ladder = sample_resonance_ladder(Erange, self.spin_groups, ensemble=ensemble, rng=rng)
+#         self.resonance_ladder = resonance_ladder
+#         return resonance_ladder
+
+
+
+#     def get_sammy_spingroups(self):
+#         if len(self.spin_groups.keys()) == 2:
+#             sgstring="""
+#   1      1    0  3.0       1.0  3.5
+#     1    1    0    0       3.0
+#   2      1    0  4.0       1.0  3.5
+#     1    1    0    0       4.0
+# """
+#         elif len(self.spin_groups.keys()) == 1:
+#             sgstring = """
+#   1      1    0  3.0       1.0  3.5
+#     1    1    0    0       3.0
+# """
+#         else:
+#             raise ValueError("Update sammy spin group formatter")
+        
+#         return sgstring
 
 
 ### legacy code 

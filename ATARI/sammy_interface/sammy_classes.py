@@ -2,7 +2,7 @@
 from typing import Optional, Union
 from dataclasses import dataclass, field
 from ATARI.models.particle_pair import Particle_Pair
-from ATARI.models.experimental_model import experimental_model
+from ATARI.models.experimental_model import Experimental_Model
 from pandas import DataFrame, Series
 from numpy import ndarray
 
@@ -109,7 +109,7 @@ class SammyInputData:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
     template: str
-    experiment: experimental_model
+    experiment: Experimental_Model
     experimental_data: Optional[Union[DataFrame,ndarray]] = None
     experimental_cov: Optional[DataFrame] = None
     energy_grid: Optional[arraytype_id] = None
@@ -165,7 +165,7 @@ class SammyInputDataYW:
 
     datasets : list[Union[DataFrame, ndarray]]
     templates : list[str]
-    experiments: list[experimental_model]
+    experiments: list[Experimental_Model]
 
     max_steps: int = 1
     iterations: int = 2

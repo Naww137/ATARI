@@ -39,6 +39,7 @@ class syndatOUT:
 
 
 
+
 class syndatOPT:
     """
     Options and settings for a single syndat case.
@@ -76,7 +77,13 @@ class syndatOPT:
 
         for key, value in kwargs.items():
             setattr(self, key, value)
-        
+    
+    def __repr__(self):
+        string=''
+        for prop in dir(self):
+            if not callable(getattr(self, prop)) and not prop.startswith('_'):
+                string += f"{prop}: {getattr(self, prop)}\n"
+        return string
     
     @property
     def sampleRES(self):
@@ -167,6 +174,9 @@ class syndat:
     neutron_spectrum: pd.DataFrame = pd.DataFrame()
         Optional input of a measured, experimental neutron spectrum if this data is accessable.
     
+    datasets: list
+        List of sampled syndatOUT samples from the current model.
+    
     """
 
     def __init__(self, 
@@ -190,6 +200,7 @@ class syndat:
         ### some conveinient definitions
         self.reaction = self.experimental_model.reaction
         self.pw_true = pd.DataFrame()
+        self.datasets = []
 
     
     @property
@@ -201,9 +212,34 @@ class syndat:
 
 
     def sample(self, 
-               sammyRTO,
-               num_samples=1
+               sammyRTO=None,
+               num_samples=1,
+               pw_true = pd.DataFrame()
                ):
+        """
+        Sample from the syndat model. 
+        The samples are stored in the datasets attribute.
+
+        Parameters
+        ----------
+        sammyRTO : _type_
+            Sammy runtime options
+        num_samples : int, optional
+            Number of samples to draw from the syndat model, by default 1
+        pw_true : _type_, optional
+            _description_, by default pd.DataFrame()
+
+        Raises
+        ------
+        ValueError
+            _description_
+        """
+        
+        if not pw_true.empty and self.options.sampleRES:
+                raise ValueError("User provided a pw_true but also asked to sampleRES")
+        if pw_true.empty and sammyRTO is None:
+            raise ValueError("User did not supply a sammyRTO or a pw_true, one of these is needed")
+        self.pw_true = pw_true
 
         datasets = []
         for i in range(num_samples):
@@ -213,9 +249,11 @@ class syndat:
             
             ### generate pointwise true from experimental model
             if self.pw_true.empty or False or self.options.sampleRES: #options.sample_experimental_model
-                self.generate_true_experimental_objects(sammyRTO) # calculate pw_truw with sammy
+                assert sammyRTO is not None
+                self.pw_true = self.generate_true_experimental_objects(sammyRTO) # calculate pw_truw with sammy
             else:
                 pass # use existing pw_true from experimental model
+            self.pw_true["tof"] = e_to_t(self.pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]
 
             ### generate raw data from generative reduction model
             self.generate_raw_observables(self.neutron_spectrum)
@@ -231,7 +269,7 @@ class syndat:
         self.datasets = datasets
         return
     
-    
+
     def tohdf5(self):
         return
 
@@ -261,9 +299,9 @@ class syndat:
             true = "theo_xs"
         pw_true = sammyOUT.pw.loc[:, ["E", true]]
         pw_true.rename(columns={true: "true"}, inplace=True)
-        pw_true["tof"] = e_to_t(pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]
+        # pw_true["tof"] = e_to_t(pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]
         
-        self.pw_true = pw_true
+        return pw_true
 
 
     

@@ -325,7 +325,7 @@ class transmission_rpi_parameters:
 #            Handler class
 # ========================================================================================
 
-class transmission_rpi:
+class Transmission_RPI:
     """
     Handler class for the rpi tranmission measurement model. 
     This holds parameters and methods used to both generate raw observable data and reduce it to transmission.
@@ -337,7 +337,6 @@ class transmission_rpi:
     @property
     def reduction_parameters(self) -> transmission_rpi_parameters:
         return self._reduction_parameters
-
     @reduction_parameters.setter
     def reduction_parameters(self, reduction_parameters):
         self._reduction_parameters = reduction_parameters

@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from ATARI.syndat.general_functions import *
-from ATARI.models.reduction_parameters import transmission_rpi_parameters
 
 
 
@@ -284,37 +283,22 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
 
 
 
-
-class reduction_parameter:
-    def __set_name__(self, owner, name):
-        self._name = name
-
-    def __get__(self, instance, owner) -> tuple:
-        return instance.__dict__[self._name]
-
-    def __set__(self, instance, value):
-        # instance.__dict__[self._name] = date.fromisoformat(value)
-        if isinstance(value, tuple):
-            if len(value) != 2:
-                raise ValueError("Tuple for reduction parameter must be (value, uncertainty)")
-        else:
-            raise ValueError("Must supply tuple for reduction parameter value and uncertainty")
-        instance.__dict__[self._name] = value
+from ATARI.models.structuring import parameter
 
 
 class transmission_rpi_parameters:
 
-    trigo = reduction_parameter()
-    trigs = reduction_parameter()
-    m1    = reduction_parameter()
-    m2    = reduction_parameter()
-    m3    = reduction_parameter()
-    m4    = reduction_parameter()
-    ks    = reduction_parameter()
-    ko    = reduction_parameter()
-    b0s   = reduction_parameter()
-    b0o   = reduction_parameter()
-    a_b   = reduction_parameter()
+    trigo = parameter()
+    trigs = parameter()
+    m1    = parameter()
+    m2    = parameter()
+    m3    = parameter()
+    m4    = parameter()
+    ks    = parameter()
+    ko    = parameter()
+    b0s   = parameter()
+    b0o   = parameter()
+    a_b   = parameter()
 
     def __init__(self, **kwargs):
 
@@ -343,7 +327,8 @@ class transmission_rpi_parameters:
 
 class transmission_rpi:
     """
-    Handler class for the rpi tranmission reduction model. This holds 
+    Handler class for the rpi tranmission measurement model. 
+    This holds parameters and methods used to both generate raw observable data and reduce it to transmission.
     """
 
     def __init__(self, **kwargs):
@@ -361,9 +346,16 @@ class transmission_rpi:
     def neutron_spectrum_triggers(self) -> int:
         return self.reduction_parameters.trigo[0]
 
+
+    def __repr__(self):
+        string = 'Measurement model (data reduction) parameters:\n'
+        string += str(vars(self.reduction_parameters))
+        return string
+
+
     def generate_raw_data(self,
                           pw_true,
-                          neutron_spectrum,
+                          true_neutron_spectrum,
                           options
                           ) -> pd.DataFrame:
         """
@@ -380,7 +372,7 @@ class transmission_rpi:
             _description_
         """
 
-        if len(neutron_spectrum) != len(pw_true):
+        if len(true_neutron_spectrum) != len(pw_true):
             raise ValueError(
                 "Experiment open data and sample data are not of the same length, check energy domain")
         
@@ -388,10 +380,10 @@ class transmission_rpi:
         true_reduction_parameters = transmission_rpi_parameters(**true_parameter_dict)
 
         monitor_array = [true_reduction_parameters.m1[0], true_reduction_parameters.m2[0], true_reduction_parameters.m3[0], true_reduction_parameters.m4[0]]
-        true_Bi = neutron_background_function(neutron_spectrum.tof, true_reduction_parameters.a_b[0][0], true_reduction_parameters.a_b[0][1])
+        true_Bi = neutron_background_function(true_neutron_spectrum.tof, true_reduction_parameters.a_b[0][0], true_reduction_parameters.a_b[0][1])
 
         raw_data, true_c = inverse_reduction(pw_true ,
-                                             neutron_spectrum ,
+                                             true_neutron_spectrum ,
                                              options.sample_counting_noise ,
                                              options.sampleTURP ,
                                              true_reduction_parameters.trigo[0],
@@ -405,7 +397,7 @@ class transmission_rpi:
 
         return raw_data
 
-    def reduce(self, raw_data, neutron_spectrum, options):
+    def reduce_raw_data(self, raw_data, neutron_spectrum, options):
         """
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
@@ -479,6 +471,10 @@ class transmission_rpi:
         # self.neutron_spectrum['dcps'] = rates[3]
 
         return trans
+
+
+
+
 
 
 

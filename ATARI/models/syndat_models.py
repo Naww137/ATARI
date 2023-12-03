@@ -2,26 +2,16 @@
 import pandas as pd
 from ATARI.models.experimental_model import Experimental_Model
 from ATARI.models.particle_pair import Particle_Pair
-from ATARI.models.T_reduction_rpi import transmission_rpi
 from typing import Protocol, Optional
 
-
-
-class Generative_Reduction_Model(Protocol):
-
-    def generate_raw_data(self, pw_true, true_neutron_spectrum, options) -> pd.DataFrame:
-        ...
-
-    @property
-    def neutron_spectrum_triggers(self) -> int:
-        ...
+from ATARI.models.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
 
 
 class Generative_Model:
     def __init__(self,
                  particle_pair: Optional[Particle_Pair] = None,
-                 experimental_model: Optional[Experimental_Model] = None,
-                 reduction_model: Optional[Generative_Reduction_Model] = None
+                 generative_experimental_model: Optional[Experimental_Model] = None,
+                 generative_measurement_model: Optional[Generative_Measurement_Model] = None
                  ):
 
         self.particle_pair = Particle_Pair()

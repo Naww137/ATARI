@@ -1,34 +1,23 @@
-
-# class SyndatOptions:
-#     def __init__(self):
-
-
 from copy import deepcopy
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import pandas as pd
-from new_classes import GenerativeModel
 
-
-from ATARI.models.Y_reduction_rpi import yield_rpi
-from ATARI.models.T_reduction_rpi import transmission_rpi
-from typing import Protocol
-from pandas import DataFrame
-
-
-from copy import deepcopy
-from ATARI.utils.atario import update_dict
 from ATARI.syndat.general_functions import *
-from ATARI.theory.experimental import e_to_t, t_to_e
+from ATARI.theory.experimental import e_to_t 
 
 from ATARI.models.experimental_model import Experimental_Model
 from ATARI.models.particle_pair import Particle_Pair
+
+
+from ATARI.models.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
 
 
 
 class syndatOUT:
     def __init__(self,
                  pw_reduced,
-                 pw_raw):
+                 pw_raw = None
+                 ):
         
         self.pw_reduced = pw_reduced
         self.pw_raw = pw_raw
@@ -51,6 +40,31 @@ class syndatOUT:
 
 
 class syndatOPT:
+    """
+    Options and settings for a single syndat case.
+    
+    Parameters
+    ----------
+    **kwargs : dict, optional
+        Any keyword arguments are used to set attributes on the instance.
+
+    Attributes
+    ----------
+    sampleRES : bool
+        Sample a new resonance ladder with each sample.
+    sample_counting_noise : bool
+        Option to sample counting statistic noise for data generation, if False, no statistical noise will be sampled.
+    calculate_covariance : bool
+        Indicate whether to return full covariance matrix or decomposed statistical and systematic covariance matrices.
+    sampleTURP : bool
+        Option to sample true underlying measurement model (data-reduction) parameters for data generation.
+    sampleTNCS : bool
+        Option to sample true neutron count spectrum for data generation.
+    smoothTNCS : bool
+        Option to use a smoothed function for the true neutron count spectrum for data generation.
+    save_raw_data : bool
+        Option to save raw count data, if False, only the reduced transmission data will be saved.
+    """
     def __init__(self, **kwargs):
         self._sampleRES = True
         self._sample_counting_noise = True
@@ -58,9 +72,18 @@ class syndatOPT:
         self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
+        self._save_raw_data = False
 
         for key, value in kwargs.items():
             setattr(self, key, value)
+        
+    
+    @property
+    def sampleRES(self):
+        return self._sampleRES
+    @sampleRES.setter
+    def sampleRES(self, sampleRES):
+        self._sampleRES = sampleRES
         
     @property
     def sampleTURP(self):
@@ -97,56 +120,120 @@ class syndatOPT:
     def calculate_covariance(self, calculate_covariance):
         self._calculate_covariance = calculate_covariance
 
+    @property
+    def save_raw_data(self):
+        return self._save_raw_data
+    @save_raw_data.setter
+    def save_raw_data(self, save_raw_data):
+        self._save_raw_data = save_raw_data
 
 
-
-
-class ReductiveModel(Protocol):
-    def reduce(self, raw_data, neutron_spectrum, options) -> pd.DataFrame:
-        ...
 
 
 
 
 class syndat:
+    """
+    Syndat model for a single experimental dataset that can be used to generate similar statistical realizations.
+    This class holds all the necessary subclasses for the reaction model, experimental model, and reduction model.
+    
+    Parameters
+    ----------
+    particle_pair: Particle_Pair
+        Class describing the reaction model.
+    experimental_model: Experimental_Model
+        Class describing the experimental model, used with the SAMMY code.
+    generative_measurement_model: Generative_Measurement_Model
+        Class describing the measurement model used for data generation.
+    reductive_measurement_model: Reductive_Measurement_Model
+        Class describing the measurement model used for data reduction.
+    options: syndatOPT
+        Syndat options class, providing information about how to run syndat.
+    neutron_spectrum: pd.DataFrame = pd.DataFrame()
+        Optional input of a measured, experimental neutron spectrum if this data is accessable.
+
+    Attributes
+    ----------
+    particle_pair: Particle_Pair
+        Class describing the reaction model.
+    experimental_model: Experimental_Model
+        Class describing the experimental model, used with the SAMMY code.
+    generative_measurement_model: Generative_Measurement_Model
+        Class describing the measurement model used for data generation.
+    reductive_measurement_model: Reductive_Measurement_Model
+        Class describing the measurement model used for data reduction.
+    options: syndatOPT
+        Syndat options class, providing information about how to run syndat.
+    neutron_spectrum: pd.DataFrame = pd.DataFrame()
+        Optional input of a measured, experimental neutron spectrum if this data is accessable.
+    
+    """
 
     def __init__(self, 
-                 generative_model: GenerativeModel,
-                 reductive_model: ReductiveModel,
+                 particle_pair: Particle_Pair,
+                 experimental_model: Experimental_Model,
+                 generative_measurement_model: Generative_Measurement_Model,
+                 reductive_measurement_model: Reductive_Measurement_Model,
                  options: syndatOPT,
                  neutron_spectrum: pd.DataFrame = pd.DataFrame()
                  ):
         
         ### user supplied options
-        self.generative_model = generative_model
-        self.reductive_model = reductive_model
+        self.particle_pair = particle_pair
+        self.experimental_model = experimental_model
+        self.generative_measurement_model = generative_measurement_model
+        self.reductive_measurement_model = reductive_measurement_model
+    
         self.options = options
         self.neutron_spectrum = neutron_spectrum
 
         ### some conveinient definitions
-        self.reaction = self.generative_model.experimental_model.reaction
+        self.reaction = self.experimental_model.reaction
         self.pw_true = pd.DataFrame()
+
+    
+    @property
+    def datasets(self):
+        return self._datasets
+    @datasets.setter
+    def datasets(self, datasets):
+        self._datasets = datasets
 
 
     def sample(self, 
-               sammyRTO
+               sammyRTO,
+               num_samples=1
                ):
 
-        ### generate pointwise true from experimental model
-        if self.pw_true.empty or False: #options.sample_experimental_model
-            # calculate pw_truw with sammy
-            self.generate_true_experimental_objects(sammyRTO)
-        else:
-            # use existing pw_true from experimental model
-            pass 
+        datasets = []
+        for i in range(num_samples):
+            
+            if self.options.sampleRES:
+                self.particle_pair.sample_resonance_ladder(self.experimental_model.energy_range)
+            
+            ### generate pointwise true from experimental model
+            if self.pw_true.empty or False or self.options.sampleRES: #options.sample_experimental_model
+                self.generate_true_experimental_objects(sammyRTO) # calculate pw_truw with sammy
+            else:
+                pass # use existing pw_true from experimental model
 
-        ### generate raw data from generative reduction model
-        self.generate_raw_observables(self.neutron_spectrum)
+            ### generate raw data from generative reduction model
+            self.generate_raw_observables(self.neutron_spectrum)
+            ### reduce raw data with reductive reduction model 
+            self.reduce_raw_observables()
 
-        ### reduce raw data with reductive reduction model 
-        self.reduce_raw_observables()
+            if self.options.save_raw_data:
+                out = syndatOUT(self.red_data, self.raw_data)
+            else:
+                out = syndatOUT(self.red_data)
+            datasets.append(out)
 
-        return syndatOUT(self.red_data, self.raw_data)
+        self.datasets = datasets
+        return
+    
+    
+    def tohdf5(self):
+        return
 
 
 
@@ -155,14 +242,16 @@ class syndat:
                                            ):
         rto = deepcopy(sammyRTO)
         rto.bayes = False
-        template = self.generative_model.experimental_model.template
+        template = self.experimental_model.template
+
+        if template is None: raise ValueError("Experimental model sammy template has not been assigned")
 
         sammyINP = sammy_classes.SammyInputData(
-            self.generative_model.particle_pair,
-            self.generative_model.particle_pair.resonance_ladder,
+            self.particle_pair,
+            self.particle_pair.resonance_ladder,
             template= template,
-            experiment= self.generative_model.experimental_model,
-            energy_grid= self.generative_model.experimental_model.energy_grid
+            experiment= self.experimental_model,
+            energy_grid= self.experimental_model.energy_grid
         )
         sammyOUT = sammy_functions.run_sammy(sammyINP, rto)
 
@@ -172,7 +261,7 @@ class syndat:
             true = "theo_xs"
         pw_true = sammyOUT.pw.loc[:, ["E", true]]
         pw_true.rename(columns={true: "true"}, inplace=True)
-        pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_model.experimental_model.FP[0], True)*1e9+self.generative_model.experimental_model.t0[0]
+        pw_true["tof"] = e_to_t(pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]
         
         self.pw_true = pw_true
 
@@ -188,9 +277,9 @@ class syndat:
         if neutron_spectrum.empty:
             self.neutron_spectrum = approximate_neutron_spectrum_Li6det(self.pw_true.E, 
                                                                         self.options.smoothTNCS, 
-                                                                        self.generative_model.experimental_model.FP[0],
-                                                                        self.generative_model.experimental_model.t0[0],
-                                                                        self.generative_model.reduction_model.neutron_spectrum_triggers)
+                                                                        self.experimental_model.FP[0],
+                                                                        self.experimental_model.t0[0],
+                                                                        self.generative_measurement_model.neutron_spectrum_triggers)
         else:
             self.neutron_spectrum = neutron_spectrum
         
@@ -201,13 +290,13 @@ class syndat:
             self.true_neutron_spectrum = deepcopy(self.neutron_spectrum)
 
         ### generate raw count data from generative reduction model
-        self.raw_data = self.generative_model.reduction_model.generate_raw_data(self.pw_true, self.true_neutron_spectrum, self.options)
+        self.raw_data = self.generative_measurement_model.generate_raw_data(self.pw_true, self.true_neutron_spectrum, self.options)
 
         return
     
 
     def reduce_raw_observables(self):
-        self.red_data = self.reductive_model.reduce(self.raw_data, self.neutron_spectrum, self.options)
+        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.neutron_spectrum, self.options)
         return
 
 

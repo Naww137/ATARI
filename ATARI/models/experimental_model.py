@@ -1,33 +1,16 @@
 import numpy as np
 from ATARI.utils.atario import update_dict
 from ATARI.theory.experimental import e_to_t, t_to_e
-
-
-class experimental_parameter:
-    def __set_name__(self, owner, name):
-        self._name = name
-
-    def __get__(self, instance, owner) -> tuple:
-        return instance.__dict__[self._name]
-
-    def __set__(self, instance, value):
-        if isinstance(value, tuple):
-            if len(value) != 2:
-                raise ValueError(
-                    "Tuple for reduction parameter must be (value, uncertainty)")
-        else:
-            raise ValueError(
-                "Must supply tuple for reduction parameter value and uncertainty")
-        instance.__dict__[self._name] = value
+from ATARI.models.structuring import parameter
 
 
 class Experimental_Model:
 
-    n = experimental_parameter()
-    FP = experimental_parameter()
-    t0 = experimental_parameter()
-    burst = experimental_parameter()
-    temp = experimental_parameter()
+    n = parameter()
+    FP = parameter()
+    t0 = parameter()
+    burst = parameter()
+    temp = parameter()
 
     def __init__(self, **kwargs):
         self.title = "T12mm"
@@ -82,6 +65,9 @@ class Experimental_Model:
         if self.energy_grid is None:
             maxE, chw, dchw = [self.channel_widths[key]
                                for key in ["maxE", "chw", "dchw"]]
+            
+            if max(maxE) < max(self.energy_range): raise ValueError("Channel width maxE is less than max(energy_range)")
+
             self.energy_grid = np.array([])
             for i in range(len(maxE)):
                 if i == 0:

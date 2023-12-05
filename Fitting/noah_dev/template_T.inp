@@ -1,0 +1,22 @@
+Title
+%%%card2%%%
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+%%%alphanumeric%%%
+BROADENING IS WANTED
+DO NOT SHIFT RPI RESOLUTION
+
+%%%card5/6%%%
+%%%card7%%%
+%%%card8%%%
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+
+RPI T
+BURST 0   10.0      1.0      
+CHANN 0   250.0     100.0     0.8      
+
+BACKGround functions
+CONST 0   9.9000000 0.1000000 
+EXPON 0 0 328.10337 23.634866 0.0514968 0.0046811 

@@ -94,9 +94,6 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
 
         if calc_cov:
 
-            ### statistical covarance
-            CovT_stat = np.diag(diag_stat)
-
             ### systematic covariance
             Cov_sys = np.diag(sys_unc**2)
             ab_cov = np.array(ab_cov)
@@ -105,12 +102,13 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
                                 [np.zeros((Cov_sys.shape[0],ab_cov.shape[1])),  Cov_sys                                         ]
                             ])   
             Jac_sys = np.array([dTi_da, dTi_db, dTi_dk, dTi_dK, dTi_db0, dTi_dB0, dTi_dalpha[0], dTi_dalpha[1],dTi_dalpha[2],dTi_dalpha[3]])
-            CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
-            
-            ### T covariance is sum of systematic and statistical covariance 
-            CovT = CovT_stat + CovT_sys
 
-            data = [CovT, CovT_stat, CovT_sys, Jac_sys, Cov_sys]
+            CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
+
+            ### T covariance is sum of systematic and statistical covariance 
+            CovT = np.diag(diag_stat) + CovT_sys
+
+            data = [CovT, diag_stat, CovT_sys, Jac_sys, Cov_sys]
             
         else:
             sys_unc = [ab_cov[0][0]]+[ab_cov[1][1]] + list(sys_unc)
@@ -333,6 +331,7 @@ class Transmission_RPI:
 
     def __init__(self, **kwargs):
         self._reduction_parameters = transmission_rpi_parameters(**kwargs)
+        self._covariance_data = {}
 
     @property
     def reduction_parameters(self) -> transmission_rpi_parameters:
@@ -345,6 +344,12 @@ class Transmission_RPI:
     def neutron_spectrum_triggers(self) -> int:
         return self.reduction_parameters.trigo[0]
 
+    @property
+    def covariance_data(self) -> dict:
+        return self._covariance_data
+    @covariance_data.setter
+    def covariance_data(self, covariance_data):
+        self._covariance_data = covariance_data
 
     def __repr__(self):
         string = 'Measurement model (data reduction) parameters:\n'
@@ -434,11 +439,11 @@ class Transmission_RPI:
 
         # monitor_array = [self.redpar.val.m1, self.redpar.val.m2, self.redpar.val.m3, self.redpar.val.m4]
         monitor_array = [self.reduction_parameters.m1[0], self.reduction_parameters.m2[0], self.reduction_parameters.m3[0], self.reduction_parameters.m4[0]]
-
-        trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof,
-                                                              raw_data.c, neutron_spectrum.c,
-                                                              raw_data.dc, neutron_spectrum.dc,
-                                                              neutron_spectrum.bw,
+        assert(np.sum(neutron_spectrum.tof.values - raw_data.tof.values)==0)
+        trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof.values,
+                                                              raw_data.c.values, neutron_spectrum.c.values,
+                                                              raw_data.dc.values, neutron_spectrum.dc.values,
+                                                              neutron_spectrum.bw.values,
                                                               self.reduction_parameters.trigo[0],
                                                               self.reduction_parameters.trigs[0],
                                                               self.reduction_parameters.a_b[0][0],
@@ -454,14 +459,34 @@ class Transmission_RPI:
                                                               options.calculate_covariance)
 
         if options.calculate_covariance:
-            self.CovT, self.CovT_stat, self.CovT_sys, self.Jac_sys, self.Cov_sys = unc_data
-            trans['exp_unc'] = np.sqrt(np.diag(self.CovT))
-            self.CovT = pd.DataFrame(self.CovT, columns=trans.E, index=trans.E)
-            self.CovT.index.name = None
+            CovT, diag_stat, CovT_sys, Jac_sys, Cov_sys = unc_data
+            trans['exp_unc'] = np.sqrt(np.diag(CovT))
+            if options.explicit_covariance:
+                CovT = pd.DataFrame(CovT, columns=trans.E, index=trans.E)
+                CovT.index.name = None
+                self.covariance_data['CovT'] = CovT
+
+                # CovT_stat = pd.DataFrame(CovT_stat, columns=trans.E)
+                # CovT_stat.index.name = None
+                # self.covariance_data['CovT_stat'] = CovT_stat
+                self.covariance_data["diag_stat"] = pd.DataFrame({'var_stat':diag_stat}, index=trans.E)
+
+                # CovT_sys = pd.DataFrame(CovT_sys, columns=trans.E)
+                # CovT_sys.index.name = None
+                # self.covariance_data['CovT_sys'] = CovT_sys
+
+                self.covariance_data['Cov_sys'] = Cov_sys
+                Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
+                self.covariance_data['Jac_sys'] = Jac_sys
+            else:
+                self.covariance_data['Cov_sys'] = Cov_sys
+
+                Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
+                self.covariance_data['Jac_sys'] = Jac_sys
+
         else:
             diag_tot, diag_stat, diag_sys = unc_data
             trans['exp_unc'] = np.sqrt(diag_tot)
-            self.CovT = None
 
         # define data cps
         # self.neutron_spectrum['cps'] = rates[0]

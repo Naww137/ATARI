@@ -77,23 +77,6 @@ class SammyRunTimeOptions:
         return str(self.options)
 
 
-# class theory:
-    
-#     def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
-#         self.isotope = isotope
-#         self.amu = amu
-#         self.ac = ac
-#         self.resonance_ladder = resonance_ladder
-#         self.formalism = formalism
-#         self.spin_groups = """
-#   1      1    0  3.0       1.0  3.5
-#     1    1    0    0       3.0
-#   2      1    0  4.0       1.0  3.5
-#     1    1    0    0       4.0
-# """
-
-
-
 arraytype_id = Union[Series, ndarray, list]
 arraytype_broadparm = Union[str, float]
 
@@ -111,7 +94,7 @@ class SammyInputData:
     template: str
     experiment: Experimental_Model
     experimental_data: Optional[Union[DataFrame,ndarray]] = None
-    experimental_cov: Optional[DataFrame] = None
+    experimental_covariance: Optional[dict] = None
     energy_grid: Optional[arraytype_id] = None
 
     initial_parameter_uncertainty: Optional[float] = 1.0

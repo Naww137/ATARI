@@ -42,6 +42,10 @@ def readlst(filepath):
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
         df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        if df.index.equals(pd.RangeIndex(len(df))):
+            pass
+        else:
+            df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
     else:
         df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
     return df
@@ -143,21 +147,15 @@ def read_ECSCM(file_path):
 # =============================================================================
 # Sammy Parameter File
 # =============================================================================
-def format_float(value, width):
-    # Convert the value to a string with the desired precision
-    formatted_value = f'{abs(value):0<12f}'  # Adjust the precision as needed
+def format_float(value, width, sep=''):
+    formatted_value = f'{abs(value):0<15f}'  
 
-    # Check if the value is negative
     if value < 0:
-        # If negative, add a negative sign to the formatted value
-        formatted_value = '-' + formatted_value
+        formatted_value = f'{sep}-' + formatted_value
     else:
-        # If positive, add a space to the left of the formatted value
-        formatted_value = ' ' + formatted_value
+        formatted_value = f'{sep} ' + formatted_value
 
-    # Check if the formatted value exceeds the desired width
     if len(formatted_value) > width:
-        # If the value is too large, truncate it to fit the width
         formatted_value = formatted_value[:width]
 
     return formatted_value
@@ -340,6 +338,36 @@ def write_samdat(exp_pw, exp_cov, filename):
         f.close()
 
 
+def write_idc(filepath, J, C, stat):
+    with open(filepath, 'w+') as f:
+        f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
+        f.write(f"FREE-FORMAt partial derivatives\n")
+        width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+
+        for E, data in J.items():
+            formatted_E = format_float(E, width)
+            f.write(formatted_E)
+            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
+            f.write(formatted_data_stat_unc)
+            for derivative in data:
+                formatted_derivative = format_float(derivative, width, sep=' ')
+                f.write(formatted_derivative)
+            f.write('\n')
+
+        f.write("\nUNCERTAINTies on data- reduction parameters\n")
+        for sys_uncertainty in np.sqrt(np.diag(C)):
+            formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
+            f.write(formatted_uncertainty)
+        f.write("\n\n")
+        
+        f.write("CORRELATIOns for data-reduction parameters")
+        for i, row in enumerate(C):
+            for corr in row[0:i]:
+                formatted_correlation = format_float(corr, width, sep=' ')
+                f.write(formatted_correlation)
+            f.write("\n")
+            
+
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -363,15 +391,22 @@ def write_saminp(filepath,
                 model,
                 experimental_model,
                 rto,
-                alphanumeric = []):
+                alphanumeric = None,
+                use_IDC = False):
     
+    if alphanumeric is None:
+        alphanumeric = []
+        
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
     
     if rto.bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
+        if use_IDC:
+            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    
     alphanumeric = [model.formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
@@ -433,16 +468,18 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 # ################################################ ###############################################
 
 
-def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False):
+def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False, use_IDC=False):
     with open(os.path.join(sammy_RTO.sammy_runDIR, 'pipe.sh'), 'w') as f:
-        f.write('sammy.inp\nSAMMY.PAR\nsammy.dat\n')
+        # f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
+        f.write(f'{sammy_RTO.path_to_SAMMY_exe}<<EOF\nsammy.inp\nSAMMY.PAR\nsammy.dat\n')
 
         if sammy_RTO.energy_window is None:
             if use_RPCM:
-                f.write("SAMMY.COV")
-            else:
-                pass
-        
+                f.write("SAMMY.COV\n")
+            if use_IDC:
+                f.write("sammy.IDC\n")
+            f.write("\n")
+
         # energy windowed solves
         elif sammy_INP.experimental_data is not None:
             iter = np.arange(np.floor(np.min(sammy_INP.experimental_data.E)),np.ceil(np.max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
@@ -455,21 +492,46 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
 
         else:
             raise ValueError("An energy window input was provided but no experimental data.")
+        
+        f.write("\nEOF")
+
+        if sammy_RTO.bayes:
+            # grep and return chi2
+            f.write("""
+chi2_line=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT | tail -n 1)
+chi2_string=$(echo "$chi2_line" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
+echo "$chi2_string"
+            """)
+
+    os.system(f"chmod +x {os.path.join(sammy_RTO.sammy_runDIR, f'pipe.sh')}")
 
 
 
 
 def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
-    # run sammy and wait for completion with subprocess
     runsammy_process = subprocess.run(
-                                    [f"sh", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
-                                    cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
-                                    capture_output=True
-                                    )
-    if len(runsammy_process.stderr) > 0:
-        print(f'SAMMY gave the following warning or error: {runsammy_process.stderr}')
+                                ["sh", "-c", f"./pipe.sh"], 
+                                cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
+                                capture_output=True, text=True, timeout=180
+                                )
+    if sammy_RTO.bayes:
+        chi2 = float(runsammy_process.stdout.split('\n')[-2])
+    else:
+        chi2=None
 
-    return
+    return chi2
+
+
+    # # run sammy and wait for completion with subprocess
+    # runsammy_process = subprocess.run(
+    #                                 [f"sh", "-c", f"{sammy_RTO.path_to_SAMMY_exe}<pipe.sh"], 
+    #                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
+    #                                 capture_output=True
+    #                                 )
+    # if len(runsammy_process.stderr) > 0:
+    #     print(f'SAMMY gave the following warning or error: {runsammy_process.stderr}')
+
+    # return
 
 
 
@@ -499,7 +561,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     with open(os.path.join(sammyRTO.sammy_runDIR, "pipe.sh"), 'w') as f:
         f.write(f"sammy.inp\n{os.path.basename(endf_file)}\nsammy.dat\n\n")
 
-    runsammy_shellpipe(sammyRTO)
+    _ = runsammy_shellpipe(sammyRTO)
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
     # could also read endf spin groups here! 
 
@@ -539,9 +601,9 @@ def get_ECSCM(sammyRTO, sammyINP):
                  sammyINP.experiment, 
                  sammyRTO,
                  alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
-    
+    sammyRTO.bayes = False
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
-    runsammy_shellpipe(sammyRTO)
+    _ = runsammy_shellpipe(sammyRTO)
 
     df, cov = read_ECSCM(os.path.join(sammyRTO.sammy_runDIR, "SAMCOV.PUB"))
 
@@ -552,10 +614,10 @@ def get_ECSCM(sammyRTO, sammyINP):
 
 
 def execute_sammy(sammy_RTO:SammyRunTimeOptions):
-    runsammy_shellpipe(sammy_RTO)
+    chi2 = runsammy_shellpipe(sammy_RTO)
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
     par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
-    return lst_df, par_df
+    return lst_df, par_df, chi2
 
 
 
@@ -593,16 +655,36 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
     make_runDIR(sammyRTO.sammy_runDIR)
 
     if isinstance(sammyINP.experimental_data, pd.DataFrame):
-        write_samdat(sammyINP.experimental_data, sammyINP.experimental_cov, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
+        write_samdat(sammyINP.experimental_data, sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     else:
         write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
 
-    write_sampar(sammyINP.resonance_ladder, sammyINP.particle_pair, sammyINP.initial_parameter_uncertainty,os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
-    fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), sammyINP.particle_pair, sammyINP.experiment, sammyRTO)
-    write_shell_script(sammyINP, sammyRTO, use_RPCM=False)
+    if isinstance(sammyINP.experimental_covariance, dict):
+        write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), 
+                  sammyINP.experimental_covariance['Jac_sys'],
+                  sammyINP.experimental_covariance['Cov_sys'],
+                  sammyINP.experimental_covariance['diag_stat'])
+        idc = True
+    else:
+        idc = False
 
-    lst_df, par_df = execute_sammy(sammyRTO)
+    write_sampar(sammyINP.resonance_ladder, 
+                 sammyINP.particle_pair, 
+                 sammyINP.initial_parameter_uncertainty,
+                 os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
+    fill_runDIR_with_templates(sammyINP.template, 
+                               "sammy.inp", 
+                               sammyRTO.sammy_runDIR)
+    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
+                 sammyINP.particle_pair, 
+                 sammyINP.experiment, 
+                 sammyRTO,use_IDC=idc)
+    write_shell_script(sammyINP, 
+                       sammyRTO, 
+                       use_RPCM=False, 
+                       use_IDC=idc)
+
+    lst_df, par_df, chi2 = execute_sammy(sammyRTO)
 
     sammy_OUT = SammyOutputData(pw=lst_df, 
                         par=sammyINP.resonance_ladder,
@@ -619,6 +701,7 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         # sammy_OUT.chi2_post = chi2_val(lst_df.theo_xs_bayes, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc))
         sammy_OUT.pw=lst_df
         sammy_OUT.par_post = par_df
+        sammy_OUT.chi2_post = chi2
 
         if sammyRTO.get_ECSCM:
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)

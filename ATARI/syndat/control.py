@@ -14,14 +14,16 @@ from ATARI.models.structuring import Generative_Measurement_Model, Reductive_Mea
 
 
 class syndatOUT:
-    def __init__(self,
-                 pw_reduced,
-                 pw_raw = None
-                 ):
+    def __init__(self, **kwargs):
         
-        self.pw_reduced = pw_reduced
-        self.pw_raw = pw_raw
-    
+        self._pw_reduced = None
+        self._pw_raw = None
+        self._covariance_data = {}
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        
     @property
     def pw_raw(self):
         return self._pw_raw
@@ -35,6 +37,13 @@ class syndatOUT:
     @pw_reduced.setter
     def pw_reduced(self, pw_reduced):
         self._pw_reduced = pw_reduced
+
+    @property
+    def covariance_data(self):
+        return self._covariance_data
+    @covariance_data.setter
+    def covariance_data(self, covariance_data):
+        self._covariance_data = covariance_data
 
 
 
@@ -53,10 +62,12 @@ class syndatOPT:
     ----------
     sampleRES : bool
         Sample a new resonance ladder with each sample.
-    sample_counting_noise : bool
+    sample_counting_noise : bool = False
         Option to sample counting statistic noise for data generation, if False, no statistical noise will be sampled.
-    calculate_covariance : bool
-        Indicate whether to return full covariance matrix or decomposed statistical and systematic covariance matrices.
+    calculate_covariance : bool = True
+        Indicate whether to calculate off-diagonal elements of the data covariance matrix.
+    explicit_covariance : bool = False
+        Indicate whether to return explicit data covariance elements or the decomposed statistical and systematic covariances with systematic derivatives.
     sampleTURP : bool
         Option to sample true underlying measurement model (data-reduction) parameters for data generation.
     sampleTNCS : bool
@@ -70,6 +81,7 @@ class syndatOPT:
         self._sampleRES = True
         self._sample_counting_noise = True
         self._calculate_covariance = False
+        self._explicit_covariance = False
         self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
@@ -126,6 +138,13 @@ class syndatOPT:
     @calculate_covariance.setter
     def calculate_covariance(self, calculate_covariance):
         self._calculate_covariance = calculate_covariance
+    
+    @property
+    def explicit_covariance(self):
+        return self._explicit_covariance
+    @explicit_covariance.setter
+    def explicit_covariance(self, explicit_covariance):
+        self._explicit_covariance = explicit_covariance
 
     @property
     def save_raw_data(self):
@@ -261,9 +280,13 @@ class syndat:
             self.reduce_raw_observables()
 
             if self.options.save_raw_data:
-                out = syndatOUT(self.red_data, self.raw_data)
+                out = syndatOUT(pw_reduced=self.red_data, 
+                                pw_raw = self.raw_data)
             else:
-                out = syndatOUT(self.red_data)
+                out = syndatOUT(pw_reduced=self.red_data)
+            if self.options.calculate_covariance:
+                out.covariance_data = self.covariance_data
+                
             datasets.append(out)
 
         self.datasets = datasets
@@ -335,6 +358,7 @@ class syndat:
 
     def reduce_raw_observables(self):
         self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.neutron_spectrum, self.options)
+        self.covariance_data = self.reductive_measurement_model.covariance_data
         return
 
 

@@ -49,6 +49,7 @@ class Particle_Pair:
         self.resonance_ladder = pd.DataFrame()
         self.formalism = "XCT"
         self.spin_groups = {}
+        self.total_energy_range = [200,250]
 
         self.ac = 8.127
         self.M = 180.94803
@@ -142,6 +143,13 @@ class Particle_Pair:
     @l_max.setter
     def l_max(self, l_max):
         self._l_max = l_max
+
+    @property
+    def total_energy_range(self):
+        return self._total_energy_range
+    @total_energy_range.setter
+    def total_energy_range(self, total_energy_range):
+        self._total_energy_range = total_energy_range
 
 
 
@@ -270,7 +278,7 @@ class Particle_Pair:
 
         return
 
-    def sample_resonance_ladder(self, energy_range,
+    def sample_resonance_ladder(self,
                                 ensemble='NNE',
                                 rng=None, seed=None):
         """
@@ -312,7 +320,7 @@ class Particle_Pair:
                 rng = np.random.default_rng(seed)
 
         resonance_ladder = sample_resonance_ladder(
-            energy_range, self.spin_groups, ensemble=ensemble, rng=rng)
+            self.total_energy_range, self.spin_groups, ensemble=ensemble, rng=rng)
         self.resonance_ladder = resonance_ladder
         return resonance_ladder
 

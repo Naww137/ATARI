@@ -85,7 +85,8 @@ class Experimental_Model:
                     [self.energy_grid, np.flipud(E)])
         else:
             pass  # need to filter to energy range here
-
+        
+        self.energy_grid = self.energy_grid[(self.energy_grid>min(self.energy_range)) & (self.energy_grid<max(self.energy_range)) ]
     @property
     def title(self):
         return self._title

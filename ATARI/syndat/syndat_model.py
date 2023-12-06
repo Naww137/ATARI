@@ -80,16 +80,18 @@ class Syndat_Model:
         self.datasets = []
 
         ### approximate neutron spectrum if none given
-        if self.generative_measurement_model.model_parameters.neutron_spectrum is None:
-            neutron_spectrum = approximate_neutron_spectrum_Li6det(self.generative_experimental_model.energy_grid, 
-                                                                    False, #self.options.smoothTNCS, 
-                                                                    self.generative_experimental_model.FP[0],
-                                                                    self.generative_experimental_model.t0[0],
-                                                                    self.generative_measurement_model.neutron_spectrum_triggers)
+        # if self.generative_measurement_model.model_parameters.neutron_spectrum is None:
+        #     neutron_spectrum = approximate_neutron_spectrum_Li6det(self.generative_experimental_model.energy_grid, 
+        #                                                             False, #self.options.smoothTNCS, 
+        #                                                             self.generative_experimental_model.FP[0],
+        #                                                             self.generative_experimental_model.t0[0],
+        #                                                             self.generative_measurement_model.neutron_spectrum_triggers)
             
-            self.generative_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
-            self.reductive_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
-
+        #     self.generative_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
+        #     self.reductive_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model)
+        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model)
+        
 
     @property
     def datasets(self):
@@ -165,6 +167,8 @@ class Syndat_Model:
 
         self.datasets = datasets
 
+    def to_hdf5(self, filepath):
+        pass
 
     def generate_raw_observables(self, pw_true, true_model_parameters):
 
@@ -228,6 +232,7 @@ class Syndat_Model:
                 true = "theo_trans"
             else:
                 true = "theo_xs"
+            assert isinstance(sammyOUT.pw, pd.DataFrame)
             pw_true = sammyOUT.pw.loc[:, ["E", true]]
             pw_true.rename(columns={true: "true"}, inplace=True)
 

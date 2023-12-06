@@ -24,13 +24,18 @@ class Experimental_Model:
         self.t0 = (3326.0, 0.0)
         self.burst = (10, 1.0)
         self.temp = (300, 0.0)
+        
+        self.additional_resfunc_lines = []
+
+        # update kwargs to get user input for some parameters
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
         self.channel_widths = {
             "maxE": [np.max(self.energy_range)],
             "chw": [100.0],
             "dchw": [0.8]
         }
-        self.additional_resfunc_lines = []
 
         # default misc inputs
         if self.reaction == 'capture':
@@ -55,11 +60,12 @@ class Experimental_Model:
                 'alphanumeric':   ["BROADENING IS WANTED"],
 
                 'ResFunc':   ""
-            }
-
-        # update kwargs
+            }        
+        
+        # update kwargs again if user supplied sammy inputs
         for key, value in kwargs.items():
             setattr(self, key, value)
+
 
         # define energy grid
         if self.energy_grid is None:

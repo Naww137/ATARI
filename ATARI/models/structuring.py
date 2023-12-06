@@ -67,6 +67,9 @@ class Generative_Measurement_Model(Protocol):
                           ) -> DataFrame:
         ...
 
+    def approximate_unknown_data(self, exp_model) -> None:
+        ...
+
     @property
     def neutron_spectrum_triggers(self) -> int:
         ...
@@ -86,6 +89,9 @@ class Reductive_Measurement_Model(Protocol):
                         ) -> DataFrame:
         ...
 
+    def approximate_unknown_data(self, exp_model) -> None:
+        ...
+        
     @property
     def neutron_spectrum_triggers(self) -> int:
         ...

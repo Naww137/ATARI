@@ -282,6 +282,10 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
 
 
 
+# ========================================================================================
+#            Default parameters class
+# ========================================================================================
+
 
 from ATARI.models.structuring import parameter, vector_parameter
 from ATARI.syndat.data_classes import syndatOPT
@@ -409,6 +413,20 @@ class Transmission_RPI:
         return self.model_parameters.sample_parameters(true_model_parameters)
     
 
+    def approximate_unknown_data(self, exp_model):
+        if self.model_parameters.neutron_spectrum is None:
+            neutron_spectrum = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
+                                                                    False, #self.options.smoothTNCS, 
+                                                                    exp_model.FP[0],
+                                                                    exp_model.t0[0],
+                                                                    self.neutron_spectrum_triggers)
+            
+            self.model_parameters.neutron_spectrum = neutron_spectrum
+            self.model_parameters.neutron_spectrum = neutron_spectrum
+
+
+        
+
     def generate_raw_data(self,
                           pw_true,
                           true_model_parameters, # need to build better protocol for this 
@@ -523,10 +541,13 @@ class Transmission_RPI:
                 Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
                 self.covariance_data['Jac_sys'] = Jac_sys
             else:
+                
                 self.covariance_data['Cov_sys'] = Cov_sys
 
                 Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
                 self.covariance_data['Jac_sys'] = Jac_sys
+
+                self.covariance_data["diag_stat"] = pd.DataFrame({'var_stat':diag_stat}, index=trans.E)
 
         else:
             diag_tot, diag_stat, diag_sys = unc_data

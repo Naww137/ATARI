@@ -9,7 +9,7 @@ from ATARI.theory.experimental import e_to_t, t_to_e
 
 
 # ========================================================================================
-#            Transmission reduction equations at RPI
+#            Capture reduction equations at RPI
 # ========================================================================================
 
 
@@ -23,10 +23,10 @@ def get_covT():
     pass
 
     
-def reduce_raw_count_data(raw_data, neutron_spectrum, TURP):
+def reduce_raw_count_data(raw_data, neutron_spectrum, model_parameters):
     #turns 0D scaling factoring into a 1D scaling factor so that it can align with the other 1D values while calculating
-    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*TURP["Scaling"][0],
-                          'dc'   :   np.ones(len(raw_data.E))*TURP["Scaling"][1]})
+    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*model_parameters.Scaling[0],
+                          'dc'   :   np.ones(len(raw_data.E))*model_parameters.Scaling[1]})
     
     #Distribution Calculations:
     Yield             = np.multiply(scaling.c, np.divide(raw_data.cg - raw_data.cb, neutron_spectrum.c))
@@ -47,22 +47,22 @@ def reduce_raw_count_data(raw_data, neutron_spectrum, TURP):
 
 def inverse_reduction(raw_data, 
                       neutron_spectrum,
-                      background,
+                      gamma_background_spectrum,
                       TURP):
     
     #turns 0D scaling factoring into a 1D scaling factor so that it can align with the other 1D values while calculating
-    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*TURP["Scaling"][0],
-                          'dc'   :   np.ones(len(raw_data.E))*TURP["Scaling"][1]})
+    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*TURP.Scaling[0],
+                          'dc'   :   np.ones(len(raw_data.E))*TURP.Scaling[1]})
     
     #Distribution Calculations:
-    count_rate             = np.divide(np.multiply(raw_data.true,neutron_spectrum.c),scaling.c) + background.c
+    count_rate             = np.divide(np.multiply(raw_data.true,neutron_spectrum.c),scaling.c) + gamma_background_spectrum.c
     
     #Uncertainty Calculations:
     partial_Cc_Cb         = 1
     partial_Cc_flux       = np.divide(raw_data.true, scaling.c)
     partial_Cc_scaling    = np.divide(np.multiply(neutron_spectrum.c, raw_data.true), np.power(scaling.c,2))
     
-    count_rate_uncertainty = np.sqrt(np.power(np.multiply(partial_Cc_Cb     , background.dc)      ,2)
+    count_rate_uncertainty = np.sqrt(np.power(np.multiply(partial_Cc_Cb     , gamma_background_spectrum.dc)      ,2)
                                     +np.power(np.multiply(partial_Cc_flux   , neutron_spectrum.dc),2)
                                     +np.power(np.multiply(partial_Cc_scaling, scaling.dc)         ,2))
     
@@ -70,84 +70,118 @@ def inverse_reduction(raw_data,
 
 
 
+from ATARI.models.structuring import parameter, vector_parameter
+from ATARI.syndat.data_classes import syndatOPT
 
+
+
+class capture_yield_rpi_parameters:
+
+    trigo = parameter()
+    trigs = parameter()
+    Scaling  = parameter()
+    neutron_spectrum = vector_parameter()
+    gamma_background_spectrum = vector_parameter()
+
+    def __init__(self, **kwargs):
+
+        self.trigo =  (9758727,         0)
+        self.trigs =  (18476117,        0)
+        self.Scaling =  (1,             0)
+        
+        self.neutron_spectrum = None
+        self.gamma_background_spectrum = None
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+    def sample_parameters(self, true_model_parameters: dict):
+        sampled_params = {}
+
+        for param_name, param_values in self.__dict__.items():
+            if param_name in true_model_parameters:
+                sampled_params[param_name] = (true_model_parameters[param_name], 0.0)
+            else:
+                if isinstance(param_values, tuple) and len(param_values) == 2:
+                    mean, uncertainty = param_values
+                    if uncertainty == 0:
+                        pass
+                    else:
+                        sample = np.random.normal(loc=mean, scale=uncertainty)
+                        sampled_params[param_name] = (sample, 0.0)
+                if isinstance(param_values, pd.DataFrame):
+                    new_c = np.random.normal(loc=param_values.c, scale=param_values.dc)
+                    df = deepcopy(param_values)
+                    df.loc[:,'c'] = new_c
+                    df.loc[:,'dc'] = np.sqrt(new_c)
+                    sampled_params[param_name] = df
+
+        return capture_yield_rpi_parameters(**sampled_params)
+    
 
 
 # ========================================================================================
 #            syndat_T class 
 # ========================================================================================
 
-class yield_rpi:
+class Capture_Yield_RPI:
 
-    def __init__(self,
-                 reduction_parameters={}, 
-                 ):
-        
-        default_reduction_parameters = {
-                            'n'         :   (0.067166,            0),
-                            'trigo'     :   (9758727,             0),
-                            'trigs'     :   (18476117,            0),
-                            'FP'        :   (35.185,              0),
-                            't0'        :   (3.326,               0),
-                            'bw'        :   (0.0064,              0),
-                            'Scaling'   :   (1,                   0)
-                            }
-        
-        self.reduction_parameters = update_dict(default_reduction_parameters, reduction_parameters)
+    def __init__(self,**kwargs):
+        self._model_parameters = capture_yield_rpi_parameters(**kwargs)
+        self._covariance_data = {}
 
+    @property
+    def model_parameters(self) -> capture_yield_rpi_parameters:
+        return self._model_parameters
+    @model_parameters.setter
+    def model_parameters(self, model_parameters):
+        self._model_parameters = model_parameters
 
-    # def run(self, 
-    #         pw_true, #Contains E (Energy) and true (?)
-    #         neutron_spectrum=pd.DataFrame(), #Sets a default, empty dataframe.
-    #         ):
-    #     ### define raw data attribute as true_df
-    #     pw_true["tof"] = e_to_t(pw_true.E, self.reduction_parameters["FP"][0], True)*1e6+self.reduction_parameters["t0"][0]
-    #     self.raw_data = pw_true
+    @property
+    def neutron_spectrum_triggers(self) -> int:
+        return self.model_parameters.trigo[0]
 
-    #     ### sample true underlying resonance parameters from measured values - defines self.theo_redpar
-    #     self.true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, self.options["Sample TURP"])
-
-    #     ### if no open spectra supplied, approximate it         #!!! Should I use true reduction parameters here?
-    #     if neutron_spectrum.empty:          
-    #         self.neutron_spectrum = approximate_neutron_spectrum_Li6det(pw_true.E, 
-    #                                                                     self.options["Smooth TNCS"], 
-    #                                                                     self.reduction_parameters["FP"][0], 
-    #                                                                     self.reduction_parameters["t0"][0], 
-    #                                                                     self.reduction_parameters["trigo"][0])
-    #     else:
-    #         self.neutron_spectrum = neutron_spectrum
-        
-    #     ### sample a realization of the true, true-underlying open count spectra
-    #     if self.options["Sample TNCS"]:
-    #         self.true_neutron_spectrum = sample_true_neutron_spectrum(self.neutron_spectrum)
-    #     else:
-    #         self.true_neutron_spectrum = deepcopy(self.neutron_spectrum)
-
-    #     ### generate raw count data for sample in given theoretical transmission and assumed true reduction parameters/open count data
-    #     self.count_rate, self.background = self.generate_raw_data(self.true_neutron_spectrum, self.true_reduction_parameters)
-
-    #     ### reduce the raw count data
-    #     self.data       = self.reduce(self.neutron_spectrum, self.reduction_parameters, self.count_rate, self.background)
-        
-        ### stupid gaussian sampling around true
-        # Yg = pd.DataFrame()
-        # Yg['tof'] = self.raw_data.tof
-        # Yg['E'] = self.raw_data.E
-        # Yg['true'] = self.raw_data.true
-        # Yg_std = (np.sqrt(Yg['true'])+1) * 0.05
-        # Yg["exp"] = abs(np.random.default_rng().normal(Yg['true'],  Yg_std))
-        # Yg['exp_unc'] = Yg_std
-
-        # self.data = Yg
+    @property
+    def covariance_data(self) -> dict:
+        return self._covariance_data
+    @covariance_data.setter
+    def covariance_data(self, covariance_data):
+        self._covariance_data = covariance_data
 
 
+    def __repr__(self):
+        string = 'Measurement model (data reduction) parameters:\n'
+        string += str(vars(self.model_parameters))
+        return string
+
+
+    def sample_true_model_parameters(self, true_model_parameters: dict):
+        return self.model_parameters.sample_parameters(true_model_parameters)
+
+
+    def approximate_unknown_data(self, exp_model):
+        if self.model_parameters.neutron_spectrum is None:
+            neutron_spectrum = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
+                                                                    False, #self.options.smoothTNCS, 
+                                                                    exp_model.FP[0],
+                                                                    exp_model.t0[0],
+                                                                    self.neutron_spectrum_triggers)
+            
+            self.model_parameters.neutron_spectrum = neutron_spectrum
+            self.model_parameters.neutron_spectrum = neutron_spectrum
+
+        if self.model_parameters.gamma_background_spectrum is None:
+            gamma_background_spectrum= pd.DataFrame({'c'    :   np.ones(len(exp_model.energy_grid))*25,
+                                                    'dc'   :   np.ones(len(exp_model.energy_grid))*0})
+            self.model_parameters.gamma_background_spectrum = gamma_background_spectrum
 
 
 
     def generate_raw_data(self,
                           pw_true,
-                          neutron_spectrum,
-                          options
+                          true_model_parameters, # need to build better protocol for this 
+                          options: syndatOPT
                           ) -> pd.DataFrame:
         """
         Generates a set of noisy, count data from a theoretical yield via the novel inverse-reduction method (Walton, et al.).
@@ -174,42 +208,61 @@ class yield_rpi:
             _description_
         """
 
-        if len(neutron_spectrum) != len(pw_true):
-            raise ValueError("Experiment open data and sample data are not of the same length, check energy domain")
+        assert true_model_parameters.neutron_spectrum is not None
+        if len(true_model_parameters.neutron_spectrum) != len(pw_true):
+            raise ValueError(
+                "neutron spectrum and sample data are not of the same length, check energy domain")
+        assert true_model_parameters.gamma_background_spectrum is not None
+        if len(true_model_parameters.gamma_background_spectrum) != len(pw_true):
+            raise ValueError(
+                "neutron spectrum and sample data are not of the same length, check energy domain")
         
-        true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, options["Sample TURP"])
+        # ====================
+        #### Noah's Changes: True reduction parameters (including neutron spectrum and background) are now sampled using the sample_true_model_parameters
+        # ====================
+
+        # # true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, options["Sample TURP"])
 
         #true_Bi = gamma_background_function()
         #We use a linear aproximation for the background function for now.
-        background=pd.DataFrame({'c'    :   np.ones(len(pw_true.E))*25,
-                                 'dc'   :   np.ones(len(pw_true.E))*0})
+        # background=pd.DataFrame({'c'    :   np.ones(len(pw_true.E))*25,
+        #                          'dc'   :   np.ones(len(pw_true.E))*0})
         
         #If we are sampling TURP, we also should sample background. Might it be better to have a distinct setting for this?
-        if(options["Sample TURP"]):
-            background.c=pois_noise(background.c)
-            background.dc=np.sqrt(background.c)
-        
+        # if(options.sampleTURP):
+        #     background.c=pois_noise(background.c)
+        #     background.dc=np.sqrt(background.c)
+        # ====================
+        #### 
+        # ====================
+
         count_rate,count_rate_uncertainty = inverse_reduction(pw_true, 
-                                     neutron_spectrum,
-                                     background,
-                                     true_reduction_parameters
+                                     true_model_parameters.neutron_spectrum,
+                                     true_model_parameters.gamma_background_spectrum,
+                                     true_model_parameters
                                     )
         count_rate=pd.DataFrame({'c'    :   count_rate,
                                  'dc'   :   count_rate_uncertainty})
         
         #We sample countrate here instead of in the reduction function.
-        if(options["Sample Counting Noise"]):
+        if(options.sample_counting_noise):
             count_rate.c=pois_noise(count_rate.c)
         
         #Uncertainty from this operation still needs to be nailed down.
 
-        raw_data = pd.DataFrame({'E':pw_true.E, 'tof':pw_true.tof, 'true':pw_true.true, 'cg':count_rate.c,'dcg':count_rate.dc, 'cb':background.c, 'dcb':background.dc})
+        raw_data = pd.DataFrame({'E':pw_true.E, 
+                                 'tof':pw_true.tof, 
+                                 'true':pw_true.true, 
+                                 'cg':count_rate.c,
+                                 'dcg':count_rate.dc, 
+                                 'cb':true_model_parameters.gamma_background_spectrum.c, 
+                                 'dcb':true_model_parameters.gamma_background_spectrum.dc})
 
         return raw_data
         
     
 
-    def reduce(self, raw_data, neutron_spectrum, options): # neutron_spectrum, reduction_parameters, countrate, background):
+    def reduce_raw_data(self, raw_data, neutron_spectrum, options): # neutron_spectrum, reduction_parameters, countrate, background):
         """
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
@@ -254,6 +307,6 @@ class yield_rpi:
 
         # define systematic uncertainties
         #I will implement covariance later once we get to defining that.
-        Yg.loc[:,'exp'],Yg.loc[:,'exp_unc'] = reduce_raw_count_data(raw_data, neutron_spectrum, self.reduction_parameters)
+        Yg.loc[:,'exp'],Yg.loc[:,'exp_unc'] = reduce_raw_count_data(raw_data, neutron_spectrum, self.model_parameters)
 
         return Yg

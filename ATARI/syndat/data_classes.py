@@ -3,7 +3,7 @@
 
 class syndatOUT:
     def __init__(self, **kwargs):
-        
+        self._par_true = None
         self._pw_reduced = None
         self._pw_raw = None
         self._covariance_data = {}
@@ -11,6 +11,12 @@ class syndatOUT:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    @property
+    def par_true(self):
+        return self._par_true
+    @par_true.setter
+    def par_true(self, par_true):
+        self._par_true = par_true
         
     @property
     def pw_raw(self):

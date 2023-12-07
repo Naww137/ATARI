@@ -3,8 +3,9 @@ import pandas as pd
 
 from ATARI.syndat.general_functions import *
 from ATARI.theory.experimental import e_to_t 
+import ATARI.utils.hdf5 as h5io
 
-from ATARI.models.particle_pair import Particle_Pair
+from ATARI.Models.particle_pair import Particle_Pair
 from typing import Optional
 
 from ATARI.syndat.syndat_model import Syndat_Model
@@ -29,6 +30,34 @@ class Syndat_Control:
         self.syndat_models = syndat_models
         self.options = options
 
+        # self.clear_samples()
+
+
+    # @property
+    # def samples(self) -> list:
+    #     return self._samples
+    # @samples.setter
+    # def samples(self, samples):
+    #     self._samples = samples
+    # def clear_samples(self):
+    #     self.samples = []  
+    
+    
+    def get_sample(self,i):
+        data = {}
+        for syn_mod in self.syndat_models:
+            data[syn_mod.title] = syn_mod.samples[i]
+        return data
+    
+    # @samples.setter
+    # def samples(self, samples):
+    #     self._samples = samples
+    # def clear_samples(self):
+    #     self.samples = []  
+
+    @property
+    def titles(self) -> list:
+        return [syn_mod.title for syn_mod in self.syndat_models]
 
 
 
@@ -39,6 +68,7 @@ class Syndat_Control:
                ):
 
         generate_pw_true_with_sammy = False
+        par_true = None
         if pw_true_list is not None:
             if self.options.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")
@@ -48,14 +78,16 @@ class Syndat_Control:
             generate_pw_true_with_sammy = True
             if sammyRTO is None:
                 raise ValueError("User did not supply a sammyRTO or a pw_true, one of these is needed")
+            par_true = self.particle_pair.resonance_ladder
         self.pw_true_list = pw_true_list
 
-        datasets = []
+
         for i in range(num_samples):
             
             ### sample resonance ladder
             if self.options.sampleRES:
                 self.particle_pair.sample_resonance_ladder()
+                par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_exp and generate_true_raw_obs
             true_parameters = {}
@@ -80,24 +112,40 @@ class Syndat_Control:
                 syn_mod.reduce_raw_observables()
 
 
-            # ### store each syndat out
-            # datasets = 
-            # for syn_mod in self.syndat_models:
+            ### for each model, append syndat out
+            # sample_dict = {}
+            for syn_mod in self.syndat_models:
 
-            # if self.options.save_raw_data:
-            #     out = syndatOUT(pw_reduced=self.red_data, 
-            #                     pw_raw = self.raw_data)
-            # else:
-            #     out = syndatOUT(pw_reduced=self.red_data)
-            # if self.options.calculate_covariance:
-            #     out.covariance_data = self.covariance_data
-                
-            # datasets.append(out)
+                if self.options.save_raw_data:
+                    out = syndatOUT(par_true=par_true,
+                                    pw_reduced=syn_mod.red_data, 
+                                    pw_raw=syn_mod.raw_data)
+                else:
+                    out = syndatOUT(par_true=par_true,
+                                    pw_reduced=syn_mod.red_data)
 
-        # self.datasets = datasets
+                if self.options.calculate_covariance:
+                    out.covariance_data = syn_mod.covariance_data
+                    
+                syn_mod.samples.append(out)
+                # sample_dict[syn_mod.title] = out
+            
+            # self.samples.append(sample_dict)
+
         return
     
 
+
+    # def to_hdf5(self, filepath):
+
+    #     for isample, sample_dict in enumerate(self.samples):
+
+    #         assert all(sample_dict[self.titles[0]].par_true.equals(sample_dict[t].par_true for t in self.titles))
+    #         h5io.write_par(filepath, isample, sample_dict[self.titles[0]].par_true, 'true')
+
+    #         for syn_mod in self.syndat_models:
+    #             # syn_mod.to_hdf5(filepath)
+    #             h5io.write_pw_exp(filepath, isample, sample_dict[t].pw_reduced, title=t, CovT=None, CovXS=None)
 
 
 

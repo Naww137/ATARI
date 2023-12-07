@@ -1,5 +1,5 @@
 import numpy as np
-from ATARI.models.particle_pair import Particle_Pair
+from ATARI.Models.particle_pair import Particle_Pair
 
 
 def make_input_template(filepath, 

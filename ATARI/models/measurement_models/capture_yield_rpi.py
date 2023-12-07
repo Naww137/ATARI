@@ -6,6 +6,10 @@ from ATARI.syndat.general_functions import *
 from ATARI.theory.experimental import e_to_t, t_to_e
 
 
+from ATARI.Models.structuring import parameter, vector_parameter
+from ATARI.syndat.data_classes import syndatOPT
+
+
 
 
 # ========================================================================================
@@ -23,74 +27,114 @@ def get_covT():
     pass
 
     
-def reduce_raw_count_data(raw_data, neutron_spectrum, model_parameters):
-    #turns 0D scaling factoring into a 1D scaling factor so that it can align with the other 1D values while calculating
-    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*model_parameters.Scaling[0],
-                          'dc'   :   np.ones(len(raw_data.E))*model_parameters.Scaling[1]})
-    
+def reduce_raw_count_data(raw_data, model_parameters):
+
+    ### counts to count rates for target gamma and background measurements
+    crg, dcrg = cts_to_ctr(raw_data.cg, raw_data.dcg, model_parameters.incident_neutron_spectrum_f.bw, model_parameters.trig_g[0])
+    brg, dbrg = cts_to_ctr(model_parameters.background_spectrum_bg.c, 
+                           model_parameters.background_spectrum_bg.dc,
+                           model_parameters.incident_neutron_spectrum_f.bw, 
+                           model_parameters.trig_bg[0])
+    ### counts to count rates for incident flux measurement
+    cr_flux, dcr_flux = cts_to_ctr(model_parameters.incident_neutron_spectrum_f.c,
+                         model_parameters.incident_neutron_spectrum_f.dc,
+                         model_parameters.incident_neutron_spectrum_f.bw,
+                         model_parameters.trig_f[0])
+    br_flux, dbr_flux = cts_to_ctr(model_parameters.background_spectrum_bf.c,
+                         model_parameters.background_spectrum_bf.dc,
+                         model_parameters.incident_neutron_spectrum_f.bw,
+                         model_parameters.trig_bf[0])
+
     #Distribution Calculations:
-    Yield             = np.multiply(scaling.c, np.divide(raw_data.cg - raw_data.cb, neutron_spectrum.c))
+    relative_flux_rate = cr_flux - br_flux # neet to mornalize by yield here!
+    relative_flux_rate_uncertainty = np.sqrt(np.power(dcr_flux,2) - np.power(dbr_flux,2))
+    Yield             = model_parameters.fn[0] * np.divide(crg - brg, relative_flux_rate)
     
     #Uncertainty Calculations:
-    partial_Y_Cc      = np.divide(scaling.c, neutron_spectrum.c)
-    partial_Y_Cb      =-np.divide(scaling.c, neutron_spectrum.c)
-    partial_Y_flux    =-np.multiply(scaling.c, np.divide(raw_data.cg - raw_data.cb, np.power(neutron_spectrum.c,2)))
-    partial_Y_scaling = np.divide(raw_data.cg - raw_data.cb, neutron_spectrum.c)
+    partial_Y_Cc      = relative_flux_rate/model_parameters.fn[0]
+    partial_Y_Cb      =-relative_flux_rate/model_parameters.fn[0]
+    partial_Y_flux    =-model_parameters.fn[0]*np.divide(crg - brg, np.power(relative_flux_rate,2))
+    partial_Y_scaling = np.divide(crg - brg, relative_flux_rate)
     
-    Yield_uncertainty = np.sqrt(np.power(np.multiply(partial_Y_Cc     , raw_data.dcg)       ,2)
-                               +np.power(np.multiply(partial_Y_Cb     , raw_data.dcb)      ,2)
-                               +np.power(np.multiply(partial_Y_flux   , neutron_spectrum.dc),2)
-                               +np.power(np.multiply(partial_Y_scaling, scaling.dc)         ,2))
+    Yield_uncertainty = np.sqrt(np.power(np.multiply(partial_Y_Cc     , dcrg)       ,2)
+                               +np.power(np.multiply(partial_Y_Cb     , dbrg)      ,2)
+                               +np.power(np.multiply(partial_Y_flux   , relative_flux_rate_uncertainty),2)
+                               +np.power(partial_Y_scaling*model_parameters.fn[1]        ,2))
     
-    return(Yield,Yield_uncertainty)
+    return Yield, Yield_uncertainty
 
 
-def inverse_reduction(raw_data, 
-                      neutron_spectrum,
-                      gamma_background_spectrum,
-                      TURP):
+def inverse_reduction(pw_true, true_model_parameters):
     
     #turns 0D scaling factoring into a 1D scaling factor so that it can align with the other 1D values while calculating
-    scaling=pd.DataFrame({'c'    :   np.ones(len(raw_data.E))*TURP.Scaling[0],
-                          'dc'   :   np.ones(len(raw_data.E))*TURP.Scaling[1]})
+    # scaling=pd.DataFrame({'c'    :   np.ones(len(pw_true.E))*TURP.Scaling[0],
+    #                       'dc'   :   np.ones(len(pw_true.E))*TURP.Scaling[1]})
     
-    #Distribution Calculations:
-    count_rate             = np.divide(np.multiply(raw_data.true,neutron_spectrum.c),scaling.c) + gamma_background_spectrum.c
-    
-    #Uncertainty Calculations:
-    partial_Cc_Cb         = 1
-    partial_Cc_flux       = np.divide(raw_data.true, scaling.c)
-    partial_Cc_scaling    = np.divide(np.multiply(neutron_spectrum.c, raw_data.true), np.power(scaling.c,2))
-    
-    count_rate_uncertainty = np.sqrt(np.power(np.multiply(partial_Cc_Cb     , gamma_background_spectrum.dc)      ,2)
-                                    +np.power(np.multiply(partial_Cc_flux   , neutron_spectrum.dc),2)
-                                    +np.power(np.multiply(partial_Cc_scaling, scaling.dc)         ,2))
-    
-    return(count_rate,count_rate_uncertainty)
+    ### relative flux rate measurement
+    cr_flux, dcr_flux = cts_to_ctr(true_model_parameters.incident_neutron_spectrum_f.c,
+                                true_model_parameters.incident_neutron_spectrum_f.dc,
+                                true_model_parameters.incident_neutron_spectrum_f.bw,
+                                true_model_parameters.trig_f[0])
+    br_flux, dbr_flux = cts_to_ctr(true_model_parameters.background_spectrum_bf.c,
+                                true_model_parameters.background_spectrum_bf.dc,
+                                true_model_parameters.incident_neutron_spectrum_f.bw,
+                                true_model_parameters.trig_bf[0])
 
+    relative_flux_rate = cr_flux - br_flux # need to normalize by yield here!
+    
+    ### target gamma background and count rate
+    br_gamma, dbr_gamma = cts_to_ctr(true_model_parameters.background_spectrum_bg.c,
+                                    true_model_parameters.background_spectrum_bg.dc,
+                                    true_model_parameters.incident_neutron_spectrum_f.bw,
+                                    true_model_parameters.trig_bg[0])
+    cr_gamma_true = np.multiply(pw_true.true, relative_flux_rate)/true_model_parameters.fn[0] + br_gamma
+    
+    ### target gamma count rate to counts and add uncertainty
+    c_true = cr_gamma_true*pw_true.tof*true_model_parameters.trig_g[0]
+    
+    ### =========================
+    ### Why uncertainty calculations here? On the generation side, everything is determined
+    ### =========================
 
+    # #Uncertainty Calculations:
+    # partial_Cc_Cb         = 1
+    # partial_Cc_flux       = np.divide(raw_data.true, scaling.c)
+    # partial_Cc_scaling    = np.divide(np.multiply(neutron_spectrum.c, raw_data.true), np.power(scaling.c,2))
+    
+    # count_rate_uncertainty = np.sqrt(np.power(np.multiply(partial_Cc_Cb     , gamma_background_spectrum.dc)      ,2)
+    #                                 +np.power(np.multiply(partial_Cc_flux   , neutron_spectrum.dc),2)
+    #                                 +np.power(np.multiply(partial_Cc_scaling, scaling.dc)         ,2))
+    
 
-from ATARI.models.structuring import parameter, vector_parameter
-from ATARI.syndat.data_classes import syndatOPT
+    return c_true
+
 
 
 
 class capture_yield_rpi_parameters:
 
-    trigo = parameter()
-    trigs = parameter()
-    Scaling  = parameter()
-    neutron_spectrum = vector_parameter()
-    gamma_background_spectrum = vector_parameter()
+    trig_g  = parameter()
+    trig_bg = parameter()
+    trig_f  = parameter()
+    trig_bf = parameter()
+    fn = parameter()
+
+    # incident_neutron_spectrum_g = vector_parameter()
+    background_spectrum_bg = vector_parameter()
+    incident_neutron_spectrum_f = vector_parameter()
+    background_spectrum_bf = vector_parameter()
 
     def __init__(self, **kwargs):
 
-        self.trigo =  (9758727,         0)
-        self.trigs =  (18476117,        0)
-        self.Scaling =  (1,             0)
-        
-        self.neutron_spectrum = None
-        self.gamma_background_spectrum = None
+        self.trig_g     =  (10000000,   0)
+        self.trig_bg    =  (100000000,  0)
+        self.trig_f     =  (10000000,   0)
+        self.trig_bf    =  (100000000,  0)
+        self.fn         =  (1,          0)
+    
+        self.background_spectrum_bg = None
+        self.incident_neutron_spectrum_f = None
+        self.background_spectrum_bf = None
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -122,7 +166,7 @@ class capture_yield_rpi_parameters:
 
 
 # ========================================================================================
-#            syndat_T class 
+#            Handler class 
 # ========================================================================================
 
 class Capture_Yield_RPI:
@@ -138,9 +182,9 @@ class Capture_Yield_RPI:
     def model_parameters(self, model_parameters):
         self._model_parameters = model_parameters
 
-    @property
-    def neutron_spectrum_triggers(self) -> int:
-        return self.model_parameters.trigo[0]
+    # @property
+    # def neutron_spectrum_triggers(self) -> int:
+    #     return self.model_parameters.trigo[0]
 
     @property
     def covariance_data(self) -> dict:
@@ -161,20 +205,32 @@ class Capture_Yield_RPI:
 
 
     def approximate_unknown_data(self, exp_model):
-        if self.model_parameters.neutron_spectrum is None:
-            neutron_spectrum = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
-                                                                    False, #self.options.smoothTNCS, 
-                                                                    exp_model.FP[0],
-                                                                    exp_model.t0[0],
-                                                                    self.neutron_spectrum_triggers)
-            
-            self.model_parameters.neutron_spectrum = neutron_spectrum
-            self.model_parameters.neutron_spectrum = neutron_spectrum
 
-        if self.model_parameters.gamma_background_spectrum is None:
-            gamma_background_spectrum= pd.DataFrame({'c'    :   np.ones(len(exp_model.energy_grid))*25,
-                                                    'dc'   :   np.ones(len(exp_model.energy_grid))*0})
-            self.model_parameters.gamma_background_spectrum = gamma_background_spectrum
+        if self.model_parameters.background_spectrum_bg is None:
+            background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
+                                                                           False, 
+                                                                           exp_model.FP[0], 
+                                                                           exp_model.t0[0], 
+                                                                           self.model_parameters.trig_bg[0])
+            self.model_parameters.background_spectrum_bg = background_spectrum_bg
+
+        if self.model_parameters.incident_neutron_spectrum_f is None:
+            incident_neutron_spectrum_f = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
+                                                                            False, #self.options.smoothTNCS, 
+                                                                            exp_model.FP[0],
+                                                                            exp_model.t0[0],
+                                                                            self.model_parameters.trig_bf[0])
+            
+            self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
+            self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
+
+        if self.model_parameters.background_spectrum_bf is None:
+            background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 
+                                                                           False, 
+                                                                           exp_model.FP[0], 
+                                                                           exp_model.t0[0], 
+                                                                           self.model_parameters.trig_bf[0])
+            self.model_parameters.background_spectrum_bf = background_spectrum_bf
 
 
 
@@ -208,14 +264,15 @@ class Capture_Yield_RPI:
             _description_
         """
 
-        assert true_model_parameters.neutron_spectrum is not None
-        if len(true_model_parameters.neutron_spectrum) != len(pw_true):
-            raise ValueError(
-                "neutron spectrum and sample data are not of the same length, check energy domain")
-        assert true_model_parameters.gamma_background_spectrum is not None
-        if len(true_model_parameters.gamma_background_spectrum) != len(pw_true):
-            raise ValueError(
-                "neutron spectrum and sample data are not of the same length, check energy domain")
+        assert true_model_parameters.incident_neutron_spectrum_f is not None
+        if len(true_model_parameters.incident_neutron_spectrum_f) != len(pw_true):
+            raise ValueError("neutron flux spectrum and sample data are not of the same length, check energy domain")
+        assert true_model_parameters.background_spectrum_bg is not None
+        if len(true_model_parameters.background_spectrum_bg) != len(pw_true):
+            raise ValueError("gamma background spectrum for target capture measurement and sample data are not of the same length, check energy domain")
+        assert true_model_parameters.background_spectrum_bf is not None
+        if len(true_model_parameters.background_spectrum_bf) != len(pw_true):
+            raise ValueError("gamma background spectrum for flux yield measurement and sample data are not of the same length, check energy domain")
         
         # ====================
         #### Noah's Changes: True reduction parameters (including neutron spectrum and background) are now sampled using the sample_true_model_parameters
@@ -236,33 +293,42 @@ class Capture_Yield_RPI:
         #### 
         # ====================
 
-        count_rate,count_rate_uncertainty = inverse_reduction(pw_true, 
-                                     true_model_parameters.neutron_spectrum,
-                                     true_model_parameters.gamma_background_spectrum,
-                                     true_model_parameters
-                                    )
-        count_rate=pd.DataFrame({'c'    :   count_rate,
-                                 'dc'   :   count_rate_uncertainty})
+        raw_data = deepcopy(pw_true)
+        true_gamma_counts = inverse_reduction(pw_true, true_model_parameters)
+
+        if options.sample_counting_noise:
+            c = pois_noise(true_gamma_counts)
+        else:
+            c = true_gamma_counts
+        
+        assert(c.all() >= 0)
+        dc = np.sqrt(c)
+
+        raw_data.loc[:, 'cg'] = c
+        raw_data.loc[:, 'dcg'] = dc
+        
+        # count_rate=pd.DataFrame({'c'    :   count_rate,
+        #                          'dc'   :   count_rate_uncertainty})
         
         #We sample countrate here instead of in the reduction function.
-        if(options.sample_counting_noise):
-            count_rate.c=pois_noise(count_rate.c)
+        # if(options.sample_counting_noise):
+        #     count_rate.c=pois_noise(count_rate.c)
         
         #Uncertainty from this operation still needs to be nailed down.
 
-        raw_data = pd.DataFrame({'E':pw_true.E, 
-                                 'tof':pw_true.tof, 
-                                 'true':pw_true.true, 
-                                 'cg':count_rate.c,
-                                 'dcg':count_rate.dc, 
-                                 'cb':true_model_parameters.gamma_background_spectrum.c, 
-                                 'dcb':true_model_parameters.gamma_background_spectrum.dc})
+        # raw_data = pd.DataFrame({'E':pw_true.E, 
+        #                          'tof':pw_true.tof, 
+        #                          'true':pw_true.true, 
+        #                          'cg':count_rate.c,
+        #                          'dcg':count_rate.dc, 
+        #                          'cb':true_model_parameters.gamma_background_spectrum.c, 
+        #                          'dcb':true_model_parameters.gamma_background_spectrum.dc})
 
         return raw_data
         
     
 
-    def reduce_raw_data(self, raw_data, neutron_spectrum, options): # neutron_spectrum, reduction_parameters, countrate, background):
+    def reduce_raw_data(self, raw_data, options): # neutron_spectrum, reduction_parameters, countrate, background):
         """
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
@@ -307,6 +373,19 @@ class Capture_Yield_RPI:
 
         # define systematic uncertainties
         #I will implement covariance later once we get to defining that.
-        Yg.loc[:,'exp'],Yg.loc[:,'exp_unc'] = reduce_raw_count_data(raw_data, neutron_spectrum, self.model_parameters)
+        Yg.loc[:,'exp'], unc_data = reduce_raw_count_data(raw_data, self.model_parameters)
+
+        if options.calculate_covariance:
+            raise ValueError("not implemented")
+
+            if options.explicit_covariance:
+                pass
+
+            else:
+                pass
+
+        else:
+            diag_tot = unc_data
+            Yg.loc[:,'exp_unc'] = diag_tot
 
         return Yg

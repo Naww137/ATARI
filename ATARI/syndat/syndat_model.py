@@ -1,7 +1,5 @@
 
 import pandas as pd
-from ATARI.models.experimental_model import Experimental_Model
-from ATARI.models.particle_pair import Particle_Pair
 from typing import Protocol, Optional
 from copy import deepcopy
 
@@ -9,8 +7,10 @@ from ATARI.syndat.general_functions import *
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
 
 from ATARI.sammy_interface import sammy_classes, sammy_functions
-from ATARI.models.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
-from ATARI.models.measurement_models.transmission_rpi import Transmission_RPI
+from ATARI.Models.experimental_model import Experimental_Model
+from ATARI.Models.particle_pair import Particle_Pair
+from ATARI.Models.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
+from ATARI.Models.measurement_models.transmission_rpi import Transmission_RPI
 
 
 class Syndat_Model:
@@ -57,7 +57,8 @@ class Syndat_Model:
                  generative_experimental_model: Optional[Experimental_Model] = None,
                  generative_measurement_model: Optional[Generative_Measurement_Model] = None,
                  reductive_measurement_model: Optional[Reductive_Measurement_Model] = None,
-                 options: Optional[syndatOPT] = None
+                 options: Optional[syndatOPT] = None,
+                 title = 'Title'
                  ):
 
         self.generative_experimental_model = Experimental_Model()
@@ -75,9 +76,10 @@ class Syndat_Model:
             self.options = options
 
         ### some convenient definitions
+        self.title = title
         self.reaction = self.generative_experimental_model.reaction
         self.pw_true = pd.DataFrame()
-        self.datasets = []
+        self.clear_samples()
 
         ### approximate neutron spectrum if none given
         # if self.generative_measurement_model.model_parameters.neutron_spectrum is None:
@@ -94,11 +96,13 @@ class Syndat_Model:
         
 
     @property
-    def datasets(self):
-        return self._datasets
-    @datasets.setter
-    def datasets(self, datasets):
-        self._datasets = datasets
+    def samples(self) -> list:
+        return self._samples
+    @samples.setter
+    def samples(self, samples):
+        self._samples = samples
+    def clear_samples(self):
+        self.samples = []  
 
     @property
     def generative_experimental_model(self):
@@ -125,11 +129,41 @@ class Syndat_Model:
     def sample(self,
                particle_pair: Optional[Particle_Pair] = None,
                sammyRTO=None,
-               pw_true: Optional[pd.DataFrame] = None,
-               num_samples=1
+               num_samples=1,
+               pw_true: Optional[pd.DataFrame] = None
                ):
+        """
+        Method to sample from the Syndat Model.
+
+        This method will draw data samples from the Syndat Model based on the options given to the current instance.
+        Particle_pair and sammyRTO must be provided to use SAMMY to calculate this object (experimentally corrected transmission, capture yield, etc.).
+        Otherwise, pw_true must be provided as the true experimental object around which the measurement model describes how data is samples (mostly for testing).
+
+        Each sample generates a SyndatOUT object.
+        Outputs are appended to the list self.samples. 
+        These samples can be cleared using self.clear_samples.
+
+        Parameters
+        ----------
+        particle_pair : Optional[Particle_Pair], optional
+            _description_, by default None
+        sammyRTO : _type_, optional
+            _description_, by default None
+        pw_true : Optional[pd.DataFrame], optional
+            _description_, by default None
+        num_samples : int, optional
+            _description_, by default 1
+
+        Raises
+        ------
+        ValueError
+            _description_
+        ValueError
+            _description_
+        """
         
         generate_pw_true_with_sammy = False
+        par_true = None
         if pw_true is not None:
             if self.options.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")
@@ -138,15 +172,20 @@ class Syndat_Model:
             generate_pw_true_with_sammy = True
             if sammyRTO is None:
                 raise ValueError("User did not supply a sammyRTO or a pw_true, one of these is needed")
+            if particle_pair is None:
+                raise ValueError("User did not supply a Particle_Pair or a pw_true, one of these is needed")
+            else:
+                par_true = particle_pair.resonance_ladder
         self.pw_true_list = pw_true
 
-        datasets = []
+        # samples = []
         for i in range(num_samples):
             
             ### sample resonance ladder
             if self.options.sampleRES:
                 assert particle_pair is not None
                 particle_pair.sample_resonance_ladder()
+                par_true = particle_pair.resonance_ladder 
            
             pw_true = self.generate_true_experimental_objects(particle_pair, 
                                                     sammyRTO, 
@@ -157,18 +196,21 @@ class Syndat_Model:
             self.reduce_raw_observables()
 
             if self.options.save_raw_data:
-                out = syndatOUT(pw_reduced=self.red_data, pw_raw=self.raw_data)
+                out = syndatOUT(par_true=par_true,
+                                pw_reduced=self.red_data, 
+                                pw_raw=self.raw_data)
             else:
-                out = syndatOUT(pw_reduced=self.red_data)
+                out = syndatOUT(par_true=par_true,
+                                pw_reduced=self.red_data)
             if self.options.calculate_covariance:
                 out.covariance_data = self.covariance_data
 
-            datasets.append(out)
+            self.samples.append(out)
 
-        self.datasets = datasets
+    # def sample_to_hdf5(self, filepath, isample):
 
-    def to_hdf5(self, filepath):
-        pass
+    #     h5io.write_pw_exp(filepath, isample, sample_dict[t].pw_reduced, title=t, CovT=None, CovXS=None)
+        
 
     def generate_raw_observables(self, pw_true, true_model_parameters):
 
@@ -195,7 +237,7 @@ class Syndat_Model:
 
     def reduce_raw_observables(self):
         self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, 
-                                                                         self.reductive_measurement_model.model_parameters.neutron_spectrum, 
+                                                                        #  self.reductive_measurement_model.model_parameters.neutron_spectrum, 
                                                                          self.options)
         self.covariance_data = self.reductive_measurement_model.covariance_data
         

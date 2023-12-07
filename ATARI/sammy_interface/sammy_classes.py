@@ -1,8 +1,8 @@
 
 from typing import Optional, Union
 from dataclasses import dataclass, field
-from ATARI.models.particle_pair import Particle_Pair
-from ATARI.models.experimental_model import Experimental_Model
+from ATARI.Models.particle_pair import Particle_Pair
+from ATARI.Models.experimental_model import Experimental_Model
 from pandas import DataFrame, Series
 from numpy import ndarray
 

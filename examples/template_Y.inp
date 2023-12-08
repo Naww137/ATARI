@@ -20,4 +20,4 @@ DO NOT SHIFT RPI RESOLUTION
 
 RPI C
 BURST 0   10.0      1.0      
-CHANN 0   500.0     100.0     0.8      
+CHANN 0   250.0     100.0     0.8      

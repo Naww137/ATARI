@@ -127,9 +127,9 @@ def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo):
         cts_open_measured = pois_noise(cts_open_approx)
 
     dataframe = pd.DataFrame({'tof'    :   tof,
-                                    'bw'    :   bin_width,
-                                    'c'     :   cts_open_measured,
-                                    'dc'    :   np.sqrt(cts_open_measured)})
+                                'bw'    :   bin_width,
+                                'c'     :   cts_open_measured,
+                                'dc'    :   np.sqrt(cts_open_measured)})
 
     dataframe['E'] = t_to_e((dataframe.tof-t0)*1e-9, FP, True) 
 

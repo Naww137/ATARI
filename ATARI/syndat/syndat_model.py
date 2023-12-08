@@ -219,6 +219,7 @@ class Syndat_Model:
 
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
         true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+        self.generative_measurement_model.true_model_parameters = true_model_parameters
         
         # ### sample a realization of the true, true-underlying open count spectra
         # if self.options.sampleTNCS:

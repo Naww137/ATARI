@@ -51,15 +51,15 @@ def reduce_raw_count_data(raw_data, model_parameters):
     Yield             = model_parameters.fn[0] * np.divide(crg - brg, relative_flux_rate)
     
     #Uncertainty Calculations:
-    partial_Y_Cc      = relative_flux_rate/model_parameters.fn[0]
-    partial_Y_Cb      =-relative_flux_rate/model_parameters.fn[0]
+    partial_Y_Cc      = model_parameters.fn[0]/relative_flux_rate
+    partial_Y_Cb      =-model_parameters.fn[0]/relative_flux_rate
     partial_Y_flux    =-model_parameters.fn[0]*np.divide(crg - brg, np.power(relative_flux_rate,2))
-    partial_Y_scaling = np.divide(crg - brg, relative_flux_rate)
+    partial_Y_fn      = np.divide(crg - brg, relative_flux_rate)
     
     Yield_uncertainty = np.sqrt(np.power(np.multiply(partial_Y_Cc     , dcrg)       ,2)
                                +np.power(np.multiply(partial_Y_Cb     , dbrg)      ,2)
                                +np.power(np.multiply(partial_Y_flux   , relative_flux_rate_uncertainty),2)
-                               +np.power(partial_Y_scaling*model_parameters.fn[1]        ,2))
+                               +np.power(partial_Y_fn*model_parameters.fn[1]        ,2))
     
     return Yield, Yield_uncertainty
 
@@ -90,7 +90,7 @@ def inverse_reduction(pw_true, true_model_parameters):
     cr_gamma_true = np.multiply(pw_true.true, relative_flux_rate)/true_model_parameters.fn[0] + br_gamma
     
     ### target gamma count rate to counts and add uncertainty
-    c_true = cr_gamma_true*pw_true.tof*true_model_parameters.trig_g[0]
+    c_true = cr_gamma_true*true_model_parameters.incident_neutron_spectrum_f.bw*true_model_parameters.trig_g[0]
     
     ### =========================
     ### Why uncertainty calculations here? On the generation side, everything is determined
@@ -155,7 +155,7 @@ class capture_yield_rpi_parameters:
                         sample = np.random.normal(loc=mean, scale=uncertainty)
                         sampled_params[param_name] = (sample, 0.0)
                 if isinstance(param_values, pd.DataFrame):
-                    new_c = np.random.normal(loc=param_values.c, scale=param_values.dc)
+                    new_c = np.random.poisson(param_values.c)#, scale=param_values.dc)
                     df = deepcopy(param_values)
                     df.loc[:,'c'] = new_c
                     df.loc[:,'dc'] = np.sqrt(new_c)
@@ -219,10 +219,10 @@ class Capture_Yield_RPI:
                                                                             False, #self.options.smoothTNCS, 
                                                                             exp_model.FP[0],
                                                                             exp_model.t0[0],
-                                                                            self.model_parameters.trig_bf[0])
+                                                                            self.model_parameters.trig_f[0])
             
             self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
-            self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
+            # self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
 
         if self.model_parameters.background_spectrum_bf is None:
             background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 

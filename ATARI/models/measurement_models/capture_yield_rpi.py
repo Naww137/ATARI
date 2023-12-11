@@ -127,9 +127,9 @@ class capture_yield_rpi_parameters:
     def __init__(self, **kwargs):
 
         self.trig_g     =  (10000000,   0)
-        self.trig_bg    =  (100000000,  0)
+        self.trig_bg    =  (1000000,  0)
         self.trig_f     =  (10000000,   0)
-        self.trig_bf    =  (100000000,  0)
+        self.trig_bf    =  (1000000,  0)
         self.fn         =  (1,          0)
     
         self.background_spectrum_bg = None

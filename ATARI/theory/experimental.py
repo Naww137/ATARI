@@ -3,19 +3,53 @@ from scipy.linalg import block_diag
 
 
 
-def t_to_e(t,d,rel):
+def t_to_e(t:float, d:float, rel:bool=True):
+    """
+    Converts from time of flight to neutron energy using relativistic or Newtonian kinematics.
+
+    Parameters
+    ----------
+    t : float or ndarray
+        Time of flight measurements.
+    d : float
+        Distance for the time of flight measurement in meters.
+    rel : bool
+        Relative kinematics (True) or Newtonian kinematics (False), default True.
+
+    Returns
+    -------
+    float or ndarray
+        Neutron energies
+    """
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s
-        E = mn*(1/np.sqrt(1-(d/t/c)**2)-1)
+        E = mn*(1/np.sqrt(1-(d/(c*t))**2)-1)
     else:
-        mn = 1.674927498e-27 #kg
+        mn = 1.674927498e-27 # kg
         jev = 1.6022e-19 # J/eV
         E = 0.5*mn*(d/t)**2 /jev # eV
     return E
 
 
-def e_to_t(E,d,rel):
+def e_to_t(E:float, d:float, rel:bool=True):
+    """
+    Converts from newton energy to time of flight using relativistic or Newtonian kinematics.
+
+    Parameters
+    ----------
+    E : float or ndarray
+        Neutron energies
+    d : float
+        Distance for the time of flight measurement in meters.
+    rel : bool
+        Relative kinematics (True) or Newtonian kinematics (False), default True.
+
+    Returns
+    -------
+    float or ndarray
+        Expected time of flight measurements
+    """
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s
@@ -32,7 +66,7 @@ def trans_2_xs(T, n, n_unc=0.0, CovT=None):
     """
     Converts pointwise transmission data to total cross section data. 
     If covariance data is supplied, first order linear propagation is used to approximate the cross section covariance matrix.
-    If the transmission value is below 0, and nan-type is returned for the corresponding cross section.
+    If the transmission value is below 0, nan-type is returned for the corresponding cross section.
 
     Parameters
     ----------

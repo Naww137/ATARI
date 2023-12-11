@@ -6,7 +6,6 @@ Created on Thu Jun 16 12:18:04 2022
 @author: noahwalton
 """
 
-import os
 import numpy as np
 
 import pandas as pd
@@ -15,9 +14,8 @@ from ATARI.syndat.sample_resparms import sample_resonance_ladder, sample_resonan
 
 class Particle_Pair:
     """
-    _summary_
-
-    _extended_summary_
+    The particle_pair class houses information about the incident and target particles for a reaction of interest. 
+    The methods for this class include functions to calculate the spingroups for the particle pair.
 
     Methods
     -------
@@ -29,6 +27,11 @@ class Particle_Pair:
         Samples a full resonance parameter ladder for each possible spin group.
     """
 
+    # Class variable constants:
+    hbar = 6.582119569e-16 # eV-s
+    c = 2.99792458e8 # m/s
+    m_eV = 939.565420e6 # eV/c^2
+
     def __init__(self, ac, M, m, I, i, l_max,
                     input_options={},   
                     spin_groups=None, 
@@ -38,7 +41,7 @@ class Particle_Pair:
         Initialization of particle pair object for a given reaction.
 
         The particle_pair class houses information about the incident and target particle for a reaction of interest. 
-        The methods for this class include functions to calculate the open channels 
+        The methods for this class include functions to calculate the open channels.
 
         Parameters
         ----------
@@ -58,7 +61,7 @@ class Particle_Pair:
 
         ### Default options
         default_options = { 'Sample Physical Constants' :   False ,
-                            'Use FUDGE'                 :   False,
+                            # 'Use FUDGE'                 :   False, # NOTE: FUDGE option was removed
                             'Sample Average Parameters' :   False  } 
         
         ### redefine options dictionary if any input options are given
@@ -73,7 +76,6 @@ class Particle_Pair:
 
         ### Gather options
         self.sample_physical_constants = self.options['Sample Physical Constants']
-        self.use_fudge = self.options['Use FUDGE']
         self.sample_average_parameters = self.options['Sample Average Parameters']
         # TODO: implement 3 options above
         if self.sample_physical_constants:
@@ -88,7 +90,7 @@ class Particle_Pair:
 
         # assuming boundary condition selected s.t. shift factor is eliminated for s wave but not others!
         if ac < 1e-7:
-            print("WARNING: scattering radius seems to be given in m rather than sqrt(barns) a.k.a. cm^-12")
+            print("WARNING: scattering radius seems to be given in meters rather than sqrt(barns) a.k.a. cm^-12")
         self.ac = ac # sqrt(barns) == cm^-12
         self.M = M # amu
         self.m = m # 1
@@ -97,11 +99,6 @@ class Particle_Pair:
         self.l_max = l_max
         # generalized
         ac_expected = (1.23*M**(1/3))+0.8 # fermi or femtometers
-
-        ### define some constants
-        self.hbar = 6.582119569e-16 # eV-s
-        self.c = 2.99792458e8 # m/s
-        self.m_eV = 939.565420e6 # eV/c^2
 
 
 
@@ -130,7 +127,7 @@ class Particle_Pair:
         return vec
 
 
-    def map_quantum_numbers(self, print_out):
+    def map_quantum_numbers(self, print_out:bool):
         """
         Maps the possible quantum numbers for pair.
 
@@ -182,15 +179,15 @@ class Particle_Pair:
         S_parity = i_parity*I_parity
 
         possible_Jpi = {}
-        J_negative = []; J_positive = []
+        # J_negative = []; J_positive = []
         J_all = []
-        for i_l, l in enumerate(L):
+        for l in L:
             this_l = {}
             
             l_parity = (-1)**l
             J_parity = S_parity*l_parity
             
-            for i_s, s in enumerate(S):
+            for s in S:
                 js = self.quant_vec_sum(s,l)
                 this_l[f's={s}'] = js
                 for j in js:
@@ -237,7 +234,7 @@ class Particle_Pair:
         # self.Jp = Jp
         self.J = Jall # Jn + Jp
 
-        return
+        return Jall
 
 
     def sample_resonance_ladder(self, Erange, spin_groups, average_parameters, 

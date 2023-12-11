@@ -36,9 +36,9 @@ def gstat(J, I, i):
     return (2*J+1)/((2*i+1)*(2*I+1))
 
 
-def k_wavenumber(E, M, m):
+def k_wavenumber(E, M:float, m:float):
     """
-    Calculates the angular wavenumber of the compound state nucleus at a given incident energy, units .
+    Calculates the angular wavenumber of the compound state nucleus at a given incident energy.
 
     This function calculates the wavenumber of the compound state nucleus
     created by an incident neutron and a Cu-63 atom. Some nucelar parameters 
@@ -65,7 +65,7 @@ def k_wavenumber(E, M, m):
     return k
     
 
-def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
+def FofE_recursive(E, ac:float, M:float, m:float, orbital_angular_momentum:int):
         """
         Calculates functions of energy using recursion.
 
@@ -135,7 +135,7 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
 
 
 
-def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
+def FofE_explicit(E, ac:float, M:float, m:float, orbital_angular_momentum:int):
     """
     Calculates penetrability and shift functions using explicit definitions.
 

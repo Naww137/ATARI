@@ -54,7 +54,7 @@ class syndatOPT:
 
     Attributes
     ----------
-    sampleRES : bool
+    sampleRES : bool = True
         Sample a new resonance ladder with each sample.
     sample_counting_noise : bool = False
         Option to sample counting statistic noise for data generation, if False, no statistical noise will be sampled.
@@ -62,13 +62,13 @@ class syndatOPT:
         Indicate whether to calculate off-diagonal elements of the data covariance matrix.
     explicit_covariance : bool = False
         Indicate whether to return explicit data covariance elements or the decomposed statistical and systematic covariances with systematic derivatives.
-    sampleTURP : bool
+    sampleTURP : bool = True
         Option to sample true underlying measurement model (data-reduction) parameters for data generation.
-    sampleTNCS : bool
+    sampleTNCS : bool = True
         Option to sample true neutron count spectrum for data generation.
-    smoothTNCS : bool
+    smoothTNCS : bool = False
         Option to use a smoothed function for the true neutron count spectrum for data generation.
-    save_raw_data : bool
+    save_raw_data : bool = False
         Option to save raw count data, if False, only the reduced transmission data will be saved.
     """
     def __init__(self, **kwargs):

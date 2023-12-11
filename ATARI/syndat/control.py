@@ -116,7 +116,7 @@ class Syndat_Control:
             # sample_dict = {}
             for syn_mod in self.syndat_models:
 
-                if self.options.save_raw_data:
+                if syn_mod.options.save_raw_data:
                     out = syndatOUT(par_true=par_true,
                                     pw_reduced=syn_mod.red_data, 
                                     pw_raw=syn_mod.raw_data)
@@ -124,7 +124,7 @@ class Syndat_Control:
                     out = syndatOUT(par_true=par_true,
                                     pw_reduced=syn_mod.red_data)
 
-                if self.options.calculate_covariance:
+                if syn_mod.options.calculate_covariance:
                     out.covariance_data = syn_mod.covariance_data
                     
                 syn_mod.samples.append(out)

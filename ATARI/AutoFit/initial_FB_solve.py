@@ -105,7 +105,8 @@ class InitialFB:
         rto = copy(sammyRTO)
         assert rto.bayes == True
 
-        initial_resonance_ladder = self.get_starting_feature_bank(particle_pair, energy_range)
+        spin_groups = [particle_pair.spin_groups['3.0'], particle_pair.spin_groups['4.0']]
+        initial_resonance_ladder = self.get_starting_feature_bank(energy_range, spin_groups)
 
         sammyINPyw = sammy_classes.SammyInputDataYW(
             particle_pair = particle_pair,
@@ -150,9 +151,9 @@ class InitialFB:
 
 
 
-    def get_starting_feature_bank(self, 
-                                  particle_pair, 
+    def get_starting_feature_bank(self,
                                   energy_range,
+                                  spin_groups,
                                   num_Elam= None,
                                   varyE = 0,
                                   varyGg = 0,
@@ -162,8 +163,8 @@ class InitialFB:
             num_Elam = int((np.max(energy_range)-np.min(energy_range)) * 1.25)
 
         Er, Gg, Gn, J_ID = [], [], [], []
-        for key, val in particle_pair.spin_groups.items():
-            Er_1, Gg_1, Gn_1, J_ID_1 = get_parameter_grid(energy_range, val, num_Elam, option=1)
+        for each in spin_groups:
+            Er_1, Gg_1, Gn_1, J_ID_1 = get_parameter_grid(energy_range, each, num_Elam, option=1)
             Er.append(Er_1); Gg.append(Gg_1); Gn.append(Gn_1); J_ID.append(J_ID_1); 
         Er = np.concatenate(Er)
         Gg = np.concatenate(Gg)

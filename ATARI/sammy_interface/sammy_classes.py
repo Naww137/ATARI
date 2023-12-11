@@ -103,12 +103,14 @@ class SammyInputData:
 
 @dataclass
 class SammyOutputData:
-    pw: Union[DataFrame, list]
+    pw: Union[DataFrame, list[DataFrame]]
     par: DataFrame
     chi2: Union[float, list[float]]
+    chi2n: Union[float, list[float]]
     pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
     chi2_post: Optional[Union[float, list[float]]] = None
+    chi2n_post : Optional[Union[float, list[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 
@@ -146,9 +148,9 @@ class SammyInputDataYW:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
 
-    datasets : list[Union[DataFrame, ndarray]]
-    templates : list[str]
-    experiments: list[Experimental_Model]
+    datasets : list[DataFrame]
+    experimental_covariance: Optional[list[Union[dict, str]]]
+    experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
 
     max_steps: int = 1
     iterations: int = 2
@@ -157,8 +159,8 @@ class SammyInputDataYW:
 
     LS: bool = False
     LevMar: bool = True
-    LevMarV: float = 2.0
-    # LevMarVd: float = 2.0
+    LevMarV: float = 1.5
+    LevMarVd: float = 5.0
     minF:   float = 1e-5
     maxF:   float = 10
     initial_parameter_uncertainty: float = 1.0

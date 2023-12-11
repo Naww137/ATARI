@@ -2,5 +2,6 @@
     "python.analysis.typeCheckingMode": "basic",
     "editor.codeActionsOnSave": {},
     "editor.formatOnSave": false,
-    "editor.fontWeight": "normal"
+    "editor.fontWeight": "normal",
+    "workbench.colorTheme": "Default Dark+"
 }

@@ -7,10 +7,10 @@ from ATARI.syndat.general_functions import *
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
 
 from ATARI.sammy_interface import sammy_classes, sammy_functions
-from ATARI.Models.experimental_model import Experimental_Model
-from ATARI.Models.particle_pair import Particle_Pair
-from ATARI.Models.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
-from ATARI.Models.measurement_models.transmission_rpi import Transmission_RPI
+from ATARI.ModelData.experimental_model import Experimental_Model
+from ATARI.ModelData.particle_pair import Particle_Pair
+from ATARI.ModelData.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
+from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
 
 
 class Syndat_Model:

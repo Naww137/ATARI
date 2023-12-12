@@ -1,5 +1,5 @@
 
-from ATARI.models.particle_pair import Particle_Pair
+from ATARI.ModelData.particle_pair import Particle_Pair
 import pandas as pd
 import os
 import shutil

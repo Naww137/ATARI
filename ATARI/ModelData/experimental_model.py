@@ -1,7 +1,7 @@
 import numpy as np
 from ATARI.utils.atario import update_dict
 from ATARI.theory.experimental import e_to_t, t_to_e
-from ATARI.Models.structuring import parameter
+from ATARI.ModelData.structuring import parameter
 
 
 class Experimental_Model:

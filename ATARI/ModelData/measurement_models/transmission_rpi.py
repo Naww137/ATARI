@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from ATARI.syndat.general_functions import *
-from ATARI.Models.structuring import parameter, vector_parameter
+from ATARI.ModelData.structuring import parameter, vector_parameter
 from ATARI.syndat.data_classes import syndatOPT
 
 

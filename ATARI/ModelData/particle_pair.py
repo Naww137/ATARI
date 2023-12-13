@@ -125,39 +125,57 @@ class Particle_Pair:
     @property
     def target(self):
         'The target particle'
-        return self._target
+        raise AttributeError('Cannot access target information. It can only be set.')
     @target.setter
     def target(self, target):
         if not isinstance(target, Particle):
             raise TypeError('"target" must be a "Particle" object.')
-        self._target = target
+        self._isotope = target.name
+        self._M = target.mass
+        self._I = target.I
 
     @property
     def projectile(self):
         'The target particle'
-        return self._projectile
+        raise AttributeError('Cannot access projectile information. It can only be set.')
     @projectile.setter
     def projectile(self, projectile):
         if not isinstance(projectile, Particle):
             raise TypeError('"projectile" must be a "Particle" object.')
-        self._projectile = projectile
+        self._m = projectile.mass
+        self._i = projectile.I
 
     @property
     def M(self):
         'Mass of the target isotope'
-        return self._target.mass
+        return self._M
+    @M.setter
+    def M(self, M):
+        self._M = M
+
     @property
     def m(self):
         'Mass of the projectile'
-        return self._projectile.mass
+        return self._m
+    @m.setter
+    def m(self, m):
+        self._m = m
+    
     @property
     def I(self):
         'Target isotope intrinsic spin'
-        return self._target.I
+        return self._I
+    @I.setter
+    def I(self, I):
+        self._I = I
+
     @property
     def i(self):
         'Projectile intrinsic spin'
-        return self._projectile.I
+        return self._i
+    @i.setter
+    def i(self, i):
+        self._i = i
 
     @property
     def l_max(self):

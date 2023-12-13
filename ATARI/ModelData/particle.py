@@ -22,20 +22,20 @@ class Particle:
         """
         Initialize a Particle object.
 
-        Attributes:
+        Attributes
         ----------
-        Z      :: int
+        Z      : int
             Atomic number
-        A      :: int
+        A      : int
             Atomic mass number
-        I      :: halfint
+        I      : half-integer
             Particle spin
-        mass   :: float
+        mass   : float
             Nuclei mass in atomic mass units (amu)
-        radius :: float
+        radius : float
             Nuclear mean square radius in femtometers (fm). Default is automatically approximated
             using `1.23 * A**(1/3)`.
-        name   :: str
+        name   : str
             Name of the particle. Default is ZZAAA MCNP ID form.
         """
         # Atomic Number:
@@ -44,7 +44,8 @@ class Particle:
         if A < Z:   print(Warning('Are you sure A < Z?'))
         self._A = int(A)
         # Isotope Spin:
-        self._I = HalfInt(I)
+        if I % 0.5 != 0.0:  raise ValueError(f'The isotope spin, {I}, must be a half-integer.')
+        self._I = float(I)
         # Mass: (amu)
         self._mass = mass
         
@@ -107,100 +108,4 @@ class Particle:
     
 Neutron = Particle(Z=0 , A=1  , I=0.5, mass=mass_neutron, radius=0.8  , name='neutron')
 Proton  = Particle(Z=1 , A=1  , I=0.5, mass=mass_proton , radius=0.833, name='proton')
-Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94800   , radius=None , name='Ta181')
-
-# =================================================================================================
-#    HalfInt:
-# =================================================================================================
-
-class HalfInt:
-    """
-    Data type for half-integers to represent spins.
-    """
-
-    def __init__(self, value):
-        if isinstance(value, self.__class__):
-            self = value
-        else:
-            if value % 0.5 != 0.0:
-                raise ValueError(f'The number, {value}, is not a half-integer.')
-            self.__2x_value = int(2*value)
-
-    @property
-    def value(self):    return 0.5 * float(self.__2x_value)
-
-    def __repr__(self):
-        if self.__2x_value % 2 == 0:
-            return f'{self.__2x_value//2}'
-        else:
-            return f'{self.__2x_value}/2'
-
-    # Arithmetic:
-    def __float__(self):
-        return self.value
-    def __eq__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value == other.value
-        else:
-            return self.value == other
-    def __ne__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value != other.value
-        else:
-            return self.value != other
-    def __lt__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value < other.value
-        else:
-            return self.value < other
-    def __le__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value <= other.value
-        else:
-            return self.value <= other
-    def __gt__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value > other.value
-        else:
-            return self.value > other
-    def __ge__(self, other) -> bool:
-        if isinstance(other, self.__class__):
-            return self.value >= other.value
-        else:
-            return self.value >= other
-    def __add__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__class__(self.value + other.value)
-        elif isinstance(other, int):
-            return self.__class__(self.value + other)
-        else:
-            return self.value + other
-    def __radd__(self, other):
-        if isinstance(other, int):
-            return self.__class__(other + self.value)
-        else:
-            return other + self.value
-    def __sub__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__class__(self.value - other.value)
-        elif isinstance(other, int):
-            return self.__class__(self.value - other)
-        else:
-            return self.value - other
-    def __rsub__(self, other):
-        if isinstance(other, int):
-            return self.__class__(other - self.value)
-        else:
-            return other - self.value
-    def __mul__(self, other):
-        if isinstance(other, self.__class__):
-            return self.value * other.value
-        elif isinstance(other, int) and (other % 2 == 0):
-            return self.__2x_value * (other // 2)
-        else:
-            return self.value * other
-    def __rmul__(self, other):
-        if isinstance(other, int) and (other % 2 == 0):
-            return self.__2x_value * (other // 2)
-        else:
-            return self.value * other
+Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94803   , radius=None , name='Ta181')

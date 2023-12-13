@@ -28,10 +28,23 @@ class Evaluation_Data:
 class InitialFBOPT:
     def __init__(self, **kwargs):
         self._Fit = True
+
         self._width_elimination = True
         self._Gn_threshold = 1e-2
         self._decrease_chi2_threshold_for_width_elimination = True
+
+        self._max_steps = 30
+        self._iterations = 2
+        self._step_threshold = 0.1
+        self._LevMar = True
+        self._LevMarV = 1.5
+        self._LevMarVd = 5
+        self._LevMarV0 = 0.5
+
         self._fit_Gg = True
+        self._fit_all_spin_groups = True
+        self._spin_group_keys = []
+
 
 
         for key, value in kwargs.items():
@@ -75,11 +88,87 @@ class InitialFBOPT:
         self._decrease_chi2_threshold_for_width_elimination = decrease_chi2_threshold_for_width_elimination
 
     @property
+    def max_steps(self):
+        return self._max_steps
+    @max_steps.setter
+    def max_steps(self, max_steps):
+        self._max_steps = max_steps
+
+    @property
+    def iterations(self):
+        return self._iterations
+    @iterations.setter
+    def iterations(self, iterations):
+        # if iterations < 1:
+        #     raise ValueError("iterations must be at least 1")
+        self._iterations = iterations
+
+    @property
+    def step_threshold(self):
+        return self._step_threshold
+    @step_threshold.setter
+    def step_threshold(self, step_threshold):
+        self._step_threshold = step_threshold
+    
+    @property
+    def LevMar(self):
+        return self._LevMar
+    @LevMar.setter
+    def LevMar(self, LevMar):
+        self._LevMar = LevMar
+    
+    @property
+    def LevMarV(self):
+        return self._LevMarV
+    @LevMarV.setter
+    def LevMarV(self, LevMarV):
+        self._LevMarV = LevMarV
+
+    @property
+    def LevMarVd(self):
+        return self._LevMarVd
+    @LevMarVd.setter
+    def LevMarVd(self, LevMarVd):
+        self._LevMarVd = LevMarVd
+
+    @property
+    def LevMarV0(self):
+        return self._LevMarV0
+    @LevMarV0.setter
+    def LevMarV0(self, LevMarV0):
+        self._LevMarV0 = LevMarV0
+
+
+    @property
     def fit_Gg(self):
         return self._fit_Gg
     @fit_Gg.setter
     def fit_Gg(self, fit_Gg):
         self._fit_Gg = fit_Gg
+
+    @property
+    def fit_all_spin_groups(self):
+        return self._fit_all_spin_groups
+    @fit_all_spin_groups.setter
+    def fit_all_spin_groups(self, fit_all_spin_groups):
+        self._fit_all_spin_groups = fit_all_spin_groups
+
+    @property
+    def spin_group_keys(self):
+        return self._spin_group_keys
+    @spin_group_keys.setter
+    def spin_group_keys(self, spin_group_keys):
+        self._spin_group_keys = spin_group_keys
+
+
+
+
+
+
+
+
+
+
 
 
 class InitialFB:
@@ -105,7 +194,12 @@ class InitialFB:
         rto = copy(sammyRTO)
         assert rto.bayes == True
 
-        spin_groups = [particle_pair.spin_groups['3.0'], particle_pair.spin_groups['4.0']]
+        
+        if self.options.fit_all_spin_groups:
+            spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
+        else:
+            assert len(self.options.spin_group_keys)>0
+            spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
         initial_resonance_ladder = self.get_starting_feature_bank(energy_range, spin_groups)
 
         sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -116,15 +210,16 @@ class InitialFB:
             experiments = experiments,
             experimental_covariance= covariance_data, 
             
-            max_steps = 30,
-            iterations = 2,
-            step_threshold = 0.1,
+            max_steps = self.options.max_steps,
+            iterations = self.options.iterations,
+            step_threshold = self.options.step_threshold,
+            LevMar = self.options.LevMar,
+            LevMarV = self.options.LevMarV,
+            LevMarVd = self.options.LevMarVd,
+            initial_parameter_uncertainty = self.options.LevMarV0,
+            
             autoelim_threshold = None,
-
             LS = False,
-            LevMar = True,
-            LevMarV = 1.5,
-            initial_parameter_uncertainty = 0.5
             )
 
         ### Fit 1 on Gn only

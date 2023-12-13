@@ -514,7 +514,7 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
     runsammy_process = subprocess.run(
                                 ["sh", "-c", f"./pipe.sh"], 
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
-                                capture_output=True, text=True, timeout=180
+                                capture_output=True, text=True, timeout=60*10
                                 )
     if sammy_RTO.bayes:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
@@ -568,7 +568,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     runsammy_process = subprocess.run(
                                     [f"sh", "-c", f"{sammyRTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammyRTO.sammy_runDIR),
-                                    capture_output=True
+                                    capture_output=True, timeout=60*2
                                     )
 
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
@@ -930,32 +930,32 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
-                            capture_output=True
+                            capture_output=True, timeout=60*5
                             )
 
     for i in range(1, iterations+1):
         runsammy_ywy0 = subprocess.run(
                                     ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True
+                                    capture_output=True, timeout=60*10
                                     )
 
         runsammy_bay0 = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True
+                                    capture_output=True, timeout=60*5
                                     )
 
     # Move par file from final iteration 
     out = subprocess.run(
         ["sh", "-c", 
-        f"""head -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step{step+1}.par"""],
-        cwd=os.path.realpath(rundir), capture_output=True)
+        f"""head -$(($(wc -l < iterate/bayes_iter{iterations+1}.par) - 1)) iterate/bayes_iter{iterations+1}.par > results/step{step+1}.par"""],
+        cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
     
 
 def run_YWY0_and_get_chi2(rundir, step):
     runsammy_ywy0 = subprocess.run(
                                 ["sh", "-c", f"./YWY0.sh {step}"], 
                                 cwd=os.path.realpath(rundir),
-                                capture_output=True, text=True
+                                capture_output=True, text=True, timeout=60*10
                                 )
     i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-2].split()]
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
@@ -968,7 +968,7 @@ def update_fudge_in_parfile(rundir, step, fudge):
         f"""head -$(($(wc -l < results/step{step}.par) - 1)) results/step{step}.par > results/temp;
 echo "{np.round(fudge,11)}" >> "results/temp"
 mv "results/temp" "results/step{step}.par" """],
-        cwd=os.path.realpath(rundir), capture_output=True)
+        cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
 
 
@@ -1022,7 +1022,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     if sammyRTO.Print:
                         print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                         print(criteria)
-                    return istep-1
+                    return max(istep-1, 0)
                 else:
                     criteria = "Chi2 improvement below threshold"
                 if sammyRTO.Print:
@@ -1041,13 +1041,13 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         istep += 1
 
     # print(criteria)
-    return istep-1
+    return max(istep-1, 0)
 
 
 
 def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
-                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*5
                         )
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []

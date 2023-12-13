@@ -6,15 +6,17 @@ Created on Thu Jun 16 12:18:04 2022
 @author: noahwalton
 """
 
-import os
 import numpy as np
-from copy import copy 
-
 import pandas as pd
-from ATARI.syndat.sample_resparms import sample_resonance_ladder, sample_resonance_ladder_old
+from ATARI.syndat.sample_resparms import sample_resonance_ladder
 from ATARI.theory.resonance_statistics import make_res_par_avg
 from ATARI.models.particle import Particle, Ta181, Neutron
 
+VALID_SAMMY_FORMALISMS = ('REICH-MOORE FORMALIS', 'MORE ACCURATE REICH-', 'XCT',
+                          'ORIGINAL REICH-MOORE', 'CRO',
+                          'MULTILEVEL BREIT-WIG', 'MLBW FORMALISM IS WA', 'MLBW',
+                          'SINGLE LEVEL BREIT-W', 'SLBW FORMALISM IS WA', 'SLBW',
+                          'REDUCED WIDTH AMPLIT')
 
 def quant_vec_sum(a,b):
     """
@@ -35,7 +37,7 @@ def quant_vec_sum(a,b):
     numpy.ndarray
         Array of all possible quantum values.
     """
-    a = abs(a); b=abs(b)
+    a = abs(a); b = abs(b)
     vec = np.arange(abs(a-b), a+b+1, 1)
     return vec
 
@@ -46,7 +48,8 @@ def quant_vec_sum(a,b):
 
 class Particle_Pair:
     """
-    ...
+    Particle_Pair is a class that stores information regarding the reacting isotopes, the
+    resonances, energy range, spingroups, and more.
     """
 
     # Class attribute constants:
@@ -71,10 +74,10 @@ class Particle_Pair:
             setattr(self, key, value)
 
     def __repr__(self):
-        string=''
+        string = ''
         for prop in dir(self):
             if not callable(getattr(self, prop)) and not prop.startswith('_'):
-                string+= f"{prop}: {getattr(self, prop)}\n"
+                string += f"{prop}: {getattr(self, prop)}\n"
         return string
 
     @property
@@ -95,9 +98,12 @@ class Particle_Pair:
 
     @property
     def formalism(self):
+        'R-matrix approximation'
         return self._formalism
     @formalism.setter
     def formalism(self, formalism):
+        if formalism not in VALID_SAMMY_FORMALISMS:
+            raise ValueError(f'"{formalism}" is not a valid sammy formalism.\n\nValid formalisms:\n{VALID_SAMMY_FORMALISMS}')
         self._formalism = formalism
 
     @property
@@ -133,25 +139,25 @@ class Particle_Pair:
     @projectile.setter
     def projectile(self, projectile):
         if not isinstance(projectile, Particle):
-            raise TypeError('"target" must be a "Particle" object.')
+            raise TypeError('"projectile" must be a "Particle" object.')
         self._projectile = projectile
 
     @property
     def M(self):
         'Mass of the target isotope'
-        return self.target.mass
+        return self._target.mass
     @property
     def m(self):
         'Mass of the projectile'
-        return self.projectile.mass
+        return self._projectile.mass
     @property
     def I(self):
         'Target isotope intrinsic spin'
-        return self.target.I
+        return self._target.I
     @property
     def i(self):
         'Projectile intrinsic spin'
-        return self.projectile.I
+        return self._projectile.I
 
     @property
     def l_max(self):
@@ -163,6 +169,7 @@ class Particle_Pair:
 
     @property
     def total_energy_range(self):
+        'Modelled energy range'
         return self._total_energy_range
     @total_energy_range.setter
     def total_energy_range(self, total_energy_range):

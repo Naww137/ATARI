@@ -1,4 +1,3 @@
-from ATARI.models.spingroups import halfint
 
 __doc__ = """
 This file stores the "Particle" class. The "Particle" class contains all relevent information to a
@@ -33,50 +32,74 @@ class Particle:
             Particle spin
         mass   :: float
             Nuclei mass in atomic mass units (amu)
-        AWRI   :: float
-            Nuclei mass divided by neutron mass
         radius :: float
-            Nuclear mean square radius in femtometers (fm)
+            Nuclear mean square radius in femtometers (fm). Default is automatically approximated
+            using `1.23 * A**(1/3)`.
         name   :: str
-            Name of the particle
+            Name of the particle. Default is ZZAAA MCNP ID form.
         """
         # Atomic Number:
-        self.Z = int(Z)
+        self._Z = int(Z)
         # Atomic Mass:
-        self.A = int(A)
+        if A < Z:   print(Warning('Are you sure A < Z?'))
+        self._A = int(A)
         # Isotope Spin:
-        self.I = halfint(I)
+        self._I = HalfInt(I)
         # Mass: (amu)
-        self.mass = float(mass)
-        # AWRI:
-        if self.mass is not None:   self.AWRI = self.mass / mass_neutron
-        else:                       self.AWRI = None
+        self._mass = mass
         
         # Nuclear Radius: (fm)
         if radius is not None:
-            if   radius > 1e2:      print(Warning(f'The channel radius, {radius}, is quite high. Make sure it is in units of femtometers.'))
-            elif radius < 1e-2:     print(Warning(f'The channel radius, {radius}, is quite low. Make sure it is in units of femtometers.'))
-            self.radius = float(radius)
-        elif self.A is not None:
-            self.radius = 1.23 * self.A**(1/3)
+            if   radius > 1e2:      print(Warning(f'The channel radius, {radius} fm, is quite high. Make sure it is in units of femtometers.'))
+            elif radius < 1e-2:     print(Warning(f'The channel radius, {radius} fm, is quite low. Make sure it is in units of femtometers.'))
+            self._radius = float(radius)
         else:
-            self.radius = None
+            self._radius = 1.23 * self._A**(1/3)
         
         # Particle Name:
-        if name is not None:
-            self.name = str(name)
-        elif (self.A is not None) and (self.Z is not None):
-            self.name = str(self.Z*1000+self.A) # MCNP ID for the isotope.
-        else:
-            self.name = '???'
+        if name is not None:    self._name = str(name)
+        else:                   self._name = str(self._Z*1000+self._A) # MCNP ID for the isotope.
+
+    @property
+    def Z(self):
+        'Atomic number'
+        return self._Z
+    @property
+    def A(self):
+        'Atomic mass number'
+        return self._A
+    @property
+    def I(self):
+        'Particle spin'
+        return self._I
+    @property
+    def mass(self):
+        'Nuclei mass in atomic mass units (amu)'
+        return self._mass
+    @property
+    def radius(self):
+        'Nuclear mean square radius in femtometers (fm)'
+        return self._radius
+    @property
+    def name(self):
+        'Name of the particle'
+        return self._name
+    @property
+    def N(self):
+        'Number of Neutrons'
+        return self._A - self._Z
+    @property
+    def AWRI(self):
+        'Nuclei mass divided by neutron mass'
+        return self._mass / mass_neutron
 
     def __repr__(self):
-        txt  = f'Particle       = {self.name}\n'
-        txt += f'Atomic Number  = {self.Z}\n'
-        txt += f'Atomic Mass    = {self.A}\n'
-        txt += f'Nuclear Spin   = {self.I}\n'
-        txt += f'Mass           = {self.mass:.7f} (amu)\n'
-        txt += f'Nuclear Radius = {self.radius:.7f} (fm)\n'
+        txt  = f'Particle       = {self._name}\n'
+        txt += f'Atomic Number  = {self._Z}\n'
+        txt += f'Atomic Mass    = {self._A}\n'
+        txt += f'Nuclear Spin   = {self._I}\n'
+        txt += f'Mass           = {self._mass:.7f} (amu)\n'
+        txt += f'Nuclear Radius = {self._radius:.7f} (fm)\n'
         return txt
     
     def __str__(self):
@@ -85,3 +108,99 @@ class Particle:
 Neutron = Particle(Z=0 , A=1  , I=0.5, mass=mass_neutron, radius=0.8  , name='neutron')
 Proton  = Particle(Z=1 , A=1  , I=0.5, mass=mass_proton , radius=0.833, name='proton')
 Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94800   , radius=None , name='Ta181')
+
+# =================================================================================================
+#    HalfInt:
+# =================================================================================================
+
+class HalfInt:
+    """
+    Data type for half-integers to represent spins.
+    """
+
+    def __init__(self, value):
+        if isinstance(value, self.__class__):
+            self = value
+        else:
+            if value % 0.5 != 0.0:
+                raise ValueError(f'The number, {value}, is not a half-integer.')
+            self.__2x_value = int(2*value)
+
+    @property
+    def value(self):    return 0.5 * float(self.__2x_value)
+
+    def __repr__(self):
+        if self.__2x_value % 2 == 0:
+            return f'{self.__2x_value//2}'
+        else:
+            return f'{self.__2x_value}/2'
+
+    # Arithmetic:
+    def __float__(self):
+        return self.value
+    def __eq__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value == other.value
+        else:
+            return self.value == other
+    def __ne__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value != other.value
+        else:
+            return self.value != other
+    def __lt__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value < other.value
+        else:
+            return self.value < other
+    def __le__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value <= other.value
+        else:
+            return self.value <= other
+    def __gt__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value > other.value
+        else:
+            return self.value > other
+    def __ge__(self, other) -> bool:
+        if isinstance(other, self.__class__):
+            return self.value >= other.value
+        else:
+            return self.value >= other
+    def __add__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__class__(self.value + other.value)
+        elif isinstance(other, int):
+            return self.__class__(self.value + other)
+        else:
+            return self.value + other
+    def __radd__(self, other):
+        if isinstance(other, int):
+            return self.__class__(other + self.value)
+        else:
+            return other + self.value
+    def __sub__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__class__(self.value - other.value)
+        elif isinstance(other, int):
+            return self.__class__(self.value - other)
+        else:
+            return self.value - other
+    def __rsub__(self, other):
+        if isinstance(other, int):
+            return self.__class__(other - self.value)
+        else:
+            return other - self.value
+    def __mul__(self, other):
+        if isinstance(other, self.__class__):
+            return self.value * other.value
+        elif isinstance(other, int) and (other % 2 == 0):
+            return self.__2x_value * (other // 2)
+        else:
+            return self.value * other
+    def __rmul__(self, other):
+        if isinstance(other, int) and (other % 2 == 0):
+            return self.__2x_value * (other // 2)
+        else:
+            return self.value * other

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from ATARI.syndat.sample_resparms import sample_resonance_ladder
 from ATARI.theory.resonance_statistics import make_res_par_avg
-from ATARI.models.particle import Particle, Ta181, Neutron
+from ATARI.ModelData.particle import Particle, Ta181, Neutron
 
 VALID_SAMMY_FORMALISMS = ('REICH-MOORE FORMALIS', 'MORE ACCURATE REICH-', 'XCT',
                           'ORIGINAL REICH-MOORE', 'CRO',

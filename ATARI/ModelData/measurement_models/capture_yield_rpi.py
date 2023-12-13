@@ -6,7 +6,7 @@ from ATARI.syndat.general_functions import *
 from ATARI.theory.experimental import e_to_t, t_to_e
 
 
-from ATARI.Models.structuring import parameter, vector_parameter
+from ATARI.ModelData.structuring import parameter, vector_parameter
 from ATARI.syndat.data_classes import syndatOPT
 
 

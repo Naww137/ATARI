@@ -759,7 +759,7 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
         temp_RTO.options["bayes"] = False
         fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", temp_RTO.sammy_runDIR)
         write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=[])
+                                    alphanumeric=[]+idc_flag)
     
     ### options for least squares
     if sammyINPYW.LS:
@@ -778,14 +778,37 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     write_saminp(os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
                                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
 
+def filter_idc(filepath, pw_df):
+    minE = np.min(pw_df.E)
+    maxE = np.max(pw_df.E)
 
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+    with open (filepath, 'w') as f:
+        in_partial_derivatives = False
+        for line in lines:
+            if line.lower().startswith("free-forma"):
+                in_partial_derivatives = True
+            elif line.lower().startswith("uncertaint") or not line.strip():
+                in_partial_derivatives = False
+                in_uncertainties = True
+
+            elif in_partial_derivatives:
+                E = float(line.split()[0]) 
+                if (round(E,5)>=round(minE,5)) & (round(E,5)<=round(maxE,5)):
+                    pass
+                else:
+                    continue
+            
+            f.write(line)
+    
 
 def make_data_for_YW(datasets, experiments, rundir, exp_cov):
     if np.all([isinstance(i, pd.DataFrame) for i in datasets]):
         real = True
     else:
         if np.any([isinstance(i,pd.DataFrame) for i in datasets]):
-            raise ValueError("It looks like you''ve mixed dummy energy-grid data and real data")
+            raise ValueError("It looks like you've mixed dummy energy-grid data and real data")
         real = False
 
     idc = []
@@ -798,6 +821,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
+                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             else:
                 idc.append(False)
@@ -858,21 +882,25 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
         f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
 
 
-def make_final_plot_bash(dataset_titles, sammyexe, rundir):
+def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
     with open(os.path.join(rundir, "plot.sh") , 'w') as f:
-        for ds in dataset_titles:
+        for i,ds in enumerate(dataset_titles):
+            if idc_list[i]: dcov=f"{ds}.idc" 
+            else: dcov=""
             f.write(f"##################################\n# Plot for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n\nEOF\n")
+            f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n")
             f.write(f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""")    
         f.write("################# read chi2 #######################\n#\n")
         for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
             f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-            # f.write(f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """)
-            # f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+            f.write(f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
         f.write("""\necho "$1""")
         for ds in dataset_titles:
             f.write(f" $chi2_string_{ds}")
+        for ds in dataset_titles:
+            f.write(f" $chi2n_string_{ds}")
         f.write(""""\n""")
     
 
@@ -894,7 +922,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
-    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR)
+    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     
 
 
@@ -1026,8 +1054,10 @@ def plot_YW(sammyRTO, dataset_titles, i):
     for dt in dataset_titles:
         lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
     i_chi2s = [float(s) for s in out.stdout.split('\n')[-2].split()]
-    i=i_chi2s[0]; chi2s=i_chi2s[1:] 
-    return par, lsts, chi2s
+    i=i_chi2s[0]
+    chi2s=i_chi2s[1:len(dataset_titles)+1]
+    chi2ns=i_chi2s[len(dataset_titles)+1:] 
+    return par, lsts, chi2s, chi2ns
 
 
 
@@ -1042,15 +1072,16 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
     ### get prior
-    par, lsts, chi2nlist = plot_YW(sammyRTO, dataset_titles, 0)
-    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=1.0, chi2n=chi2nlist)
+    par, lsts, chi2list, chi2nlist = plot_YW(sammyRTO, dataset_titles, 0)
+    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list, chi2n=chi2nlist)
     
     ### run bayes
     if sammyRTO.bayes:
         ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-        par_post, lsts_post, chi2nlist_post = plot_YW(sammyRTO, dataset_titles, ifinal)
+        par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyRTO, dataset_titles, ifinal)
         sammy_OUT.pw_post = lsts_post
         sammy_OUT.par_post = par_post
+        sammy_OUT.chi2_post = chi2list_post
         sammy_OUT.chi2n_post = chi2nlist_post
 
 

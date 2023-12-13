@@ -1,6 +1,7 @@
 import numpy as np
 from ATARI.theory.experimental import e_to_t, t_to_e
-from ATARI.models.structuring import parameter
+from ATARI.ModelData.structuring import parameter
+
 
 class Experimental_Model:
 

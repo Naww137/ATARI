@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 from ATARI.syndat.general_functions import *
+<<<<<<< HEAD:ATARI/models/measurement_models/transmission_rpi.py
 from ATARI.models.structuring import parameter, vector_parameter
+=======
+from ATARI.ModelData.structuring import parameter, vector_parameter
+>>>>>>> a54e4fd83fdb48118e0da4da5cea519f7af67f1c:ATARI/ModelData/measurement_models/transmission_rpi.py
 from ATARI.syndat.data_classes import syndatOPT
 
 

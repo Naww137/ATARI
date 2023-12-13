@@ -35,7 +35,7 @@ def test_mean_converges_to_true_transmissionRPI():
     assert (np.all(np.isclose(np.mean(exp_trans, axis=0), true_trans, rtol=1e-2)))
     assert (np.all(normaltest((exp_trans-true_trans)/exp_trans_unc).pvalue>1e-5))
 
-    print("Passed test mean_converges_to_true for syndat.transmission_rpi.syndat_T")
+    print("Passed test mean_converges_to_true for syndat.transmission_rpi.Transmission_RPI")
 
 
 
@@ -66,7 +66,7 @@ def test_mean_converges_to_true_captureRPI():
     assert (np.all(np.isclose(np.mean(exp_trans, axis=0), true_trans, rtol=1e-2)))
     assert (np.all(normaltest((exp_trans-true_trans)/exp_trans_unc).pvalue>1e-5))
 
-    print("Passed test mean_converges_to_true for syndat.transmission_rpi.syndat_T")
+    print("Passed test mean_converges_to_true for syndat.capture_yield_rpi.Capture_Yield_RPI")
 
 
 def no_sampling_returns_same_values():

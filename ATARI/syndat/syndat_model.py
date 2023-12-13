@@ -81,16 +81,6 @@ class Syndat_Model:
         self.pw_true = pd.DataFrame()
         self.clear_samples()
 
-        ### approximate neutron spectrum if none given
-        # if self.generative_measurement_model.model_parameters.neutron_spectrum is None:
-        #     neutron_spectrum = approximate_neutron_spectrum_Li6det(self.generative_experimental_model.energy_grid, 
-        #                                                             False, #self.options.smoothTNCS, 
-        #                                                             self.generative_experimental_model.FP[0],
-        #                                                             self.generative_experimental_model.t0[0],
-        #                                                             self.generative_measurement_model.neutron_spectrum_triggers)
-            
-        #     self.generative_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
-        #     self.reductive_measurement_model.model_parameters.neutron_spectrum = neutron_spectrum
         self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model)
         self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model)
         
@@ -189,7 +179,8 @@ class Syndat_Model:
            
             pw_true = self.generate_true_experimental_objects(particle_pair, 
                                                     sammyRTO, 
-                                                    generate_pw_true_with_sammy)
+                                                    generate_pw_true_with_sammy,
+                                                    pw_true)
 
             self.generate_raw_observables(pw_true, true_model_parameters={})
 

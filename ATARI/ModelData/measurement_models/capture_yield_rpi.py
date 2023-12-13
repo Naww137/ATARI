@@ -47,7 +47,7 @@ def reduce_raw_count_data(raw_data, model_parameters):
 
     #Distribution Calculations:
     relative_flux_rate = cr_flux - br_flux # neet to mornalize by yield here!
-    relative_flux_rate_uncertainty = np.sqrt(np.power(dcr_flux,2) - np.power(dbr_flux,2))
+    relative_flux_rate_uncertainty = np.sqrt(np.power(dcr_flux,2) + np.power(dbr_flux,2))
     Yield             = model_parameters.fn[0] * np.divide(crg - brg, relative_flux_rate)
     
     #Uncertainty Calculations:

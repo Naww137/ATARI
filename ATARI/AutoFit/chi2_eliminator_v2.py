@@ -216,6 +216,8 @@ class eliminator_by_chi2:
             best_model_chars = None
             current_level = len(ladder)
 
+            if current_level == 1:
+                break
 
 
             ### Identify fixed resonances
@@ -295,7 +297,9 @@ class eliminator_by_chi2:
                                         delta_chi2_allowed,
                                         best_model_chi2,
                                         all_models,
-                                        any_model_passed_test)
+                                        any_model_passed_test,
+                                        best_model_chars,
+                                        best_removed_resonance)
                 fit_code, best_removed_resonance, best_model_chars, any_model_passed_test = fitted_test_out
 
                 LevMarV0 = self.options.start_fudge_for_deep_stage
@@ -475,6 +479,7 @@ class eliminator_by_chi2:
                 priors_passed_cnt += 1
 
                 # reset best prior chi2 if better
+                # best_removed_resonance_prior = None
                 if (prior_sum_chi2 < best_prior_chi2):
                     best_prior_chi2 = prior_sum_chi2
                     best_prior_model_chars = prior_chars
@@ -509,7 +514,9 @@ class eliminator_by_chi2:
                            delta_chi2_allowed,
                            best_model_chi2,
                            all_models,
-                           any_model_passed_test
+                           any_model_passed_test,
+                           best_model_chars,
+                           best_removed_resonance
                            ):
         # if no priors passed the test - do the fitting for each model
         if (self.rto.Print):

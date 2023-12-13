@@ -63,7 +63,7 @@ class elim_OPTs:
         self._deep_fit_max_iter = kwargs.get('deep_fit_max_iter', 20)
         self._deep_fit_step_thr = kwargs.get('deep_fit_step_thr', 0.01)
         self._start_fudge_for_deep_stage = kwargs.get('start_fudge_for_deep_stage', 0.1)
-        
+
         self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
 
         # all that passed through
@@ -296,7 +296,7 @@ class eliminator_by_chi2:
                                         best_model_chi2,
                                         all_models,
                                         any_model_passed_test)
-                fit_code, best_removed_resonance, best_model_chars = fitted_test_out
+                fit_code, best_removed_resonance, best_model_chars, any_model_passed_test = fitted_test_out
 
                 LevMarV0 = self.options.start_fudge_for_deep_stage
 
@@ -614,7 +614,7 @@ class eliminator_by_chi2:
 
             print('End Doing limited iterations to find the best model inside current level...')
 
-        return (fit_code, best_removed_resonance, best_model_chars)
+        return (fit_code, best_removed_resonance, best_model_chars, any_model_passed_test)
 
 
 

@@ -406,7 +406,12 @@ class eliminator_by_chi2:
                 print()
                 print()
                 print(f'Level time: {np.round(level_time, 1)} sec')
-                print(f'Total elapsed time: {np.round(time.time() - start_time, 1)} sec')
+                tot_el_time = time.time() - start_time
+                resdif = max(ladder_IN.shape[0] - selected_ladder_chars.par_post.shape[0], 1)
+
+                print(f'Total elapsed time: {np.round(tot_el_time, 1)} sec')
+                print(f'time per res.: {np.round(tot_el_time/resdif, 1)} sec')
+                print()
                 print()
                 print('*'*40)
                 print()

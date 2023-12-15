@@ -14,15 +14,22 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
         data: np.array, 
         data_unc: np.array,
         fit: np.array,
-        ladder_df: pd.DataFrame):
+        ladder_df: pd.DataFrame,
+        precalc_chi2: float = 0):
         
     residuals = data - fit
 
     n = len(data) # length of the dataset
     k = ladder_df.shape[0] * 3 # num of res params
 
-    chi2 = np.sum((residuals / data_unc) ** 2) # chi2 (weighted residual sum of squares)
-    chi2_n = chi2 / n                          # TODO - or just n or (n-k) for this case?
+    if (precalc_chi2==0):
+        chi2 = np.sum((residuals / data_unc) ** 2) # chi2 (weighted residual sum of squares)
+    else:
+        print('Warning - using precalculated chi2 value')
+        chi2 = precalc_chi2 # chi2 (weighted residual sum of squares)
+
+    chi2_n = chi2 / n
+
 
     aic_wls = 2 * k + chi2 # AIC for WLS!
 
@@ -118,8 +125,8 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
 def characterize_sol(Ta_pair: Particle_Pair,
                      datasets: list,
                      experiments: list,
-                    #covariance_data: list,
-                     sol: SammyOutputData 
+                     sol: SammyOutputData, # !
+                     covariance_data: list =[]
                      ):
     
     output_dict = {}
@@ -146,7 +153,17 @@ def characterize_sol(Ta_pair: Particle_Pair,
             data = ds.exp, 
             data_unc = ds.exp_unc,
             fit = sol.pw_post[index][model_key],
-            ladder_df = sol.par_post)
+            ladder_df = sol.par_post,
+            precalc_chi2 = sol.chi2_post[index])
+        
+        # note, if the data about cov is present - take chi2 values from sol (SammyOutputData) object
+        if (len(covariance_data)>0):
+            print('Using cov data for chi2 calc')
+            chi2 = sol.chi2_post[index]
+            chi2_n = sol.chi2n_post[index]
+        else:
+            print('for chi2 calc using diag unc only')
+
         
 
         aic.append(aic_wls)

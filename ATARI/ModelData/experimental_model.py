@@ -1,5 +1,4 @@
 import numpy as np
-from ATARI.utils.atario import update_dict
 from ATARI.theory.experimental import e_to_t, t_to_e
 from ATARI.ModelData.structuring import parameter
 
@@ -93,18 +92,19 @@ class Experimental_Model:
             pass 
         
         self.energy_grid = self.energy_grid[(self.energy_grid>min(self.energy_range)) & (self.energy_grid<max(self.energy_range)) ]
+
     @property
     def title(self):
+        'The name of the experiment'
         return self._title
-
     @title.setter
     def title(self, title):
         self._title = title
 
     @property
     def energy_range(self):
+        'The energy range for the experiment'
         return self._energy_range
-
     @energy_range.setter
     def energy_range(self, energy_range):
         self._energy_range = energy_range
@@ -112,7 +112,6 @@ class Experimental_Model:
     @property
     def template(self):
         return self._template
-
     @template.setter
     def template(self, template):
         self._template = template
@@ -120,15 +119,14 @@ class Experimental_Model:
     @property
     def energy_grid(self):
         return self._energy_grid
-
     @energy_grid.setter
     def energy_grid(self, energy_grid):
         self._energy_grid = energy_grid
 
     @property
     def reaction(self):
+        'The type of reaction to model'
         return self._reaction
-
     @reaction.setter
     def reaction(self, reaction):
         self._reaction = reaction
@@ -136,7 +134,6 @@ class Experimental_Model:
     @property
     def channel_widths(self):
         return self._channel_widths
-
     @channel_widths.setter
     def channel_widths(self, channel_widths):
         self._channel_widths = channel_widths
@@ -144,7 +141,6 @@ class Experimental_Model:
     @property
     def sammy_inputs(self):
         return self._sammy_inputs
-
     @sammy_inputs.setter
     def sammy_inputs(self, sammy_inputs):
         self._sammy_inputs = sammy_inputs

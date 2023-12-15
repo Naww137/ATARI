@@ -6,14 +6,17 @@ Created on Thu Jun 16 12:18:04 2022
 @author: noahwalton
 """
 
-import os
 import numpy as np
-from copy import copy 
-
 import pandas as pd
-from ATARI.syndat.sample_resparms import sample_resonance_ladder, sample_resonance_ladder_old
+from ATARI.syndat.sample_resparms import sample_resonance_ladder
 from ATARI.theory.resonance_statistics import make_res_par_avg
+from ATARI.ModelData.particle import Particle, Ta181, Neutron
 
+VALID_SAMMY_FORMALISMS = ('REICH-MOORE FORMALIS', 'MORE ACCURATE REICH-', 'XCT',
+                          'ORIGINAL REICH-MOORE', 'CRO',
+                          'MULTILEVEL BREIT-WIG', 'MLBW FORMALISM IS WA', 'MLBW',
+                          'SINGLE LEVEL BREIT-W', 'SLBW FORMALISM IS WA', 'SLBW',
+                          'REDUCED WIDTH AMPLIT')
 
 def quant_vec_sum(a,b):
     """
@@ -34,7 +37,7 @@ def quant_vec_sum(a,b):
     numpy.ndarray
         Array of all possible quantum values.
     """
-    a = abs(a); b=abs(b)
+    a = abs(a); b = abs(b)
     vec = np.arange(abs(a-b), a+b+1, 1)
     return vec
 
@@ -44,6 +47,16 @@ def quant_vec_sum(a,b):
 
 
 class Particle_Pair:
+    """
+    Particle_Pair is a class that stores information regarding the reacting isotopes, the
+    resonances, energy range, spingroups, and more.
+    """
+
+    # Class attribute constants:
+    _hbar = 6.582119569e-16  # eV-s
+    _c    = 2.99792458e8  # m/s
+    _m_eV = 939.565420e6  # eV/c^2
+
     def __init__(self, **kwargs):
         self.isotope = "Ta181"
         self.resonance_ladder = pd.DataFrame()
@@ -51,31 +64,25 @@ class Particle_Pair:
         self.spin_groups = {}
         self.total_energy_range = [200,250]
 
-        self.ac = 8.127
-        self.M = 180.94803
-        self.m = 1
-        self.I = 3.5
-        self.i = 0.5
-        self.l_max = 2
+        self.target     = Ta181
+        self.projectile = Neutron
+        self.ac = 8.127 # fm
 
-        # define some constants
-        self._hbar = 6.582119569e-16  # eV-s
-        self._c = 2.99792458e8  # m/s
-        self._m_eV = 939.565420e6  # eV/c^2
-        ac_expected = (1.23*self.M**(1/3))+0.8  # fermi or femtometers
+        self.l_max = 2
 
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def __repr__(self):
-        string=''
+        string = ''
         for prop in dir(self):
             if not callable(getattr(self, prop)) and not prop.startswith('_'):
-                string+= f"{prop}: {getattr(self, prop)}\n"
+                string += f"{prop}: {getattr(self, prop)}\n"
         return string
 
     @property
     def isotope(self):
+        'The name of the isotope'
         return self._isotope
     @isotope.setter
     def isotope(self, isotope):
@@ -83,6 +90,7 @@ class Particle_Pair:
 
     @property
     def resonance_ladder(self):
+        'The resonance ladder'
         return self._resonance_ladder
     @resonance_ladder.setter
     def resonance_ladder(self, resonance_ladder):
@@ -90,13 +98,17 @@ class Particle_Pair:
 
     @property
     def formalism(self):
+        'R-matrix approximation'
         return self._formalism
     @formalism.setter
     def formalism(self, formalism):
+        if formalism not in VALID_SAMMY_FORMALISMS:
+            raise ValueError(f'"{formalism}" is not a valid sammy formalism.\n\nValid formalisms:\n{VALID_SAMMY_FORMALISMS}')
         self._formalism = formalism
 
     @property
     def spin_groups(self):
+        'The recorded spingroups'
         return self._spin_groups
     @spin_groups.setter
     def spin_groups(self, spin_groups):
@@ -104,13 +116,38 @@ class Particle_Pair:
 
     @property
     def ac(self):
+        'Channel radius'
         return self._ac
     @ac.setter
     def ac(self, ac):
         self._ac = ac
 
     @property
+    def target(self):
+        'The target particle'
+        raise AttributeError('Cannot access target information. It can only be set.')
+    @target.setter
+    def target(self, target):
+        if not isinstance(target, Particle):
+            raise TypeError('"target" must be a "Particle" object.')
+        self._isotope = target.name
+        self._M = target.mass
+        self._I = target.I
+
+    @property
+    def projectile(self):
+        'The target particle'
+        raise AttributeError('Cannot access projectile information. It can only be set.')
+    @projectile.setter
+    def projectile(self, projectile):
+        if not isinstance(projectile, Particle):
+            raise TypeError('"projectile" must be a "Particle" object.')
+        self._m = projectile.mass
+        self._i = projectile.I
+
+    @property
     def M(self):
+        'Mass of the target isotope'
         return self._M
     @M.setter
     def M(self, M):
@@ -118,13 +155,15 @@ class Particle_Pair:
 
     @property
     def m(self):
+        'Mass of the projectile'
         return self._m
     @m.setter
     def m(self, m):
         self._m = m
-
+    
     @property
     def I(self):
+        'Target isotope intrinsic spin'
         return self._I
     @I.setter
     def I(self, I):
@@ -132,6 +171,7 @@ class Particle_Pair:
 
     @property
     def i(self):
+        'Projectile intrinsic spin'
         return self._i
     @i.setter
     def i(self, i):
@@ -139,6 +179,7 @@ class Particle_Pair:
 
     @property
     def l_max(self):
+        'Maximum angular momentum'
         return self._l_max
     @l_max.setter
     def l_max(self, l_max):
@@ -146,6 +187,7 @@ class Particle_Pair:
 
     @property
     def total_energy_range(self):
+        'Modelled energy range'
         return self._total_energy_range
     @total_energy_range.setter
     def total_energy_range(self, total_energy_range):

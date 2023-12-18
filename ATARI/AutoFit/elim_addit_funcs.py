@@ -318,3 +318,38 @@ def set_varying_fixed_params(ladder_df: pd.DataFrame,
         ladder_df[col] = value
 
     return ladder_df
+
+
+
+def find_side_res_df(
+        initial_sol_df: pd.DataFrame,
+        energy_region: list,
+        N_res: int = 2
+) -> pd.DataFrame:
+    """
+    Select N_res resonances from the initial DataFrame, with half (rounded down) from the left and half (rounded up) from the right of the given energy_region.
+    
+    Parameters:
+    initial_sol_df (pd.DataFrame): DataFrame containing the initial solutions with an 'E' column for energy.
+    energy_region (list): A list with two elements specifying the energy region [min_energy, max_energy].
+    N_res (int): Number of resonances to select, default is 2.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the selected resonances.
+    """
+
+    left_res_count = N_res // 2
+    right_res_count = N_res - left_res_count
+
+    # Select resonances to the left of the energy region
+    left_res = initial_sol_df[initial_sol_df['E'] < np.min(energy_region)]
+    left_res = left_res.nlargest(left_res_count, 'E')
+
+    # Select resonances to the right of the energy region
+    right_res = initial_sol_df[initial_sol_df['E'] > np.max(energy_region)]
+    right_res = right_res.nsmallest(right_res_count, 'E')
+
+    # Combine the selected resonances
+    selected_res = pd.concat([left_res, right_res])
+
+    return selected_res

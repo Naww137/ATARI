@@ -36,6 +36,9 @@ class elim_OPTs:
         value of chi2 allowed difference when comparing 2 models,
     fixed_resonances_df: pd.Dataframe
         dataframe with side resonances, fixed to track during elimination,
+    stop_at_chi2_thr: Bool
+        Boolean value which tells to stop if during search of a models there was 
+        no models that passed the chi2 test, if false - continue to delete resonances until we will not have at least one resonance.
     **kwargs : dict, optional
         Any keyword arguments are used to set attributes on the instance.
 
@@ -66,6 +69,8 @@ class elim_OPTs:
 
         self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
 
+        self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', True) # by default stops when didn't find the model that passed the test
+
         # all that passed through
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -78,6 +83,14 @@ class elim_OPTs:
     @chi2_allowed.setter
     def chi2_allowed(self, chi2_allowed):
         self._chi2_allowed = chi2_allowed
+    
+    # stop or not if we didn't found the model that passess the test (just dive deep to 1 res. model)
+    @property
+    def stop_at_chi2_thr(self):
+        return self._stop_at_chi2_thr
+    @stop_at_chi2_thr.setter
+    def stop_at_chi2_thr(self, stop_at_chi2_thr):
+        self._stop_at_chi2_thr = stop_at_chi2_thr
 
     #side resonances (fixed in energy only)
     @property 
@@ -111,6 +124,7 @@ class elim_OPTs:
     def deep_fit_step_thr(self,deep_fit_step_thr):
         self._deep_fit_step_thr = deep_fit_step_thr
 
+    # if solution passed the prior it's recommended to start from small value of V-coeff. for LM alg. to save time
     @property
     def LevMarV0_priorpassed(self):
         return self._LevMarV0_priorpassed
@@ -161,7 +175,6 @@ class eliminator_by_chi2:
         self.options = options
 
 
-    #TODO or specify a class for output to store everything there? like history, characteristics of ladders and other things?
     def eliminate(self, 
                   ladder_df : pd.DataFrame = pd.DataFrame() 
                   ) -> eliminator_OUTput: 
@@ -177,6 +190,7 @@ class eliminator_by_chi2:
 
         # Initializing model history dictionary
         model_history = {}
+        final_model_passed_test = True # set it from the start.
 
         # ladder for processing - from direct input or from sammyINPyw
         if (ladder_df.shape[0]==0):
@@ -186,6 +200,7 @@ class eliminator_by_chi2:
 
         # saving initial input
         ladder_IN = ladder.copy()
+        ladder_OUT = ladder.copy()
 
         # printout
         if (self.rto.Print):
@@ -201,8 +216,9 @@ class eliminator_by_chi2:
             print('Side resonances used:')
             print(fixed_res_df)
             print()
-
-
+            print('Stopping option:')
+            print(f'\t stop_at_chi2_thr: {self.options.stop_at_chi2_thr}')
+            
 
         ### Start elimination
         while True: 
@@ -215,10 +231,6 @@ class eliminator_by_chi2:
             best_removed_resonance = None
             best_model_chars = None
             current_level = len(ladder)
-
-            if current_level == 1:
-                break
-
 
             ### Identify fixed resonances
             if (fixed_res_df.shape[0] == 2):
@@ -239,26 +251,31 @@ class eliminator_by_chi2:
                 fixed_resonances_indices=[]
 
             
-
             ### Setup all model information of this level and starting chi2
-            all_models = {}
+
             if (self.rto.Print):
                 print('*'*40)
                 print(f'Current level: {current_level}')
                 print(f'\t Searching for models with {current_level - 1} resonances...')
                 print('*'*40)
                 print()
+            
             fit_code_init_level = f'init_sol_level_{current_level}'
             initial_ladder_chars = self.evaluate_prior(ladder)
 
             if (self.rto.Print):        
-                self.printout_prior_params(sammy_OUT = initial_ladder_chars, 
-                                        addit_str = fit_code_init_level)
+
+                print()
+                print(f'\t {fit_code_init_level}')
+                print(f'\t {initial_ladder_chars.chi2}') # TODO: check this also..
+                print()
             
             best_model_chars = initial_ladder_chars
             base_chi2 = np.sum(initial_ladder_chars.chi2)
 
-
+            # if we are on the level of one resonance - just stop
+            if (current_level==1):
+                break
 
             ### test all N-1 priors 
             prior_test_out = self.test_priors(current_level, 
@@ -266,11 +283,10 @@ class eliminator_by_chi2:
                                               fixed_resonances,
                                               ladder,
                                               delta_chi2_allowed,
-                                              base_chi2,
-                                              all_models)
+                                              base_chi2)
+            
             any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_chi2, priors_passed_cnt, best_removed_resonance_prior = prior_test_out
         
-
             ### if any priors passed remove, 
             if (any_prior_passed_test):
                 if (self.rto.Print):
@@ -279,6 +295,7 @@ class eliminator_by_chi2:
                     print(f'Best model found {best_removed_resonance_prior}:')
                     print(f'Σχ²: \t {best_prior_chi2}')
                     print()
+
                 best_model_chi2 = best_prior_chi2
                 best_removed_resonance = best_removed_resonance_prior
                 best_model_chars = best_prior_model_chars
@@ -296,11 +313,9 @@ class eliminator_by_chi2:
                                         base_chi2,
                                         delta_chi2_allowed,
                                         best_model_chi2,
-                                        all_models,
-                                        any_model_passed_test,
-                                        best_model_chars,
-                                        best_removed_resonance)
-                fit_code, best_removed_resonance, best_model_chars, any_model_passed_test = fitted_test_out
+                                        any_model_passed_test)
+                
+                best_removed_resonance, best_model_chars, any_model_passed_test = fitted_test_out
 
                 LevMarV0 = self.options.start_fudge_for_deep_stage
 
@@ -311,74 +326,104 @@ class eliminator_by_chi2:
                 print('Starting "deep" fitting of best initial guess by chi2...')
                 print()
 
-            fit_code = 'deep_vary_E_Gn1'
-            posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = best_model_chars.par, 
+            # TODO: change this code
+            # deep fitting stage - using best_model_chars - 
+            # the problem is that after 2 different stages we have different params..
+            if (any_prior_passed_test):
+                deep_stage_ladder_start = best_model_chars.par
+            else:
+                deep_stage_ladder_start = best_model_chars.par_post
+
+            posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
                                                                      max_steps = interm_iter_allowed,
                                                                      step_threshold = deep_fit_step_thr,
                                                                      LevMarV0 = LevMarV0) 
 
             cur_sol_chars_deep = posterior_deep_SO
+
             deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
+
             benefit_deep_chi2 = deep_chi2 - base_chi2
             
-
             ### printout
             if (self.rto.Print):
-                self.printout_prior_params(sammy_OUT = cur_sol_chars_deep, 
-                                        addit_str = fit_code)
-                
+
                 print(f'\t proc_time {sol_fit_time_deep}  s')
                 print()
                 print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_iter_allowed} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
        
-                print('Deep fitting decision about model selection')
-                self.printout_prior_params(sammy_OUT = best_model_chars, 
-                                        addit_str = 'Before deep')
+                print('Deep fitting decision about model selection:')
+                print()
+                print(f'\t Before: {np.sum(posterior_deep_SO.chi2)}')
                 
-                self.printout_prior_params(sammy_OUT = cur_sol_chars_deep, 
-                                        addit_str = 'After deep')
-            
+                print(f'\t After: {np.sum(posterior_deep_SO.chi2_post)}')
+                print()
 
-            ### Logic for re-assigning models in loop
-            if (benefit_deep_chi2 > (sum(best_model_chars.chi2) - base_chi2) ):
-                
-                selected_ladder_chars = best_model_chars
-                if (self.rto.Print):
-                    print('Note, after deep fitting - the benefit of chi2 is less than before.')
+            selected_ladder_chars = cur_sol_chars_deep
 
-            else:
-                selected_ladder_chars = cur_sol_chars_deep
-                if (self.rto.Print):
-                    print('After deep fitting - the benefit of chi2 is larger than before.')
-                    print('Getting the results as a final')
+            # checking if final model passed the test
+            if ((benefit_deep_chi2 <= delta_chi2_allowed) & final_model_passed_test):
+                final_model_passed_test = True
+                ladder_OUT = selected_ladder_chars.par_post
+            else: 
+                final_model_passed_test = False
 
             level_time = time.time() - level_start_time
 
             ### final printout, save model data, and continue or break while loop
             if (self.rto.Print):
-                print('Deep fitting result')
-                print(cur_sol_chars_deep.par)
+                print('Deep fitting stage. Results')
+                cols_to_show = ['E', 'Gn1', 'Gg', 'varyE', 'varyGg', 'varyGn1', 'J_ID']
+                print(selected_ladder_chars.par_post[cols_to_show])
                 print()
+                print(f'Current N_res: {selected_ladder_chars.par_post.shape[0]}')
+                print(f'Level {current_level} passed the test: {final_model_passed_test}')
                 print('End of deep fitting stage...')
                 print()
+                print()
                 print(f'Level time: {np.round(level_time, 1)} sec')
+                tot_el_time = time.time() - start_time
+                resdif = max(ladder_IN.shape[0] - selected_ladder_chars.par_post.shape[0], 1)
+
+                print(f'Total elapsed time: {np.round(tot_el_time, 1)} sec')
+                print(f'time per res.: {np.round(tot_el_time/resdif, 1)} sec')
+                print()
                 print()
                 print('*'*40)
                 print()
 
             model_history[current_level] = {
-                'initial_ladder_chars': deep_fit_step_thr,
-                'all_models': all_models,
-                'selected_ladder_chars': selected_ladder_chars,
-                'any_model_passed_test': any_model_passed_test,
+                
+                'input_ladder' : ladder,
+                'selected_ladder_chars': selected_ladder_chars, # solution with min chi2 on this level
+                'any_model_passed_test': any_model_passed_test, # any model on this level of N-1 res..
+                'final_model_passed_test': final_model_passed_test,
                 'level_time': level_time,
                 'total_time': time.time() - start_time
             }
 
-            if best_removed_resonance is not None and any_model_passed_test:
-                ladder = selected_ladder_chars.par
+            # stopping criteria
+            if (self.options.stop_at_chi2_thr):
+
+
+                # if stop after the first shot when no models pass the test (speedup)
+                if best_removed_resonance is not None and any_model_passed_test:
+                    ladder = ladder_OUT 
+                else:
+                    print(f'Note, using the stopping criteria by chi2 threshold {delta_chi2_allowed}')
+                    print('Threshold reached')
+                    print(f'Any model passed the test: {any_model_passed_test}')
+                    break
             else:
-                break
+                
+                # not stopping continuing up to 1 res..
+                print('Skipping stopping by chi2 test, going to 1 res model')
+                if(ladder.shape[0]==1):
+                    print('Reached one resonance model.. stopping')
+                    break
+                else:
+                    ladder = selected_ladder_chars.par_post
+
         
         
 
@@ -393,7 +438,7 @@ class eliminator_by_chi2:
             elim_success = False
 
         el_out = eliminator_OUTput(
-            ladder_OUT = ladder,
+            ladder_OUT = ladder_OUT,
             ladder_IN = ladder_IN,
             elimination_history= model_history,
             success = elim_success,
@@ -402,32 +447,6 @@ class eliminator_by_chi2:
 
         return el_out
 
-        
-        
-    """TODO: remove this function somewhere, maybe in utils?"""
-    def generate_sammy_rundir_uniq_name(self, 
-                                        path_to_sammy_temps: str = './sammy_temps/',
-                                        addit_str: str = ''):
-
-        if not os.path.exists(path_to_sammy_temps):
-            os.mkdir(path_to_sammy_temps)
-
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-
-        # Combine timestamp and random characters
-        unique_string = timestamp + str(uuid.uuid4())
-        
-        # Truncate the string to 100 characters
-        unique_string = unique_string[:100]
-
-        sammy_rundirname = path_to_sammy_temps+'SAMMY_RD_'+addit_str+'_'+unique_string+'/'
-
-        return sammy_rundirname
-
-
-
-
-
 
     def test_priors(self,
                     current_level, 
@@ -435,8 +454,7 @@ class eliminator_by_chi2:
                     fixed_resonances,
                     ladder,
                     delta_chi2_allowed,
-                    base_chi2,
-                    all_models
+                    base_chi2
                     ):
         
         # check if prior model pass the test even without refitting after resonance deletion (insignificant resonances)
@@ -467,7 +485,6 @@ class eliminator_by_chi2:
             prior_benefit_chi2 = prior_sum_chi2 - base_chi2
 
             ### Check if un-fitted N-1 model still is acceptable
-            current_prior_passed_test = False
             test_result = "✗"  # Cross mark if the test is not passed
             if ((prior_benefit_chi2<=delta_chi2_allowed)):
 
@@ -475,7 +492,7 @@ class eliminator_by_chi2:
                 sign = "<="
 
                 any_prior_passed_test = True
-                current_prior_passed_test = True
+
                 priors_passed_cnt += 1
 
                 # reset best prior chi2 if better
@@ -489,17 +506,10 @@ class eliminator_by_chi2:
 
             if (self.rto.Print):
                 print(f'Prior ladder check, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'    Σχ²: \t {prior_sum_chi2} | \t base: {base_chi2}   ')
-                print(f'     \t  {prior_benefit_chi2}  \t {sign} \t {delta_chi2_allowed} \t => \t {test_result}')
+                print(f'\t\tΣχ²: \t {np.round(prior_sum_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
+                print(f'\t\t{np.round(prior_benefit_chi2,4)}\t\t{sign}\t\t{delta_chi2_allowed}\t\t=>\t\t{test_result}')
                 print()
 
-            # saving models data
-            all_models[j] = {
-                'prior_chars': prior_chars,
-                'posterior_chars': prior_chars,
-                'fit_time': 0,
-                'test_passed': current_prior_passed_test
-            }
 
         return (any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_chi2, priors_passed_cnt, best_removed_resonance_prior)
 
@@ -513,19 +523,23 @@ class eliminator_by_chi2:
                            base_chi2,
                            delta_chi2_allowed,
                            best_model_chi2,
-                           all_models,
-                           any_model_passed_test,
-                           best_model_chars,
-                           best_removed_resonance
+                           any_model_passed_test
                            ):
+       
         # if no priors passed the test - do the fitting for each model
         if (self.rto.Print):
             print('*'*40)
             print('No priors passed the test...')
             print(f'Doing limited iterations to find the best model inside current level - {current_level} - > {current_level-1}...')
-            
-        # selecting the most perspective model from the chi2 point of view with limited iterations allowed
+        
+        posteriors_passed_cnt = 0 # number of models that pass the test after fitting
+        
+        # TODO: change this..
+        best_removed_resonance = None
+        best_model_chars = None
 
+
+        # selecting the most perspective model from the chi2 point of view with limited iterations allowed
         for j in range(current_level):  # For every resonance in the current ladder
         
             # Refit the data with this temporary ladder
@@ -543,13 +557,10 @@ class eliminator_by_chi2:
             # note - always keep the side-resonances
             prior_ladder, row_removed = self.remove_resonance(ladder, j)
 
-            # refit
-            fit_code = 'interm_vary_E_Gn1'
-
             posterior_interm_SO, sol_fit_time_interm = self.fit_YW_by_ig(
                 ladder_df = prior_ladder,
                 max_steps = interm_iter_allowed,
-                # note here default step_threshold and initial step size will be used!
+                # step_threshold = self.options.deep_fit_step_thr
                 )
             
             ### NEW: NOAH - Again, don't need to re-characterize just use old chi2
@@ -568,60 +579,55 @@ class eliminator_by_chi2:
 
             benefit_chi2 = interm_step_chi2 - base_chi2
             
-            if (self.rto.Print):
-                print(f'Intermediate fitting using limited iterations.. ')
-
             test_result = "✗"
 
             # Check if this model is best so far
             if ((benefit_chi2 <= delta_chi2_allowed)):
                 
-                # mark that at least one sol passed AICc test
+                # mark that at least one sol passed the chi2 test
                 any_model_passed_test = True
                 current_model_passed_test = True
 
                 test_result = "✓"  # Check mark if the test is passed
                 sign = "<="
 
+                posteriors_passed_cnt +=1
+
                 if (self.rto.Print):
                     print()
                     print('Model passed chi2 test!')
-
-                if (interm_step_chi2 < best_model_chi2):
-                    
-                    best_model_chi2 = interm_step_chi2
-                    best_removed_resonance = j
-                    best_model_chars = cur_sol_chars
-            
             else:
 
                 current_model_passed_test = False
                 sign = ">"
 
+            # TODO: check - so we will use always
+            if (interm_step_chi2 < best_model_chi2):
+                
+                best_model_chi2 = interm_step_chi2
+                best_removed_resonance = j
+                best_model_chars = cur_sol_chars
+
             if (self.rto.Print):
                 print(f'Intermediate fitting, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'    Σχ²: \t {interm_step_chi2} | \t base: {base_chi2}   ')
-                print(f'     \t  {benefit_chi2}  \t {sign} \t {delta_chi2_allowed} \t => \t {test_result}')
+                print(f'\t Σχ²: \t {np.round(interm_step_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
+                print(f'\t\t  {np.round(benefit_chi2,4)}  \t {sign} \t {delta_chi2_allowed} \t => \t {test_result}')
                 print()
                 
-            # Store this model's data
-            all_models[j] = {
-                'posterior_chars': cur_sol_chars,
-                'fit_time': sol_fit_time_interm,
-                'test_passed': current_model_passed_test
-            }
-
         if (self.rto.Print):
             print('*'*40)
             # if some of the models passed the test using intermediate stage
             if (any_model_passed_test):
-                print('Some models passed the test, using best for a deep fit')
+                print(f'{posteriors_passed_cnt} models passed the test, using best for a deep fit')
+                print(f'Best model is {best_removed_resonance}.')
+                print(f'Σχ²: {best_model_chi2}')
             else:
                 print('No models passed the test!')
+                print(f'Best model is {best_removed_resonance}.')
 
             print('End Doing limited iterations to find the best model inside current level...')
 
-        return (fit_code, best_removed_resonance, best_model_chars, any_model_passed_test)
+        return (best_removed_resonance, best_model_chars, any_model_passed_test)
 
 
 
@@ -668,7 +674,7 @@ class eliminator_by_chi2:
         # redefining rto and inputs
         cur_rto = SammyRunTimeOptions(
             sammyexe = self.rto.path_to_SAMMY_exe,
-            options = {"Print":   self.rto.Print,
+            options = {"Print":   False, #self.rto.Print,
                 "bayes":  True,
                 "keep_runDIR": self.rto.keep_runDIR,
                 "sammy_runDIR": self.rto.sammy_runDIR
@@ -719,19 +725,3 @@ class eliminator_by_chi2:
             print(ladder)
             raise ValueError(f'Invalid index {index_to_remove}')
         return new_ladder, removed_row
-    
-    
-    def printout_prior_params(self, 
-                                 sammy_OUT: SammyOutputData,
-                                 addit_str: str = ''):
-    
-        print()
-        print(f'Solution characterization: {addit_str} ')
-        print(f'    N_res: \t {sammy_OUT.par.shape[0]}')
-        #print(f'    NLLW: \t {sol_chars_dict["fit"]["NLLW"]}')
-        print(f'    Σχ²: \t {np.round(np.sum(sammy_OUT.chi2),3)}' ) # / {np.round(sum(sol_chars_dict["fit"]["chi2_n"].values()),3)}')
-        #print(f'    Σ AICc: \t {np.round(sum(sol_chars_dict["fit"]["AICc"].values()),3)}')
-        #print(f'    SSE: \t {sol_chars_dict["SSE"]}')
-        print()
-
-        return True

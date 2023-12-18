@@ -1040,7 +1040,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
         istep += 1
 
-    # print(criteria)
+    print("Maximum steps reached")
     return max(istep-1, 0)
 
 

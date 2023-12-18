@@ -39,7 +39,7 @@ class InitialFBOPT:
         self._LevMar = True
         self._LevMarV = 1.5
         self._LevMarVd = 5
-        self._LevMarV0 = 0.5
+        self._LevMarV0 = 0.05
 
         self._fit_Gg = True
         self._fit_all_spin_groups = True

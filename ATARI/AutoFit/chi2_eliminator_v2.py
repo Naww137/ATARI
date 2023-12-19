@@ -233,7 +233,7 @@ class eliminator_by_chi2:
             current_level = len(ladder)
 
             ### Identify fixed resonances
-            if (fixed_res_df.shape[0] == 2):
+            if (fixed_res_df.shape[0] > 0):
 
                 # Extract energies from fixed_side_resonances
                 fixed_res_energies = fixed_res_df["E"].tolist()
@@ -278,6 +278,7 @@ class eliminator_by_chi2:
                 break
 
             ### test all N-1 priors 
+            time_test_priors_start = time.time()
             prior_test_out = self.test_priors(current_level, 
                                               fixed_resonances_indices, 
                                               fixed_resonances,
@@ -285,6 +286,8 @@ class eliminator_by_chi2:
                                               delta_chi2_allowed,
                                               base_chi2)
             
+            priors_test_time = time.time() - time_test_priors_start
+
             any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_chi2, priors_passed_cnt, best_removed_resonance_prior = prior_test_out
         
             ### if any priors passed remove, 
@@ -381,12 +384,17 @@ class eliminator_by_chi2:
                 print('End of deep fitting stage...')
                 print()
                 print()
-                print(f'Level time: {np.round(level_time, 1)} sec')
+                print(f'Level time: \t {np.round(level_time, 1)} sec')
+                print(f'Priors test time: \t {np.round(priors_test_time,2)} sec')
+
                 tot_el_time = time.time() - start_time
                 resdif = max(ladder_IN.shape[0] - selected_ladder_chars.par_post.shape[0], 1)
 
-                print(f'Total elapsed time: {np.round(tot_el_time, 1)} sec')
-                print(f'time per res.: {np.round(tot_el_time/resdif, 1)} sec')
+                time_per_res  = np.round(tot_el_time/resdif,1)
+
+                print(f'Current elapsed time: \t {np.round(tot_el_time, 1)} sec')
+                print(f'Time per res.: \t {time_per_res} sec')
+                print(f'Estimated TEE: \t {np.round(time_per_res * (current_level) /3600 , 1)} hours')
                 print()
                 print()
                 print('*'*40)
@@ -673,7 +681,7 @@ class eliminator_by_chi2:
         # redefining rto and inputs
         cur_rto = SammyRunTimeOptions(
             sammyexe = self.rto.path_to_SAMMY_exe,
-            options = {"Print":   False, #self.rto.Print,
+            options = {"Print":  self.rto.Print,
                 "bayes":  True,
                 "keep_runDIR": self.rto.keep_runDIR,
                 "sammy_runDIR": self.rto.sammy_runDIR

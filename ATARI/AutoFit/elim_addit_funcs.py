@@ -243,7 +243,7 @@ def reduce_ladder(ladder_df: pd.DataFrame,
     # Identify fixed resonances
     if (keep_fixed):
 
-        if (fixed_side_resonances.shape[0] == 2):
+        if (fixed_side_resonances.shape[0] > 0):
 
             # Extract energies from fixed_side_resonances
             energies = fixed_side_resonances["E"].tolist()
@@ -255,8 +255,8 @@ def reduce_ladder(ladder_df: pd.DataFrame,
             print(fixed_resonances)
             print(f'Keeping them: {keep_fixed}')
 
-            # Check if both energy values were found
-            if len(fixed_resonances) != 2:
+            # Check if all energy values were found
+            if len(fixed_resonances) != fixed_side_resonances.shape[0]:
                 print("** Error: Not enough matching energy values found for fixed resonances in ladder. **")
                 print("Missing energy values:", set(energies) - set(fixed_resonances["E"].tolist()))
                 raise ValueError

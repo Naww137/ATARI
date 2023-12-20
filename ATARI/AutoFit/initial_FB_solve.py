@@ -68,6 +68,9 @@ class InitialFBOPT:
 
     @property
     def width_elimination(self):
+        """
+        Option to eliminate resonances based on neutron width
+        """
         return self._width_elimination
     @width_elimination.setter
     def width_elimination(self, width_elimination):
@@ -75,6 +78,9 @@ class InitialFBOPT:
 
     @property
     def Gn_threshold(self):
+        """
+        Neutron width threshold for width-based elimination
+        """
         return self._Gn_threshold
     @Gn_threshold.setter
     def Gn_threshold(self, Gn_threshold):
@@ -82,6 +88,9 @@ class InitialFBOPT:
 
     @property
     def decrease_chi2_threshold_for_width_elimination(self):
+        """
+        If running width elimination, decrease the chi2 threshold convergence criteria
+        """
         return self._decrease_chi2_threshold_for_width_elimination
     @decrease_chi2_threshold_for_width_elimination.setter
     def decrease_chi2_threshold_for_width_elimination(self, decrease_chi2_threshold_for_width_elimination):
@@ -89,6 +98,9 @@ class InitialFBOPT:
 
     @property
     def max_steps(self):
+        """
+        Maximum number of steps in non-linear least squares solution scheme.
+        """
         return self._max_steps
     @max_steps.setter
     def max_steps(self, max_steps):
@@ -96,6 +108,9 @@ class InitialFBOPT:
 
     @property
     def iterations(self):
+        """
+        Number of internal SAMMY iterations of G for nonlinearity.
+        """
         return self._iterations
     @iterations.setter
     def iterations(self, iterations):
@@ -105,6 +120,9 @@ class InitialFBOPT:
 
     @property
     def step_threshold(self):
+        """
+        Chi2 improvement threshold convergence criteria.
+        """
         return self._step_threshold
     @step_threshold.setter
     def step_threshold(self, step_threshold):
@@ -112,6 +130,9 @@ class InitialFBOPT:
     
     @property
     def LevMar(self):
+        """
+        
+        """
         return self._LevMar
     @LevMar.setter
     def LevMar(self, LevMar):

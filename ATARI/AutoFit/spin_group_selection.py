@@ -122,7 +122,8 @@ class SpinSelect:
                       datasets,
                       experiments,
                       covariance_data,
-                      sammyRTO):
+                      sammyRTO,
+                      fixed_resonances_indices=[]):
 
 
         sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -145,14 +146,17 @@ class SpinSelect:
             initial_parameter_uncertainty = self.options.LevMarV0
             )
 
-        # possible_J_ID = [1.0, 2.0]
-        possible_dfs = get_all_resonance_ladder_combinations(possible_J_ID, starting_ladder)
+        in_window_df = copy(starting_ladder)
+        fixed_resonances_df = in_window_df.iloc[fixed_resonances_indices, :]
+        in_window_df.drop(index = fixed_resonances_indices, inplace=True)
+
+        possible_dfs = get_all_resonance_ladder_combinations(possible_J_ID, in_window_df)
 
         leading_model = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
         leading_chi2 = leading_model.chi2n_post
 
         for each_df in possible_dfs:
-            sammyINPyw.resonance_ladder = each_df
+            sammyINPyw.resonance_ladder = pd.concat([each_df, fixed_resonances_df])
             sammyOUT_temp = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
             if np.sum(sammyOUT_temp.chi2n_post) < np.sum(leading_chi2):
                 leading_chi2 = sammyOUT_temp.chi2n_post

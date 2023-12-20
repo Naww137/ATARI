@@ -495,9 +495,9 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
         
         f.write("\nEOF")
 
-        if sammy_RTO.bayes:
+        # if sammy_RTO.bayes:
             # grep and return chi2
-            f.write("""
+        f.write("""
 chi2_line=$(grep -i "CUSTOMARY CHI SQUARED = " SAMMY.LPT | tail -n 1)
 chi2_string=$(echo "$chi2_line" | awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')
 chi2_linen=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" SAMMY.LPT | tail -n 1)
@@ -516,11 +516,11 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*10
                                 )
-    if sammy_RTO.bayes:
-        chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
-    else:
-        chi2=None
-        chi2n = None
+    # if sammy_RTO.bayes:
+    chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
+    # else:
+        # chi2=None
+        # chi2n = None
 
     return chi2, chi2n
 
@@ -700,8 +700,8 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
     sammy_OUT = SammyOutputData(pw=lst_df, 
                         par=sammyINP.resonance_ladder,
-                        chi2=[],
-                        chi2n=[])#,
+                        chi2=[chi2],
+                        chi2n=[chi2n])#,
                         # chi2=chi2_val(lst_df.theo_xs, lst_df.exp_xs, np.diag(lst_df.exp_xs_unc)))
 
     #### need to update for recursive sammy

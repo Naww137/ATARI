@@ -426,7 +426,7 @@ class eliminator_by_chi2:
                 
                 # not stopping continuing up to 1 res..
                 print('Skipping stopping by chi2 test, going to 1 res model')
-                if(ladder.shape[0]==1):
+                if(ladder.shape[0]==fixed_res_df.shape[0]+1):
                     print('Reached one resonance model.. stopping')
                     break
                 else:

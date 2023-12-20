@@ -30,16 +30,16 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
 
     chi2_n = chi2 / n
 
-
     aic_wls = 2 * k + chi2 # AIC for WLS!
 
     aicc_wls = aic_wls + 2 * k * (k + 1) / (n - k - 1)
 
     # BIC for WLS
     bic_wls = k * np.log(n) + chi2
-    bicc_wls = bic_wls + np.log(n) * k * (k + 1) / (2 * (n - k - 1))
+    bicc_wls = bic_wls +  2* k * (k + 1) / (2 * (n - k - 1))
     
     return aic_wls, aicc_wls, bic_wls, bicc_wls, chi2, chi2_n
+
 
 
 
@@ -125,17 +125,23 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
 def characterize_sol(Ta_pair: Particle_Pair,
                      datasets: list,
                      experiments: list,
-                     sol: SammyOutputData, # !
+                     sol: SammyOutputData, # ! chi2 is calculated inside?
                      covariance_data: list =[]
                      ):
     
     output_dict = {}
 
+    # for each datasets if they are separate
     aic = []
     aicc = []
     chi2_stat = []
     bic = []
     bicc = []
+
+    # Variables for aggregated data
+    aggregated_exp_data = []
+    aggregated_exp_unc = []
+    aggregated_fit = []
 
     # chi2 & AIC calculation based on the datasets & fits
     for index, ds in enumerate(datasets):
@@ -163,7 +169,10 @@ def characterize_sol(Ta_pair: Particle_Pair,
             chi2_n = sol.chi2n_post[index]
         else:
             print('for chi2 calc using diag unc only')
-
+        
+        # Aggregate data for each dataset
+        aggregated_exp_data.extend(ds.exp)
+        aggregated_exp_unc.extend(ds.exp_unc)
         
 
         aic.append(aic_wls)
@@ -172,11 +181,28 @@ def characterize_sol(Ta_pair: Particle_Pair,
         bic.append(bic_wls)
         bicc.append(bicc_wls)
 
+    # for each dataset - separately - wrong!
     output_dict['aic'] = aic
     output_dict['aicc'] = aicc
     output_dict['bic'] = bic
     output_dict['bicc'] = bicc
     output_dict['chi2_stat'] = chi2_stat
+
+    # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
+    if(len(covariance_data)>0 and (len(sol.chi2_post)>0)):
+
+        #chi2 for all datasets
+        precalc_chi2_sum = np.sum(sol.chi2_post)
+
+        k = sol.par_post.shape[0] * 3
+
+        n = len(aggregated_exp_data)
+
+        AICc_entire_ds = 2*k + precalc_chi2_sum + 2*k*(k+1)/(n-k-1)
+        BIC_entire_ds = k*np.log(n) + precalc_chi2_sum
+
+        output_dict['aicc_entire_ds'] = AICc_entire_ds
+        output_dict['bic_entire_ds'] = BIC_entire_ds
 
     # Wigner - by spingroups
     NLLW, NLLW_gr = calc_Wigner_LL_by_ladder(ladder_df = sol.par_post,

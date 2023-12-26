@@ -9,6 +9,8 @@ from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOp
 import os
 import pickle
 
+from matplotlib.pyplot import *
+
 #     calc return aic, aicc, bic, bicc for models that were fittes using WLS
 def calc_AIC_AICc_BIC_BICc_by_fit(
         data: np.array, 
@@ -20,7 +22,7 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
     residuals = data - fit
 
     n = len(data) # length of the dataset
-    k = ladder_df.shape[0] * 3 # num of res params
+    k = ladder_df.shape[0] * 3 # num of res params +1(?)
 
     if (precalc_chi2==0):
         chi2 = np.sum((residuals / data_unc) ** 2) # chi2 (weighted residual sum of squares)
@@ -194,7 +196,7 @@ def characterize_sol(Ta_pair: Particle_Pair,
         #chi2 for all datasets
         precalc_chi2_sum = np.sum(sol.chi2_post)
 
-        k = sol.par_post.shape[0] * 3
+        k = sol.par_post.shape[0] * 3 + 1 # estimating the variance
 
         n = len(aggregated_exp_data)
 
@@ -379,3 +381,293 @@ def find_side_res_df(
     selected_res = pd.concat([left_res, right_res])
 
     return selected_res
+
+
+### calc the SSE for one case
+
+
+
+
+### elimination history funcs (parsing, plotting, etc)
+
+def load_all(savefolder: str,
+             hist_pkl_name: str,
+             dataset_pkl_name: str):
+
+    hist = load_obj_from_pkl(folder_name=savefolder, pkl_fname=hist_pkl_name)
+    case_data_loaded = load_obj_from_pkl(folder_name=savefolder, pkl_fname=dataset_pkl_name)
+
+    datasets = case_data_loaded['datasets']
+    covariance_data = case_data_loaded['covariance_data']
+    experiments = case_data_loaded['experiments']
+    true_chars = case_data_loaded['true_chars']
+    Ta_pair = case_data_loaded['Ta_pair']
+
+    return datasets, covariance_data, experiments, true_chars, Ta_pair, hist
+
+
+
+
+
+# plotting for comparison of models
+
+# add comparison of the solutions
+
+
+# little bit modified
+def plot_datafits(datasets, experiments, 
+    fits=[], fits_chi2=[], f_model_name='fit', f_color='',
+    priors=[], priors_chi2=[], pr_model_name='prior', pr_color='',
+    true=[], true_chi2=[], t_model_name ='true', t_color = '',
+    true_pars = pd.DataFrame(), 
+    prior_pars = pd.DataFrame(),
+    fit_pars = pd.DataFrame(),
+    title: str = '',
+    show_spingroups: bool = True,
+    fig_size : tuple = (12,9)
+    ):
+
+    colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    fig, axes = subplots(2,1, figsize=fig_size, sharex=True)
+
+    for i, exp in enumerate(experiments):
+        if exp.reaction == "transmission":
+            model_key = "theo_trans"
+            iax = 0
+        elif exp.reaction == "capture":
+            model_key = "theo_xs"
+            iax = 1
+        else:
+            raise ValueError()
+
+        axes[iax].errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
+                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+        
+        if len(fits) != 0:
+            if (len(fits_chi2) != 0):
+                fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
+            else:
+                fit_label = f'{f_model_name} {exp.title}'
+            
+            if (len(f_color)==0):
+                fit_color = 'red'
+            else:
+                fit_color = f_color
+
+            axes[iax].plot(fits[i].E, fits[i][model_key], color=fit_color, zorder=1, lw=1.5, label=fit_label) # colors[i]
+        
+        if len(priors) != 0:
+            if (len(priors_chi2) != 0):
+                prior_label = f'{pr_model_name} {exp.title} ({priors_chi2[i]})'
+            else:
+                prior_label = f'{pr_model_name} {exp.title}'
+
+            if (len(f_color)==0):
+                prior_color = 'orange'
+            else:
+                prior_color = pr_color
+            
+            axes[iax].plot(priors[i].E, priors[i][model_key], '--', color=prior_color, zorder=0, lw=1.5, label=prior_label)
+        
+        if (len(t_color)==0):
+            true_color = 'green'
+        else:
+            true_color = t_color
+
+        if len(true) != 0:
+            if (len(true_chi2) != 0):
+                true_label = f'{t_model_name} {exp.title} ({true_chi2[i]})'
+            else:
+                true_label = f'{t_model_name} {exp.title}'
+            
+            axes[iax].plot(true[i].E, true[i][model_key], '-', color=true_color, zorder=1, alpha=0.5, lw=1.5, label=true_label)
+
+
+    # Set the y-axis limits with additional space for text and capture ymax before changing
+    
+    y_top_padding = 0.1 
+    x_offset = 0.05
+
+    ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+    for ax in axes:
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + y_top_padding)
+
+    font_size = 8
+    y_text_shift = 0.01  # Adjust as needed, related to font size
+    y_text_positions = [ymax_values[0], ymax_values[1]]
+
+    # show vertical lines for energies
+    
+    # fits
+    for index, res in fit_pars.iterrows():
+        res_E = res.E
+        # Add vertical lines at the resonance energies to both subplots
+        axes[0].axvline(x=res_E, color=fit_color, linestyle='--', linewidth=0.5, alpha=0.3)
+        axes[1].axvline(x=res_E, color=fit_color, linestyle='--', linewidth=0.5, alpha=0.3)
+
+        if (show_spingroups):
+            # add txt with
+            sp_gr_txt = np.round(int(res.J_ID),0)
+            
+            y_text_position = ymax  # Position the text at the top of the original y-axis limit
+            x_text_position = res_E + x_offset
+            
+            # Show the text to the right of the line
+            for i, ax in enumerate(axes):
+                y_text_position = ymax_values[i]  # Use original ymax for text position
+                #ax.text(x_text_position, y_text_position, str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=8)
+
+                ax.text(res_E, y_text_positions[i], str(sp_gr_txt), color=fit_color, verticalalignment='bottom', fontsize=font_size)
+                y_text_positions[i] -= y_text_shift
+
+
+    # the same for theoretical positions
+    for index, true_res in true_pars.iterrows():
+
+        true_res_energy = true_res.E
+        # Add vertical lines at the resonance energies to both subplots
+        axes[0].axvline(x=true_res_energy, color=true_color, linestyle='--', linewidth=0.5, alpha=0.7)
+        axes[1].axvline(x=true_res_energy, color=true_color, linestyle='--', linewidth=0.5, alpha=0.7)
+
+        if (show_spingroups):
+            # add txt with
+            sp_gr_txt = np.round(true_res.J_ID,0)
+            y_text_position = ymax  # Position the text at the top of the original y-axis limit
+            x_text_position = true_res_energy
+            
+            # Show the text to the right of the line
+            for i, ax in enumerate(axes):
+                y_text_position = ymax_values[i]  # Use original ymax for text position
+                ax.text(x_text_position , y_text_position, str(sp_gr_txt), color=true_color, verticalalignment='bottom', fontsize=8)
+
+    
+    for index, res in prior_pars.iterrows():
+        # Add vertical lines at the resonance energies to both subplots
+        axes[0].axvline(x=res.E, color=prior_color, linestyle='--', linewidth=0.8, alpha=0.5)
+        axes[1].axvline(x=res.E, color=prior_color, linestyle='--', linewidth=0.8, alpha=0.5)
+
+        
+    axes[0].set_ylabel("T")
+    axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+    # set title
+    fig.suptitle(title, fontsize=14)
+    
+    # additional info if present
+    add_title = ''
+    if (true_pars.shape[0]>0):
+        add_title+=''+r'$N_{'+f'{t_model_name}'+'}$ = '+str(true_pars.shape[0])
+        
+    if (len(true_chi2)>0):
+        add_title += ', ' if (len(add_title)>0) else ''
+        add_title+='$\sum_{ds}\chi^2$ = '+str(np.round(np.sum(true_chi2),3))
+
+    if (prior_pars.shape[0]>0):
+        add_title += ', ' if (len(add_title)>0) else ''
+        add_title += r'$N_{'+f'{pr_model_name}'+'}$ = '+str(prior_pars.shape[0])
+    if (len(priors_chi2)>0):
+        add_title += ', ' if (len(add_title)>0) else ''
+        add_title+='$\sum_{ds}\chi^2$ = '+str(np.round(np.sum(priors_chi2),3))
+
+    if (fit_pars.shape[0]>0):
+        add_title += ', ' if (len(add_title)>0) else ''
+        add_title+=r'$N_{'+f'{f_model_name}'+'}$ = '+str(fit_pars.shape[0])
+    if (len(fits_chi2)>0):
+        add_title += ', ' if (len(add_title)>0) else ''
+        add_title+='$\sum_{ds}\chi^2$ = '+str(np.round(np.sum(fits_chi2),3))
+    
+    # end additional info if present
+    axes[0].set_title(add_title, fontsize=10)
+    
+
+    # ### make it pretty
+    for ax in axes:
+        # ax.set_xlim([200,250])
+        # ax.set_ylim([-0.1,1.1])
+        ax.legend(fontsize='xx-small', loc='lower right')
+
+    fig.supxlabel('Energy (eV)')
+    fig.tight_layout()
+
+    return fig
+
+
+# plotting history
+def plot_history(allexp_data: dict, 
+                 show_keys: list, 
+                 fig_size: tuple = (6, 10), 
+                 max_level: int = None,
+                 title : str = ''):
+    
+    # Create the figure and axis objects
+    fig, (ax1, ax2) = subplots(2, 1, figsize=fig_size, sharex=True, gridspec_kw={'height_ratios': [1, 1]})
+
+    # Iterate over each key in the specified show_keys list
+    for key in show_keys:
+
+        value = allexp_data[key]
+
+        cur_hist = value['hist']
+
+        if max_level is None:
+            cur_max_level = max(cur_hist.elimination_history.keys())
+        else:
+            cur_max_level = min(max(cur_hist.elimination_history.keys()), max_level)
+
+        levels = []
+        N_ress = []
+        chi2_s = []
+
+        gl_min_level = np.min(list(cur_hist.elimination_history.keys()))
+        gl_max_level = np.max(list(cur_hist.elimination_history.keys()))
+
+
+        for level in cur_hist.elimination_history.keys():
+            if level < cur_max_level:
+                break  # Skip levels higher than max_level
+
+            # Retrieve data for the current level
+            numres = cur_hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+            chi2 = np.sum(cur_hist.elimination_history[level]['selected_ladder_chars'].chi2_post)
+
+            levels.append(level)
+            N_ress.append(numres)
+            chi2_s.append(chi2)
+
+            total_time = cur_hist.elimination_history[level]['total_time']
+
+        # Plot the data for the current key
+        ax1.plot(N_ress, chi2_s, marker='o', label=f'$\Delta\chi^2$ = {key}, t = {np.round(total_time,1)}')  # Modify as needed for labeling
+        ax1.legend()
+
+        # Calculate differences in chi2 values and plot
+        chi2_diffs = np.diff(chi2_s, prepend=chi2_s[0])
+        ax2.plot(N_ress, chi2_diffs, marker='o')  # Modify as needed for styling
+
+    # #plotting true chi2 
+    # if (len(allexp_data[f'{key}']['true_chars'].chi2)>0):
+    #     ax1.axhline(y=sum(allexp_data[f'{key}']['true_chars'].chi2), color='g', linestyle='--', linewidth=0.5, alpha=0.5)
+        
+
+    # Set labels and other properties
+    ax1.set_ylabel('$\chi^2$')
+    ax1.grid(True)
+    #ax2.set_xlabel(r'$N_{res}$')
+    ax2.set_ylabel('Change in $\chi^2$')
+
+    ax2.set_xlim((gl_min_level, gl_max_level))
+
+    fig.suptitle(title, fontsize=14)
+
+    ax1.set_title('Change in $\chi^2$', fontsize=10)
+
+    ax2.invert_xaxis()
+    ax2.grid(True)
+    fig.supxlabel(r'$N_{res}$')
+
+    fig.tight_layout()
+
+
+    # Return the figure object for further manipulation or display
+    return fig

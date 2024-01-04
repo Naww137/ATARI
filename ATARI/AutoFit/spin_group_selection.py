@@ -26,7 +26,7 @@ class SpinSelectOPT:
     def __init__(self, **kwargs):
         self._max_steps = 5
         self._iterations = 2
-        self._step_threshold = 0.01
+        self._step_threshold = 0.1
         self._LevMar = True
         self._LevMarV = 2
         self._LevMarVd = 5

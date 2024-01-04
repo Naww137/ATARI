@@ -195,7 +195,7 @@ Ta_pair.add_spin_group(Jpi='4.0',
 from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
 from ATARI.AutoFit import chi2_eliminator_v2, elim_addit_funcs
 
-def fit(title, sammy_rto_fit, initialFBopt, spin_group_opt):
+def fit(title, maxres, sammy_rto_fit, initialFBopt, spin_group_opt):
     
     ### initial FB
     autofit_initial = InitialFB(initialFBopt)
@@ -211,7 +211,7 @@ def fit(title, sammy_rto_fit, initialFBopt, spin_group_opt):
     external_resonances = copy(initial_out.final_external_resonances)
     assert(isinstance(start_ladder, pd.DataFrame))
     assert(isinstance(external_resonances, pd.DataFrame))
-    start_ladder['varyGg'] = np.zeros(len(start_ladder))
+    start_ladder['varyGg'] = np.zeros(len(start_ladder))*1
     start_ladder = pd.concat([external_resonances, start_ladder], ignore_index=True)
     external_resonance_indices = [0,1]
 
@@ -243,9 +243,9 @@ def fit(title, sammy_rto_fit, initialFBopt, spin_group_opt):
     ### Eliminate
     elim_opts = chi2_eliminator_v2.elim_OPTs(chi2_allowed = 0,
                                         fixed_resonances_df = external_resonances,
-                                        deep_fit_max_iter = 5,
+                                        deep_fit_max_iter = 10,
                                         deep_fit_step_thr = 0.1,
-                                        start_fudge_for_deep_stage = 0.05,
+                                        start_fudge_for_deep_stage = 0.1,
                                         stop_at_chi2_thr = False
                                         )
 
@@ -261,7 +261,8 @@ def fit(title, sammy_rto_fit, initialFBopt, spin_group_opt):
 
     ### spin group selection
     spinselector = spin_group_selection.SpinSelect(spin_group_opt)
-    models = [history.elimination_history[i]['selected_ladder_chars'] for i in range(minkey+1, minkey+3)]
+    minkey = min(history.elimination_history.keys())
+    models = [history.elimination_history[i]['selected_ladder_chars'] for i in range(minkey+1, minkey+maxres)]
 
     spinselect_out = spinselector.fit_multiple_models(models,
                                     [1.0,2.0],
@@ -295,5 +296,6 @@ spinselectopt = spin_group_selection.SpinSelectOPT()
 
 
 title = "def_1sg"
-fit(title, sammy_rto_fit, initialFBopt,spinselectopt)
+maxres = 5
+fit(title, maxres, sammy_rto_fit, initialFBopt,spinselectopt)
 

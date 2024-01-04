@@ -102,7 +102,16 @@ class SpinSelectOPT:
 
 
 
+class SpinSelectOUT:
 
+    def __init__(self):
+        
+        self.history = {}
+
+    def add_model(self, N, spin_models, leading_model):
+        self.history[N] = {"all_spin_models": spin_models,
+                           "leading_model"  : leading_model,
+                           "all_chi2n"      : [np.sum(each.chi2n_post) for each in spin_models]}
 
 
 
@@ -114,8 +123,37 @@ class SpinSelect:
         self.options = options
         # if options.Fit:
             # self.fit()
+        
+    def fit_multiple_models(self,
+                            models,
+                            possible_J_ID,
+                            particle_pair,
+                            datasets,
+                            experiments,
+                            covariance_data,
+                            sammyRTO,
+                            fixed_resonances_indices):
+        
+        # model_Ns = [len(model.par_post) for model in models]
+        out = SpinSelectOUT()
 
-    def get_best_chi2(self, 
+        for model in models:
+            N = len(model.par_post)
+            model.par_post['varyGg'] = np.ones(len(model.par_post))
+            all_outs, leading_model = self.try_all_spin_groups(possible_J_ID, #[1.0,2.0],
+                                                                model.par_post, #sammyOUT_elim.par_post,
+                                                                particle_pair, #Ta_pair,
+                                                                datasets,
+                                                                experiments,
+                                                                covariance_data,
+                                                                sammyRTO, #sammy_rto_fit,
+                                                                fixed_resonances_indices = fixed_resonances_indices)
+            out.add_model(N, all_outs, leading_model)
+
+        return out
+            
+
+    def try_all_spin_groups(self, 
                       possible_J_ID,
                       starting_ladder,
                       particle_pair,
@@ -155,14 +193,15 @@ class SpinSelect:
         leading_model = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
         leading_chi2 = leading_model.chi2n_post
 
+        all_outs = []
         for each_df in possible_dfs:
             sammyINPyw.resonance_ladder = pd.concat([each_df, fixed_resonances_df])
             sammyOUT_temp = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
+            all_outs.append(sammyOUT_temp)
             if np.sum(sammyOUT_temp.chi2n_post) < np.sum(leading_chi2):
                 leading_chi2 = sammyOUT_temp.chi2n_post
                 leading_model = sammyOUT_temp
             else:
                 pass
         
-
-        return leading_model
+        return all_outs, leading_model

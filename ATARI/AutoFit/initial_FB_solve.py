@@ -1,5 +1,5 @@
 from typing import Protocol
-from ATARI.AutoFit.functions import get_parameter_grid, get_resonance_ladder, eliminate_small_Gn, update_vary_resonance_ladder
+from ATARI.AutoFit.functions import eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
 import pandas as pd
@@ -28,6 +28,7 @@ class Evaluation_Data:
 class InitialFBOPT:
     def __init__(self, **kwargs):
         self._Fit = True
+        self._external_resonances = True
 
         self._width_elimination = True
         self._Gn_threshold = 1e-2
@@ -44,6 +45,10 @@ class InitialFBOPT:
         self._fit_Gg = True
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
+
+        self._num_Elam = None
+        self._starting_Gg_multiplier = 1
+        self._starting_Gn1_multiplier = 1
 
 
 
@@ -95,6 +100,16 @@ class InitialFBOPT:
     @decrease_chi2_threshold_for_width_elimination.setter
     def decrease_chi2_threshold_for_width_elimination(self, decrease_chi2_threshold_for_width_elimination):
         self._decrease_chi2_threshold_for_width_elimination = decrease_chi2_threshold_for_width_elimination
+
+    @property
+    def external_resonances(self):
+        """
+        If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
+        """
+        return self._external_resonances
+    @external_resonances.setter
+    def external_resonances(self, external_resonances):
+        self._external_resonances = external_resonances
 
     @property
     def max_steps(self):
@@ -182,6 +197,29 @@ class InitialFBOPT:
         self._spin_group_keys = spin_group_keys
 
 
+    @property
+    def num_Elam(self):
+        """Number of resonance features in starting feature bank for each spin group"""
+        return self._num_Elam
+    @num_Elam.setter
+    def num_Elam(self, num_Elam):
+        self._num_Elam = num_Elam
+
+    @property
+    def starting_Gg_multiplier(self):
+        """Factor of average capture width used in initial feature bank"""
+        return self._starting_Gg_multiplier
+    @starting_Gg_multiplier.setter
+    def starting_Gg_multiplier(self, starting_Gg_multiplier):
+        self._starting_Gg_multiplier = starting_Gg_multiplier
+
+    @property
+    def starting_Gn1_multiplier(self):
+        """Factor of Q01 neutron width used in initial feature bank"""
+        return self._starting_Gn1_multiplier
+    @starting_Gn1_multiplier.setter
+    def starting_Gn1_multiplier(self, starting_Gn1_multiplier):
+        self._starting_Gn1_multiplier = starting_Gn1_multiplier
 
 
 
@@ -189,7 +227,37 @@ class InitialFBOPT:
 
 
 
+class InitialFBOUT:
+    def __init__(self,
+                 outs_fit_1: list[sammy_classes.SammyOutputData],
+                 outs_fit_2: list[sammy_classes.SammyOutputData],
+                 external_resonance_indices):
+        
+        outs_fit_1.extend(outs_fit_2)
+        self.sammy_outs = outs_fit_1
 
+        samout_final = outs_fit_2[-1]
+        final_par = copy(samout_final.par_post)
+        assert(isinstance(final_par, pd.DataFrame))
+        self.final_external_resonances = final_par.iloc[external_resonance_indices, :]
+        self.final_internal_resonances = final_par.drop(index = external_resonance_indices)
+
+        # self.final_internal_resonances = 
+
+    
+    @property
+    def chi2(self):
+        chi2_list = []
+        for samout in self.sammy_outs:
+            chi2_list.append(np.sum(samout.chi2n_post))
+        return chi2_list
+
+    @property
+    def N_res(self):
+        N_res = []
+        for samout in self.sammy_outs:
+            N_res.append(len(samout.par_post))
+        return N_res
 
 
 class InitialFB:
@@ -215,14 +283,29 @@ class InitialFB:
         rto = copy(sammyRTO)
         assert rto.bayes == True
 
-        
+        ### setup spin groups
         if self.options.fit_all_spin_groups:
             spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
         else:
             assert len(self.options.spin_group_keys)>0
             spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
-        initial_resonance_ladder = self.get_starting_feature_bank(energy_range, spin_groups)
+        initial_resonance_ladder = get_starting_feature_bank(energy_range,
+                                                            spin_groups,
+                                                            num_Elam= self.options.num_Elam,
+                                                            starting_Gg_multiplier = self.options.starting_Gg_multiplier,
+                                                            starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
+                                                            varyE = 0, varyGg = 0, varyGn1 = 1)
+    
+        ### setup external resonances
+        if self.options.external_resonances:
+            external_resonance_ladder = get_external_resonance_ladder(spin_groups, energy_range)
+            external_resonance_indices = list(range(0,len(external_resonance_ladder)))
+        else:
+            external_resonance_ladder = pd.DataFrame()
+            external_resonance_indices = []
+        initial_resonance_ladder = pd.concat([external_resonance_ladder, initial_resonance_ladder], ignore_index=True)
 
+        ### setup sammy inp
         sammyINPyw = sammy_classes.SammyInputDataYW(
             particle_pair = particle_pair,
             resonance_ladder = initial_resonance_ladder,  
@@ -249,45 +332,26 @@ class InitialFB:
                                              sammyINPyw)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
-        reslad_1 = outs_fit_1[-1].par_post
+        reslad_1 = copy(outs_fit_1[-1].par_post)
+        assert(isinstance(reslad_1, pd.DataFrame))
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
+        external_resonance_ladder = reslad_1.iloc[external_resonance_indices, :]
+        reslad_1.drop(index=external_resonance_indices, inplace=True)
         if self.options.fit_Gg:
             reslad_1 = update_vary_resonance_ladder(reslad_1, varyE=1, varyGg=1, varyGn1=1)
         else:
             reslad_1 = update_vary_resonance_ladder(reslad_1, varyE=1, varyGg=0, varyGn1=1)
-
+        reslad_1 = pd.concat([external_resonance_ladder, reslad_1], ignore_index=True)
         sammyINPyw.resonance_ladder = reslad_1
+
         outs_fit_2 = self.fit_and_eliminate(rto,
                                              sammyINPyw)
         
-        return outs_fit_2
 
-
-
-
-    def get_starting_feature_bank(self,
-                                  energy_range,
-                                  spin_groups,
-                                  num_Elam= None,
-                                  varyE = 0,
-                                  varyGg = 0,
-                                  varyGn1 = 1
-                                  ):
-        if num_Elam is None:
-            num_Elam = int((np.max(energy_range)-np.min(energy_range)) * 1.25)
-
-        Er, Gg, Gn, J_ID = [], [], [], []
-        for each in spin_groups:
-            Er_1, Gg_1, Gn_1, J_ID_1 = get_parameter_grid(energy_range, each, num_Elam, option=1)
-            Er.append(Er_1); Gg.append(Gg_1); Gn.append(Gn_1); J_ID.append(J_ID_1); 
-        Er = np.concatenate(Er)
-        Gg = np.concatenate(Gg)
-        Gn = np.concatenate(Gn)
-        J_ID = np.concatenate(J_ID) 
-
-        return get_resonance_ladder(Er, Gg, Gn, J_ID, varyE=varyE, varyGg=varyGg, varyGn1=varyGn1)
+        return InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
+    
 
 
 

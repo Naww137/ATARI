@@ -32,6 +32,10 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
     n = len(data) # length of the dataset
     k = ladder_df.shape[0] * 3 # num of res params +1(?)
 
+    if (n<=k+1):
+
+        raise ValueError(f'Number of parameters of the model must be << than number of observations! n = {n}, k = {k}')
+
     if (precalc_chi2==0):
         chi2 = np.sum((residuals / data_unc) ** 2) # chi2 (weighted residual sum of squares)
     else:
@@ -212,7 +216,7 @@ def characterize_sol(Ta_pair: Particle_Pair,
         #chi2 for all datasets
         precalc_chi2_sum = np.sum(sol.chi2_post)
 
-        k = sol.par_post.shape[0] * 3 + 1 # estimating the variance
+        k = sol.par_post.shape[0] * 3  #+ 1 # estimating the variance
 
         n = len(aggregated_exp_data)
 
@@ -313,6 +317,7 @@ def calculate_probability_N_res(avg_distance, N_res, num_samples, e_range):
 
     # Calculate and return the probability
     probability = count_exact_N_res / num_samples
+    
     return probability
 
 
@@ -696,6 +701,51 @@ def plot_datafits(datasets, experiments,
     fig.tight_layout()
 
     return fig
+
+
+def get_level_times(allexp_data: dict, 
+                 show_keys: list,
+                 settings: dict, 
+                 fig_size: tuple = (6, 10), 
+                 max_level: int = None,
+                 title : str = ''):
+
+    times_dict = {}
+
+    for key in show_keys:
+        
+        value = allexp_data[key]
+        cur_hist = value['hist']
+
+        N_res = []
+        level_times = []
+        total_times = []
+
+        for level in cur_hist.elimination_history.keys():
+
+            numres = cur_hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+            N_res.append(numres)
+
+            cur_level_time = cur_hist.elimination_history[level]['level_time']
+            level_times.append(cur_level_time)
+
+            cur_total_time = cur_hist.elimination_history[level]['total_time']
+            total_times.append(cur_total_time)
+
+        times_dict[key] = {
+            'N_res': N_res,
+            'level_times': level_times,
+            'total_times': total_times
+        }
+    
+    #now plot and output
+    # TODO: plot
+        
+    return times_dict
+
+
+
+
 
 
 # plotting history
@@ -1160,3 +1210,48 @@ def calc_all_SSE_gen_XS_plot(
 
 
     return df_est, df_theo, resid_matrix, SSE_dict, figure
+
+
+def format_time_2_str(time_interval):
+    """Reformat time interval in sec to present it in a more nice format for vieweing in
+    days, hours, minutes, seconds
+    
+    Parameters
+    ----------
+    time_interval : float
+        value of time interval in seconds
+    ----------
+
+    Outputs
+    ----------
+    time_components_list : list
+        list with time components [days, hours, minutes, seconds]
+    formatted_string : str
+        string representation of time components but each component is added only if it's > 0
+        example: 1 d, 2 h, 12 sec
+    ----------
+    """
+
+    # Calculate days, hours, minutes, and seconds
+    days, remainder = divmod(time_interval, 86400)  # 86400 seconds in a day
+    hours, remainder = divmod(remainder, 3600)  # 3600 seconds in an hour
+    minutes, seconds = divmod(remainder, 60)  # 60 seconds in a minute
+    
+    # Prepare the components for the list
+    time_components_list = [int(days), int(hours), int(minutes), int(seconds)]
+    
+    # Prepare the string components, only adding if value is > 0
+    string_components = []
+    if days > 0:
+        string_components.append(f"{int(days)} d")
+    if hours > 0:
+        string_components.append(f"{int(hours)} h")
+    if minutes > 0:
+        string_components.append(f"{int(minutes)} min")
+    if seconds > 0:  # Assuming you want to show seconds even if it's 0
+        string_components.append(f"{int(seconds)} sec")
+    
+    # Join the string components
+    formatted_string = ", ".join(string_components)
+    
+    return time_components_list, formatted_string

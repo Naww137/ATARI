@@ -6,6 +6,7 @@ from typing import Protocol, Optional
 ### Descriptors
 
 class parameter:
+    'A way of representing a value and uncertainty.'
     def __set_name__(self, owner, name):
         self._name = name
 

@@ -11,6 +11,7 @@ workspace/
 fort*
 *SAMMY_runDIR*
 *.gif
+.vscode/
 
 
 # Byte-compiled / optimized / DLL files

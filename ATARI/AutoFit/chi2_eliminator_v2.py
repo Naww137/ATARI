@@ -496,6 +496,7 @@ class eliminator_by_chi2:
                 priors_passed_cnt += 1
 
                 # reset best prior chi2 if better
+                # best_removed_resonance_prior = None
                 if (prior_sum_chi2 < best_prior_chi2):
                     best_prior_chi2 = prior_sum_chi2
                     best_prior_model_chars = prior_chars

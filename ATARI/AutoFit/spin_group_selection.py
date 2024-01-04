@@ -30,7 +30,7 @@ class SpinSelectOPT:
         self._LevMar = True
         self._LevMarV = 2
         self._LevMarVd = 5
-        self._LevMarV0 = 0.05
+        self._LevMarV0 = 0.1
 
         for key, value in kwargs.items():
             setattr(self, key, value)

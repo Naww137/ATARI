@@ -1,5 +1,4 @@
 # %%
-from matplotlib.pyplot import *
 import numpy as np
 import pandas as pd
 import os
@@ -8,9 +7,11 @@ from ATARI.AutoFit import spin_group_selection
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
-
+from ATARI.AutoFit.control import AutoFitOUT
 from copy import copy
 
+script_directory = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_directory)
 
 
 # %% built experimental models
@@ -56,7 +57,7 @@ capdat2 = capdat2[(capdat2.E<max(expcap2.energy_range)) & (capdat2.E>min(expcap2
 ### 1mm Transmission data
 transdat1 = sammy_functions.readlst("./trans-Ta-1mm.twenty")
 transdat1_covfile = './trans-Ta-1mm.idc'
-chw, Emax = get_chw_and_upperE(transdat1.E, 100.14)
+# chw, Emax = get_chw_and_upperE(transdat1.E, 100.14)
 exptrans1 = Experimental_Model(title = "trans1mm",
                                reaction = "transmission", 
                                energy_range = energy_range_all,
@@ -194,7 +195,7 @@ Ta_pair.add_spin_group(Jpi='4.0',
 from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
 from ATARI.AutoFit import chi2_eliminator_v2, elim_addit_funcs
 
-def fit(sammy_rto_fit, initialFBopt, spin_group_opt):
+def fit(title, sammy_rto_fit, initialFBopt, spin_group_opt):
     
     ### initial FB
     autofit_initial = InitialFB(initialFBopt)
@@ -240,11 +241,12 @@ def fit(sammy_rto_fit, initialFBopt, spin_group_opt):
         )
 
     ### Eliminate
-    elim_opts = chi2_eliminator_v2.elim_OPTs(chi2_allowed = 100,
+    elim_opts = chi2_eliminator_v2.elim_OPTs(chi2_allowed = 0,
                                         fixed_resonances_df = external_resonances,
                                         deep_fit_max_iter = 5,
                                         deep_fit_step_thr = 0.1,
                                         start_fudge_for_deep_stage = 0.05,
+                                        stop_at_chi2_thr = False
                                         )
 
     elimi = chi2_eliminator_v2.eliminator_by_chi2(rto=sammy_rto_fit,
@@ -254,59 +256,44 @@ def fit(sammy_rto_fit, initialFBopt, spin_group_opt):
 
     history = elimi.eliminate(ladder_df=start_ladder)
     
-
     print(f'Eliminated from {history.ladder_IN.shape[0]} res -> {history.ladder_OUT.shape[0]}')
     minkey = min(history.elimination_history.keys())
-    sammyOUT_elim = history.elimination_history[minkey+1]['selected_ladder_chars']
-
 
     ### spin group selection
     spinselector = spin_group_selection.SpinSelect(spin_group_opt)
+    models = [history.elimination_history[i]['selected_ladder_chars'] for i in range(minkey+1, minkey+3)]
 
-    for i in range(minkey+1,minkey+5):
-        elim_out = history.elimination_history[i]['selected_ladder_chars']
+    spinselect_out = spinselector.fit_multiple_models(models,
+                                    [1.0,2.0],
+                                    Ta_pair,
+                                    datasets,
+                                    experiments,
+                                    covariance_data,
+                                    sammy_rto_fit,
+                                    external_resonance_indices)
+    
+    autofit_out = AutoFitOUT(initial_out, history, spinselect_out)
 
-        elim_out.par_post['varyGg'] = np.ones(len(sammyOUT_elim.par_post))
-        sammyOUT_spin = spinselector.get_best_chi2([1.0,2.0],
-                                                    elim_out.par_post, #sammyOUT_elim.par_post,
-                                                    Ta_pair,
-                                                    datasets,
-                                                    experiments,
-                                                    covariance_data,
-                                                    sammy_rto_fit,
-                                                    fixed_resonances_indices = external_resonance_indices)
+    file = open(f'./Out_{title}.pkl', 'wb')
+    pickle.dump(autofit_out, file)
+    file.close()
 
-        file = open(f'./spin_model_{i}.pkl', 'wb')
-        pickle.dump(sammyOUT_spin, file)
-        file.close()
-
-        file = open(f'./elim_{i}.pkl', 'wb')
-        pickle.dump(elim_out, file)
-        file.close()
-        
-
-
-#%% 
+#%%  Main
 
 sammy_rto_fit = sammy_classes.SammyRunTimeOptions('/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
                                         {"Print":   True,
                                          "bayes":   True,
-                                         "keep_runDIR": True,
-                                         "sammy_runDIR": "sammy_runDIR"
+                                         "keep_runDIR": False,
+                                         "sammy_runDIR": "sammy_runDIR_py"
                                          })
 
 
-initialFBopt = InitialFBOPT(Gn_threshold=1e-2,
-                       iterations=3,
-                       max_steps = 30,
-                       step_threshold=0.01,
-                       LevMarV0=0.05,
-                       fit_all_spin_groups=False,
-                       spin_group_keys = ['3.0'])
+initialFBopt = InitialFBOPT(fit_all_spin_groups=False,
+                            spin_group_keys = ['3.0'])
 
-spinselectopt = spin_group_selection.SpinSelectOPT(step_threshold=0.01,
-                                                    max_steps=10,
-                                                    LevMarV0 = 0.1)
+spinselectopt = spin_group_selection.SpinSelectOPT()
 
-fit(sammy_rto_fit, initialFBopt,spinselectopt)
+
+title = "def_1sg"
+fit(title, sammy_rto_fit, initialFBopt,spinselectopt)
 

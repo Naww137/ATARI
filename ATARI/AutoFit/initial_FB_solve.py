@@ -36,7 +36,7 @@ class InitialFBOPT:
 
         self._max_steps = 30
         self._iterations = 2
-        self._step_threshold = 0.1
+        self._step_threshold = 0.001
         self._LevMar = True
         self._LevMarV = 1.5
         self._LevMarVd = 5

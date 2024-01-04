@@ -4,6 +4,9 @@ TWENTY
 EV
 GENERATE PLOT FILE AUTOMATICALLY
 %%%alphanumeric%%%
+USE MULTIPLE SCATTERING
+INFINITE SLAB
+NORMALIZE AS YIELD Rather than cross section
 BROADENING IS WANTED
 DO NOT SHIFT RPI RESOLUTION
 
@@ -15,7 +18,7 @@ DO NOT SHIFT RPI RESOLUTION
   2      1    0  4.0       1.0  3.5
     1    1    0    0       4.0
 
-RPI T
+RPI C
 BURST 0   8.0       0.0      
 CHANN 0   613.02    102.4     1.6      
 CHANN 0   6140.23   51.2      1.6      

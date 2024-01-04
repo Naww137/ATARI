@@ -11,9 +11,9 @@ import pickle
 
 #     calc return aic, aicc, bic, bicc for models that were fittes using WLS
 def calc_AIC_AICc_BIC_BICc_by_fit(
-        data: np.array, 
-        data_unc: np.array,
-        fit: np.array,
+        data: np.ndarray, 
+        data_unc: np.ndarray,
+        fit: np.ndarray,
         ladder_df: pd.DataFrame,
         precalc_chi2: float = 0):
         

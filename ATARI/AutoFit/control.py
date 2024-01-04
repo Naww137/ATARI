@@ -1,28 +1,99 @@
 
 import pandas as pd
-
+import numpy as np
 from ATARI.syndat.control import Syndat_Control, Syndat_Model
+from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
+from ATARI.AutoFit.chi2_eliminator_v2 import elim_OPTs, eliminator_by_chi2
+from ATARI.AutoFit.spin_group_selection import SpinSelectOPT, SpinSelect
+from typing import Optional
 
-class autofitOPT:
-    def __init__(self):
-        pass
+
+class AutoFitOPT:
+    def __init__(self,
+                 featurebankOPT: Optional[InitialFBOPT] = None,
+                 eliminateOPT: Optional[elim_OPTs]      = None,
+                 spinselectOPT: Optional[SpinSelectOPT] = None#,
+                #  **kwargs
+                 ):
+        
+        if featurebankOPT is None:
+            self.featurebankOPT = InitialFBOPT()
+        else:
+            self.featurebankOPT = featurebankOPT
+        if eliminateOPT is None:
+            self.elimOPT = elim_OPTs()
+        else:
+            self.eliminateOPT = eliminateOPT
+        if spinselectOPT is None:
+            self.spinselectOPT = SpinSelectOPT()
+        else:
+            self.spinselectOPT = spinselectOPT
+
+        # for key, value in kwargs.items():
+        #     setattr(self, key, value)
 
 
 
-# options = 
+class AutoFitOUT:
+    def __init__(self, 
+                 initialFBOUT,
+                 eliminateOUT,
+                 spinselectOUT):
+        self.initial = initialFBOUT
+        self.eliminate = eliminateOUT
+        self.spinselect = spinselectOUT
+
 
 class AutoFit_Control:
 
-    def __init__(self):
-        pass
+    def __init__(self,
+                 autofitOPT: Optional[AutoFitOPT]
+                 ):
+        
+
+        if autofitOPT is None:
+            self.autofitOPT = AutoFitOPT()
+        else:
+            self.autofitOPT = autofitOPT
+
+        self.initial_fit = InitialFB(self.autofitOPT.featurebankOPT)
+        self.eliminator = eliminator_by_chi2(rto=sammy_rto_fit,
+                                             sammyINPyw = elim_sammyINPyw, 
+                                             options = self.autofitOPT.eliminateOPT)
+        self.spinselect = SpinSelect(self.autofitOPT.spinselectOPT)
+
     
+    def fit(self, 
+            particle_pair,
+            energy_range,
+            datasets,
+            experiments,
+            covariance_data,
+            sammy_rto_fit
+            ):
+        
+        ### initial feature bank solve
+        initial_out = self.initial_fit.fit(particle_pair,
+                                           energy_range,
+                                           datasets,
+                                           experiments,
+                                           covariance_data,
+                                           sammy_rto_fit
+                                           )
+        
+        initial_out_final_par = initial_out[-1].par_post
+        assert isinstance(initial_out_final_par, pd.DataFrame)
+        initial_out_final_par["varyGg"] = np.zeros(len(initial_out_final_par))
+        # need to get side resonances here 
 
 
-    
-    def fit(self, data):
-        # determine data type
-        # fit with trained and validated hyperparameters
-        pass
+        ### eliminator solve
+        eliminate_out = self.eliminator.eliminate(initial_out_final_par)
+
+        # return models 5 res - 20 res 
+
+        ### spin group selector
+
 
 
 

@@ -22,6 +22,8 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from dataclasses import dataclass
 from typing import Optional, Union
 
+from ATARI.AutoFit import elim_addit_funcs
+
 # end imports
 
 
@@ -30,7 +32,7 @@ class elim_OPTs:
     """
     Options and settings for a single elimination routine.
     
-    Parameters
+    Parameters & Attributes
     ----------
     chi2_allowed : float
         value of chi2 allowed difference when comparing 2 models,
@@ -39,22 +41,16 @@ class elim_OPTs:
     stop_at_chi2_thr: Bool
         Boolean value which tells to stop if during search of a models there was 
         no models that passed the chi2 test, if false - continue to delete resonances until we will not have at least one resonance.
-    **kwargs : dict, optional
-        Any keyword arguments are used to set attributes on the instance.
-
-    Attributes
-    ----------
-    chi2_allowed : float
-        value of chi2 difference allowed when comparing 2 models.
-    fixed_resonances_df: pd.Dataframe
-        dataframe with side resonances, fixed to track during elimination.
     deep_fit_max_iter: int
         allowed number of iterations to perform YW fitting
     deep_fit_step_thr: flota,
         chi2 step threshold used for YW fitting procedure
     start_fudge_for_deep_stage: float
         Starting value of a fudge factor used for YW scheme
-    
+
+    **kwargs : dict, optional
+        Any keyword arguments are used to set attributes on the instance.
+
     """
     def __init__(self, **kwargs):
         
@@ -233,7 +229,7 @@ class eliminator_by_chi2:
             current_level = len(ladder)
 
             ### Identify fixed resonances
-            if (fixed_res_df.shape[0] == 2):
+            if (fixed_res_df.shape[0] > 0):
 
                 # Extract energies from fixed_side_resonances
                 fixed_res_energies = fixed_res_df["E"].tolist()
@@ -278,6 +274,7 @@ class eliminator_by_chi2:
                 break
 
             ### test all N-1 priors 
+            time_test_priors_start = time.time()
             prior_test_out = self.test_priors(current_level, 
                                               fixed_resonances_indices, 
                                               fixed_resonances,
@@ -285,6 +282,8 @@ class eliminator_by_chi2:
                                               delta_chi2_allowed,
                                               base_chi2)
             
+            priors_test_time = time.time() - time_test_priors_start
+
             any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_chi2, priors_passed_cnt, best_removed_resonance_prior = prior_test_out
         
             ### if any priors passed remove, 
@@ -293,7 +292,9 @@ class eliminator_by_chi2:
                     print()
                     print(f'Priors passed the test...{priors_passed_cnt}')
                     print(f'Best model found {best_removed_resonance_prior}:')
-                    print(f'Σχ²: \t {best_prior_chi2}')
+                    print(f'Σχ²:\t{best_prior_chi2}')
+                    #print(f'Time for priors test: {np.round(priors_test_time,2)} sec')
+                    print(f'Time for priors test: {elim_addit_funcs.format_time_2_str(priors_test_time)[1]}')
                     print()
 
                 best_model_chi2 = best_prior_chi2
@@ -348,7 +349,7 @@ class eliminator_by_chi2:
             ### printout
             if (self.rto.Print):
 
-                print(f'\t proc_time {sol_fit_time_deep}  s')
+                print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)}')
                 print()
                 print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_iter_allowed} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
        
@@ -381,12 +382,20 @@ class eliminator_by_chi2:
                 print('End of deep fitting stage...')
                 print()
                 print()
-                print(f'Level time: {np.round(level_time, 1)} sec')
+                print(f'Level time: \t {elim_addit_funcs.format_time_2_str(level_time)[1]}')
+                print(f'Priors test time: \t {elim_addit_funcs.format_time_2_str(priors_test_time)[1]}')
+
                 tot_el_time = time.time() - start_time
                 resdif = max(ladder_IN.shape[0] - selected_ladder_chars.par_post.shape[0], 1)
 
-                print(f'Total elapsed time: {np.round(tot_el_time, 1)} sec')
-                print(f'time per res.: {np.round(tot_el_time/resdif, 1)} sec')
+                time_per_res  = np.round(tot_el_time/resdif,1)
+
+                print('*'*40)
+                print(f'Current elapsed time: \t {elim_addit_funcs.format_time_2_str(tot_el_time)[1]}')
+                print(f'Time per res.: \t {time_per_res} sec')
+                print()
+                print(f'Estimated TEE: \t {np.round(time_per_res * (current_level) /3600 , 1)} h')
+                print(f'\t ~ {elim_addit_funcs.format_time_2_str(time_per_res * (current_level))[1]}')
                 print()
                 print()
                 print('*'*40)
@@ -418,7 +427,7 @@ class eliminator_by_chi2:
                 
                 # not stopping continuing up to 1 res..
                 print('Skipping stopping by chi2 test, going to 1 res model')
-                if(ladder.shape[0]==1):
+                if(ladder.shape[0]==fixed_res_df.shape[0]+1):
                     print('Reached one resonance model.. stopping')
                     break
                 else:
@@ -505,9 +514,11 @@ class eliminator_by_chi2:
                 sign = ">"
 
             if (self.rto.Print):
+                print()
                 print(f'Prior ladder check, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'\t\tΣχ²: \t {np.round(prior_sum_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
-                print(f'\t\t{np.round(prior_benefit_chi2,4)}\t\t{sign}\t\t{delta_chi2_allowed}\t\t=>\t\t{test_result}')
+                print(f'\tΣχ²: \t {np.round(prior_sum_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
+                print(f'\t\t\t {np.round(prior_benefit_chi2,4)}\t\t{sign}\t\t{delta_chi2_allowed}\t\t=>\t\t{test_result}')
+                print(f'\t {priors_passed_cnt} / {current_level} passed.    ({fixed_resonances.shape[0]} side res.)')
                 print()
 
 
@@ -609,9 +620,14 @@ class eliminator_by_chi2:
                 best_model_chars = cur_sol_chars
 
             if (self.rto.Print):
+                print()
                 print(f'Intermediate fitting, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'\t Σχ²: \t {np.round(interm_step_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
-                print(f'\t\t  {np.round(benefit_chi2,4)}  \t {sign} \t {delta_chi2_allowed} \t => \t {test_result}')
+                print(f'\tΣχ²:\t{np.round(interm_step_chi2,4)}\tbase: {np.round(base_chi2,4)}   ')
+                print(f'\t\t\t{np.round(benefit_chi2,4)}\t{sign}\t{delta_chi2_allowed}\t => \t {test_result}')
+                #print(f'\t\t\t{sol_fit_time_interm} sec for processing')
+                print(f'\t\t\tproc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_interm)[1]}')
+                print()
+                print(f'\t{posteriors_passed_cnt} / {current_level} passed.\t({fixed_resonances.shape[0]} side res.)')
                 print()
                 
         if (self.rto.Print):
@@ -619,8 +635,8 @@ class eliminator_by_chi2:
             # if some of the models passed the test using intermediate stage
             if (any_model_passed_test):
                 print(f'{posteriors_passed_cnt} models passed the test, using best for a deep fit')
-                print(f'Best model is {best_removed_resonance}.')
-                print(f'Σχ²: {best_model_chi2}')
+                print(f'Best model is\t{best_removed_resonance}.')
+                print(f'Σχ²:\t{best_model_chi2}')
             else:
                 print('No models passed the test!')
                 print(f'Best model is {best_removed_resonance}.')
@@ -674,7 +690,7 @@ class eliminator_by_chi2:
         # redefining rto and inputs
         cur_rto = SammyRunTimeOptions(
             sammyexe = self.rto.path_to_SAMMY_exe,
-            options = {"Print":   False, #self.rto.Print,
+            options = {"Print":  self.rto.Print,
                 "bayes":  True,
                 "keep_runDIR": self.rto.keep_runDIR,
                 "sammy_runDIR": self.rto.sammy_runDIR

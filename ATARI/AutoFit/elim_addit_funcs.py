@@ -3,6 +3,7 @@
 
 import numpy as np
 import pandas as pd
+
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
 
@@ -12,6 +13,8 @@ from ATARI.theory.resonance_statistics import sample_RRR_levels
 
 from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOptions, SammyOutputData, SammyInputData
 from ATARI.sammy_interface.sammy_functions import run_sammy
+
+#from ATARI.AutoFit.chi2_eliminator_v2 import eliminator_OUTput
 
 import os
 import pickle
@@ -32,10 +35,6 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
     n = len(data) # length of the dataset
     k = ladder_df.shape[0] * 3 # num of res params +1(?)
 
-    if (n<=k+1):
-
-        raise ValueError(f'Number of parameters of the model must be << than number of observations! n = {n}, k = {k}')
-
     if (precalc_chi2==0):
         chi2 = np.sum((residuals / data_unc) ** 2) # chi2 (weighted residual sum of squares)
     else:
@@ -45,12 +44,23 @@ def calc_AIC_AICc_BIC_BICc_by_fit(
     chi2_n = chi2 / n
 
     aic_wls = 2 * k + chi2 # AIC for WLS!
+    bic_wls = k * np.log(n) + chi2 # BIC for WLS!
 
-    aicc_wls = aic_wls + 2 * k * (k + 1) / (n - k - 1)
+    if (n<=k+1):
+        error_msg = f'Number of parameters of the model must be << than number of observations! n = {n}, k = {k}'
+        print('!!!')
+        print('\t', error_msg)
+        print()
+        #raise ValueError(error_msg)
+        
+        bicc_wls = np.inf
+        aicc_wls = np.inf
 
-    # BIC for WLS
-    bic_wls = k * np.log(n) + chi2
-    bicc_wls = bic_wls +  2* k * (k + 1) / (2 * (n - k - 1))
+    else:
+        aicc_wls = aic_wls + 2 * k * (k + 1) / (n - k - 1)
+        bicc_wls = bic_wls +  2* k * (k + 1) / (2 * (n - k - 1))
+
+
     
     return aic_wls, aicc_wls, bic_wls, bicc_wls, chi2, chi2_n
 
@@ -754,7 +764,8 @@ def plot_history(allexp_data: dict,
                  settings: dict, 
                  fig_size: tuple = (6, 10), 
                  max_level: int = None,
-                 title : str = ''):
+                 title : str = '',
+                 folder_to_save: str = 'data/'):
 
     
     ioff() # turn interactive plotting off
@@ -846,7 +857,7 @@ def plot_history(allexp_data: dict,
             )
 
             if (xs_figure):
-                xs_figure.savefig(fname=f'/home/fire/py_projects/ATARI_YW_newstruct/ATARI/examples/Ta181_Analysis/data/anim/xs_{key}_step_{level}.png')
+                xs_figure.savefig(fname=f'{folder_to_save}xs_{key}_step_{level}.png')
 
             
             total_SSE = np.round(SSE_dict['SSE_sum_normalized_casewise'][0],1)
@@ -1253,5 +1264,82 @@ def format_time_2_str(time_interval):
     
     # Join the string components
     formatted_string = ", ".join(string_components)
+
+    if (sum(time_components_list)==0):
+        formatted_string = '0 sec'
     
     return time_components_list, formatted_string
+
+
+
+def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
+                                                Ta_pair: Particle_Pair,
+                     datasets: list,
+                     experiments: list,
+                     covariance_data: list =[]):
+
+    # table for analysis of the models - produce chi2
+
+    # sums - for all datasets
+    NLLW_s = []
+    chi2_s = []
+    aicc_s = []
+    bicc_s = []
+    N_res_s = []
+    test_pass = []
+
+    N_res_joint_LL = []
+
+    for level in hist.elimination_history.keys():
+        
+        numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+        pass_test = hist.elimination_history[level]['final_model_passed_test']
+
+        # print(level)
+        # print(f'N_res = {numres}')
+
+        # print(f'level {level}, # of resonances: {numres},  passed the test: {pass_test}')
+        cur_ch_dict = characterize_sol(Ta_pair=Ta_pair,
+                        datasets = datasets,
+                        experiments = experiments,
+                        sol = hist.elimination_history[level]['selected_ladder_chars'],
+                        covariance_data = covariance_data
+                        )
+        
+        N_res_s.append(numres)
+        test_pass.append(pass_test)
+        chi2_s.append(sum(cur_ch_dict['chi2_stat']))
+        
+        # aicc_s.append(sum(cur_ch_dict['aicc']))
+        # bicc_s.append(sum(cur_ch_dict['bicc']))
+
+        aicc_s.append(cur_ch_dict['aicc_entire_ds'])
+        bicc_s.append(cur_ch_dict['bic_entire_ds'])
+
+        NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
+        N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
+
+
+        # levels.append(level)
+        # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
+        # N_ress.append(numres)
+        # print(cur_ch_dict )
+
+    # combine to one DataFrame
+    table_df = pd.DataFrame.from_dict({
+        'N_res': N_res_s,
+        'N_res_joint_LL': N_res_joint_LL,
+        'passed': test_pass,
+        'sum_chi2': chi2_s,
+        'sum_NLLW': NLLW_s,
+        'AICc': aicc_s,
+        'BIC': bicc_s
+    })
+
+    # calculating deltas in BIC and AICc
+    table_df['delta_AICc_best'] = table_df['AICc'] - table_df['AICc'].min()
+    table_df['delta_BIC_best'] = table_df['BIC'] - table_df['BIC'].min()
+    table_df['delta_chi2_prev'] = table_df['sum_chi2'].diff().fillna(0)
+    table_df['delta_chi2_best'] = table_df['sum_chi2'] - table_df['sum_chi2'].min()
+
+    return table_df

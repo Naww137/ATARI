@@ -18,13 +18,51 @@ from copy import copy
 from ATARI.AutoFit import chi2_eliminator_v2
 from ATARI.AutoFit import elim_addit_funcs
 
+global_st_time = time.time()
+
+# 
+current_dir = os.path.dirname(os.path.realpath(__file__))
+print(f'Current directory: {current_dir}')
+
 
 # %%
-# %matplotlib widget
+# all options to run! 
+settings = {
+    'path_to_SAMMY_exe': '/home/fire/SAMMY/sammy/build/install/bin/sammy',
+    'path_to_SAMMY_temps': './sammy_temps/',
+    'keep_runDIR_SAMMY': True,
+    'shell_SAMMY': 'bash',
+}
 
-current_dir = os.path.dirname(os.path.realpath(__file__))
+# folder where to save all
+savefolder = os.path.join(current_dir, 'data_new/')
 
-# print(f'Current directory: {current_dir}')
+if not os.path.exists(savefolder):
+    os.makedirs(savefolder)
+    print(f'Created folder: {savefolder}')
+
+fig_size = (10,6)
+
+Gn_thr = 0.01
+N_red = 35 # number of resonances to keep after the initial autofit
+delta_E = 10 # eV - delta in energy for selection of side resonances from initial dataframe
+
+energy_range_all = [202, 227]
+# energy_range_all = [201, 228]
+# energy_range_all = [201, 210]
+
+chi2_allowed = 0
+
+start_deep_fit_from = 15 # excluding the side resonances provided
+
+fit_all_spin_groups = True
+
+greedy_mode = True
+
+
+
+
+
 
 # %% [markdown]
 # ## Measurement Data
@@ -50,8 +88,7 @@ def get_chw_and_upperE(E, FP):
 # print(Emax)
 # print(chw)
 
-energy_range_all = [202, 227]
-# energy_range_all = [201, 228]
+
 
 # %%
 ### 1mm capture data
@@ -250,33 +287,10 @@ for data, exp in zip(datasets, experiments):
 
 fig = plot(datasets, experiments)
 fig.tight_layout()
+fig.show()
 
 # %%
 ## Could also plot covariance here
-
-# %%
-# all options to run! 
-settings = {
-    'path_to_SAMMY_exe': '/home/fire/SAMMY/sammy/build/install/bin/sammy',
-    'path_to_SAMMY_temps': './sammy_temps/',
-    'keep_runDIR_SAMMY': True,
-    'shell_SAMMY': 'bash',
-}
-
-# folder where to save all
-savefolder = os.path.join(current_dir, 'data_new/')
-
-if not os.path.exists(savefolder):
-    os.makedirs(savefolder)
-    print(f'Created folder: {savefolder}')
-
-fig_size = (10,6)
-
-Gn_thr = 0.01
-N_red = 19 # number of resonances to keep after the initial autofit
-
-chi2_allowed = 0
-fit_all_spin_groups = True
 
 # %% [markdown]
 # ## Fit from ENDF or JEFF
@@ -305,7 +319,7 @@ jeff_file = os.path.join(current_dir, "73-Ta-181g.jeff33")
 
 jeff_parameters = sammy_functions.get_endf_parameters(jeff_file, matnum, sammyRTO)
 
-jeff_parameters = jeff_parameters[(jeff_parameters.E<max(energy_range_all)+5) & (jeff_parameters.E>min(energy_range_all)-5)]
+jeff_parameters = jeff_parameters[(jeff_parameters.E<max(energy_range_all)+delta_E) & (jeff_parameters.E>min(energy_range_all)-delta_E)]
 jeff_parameters["varyGn1"] = np.ones(len(jeff_parameters))
 jeff_parameters["varyGg"] = np.ones(len(jeff_parameters))*0
 jeff_parameters["varyE"] = np.ones(len(jeff_parameters))
@@ -436,8 +450,9 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
     #fig_size = fig_size
     )
 
-fig2.savefig(fname=savefolder+'SFJ_Fit_Result.png')
-#fig2.show()
+f_name_to_save = savefolder+f'SFJ_Fit_Result_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+fig2.savefig(fname=f_name_to_save)
+fig2.show()
 
 # %%
 sammyOUT_SFJ.par_post
@@ -483,7 +498,7 @@ printout_chi2_post(outs[0], 'autofit prior')
 
 # %%
 # saving initial solution & chars
-f_name_to_save = f'Autofit_init_res_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.pkl'
+f_name_to_save = f'Autofit_init_res_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.pkl'
 
 save_obj  = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, 
                                              file_name=f_name_to_save,
@@ -520,7 +535,9 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
     #fig_size = fig_size
     )
 
-fig2.savefig(fname=savefolder+'AF_Result.png')
+f_name_to_save = savefolder+f'AF_Result_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+fig2.savefig(fname=f_name_to_save)
+
 #fig2.show()
 
 # %%
@@ -537,7 +554,7 @@ print(f'N_res: {final_fb_output.par_post.shape[0]}')
 # run
 from ATARI.utils.misc import fine_egrid
 
-importlib.reload(elim_addit_funcs)
+# importlib.reload(elim_addit_funcs)
 
 energy_grid = fine_egrid(energy = energy_range_all)
 
@@ -553,17 +570,20 @@ df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_S
 )
 
 #xs_figure.show()
-xs_figure.savefig(fname=savefolder+'xs_Initial_Fit_Result.png')
+
+f_name_to_save = savefolder+f'xs_AF_Res_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+xs_figure.savefig(fname=f_name_to_save)
+
 
 # %% [markdown]
 # # Resonance elimination 
 # 
 
 # %%
-import importlib
+# import importlib
 
-importlib.reload(chi2_eliminator_v2)
-importlib.reload(elim_addit_funcs)
+# importlib.reload(chi2_eliminator_v2)
+# importlib.reload(elim_addit_funcs)
 
 start_ladder = final_fb_output.par_post
 assert isinstance(start_ladder, pd.DataFrame)
@@ -591,7 +611,6 @@ print(start_ladder)
 
 # %%
 # if we do not want to wait hours...
-
 N_red = min(N_red, start_ladder.shape[0],) # not limiting
 
 # just to reduce processing time
@@ -638,6 +657,9 @@ elim_opts = chi2_eliminator_v2.elim_OPTs(chi2_allowed = chi2_allowed,
                                       deep_fit_max_iter = 30,
                                       deep_fit_step_thr = 0.01,
                                       start_fudge_for_deep_stage = 0.05,
+                                      greedy_mode = greedy_mode,
+                                      use_spin_shuffling = False,
+                                      start_deep_fit_from = start_deep_fit_from
                                       )
 
 # %%
@@ -651,10 +673,6 @@ hist = elimi.eliminate(ladder_df= start_ladder)
 
 # %%
 # # true - using JEFF? just for comparison
-
-# true_chars = elimi.evaluate_prior(jeff_parameters) 
-# print(true_chars.chi2)
-
 true_chars = sammyOUT_SFJ
 
 # %%
@@ -664,20 +682,20 @@ print(f'Elim took {np.round(hist.elim_tot_time,2)} sec')
 
 # %%
 # save history?
-
-# can we save the history not to refit all the time?
-
 fitted_elim_case_data = {
         'datasets' : datasets,
         'covariance_data' : covariance_data,
     'experiments': experiments,
     'true_chars': true_chars, # note, jeff are used as true here
     'Ta_pair': Ta_pair,
+    # elim parameters
+    'elim_opts': elim_opts 
 }
+
 if (fit_all_spin_groups):
-    f_name_to_save = f'sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_allspingr'
+    f_name_to_save = f'sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_allspingr_sdf_{start_deep_fit_from}'
 else:
-    f_name_to_save = f'sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}'
+    f_name_to_save = f'sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}'
 
 saved_hist = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=f'hist_{f_name_to_save}.pkl', obj=hist)
 saved_data = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=f'dataset_{f_name_to_save}.pkl', obj=fitted_elim_case_data)
@@ -685,7 +703,6 @@ saved_data = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=
 
 # %%
 # plot the final selected fit?
-# images production from history
 
 prior_level = max(hist.elimination_history.keys())
 prior_numres = hist.elimination_history[prior_level]['input_ladder'].shape[0]
@@ -714,8 +731,8 @@ for level in hist.elimination_history.keys():
     chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
     N_ress.append(numres)
 
-# plotting    
 
+# plotting    
 # differences in chi2 values between 2 models
 chi2_diffs = np.diff(chi2_s, prepend=chi2_s[0]) 
 
@@ -738,9 +755,12 @@ ax2.invert_xaxis()
 ax2.grid(True)
 
 tight_layout()
-f_name_to_save = f'hist_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}'
+f_name_to_save = f'hist_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}'
 fig.savefig(savefolder+f'{f_name_to_save}.png')
 #show()
+
+
+
 
 # %%
 # plotting data from history
@@ -791,76 +811,39 @@ fig = show_plot_from_hist(datasets = datasets,
                           addit_title_str=', $\Delta\chi^2$ = '+str(chi2_allowed)
                           )
 
-fig.savefig(savefolder+f'elim_result_sel_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png')
+fig.savefig(savefolder+f'elim_result_sel_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png')
 #fig.show()
+
+# in xs space
+df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
+        est_ladder = hist.elimination_history[level_to_compare]['selected_ladder_chars'].par_post,
+        theo_ladder = sammyOUT_SFJ.par_post,
+        Ta_pair = Ta_pair,
+        settings = settings,
+        energy_grid=energy_grid,
+        reactions_SSE = ['capture', 'elastic'],
+        fig_size=fig_size,
+        calc_fig=True
+)
+#xs_figure.show()
+
+f_name_to_save = savefolder+f'xs_elim_res_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png'
+xs_figure.savefig(fname=f_name_to_save)
 
 # %%
 # table for analysis of the models - produce chi2
 
-importlib.reload(elim_addit_funcs)
-
-# sums - for all datasets
-NLLW_s = []
-chi2_s = []
-aicc_s = []
-bicc_s = []
-N_res_s = []
-test_pass = []
-
-N_res_joint_LL = []
-
-for level in hist.elimination_history.keys():
-        
-    numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
-    pass_test = hist.elimination_history[level]['final_model_passed_test']
-
-    # print(f'level {level}, # of resonances: {numres},  passed the test: {pass_test}')
-    cur_ch_dict = elim_addit_funcs.characterize_sol(Ta_pair=Ta_pair,
-                     datasets=datasets,
-                     experiments=experiments,
-                     sol = hist.elimination_history[level]['selected_ladder_chars'],
-                     covariance_data = covariance_data
-                     )
-    
-    N_res_s.append(numres)
-    test_pass.append(pass_test)
-    chi2_s.append(sum(cur_ch_dict['chi2_stat']))
-    
-    # aicc_s.append(sum(cur_ch_dict['aicc']))
-    # bicc_s.append(sum(cur_ch_dict['bicc']))
-
-    aicc_s.append(cur_ch_dict['aicc_entire_ds'])
-    bicc_s.append(cur_ch_dict['bic_entire_ds'])
-
-    NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
-    N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
-
-
-    # levels.append(level)
-    # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
-    # N_ress.append(numres)
-    print(cur_ch_dict )
-
-# combine to one DataFrame
-table_df = pd.DataFrame.from_dict({
-    'N_res': N_res_s,
-    'N_res_joint_LL': N_res_joint_LL,
-    'passed': test_pass,
-    'sum_chi2': chi2_s,
-    'sum_NLLW': NLLW_s,
-    'AICc': aicc_s,
-    'BIC': bicc_s
-
-})
-
-# calculating deltas in BIC and AICc
-table_df['delta_AICc_best'] = table_df['AICc'] - table_df['AICc'].min()
-table_df['delta_BIC_best'] = table_df['BIC'] - table_df['BIC'].min()
-table_df['delta_chi2_prev'] = table_df['sum_chi2'].diff().fillna(0)
-table_df['delta_chi2_best'] = table_df['sum_chi2'] - table_df['sum_chi2'].min()
+table_df = elim_addit_funcs.create_solutions_comparison_table_from_hist(hist = hist,
+                                                Ta_pair = Ta_pair,
+                     datasets = datasets,
+                     experiments = experiments,
+                     covariance_data = covariance_data)
 
 # saving comparison table
-table_df.to_csv(path_or_buf=savefolder+f'comparison_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.csv')
+table_df.to_csv(path_or_buf=savefolder+f'comparison_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.csv')
+
 print('Sol. Comparison table:')
 print(table_df)
 
+
+print(f'Entire cycle took {elim_addit_funcs.format_time_2_str(time.time()-global_st_time)[1]}')

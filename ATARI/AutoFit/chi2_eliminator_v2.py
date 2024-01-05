@@ -29,24 +29,47 @@ from ATARI.AutoFit import elim_addit_funcs
 
 ### classes definitions
 class elim_OPTs:
+    # TODO: change set all params smoothly!
     """
     Options and settings for a single elimination routine.
     
     Parameters & Attributes
     ----------
     chi2_allowed : float
-        value of chi2 allowed difference when comparing 2 models,
+        value of chi2 allowed difference when comparing 2 models
+
     fixed_resonances_df: pd.Dataframe
-        dataframe with side resonances, fixed to track during elimination,
+        dataframe with side resonances, fixed to track during elimination
+
     stop_at_chi2_thr: Bool
         Boolean value which tells to stop if during search of a models there was 
-        no models that passed the chi2 test, if false - continue to delete resonances until we will not have at least one resonance.
+        no models that passed the chi2 test, if false - continue to delete resonances until we
+        will not have at least one resonance.
+
+    interm_fit_max_iter: int
+        allowed number of iterations for intermediate stage to perform YW fitting
+
     deep_fit_max_iter: int
-        allowed number of iterations to perform YW fitting
-    deep_fit_step_thr: flota,
+        allowed number of iterations for deep-fitting stage 
+
+    interm_fit_step_thr: float,
+        chi2 step threshold used for YW fitting procedure in intermediate fitting stage
+
+    deep_fit_step_thr: float,
         chi2 step threshold used for YW fitting procedure
+
     start_fudge_for_deep_stage: float
         Starting value of a fudge factor used for YW scheme
+
+    greedy_mode: bool
+        If set to True - eliminator will not test all models of current branch
+        and select best of them - it will use first model of current branch that passed the test (TODO: not implemented yet)
+
+    start_deep_fit_from: int
+        this determines the number of resonances in a current level on a path from N->N-1 where deep fit start from (see default value) (TODO: not implemented yet)
+
+    use_spin_shuffling: bool
+        this determines whether shuffling of the spin-groups assignments should be used or not, starts from the same level as start_deep_fit_from (TODO: not implemented yet)
 
     **kwargs : dict, optional
         Any keyword arguments are used to set attributes on the instance.
@@ -55,7 +78,7 @@ class elim_OPTs:
     def __init__(self, **kwargs):
         
         # default values for all 
-        #self._input_ladder = kwargs.get('sampleRES', pd.DataFrame())
+
         self._chi2_allowed = kwargs.get('chi2_allowed', 8)
         self._fixed_resonances_df = kwargs.get('fixed_resonances_df', pd.DataFrame())
         
@@ -66,6 +89,12 @@ class elim_OPTs:
         self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
 
         self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', True) # by default stops when didn't find the model that passed the test
+        
+        self._greedy_mode = kwargs.get('greedy_mode', False) # by default False  - search all solutions
+
+        self._use_spin_shuffling = kwargs.get('use_spin_shuffling', False)
+
+        self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 5)
 
         # all that passed through
         for key, value in kwargs.items():
@@ -87,6 +116,30 @@ class elim_OPTs:
     @stop_at_chi2_thr.setter
     def stop_at_chi2_thr(self, stop_at_chi2_thr):
         self._stop_at_chi2_thr = stop_at_chi2_thr
+
+     # stop or not if we found a solution inside a subset that passed the test (greedy in time)
+    @property
+    def greedy_mode(self):
+        return self._greedy_mode
+    @greedy_mode.setter
+    def greedy_mode(self, greedy_mode):
+        self._greedy_mode = greedy_mode
+
+    # start_deep_fit_from
+    @property 
+    def start_deep_fit_from(self):
+        return self._start_deep_fit_from
+    @start_deep_fit_from.setter
+    def start_deep_fit_from(self, start_deep_fit_from):
+        self._start_deep_fit_from = start_deep_fit_from
+
+    # use spin shiffling for selection of best model on each level starting from start_deep_fit_from (greedy in time)
+    @property
+    def use_spin_shuffling(self):
+        return self._use_spin_shuffling
+    @use_spin_shuffling.setter
+    def use_spin_shuffling(self, use_spin_shuffling):
+        self._use_spin_shuffling = use_spin_shuffling
 
     #side resonances (fixed in energy only)
     @property 
@@ -183,9 +236,13 @@ class eliminator_by_chi2:
         interm_iter_allowed = self.options.deep_fit_max_iter # allowed number of iterations for YW if no priors passes the test
         deep_fit_step_thr = self.options.deep_fit_step_thr # threshold for deep fitting stage
         fixed_res_df = self.options.fixed_resonances_df
+        start_deep_fit_from = self.options.start_deep_fit_from
+        greedy_mode = self.options.greedy_mode # to save time.. - just take first model that passes the test
+        use_spin_shuffling = self.options.use_spin_shuffling
 
         # Initializing model history dictionary
         model_history = {}
+
         final_model_passed_test = True # set it from the start.
 
         # ladder for processing - from direct input or from sammyINPyw
@@ -204,16 +261,19 @@ class eliminator_by_chi2:
             print('Elimination cycle printout enabled')
             print('*'*40)
             print()
-            print(f'Chi2 thresold applied for model selection: {delta_chi2_allowed}')
+            print(f'\tChi2 thresold applied for model selection: {delta_chi2_allowed}')
+            print('\tStopping options:')
+            print(f'\tstop_at_chi2_thr: {self.options.stop_at_chi2_thr}')
+            print(f'\t"Greedy" mode: {greedy_mode}')
+            print(f'\tUse spin shuffling: {use_spin_shuffling}')
+            print(f'\tStarting deep fitting and/or reshuffling from N = {start_deep_fit_from} res. (excl. fixed side res.)')
             print(f'')
-            print()
             print('Input ladder:')
             print(ladder)
             print('Side resonances used:')
             print(fixed_res_df)
             print()
-            print('Stopping option:')
-            print(f'\t stop_at_chi2_thr: {self.options.stop_at_chi2_thr}')
+            
             
 
         ### Start elimination
@@ -226,7 +286,8 @@ class eliminator_by_chi2:
             best_model_chi2 = float('inf')
             best_removed_resonance = None
             best_model_chars = None
-            current_level = len(ladder)
+
+            current_level = len(ladder) # note - from which we are going to N-1!
 
             ### Identify fixed resonances
             if (fixed_res_df.shape[0] > 0):
@@ -262,8 +323,8 @@ class eliminator_by_chi2:
             if (self.rto.Print):        
 
                 print()
-                print(f'\t {fit_code_init_level}')
-                print(f'\t {initial_ladder_chars.chi2}') # TODO: check this also..
+                print(f'\t{fit_code_init_level}')
+                print(f'\tBase chi2 for level: {initial_ladder_chars.chi2}')
                 print()
             
             best_model_chars = initial_ladder_chars
@@ -275,6 +336,7 @@ class eliminator_by_chi2:
 
             ### test all N-1 priors 
             time_test_priors_start = time.time()
+            
             prior_test_out = self.test_priors(current_level, 
                                               fixed_resonances_indices, 
                                               fixed_resonances,
@@ -322,11 +384,8 @@ class eliminator_by_chi2:
 
 
             ### Do deep fitting after selecting model from prior or deep fit       
-            if (self.rto.Print):
-                print()
-                print('Starting "deep" fitting of best initial guess by chi2...')
-                print()
-
+            
+            # if we are doing deep fit on this stage
             # TODO: change this code
             # deep fitting stage - using best_model_chars - 
             # the problem is that after 2 different stages we have different params..
@@ -335,24 +394,49 @@ class eliminator_by_chi2:
             else:
                 deep_stage_ladder_start = best_model_chars.par_post
 
-            posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
-                                                                     max_steps = interm_iter_allowed,
-                                                                     step_threshold = deep_fit_step_thr,
-                                                                     LevMarV0 = LevMarV0) 
+            if ((deep_stage_ladder_start.shape[0]- fixed_res_df.shape[0]) <= start_deep_fit_from):
+                if (self.rto.Print):
+                    print()
+                    print('Starting "deep" fitting of best initial guess by chi2...')
+                    print()
+
+                posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
+                                                                        max_steps = interm_iter_allowed,
+                                                                        step_threshold = deep_fit_step_thr,
+                                                                        LevMarV0 = LevMarV0)           
+
+            else:
+                if (self.rto.Print):
+                    print()
+                    print('Skipping "deep" fitting stage, utilizing best model for the next step w/o chi2...')
+                    print()
+                
+                posterior_deep_SO = best_model_chars
+                sol_fit_time_deep = 0
+                
+                # based on the priors we should determine if we need to use par or par_post...
+                if (any_prior_passed_test):
+                    posterior_deep_SO.par_post = posterior_deep_SO.par
+                    posterior_deep_SO.chi2_post = posterior_deep_SO.chi2
+                    posterior_deep_SO.chi2n_post = posterior_deep_SO.chi2n
+                    posterior_deep_SO.pw_post = posterior_deep_SO.pw
+
+                else:
+                    pass
 
             cur_sol_chars_deep = posterior_deep_SO
-
             deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
-
             benefit_deep_chi2 = deep_chi2 - base_chi2
+
+            selected_ladder_chars = cur_sol_chars_deep
             
             ### printout
             if (self.rto.Print):
 
-                print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)}')
+                print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)[1]}')
                 print()
                 print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_iter_allowed} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
-       
+    
                 print('Deep fitting decision about model selection:')
                 print()
                 print(f'\t Before: {np.sum(posterior_deep_SO.chi2)}')
@@ -360,7 +444,6 @@ class eliminator_by_chi2:
                 print(f'\t After: {np.sum(posterior_deep_SO.chi2_post)}')
                 print()
 
-            selected_ladder_chars = cur_sol_chars_deep
 
             # checking if final model passed the test
             if ((benefit_deep_chi2 <= delta_chi2_allowed) & final_model_passed_test):
@@ -373,7 +456,7 @@ class eliminator_by_chi2:
 
             ### final printout, save model data, and continue or break while loop
             if (self.rto.Print):
-                print('Deep fitting stage. Results')
+                print(f'Current Stage Results {current_level}, N_res = {selected_ladder_chars.par_post.shape[0]}')
                 cols_to_show = ['E', 'Gn1', 'Gg', 'varyE', 'varyGg', 'varyGn1', 'J_ID']
                 print(selected_ladder_chars.par_post[cols_to_show])
                 print()
@@ -394,8 +477,8 @@ class eliminator_by_chi2:
                 print(f'Current elapsed time: \t {elim_addit_funcs.format_time_2_str(tot_el_time)[1]}')
                 print(f'Time per res.: \t {time_per_res} sec')
                 print()
-                print(f'Estimated TEE: \t {np.round(time_per_res * (current_level) /3600 , 1)} h')
-                print(f'\t ~ {elim_addit_funcs.format_time_2_str(time_per_res * (current_level))[1]}')
+                print(f'Estimated TEE: \t {np.round(time_per_res * (selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]) /3600 , 1)} h')
+                print(f'\t ~ {elim_addit_funcs.format_time_2_str(time_per_res * (selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]))[1]}')
                 print()
                 print()
                 print('*'*40)
@@ -490,6 +573,7 @@ class eliminator_by_chi2:
             # note - always keep the side-resonances
             prior_ladder, row_removed = self.remove_resonance(ladder, j)
             prior_chars = self.evaluate_prior(prior_ladder) 
+
             prior_sum_chi2 = np.sum(prior_chars.chi2)
             prior_benefit_chi2 = prior_sum_chi2 - base_chi2
 
@@ -515,10 +599,21 @@ class eliminator_by_chi2:
             if (self.rto.Print):
                 print()
                 print(f'Prior ladder check, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'\tΣχ²: \t {np.round(prior_sum_chi2,4)} | \t base: {np.round(base_chi2,4)}   ')
+                print(f'\tΣχ²: \t {np.round(prior_sum_chi2,4)} \t| base: {np.round(base_chi2,4)} | current best: {np.round(best_prior_chi2,4)}')
                 print(f'\t\t\t {np.round(prior_benefit_chi2,4)}\t\t{sign}\t\t{delta_chi2_allowed}\t\t=>\t\t{test_result}')
                 print(f'\t {priors_passed_cnt} / {current_level} passed.    ({fixed_resonances.shape[0]} side res.)')
                 print()
+            
+            # check if we have at least one solution that passed the test and if we have - just give it as output (without seaarch of the best - taking first)
+            if (self.options.greedy_mode and any_prior_passed_test):
+                if (self.rto.Print):
+                    print()
+                    print('Using "greedy" mode')
+                    print('Skipping search of solutions - taking first solution that satisfies conditions.')
+                    print(f'Deleted res. # {best_removed_resonance_prior}')
+                    print(f'Chi2: {best_prior_chi2} | {base_chi2}')
+                break
+            # end check if we have at least one solution that passed the test and if we have - just give it as output (without seaarch of the best - taking first)
 
 
         return (any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_chi2, priors_passed_cnt, best_removed_resonance_prior)
@@ -621,13 +716,25 @@ class eliminator_by_chi2:
             if (self.rto.Print):
                 print()
                 print(f'Intermediate fitting, deleted {j}, E_λ  = {row_removed["E"].item()}')
-                print(f'\tΣχ²:\t{np.round(interm_step_chi2,4)}\tbase: {np.round(base_chi2,4)}   ')
+                print(f'\tΣχ²:\t{np.round(interm_step_chi2,4)}\tbase: {np.round(base_chi2,4)} | current best: {best_model_chi2}  ')
                 print(f'\t\t\t{np.round(benefit_chi2,4)}\t{sign}\t{delta_chi2_allowed}\t => \t {test_result}')
                 #print(f'\t\t\t{sol_fit_time_interm} sec for processing')
                 print(f'\t\t\tproc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_interm)[1]}')
                 print()
                 print(f'\t{posteriors_passed_cnt} / {current_level} passed.\t({fixed_resonances.shape[0]} side res.)')
                 print()
+            
+            # check if we have at least one solution that passed the test and if we have - just give it as output (without seaarch of the best - taking first)
+            if (self.options.greedy_mode and any_model_passed_test):
+                if (self.rto.Print):
+                    print()
+                    print('Using "greedy" mode')
+                    print('Skipping search of solutions - taking first solution that satisfies conditions.')
+                    print(f'Deleted res. # {best_removed_resonance}')
+                    print(f'Chi2: {best_model_chi2} | {base_chi2}')
+                break
+            # end check if we have at least one solution that passed the test and if we have - just give it as output (without seaarch of the best - taking first)
+
                 
         if (self.rto.Print):
             print('*'*40)

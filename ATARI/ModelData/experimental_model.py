@@ -30,12 +30,6 @@ class Experimental_Model:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.channel_widths = {
-            "maxE": [np.max(self.energy_range)],
-            "chw": [100.0],
-            "dchw": [0.8]
-        }
-
         # default misc inputs
         if self.reaction == 'capture':
             self.sammy_inputs = {
@@ -66,6 +60,18 @@ class Experimental_Model:
             setattr(self, key, value)
 
 
+        if self.energy_range is None:
+            if self.energy_grid is None:
+                raise ValueError("Neither energy range or energy grid was given")
+            else:
+                self.energy_range = [np.min(self.energy_grid), np.max(self.energy_grid)]
+
+        self.channel_widths = {
+            "maxE": [np.max(self.energy_range)],
+            "chw": [100.0],
+            "dchw": [0.8]
+        }
+
         # define energy grid
         if self.energy_grid is None:
             maxE, chw, dchw = [self.channel_widths[key]
@@ -89,8 +95,8 @@ class Experimental_Model:
                 self.energy_grid = np.concatenate(
                     [self.energy_grid, np.flipud(E)])
         else:
-            pass 
-        
+            pass
+
         self.energy_grid = self.energy_grid[(self.energy_grid>min(self.energy_range)) & (self.energy_grid<max(self.energy_range)) ]
 
     @property

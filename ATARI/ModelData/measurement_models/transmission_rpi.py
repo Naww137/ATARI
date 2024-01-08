@@ -338,13 +338,13 @@ class transmission_rpi_parameters:
                 if isinstance(param_values, tuple) and len(param_values) == 2:
                     mean, uncertainty = param_values
                     if uncertainty == 0:
-                        pass
+                        sample = mean
                     else:
                         if param_name == 'a_b':
                             sample = np.random.multivariate_normal(mean, uncertainty)
                         else:
                             sample = np.random.normal(loc=mean, scale=uncertainty)
-                        sampled_params[param_name] = (sample, 0.0)
+                    sampled_params[param_name] = (sample, 0.0)
                 if isinstance(param_values, pd.DataFrame):
                     new_c = np.random.normal(loc=param_values.c, scale=param_values.dc)
                     df = deepcopy(param_values)

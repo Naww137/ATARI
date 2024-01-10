@@ -61,9 +61,13 @@ class elim_OPTs:
     start_fudge_for_deep_stage: float
         Starting value of a fudge factor used for YW scheme
 
+    LevMarV0_priorpassed: float
+        Starting value of a fidge factor used for YW scheme if model passed the test without refitting
+        priors tests
+
     greedy_mode: bool
         If set to True - eliminator will not test all models of current branch
-        and select best of them - it will use first model of current branch that passed the test (TODO: not implemented yet)
+        and select best of them - it will use first model of current branch that passed the test 
 
     start_deep_fit_from: int
         this determines the number of resonances in a current level on a path from N->N-1 where deep fit start from (see default value) (TODO: not implemented yet)
@@ -79,11 +83,15 @@ class elim_OPTs:
         
         # default values for all 
 
-        self._chi2_allowed = kwargs.get('chi2_allowed', 8)
+        self._chi2_allowed = kwargs.get('chi2_allowed', 0)
         self._fixed_resonances_df = kwargs.get('fixed_resonances_df', pd.DataFrame())
         
         self._deep_fit_max_iter = kwargs.get('deep_fit_max_iter', 20)
-        self._deep_fit_step_thr = kwargs.get('deep_fit_step_thr', 0.01)
+        self._deep_fit_step_thr = kwargs.get('deep_fit_step_thr', 0.001)
+
+        self._interm_fit_max_iter = kwargs.get('interm_fit_max_iter', 10)
+        self._interm_fit_step_thr = kwargs.get('interm_fit_step_thr', 0.01)
+         
         self._start_fudge_for_deep_stage = kwargs.get('start_fudge_for_deep_stage', 0.1)
 
         self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
@@ -94,7 +102,7 @@ class elim_OPTs:
 
         self._use_spin_shuffling = kwargs.get('use_spin_shuffling', False)
 
-        self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 5)
+        self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 10)
 
         # all that passed through
         for key, value in kwargs.items():
@@ -173,6 +181,22 @@ class elim_OPTs:
     def deep_fit_step_thr(self,deep_fit_step_thr):
         self._deep_fit_step_thr = deep_fit_step_thr
 
+    @property
+    def interm_fit_max_iter(self):
+        return self._interm_fit_max_iter
+    @interm_fit_max_iter.setter
+    def interm_fit_max_iter(self, interm_fit_max_iter):
+        self._interm_fit_max_iter = interm_fit_max_iter
+
+    # step threshold by chi2 decrease for interm fit stage during elimination
+    @property
+    def interm_fit_step_thr(self):
+        return self._interm_fit_step_thr
+    @interm_fit_step_thr.setter
+    def interm_fit_step_thr(self,interm_fit_step_thr):
+        self._interm_fit_step_thr = interm_fit_step_thr
+
+
     # if solution passed the prior it's recommended to start from small value of V-coeff. for LM alg. to save time
     @property
     def LevMarV0_priorpassed(self):
@@ -233,10 +257,17 @@ class eliminator_by_chi2:
         start_time = time.time()
 
         delta_chi2_allowed = self.options.chi2_allowed
-        interm_iter_allowed = self.options.deep_fit_max_iter # allowed number of iterations for YW if no priors passes the test
+
+        interm_fit_max_iter = self.options.interm_fit_max_iter # allowed number of iterations for YW if no priors passes the test
+        interm_fit_step_thr = self.options.deep_fit_step_thr
+
         deep_fit_step_thr = self.options.deep_fit_step_thr # threshold for deep fitting stage
+        deep_fit_max_iter = self.options.deep_fit_max_iter
+
         fixed_res_df = self.options.fixed_resonances_df
+
         start_deep_fit_from = self.options.start_deep_fit_from
+
         greedy_mode = self.options.greedy_mode # to save time.. - just take first model that passes the test
         use_spin_shuffling = self.options.use_spin_shuffling
 
@@ -372,7 +403,6 @@ class eliminator_by_chi2:
                                         fixed_resonances_indices,
                                         fixed_resonances,
                                         ladder,
-                                        interm_iter_allowed,
                                         base_chi2,
                                         delta_chi2_allowed,
                                         best_model_chi2,
@@ -401,7 +431,7 @@ class eliminator_by_chi2:
                     print()
 
                 posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
-                                                                        max_steps = interm_iter_allowed,
+                                                                        max_steps = deep_fit_max_iter,
                                                                         step_threshold = deep_fit_step_thr,
                                                                         LevMarV0 = LevMarV0)           
 
@@ -435,7 +465,7 @@ class eliminator_by_chi2:
 
                 print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)[1]}')
                 print()
-                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_iter_allowed} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
+                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_fit_max_iter} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
     
                 print('Deep fitting decision about model selection:')
                 print()
@@ -497,13 +527,11 @@ class eliminator_by_chi2:
             # stopping criteria
             if (self.options.stop_at_chi2_thr):
 
-
                 # if stop after the first shot when no models pass the test (speedup)
                 if best_removed_resonance is not None and any_model_passed_test:
                     ladder = ladder_OUT 
                 else:
-                    print(f'Note, using the stopping criteria by chi2 threshold {delta_chi2_allowed}')
-                    print('Threshold reached')
+                    print(f'Note, stopping on criteria by chi2 threshold {delta_chi2_allowed}')
                     print(f'Any model passed the test: {any_model_passed_test}')
                     break
             else:
@@ -624,7 +652,6 @@ class eliminator_by_chi2:
                            fixed_resonances_indices,
                            fixed_resonances,
                            ladder,
-                           interm_iter_allowed,
                            base_chi2,
                            delta_chi2_allowed,
                            best_model_chi2,
@@ -664,8 +691,8 @@ class eliminator_by_chi2:
 
             posterior_interm_SO, sol_fit_time_interm = self.fit_YW_by_ig(
                 ladder_df = prior_ladder,
-                max_steps = interm_iter_allowed,
-                # step_threshold = self.options.deep_fit_step_thr
+                max_steps = self.options.interm_fit_max_iter,
+                step_threshold = self.options.interm_fit_step_thr
                 )
             
             ### NEW: NOAH - Again, don't need to re-characterize just use old chi2

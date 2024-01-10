@@ -18,6 +18,7 @@ from ATARI.sammy_interface.sammy_functions import run_sammy
 
 import os
 import pickle
+import copy
 
 from matplotlib.pyplot import *
 from matplotlib import pyplot as plt
@@ -158,14 +159,14 @@ def characterize_sol(Ta_pair: Particle_Pair,
     # for each datasets if they are separate
     aic = []
     aicc = []
-    chi2_stat = []
+    all_chi2 = []
+
     bic = []
     bicc = []
 
     # Variables for aggregated data
     aggregated_exp_data = []
     aggregated_exp_unc = []
-    aggregated_fit = []
 
     # for e-range and characterization
 
@@ -199,6 +200,7 @@ def characterize_sol(Ta_pair: Particle_Pair,
             print('Using cov data for chi2 calc')
             chi2 = sol.chi2_post[index]
             chi2_n = sol.chi2n_post[index]
+
         else:
             print('for chi2 calc using diag unc only')
         
@@ -209,7 +211,9 @@ def characterize_sol(Ta_pair: Particle_Pair,
 
         aic.append(aic_wls)
         aicc.append(aicc_wls)
-        chi2_stat.append(chi2)
+        
+        all_chi2.append(chi2)
+
         bic.append(bic_wls)
         bicc.append(bicc_wls)
 
@@ -218,7 +222,9 @@ def characterize_sol(Ta_pair: Particle_Pair,
     output_dict['aicc'] = aicc
     output_dict['bic'] = bic
     output_dict['bicc'] = bicc
-    output_dict['chi2_stat'] = chi2_stat
+    output_dict['chi2'] = all_chi2
+
+    output_dict['chi2_stat'] = np.sum(all_chi2) / ( len(aggregated_exp_data) - len(sol.par_post) * 3)
 
     # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
     if(len(covariance_data)>0 and (len(sol.chi2_post)>0)):
@@ -241,9 +247,6 @@ def characterize_sol(Ta_pair: Particle_Pair,
                              Ta_pair = Ta_pair)
 
     output_dict['NLLW'] = NLLW_gr
-
-    # propability of having such number of resonances 
-    #print(e_range)
 
     joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
                                                              e_range = e_range,
@@ -373,12 +376,98 @@ def load_obj_from_pkl(folder_name: str, pkl_fname: str):
     except Exception as e:
         print(f"An error occurred while loading the pickle file: {e}")
         return None
+
+
+def separate_side_res_from_inwindow_res(ladder_df: pd.DataFrame, 
+                                        fixed_side_resonances: pd.DataFrame):
     
+    ladder = ladder_df.copy()
+
+    # Extract energies from fixed_side_resonances
+    energies = fixed_side_resonances["E"].tolist()
+
+    # Find those energies in the ladder dataframe
+    fixed_resonances = ladder[ladder["E"].isin(energies)]
+
+    # print('Found side resonances (fixed):')
+    # print(fixed_resonances)
+
+    # print('*'*40)
+    # print('Provided info on side resonances:')
+    # print(fixed_side_resonances)
+    # print()
+    # print('Provided ladder:')
+    # print(ladder)
+    # print('*'*40)
+    # print()
+
+    # Check if all energy values were found
+    if len(fixed_resonances) != fixed_side_resonances.shape[0]:
+        print("** Error: Not enough matching energy values found for fixed resonances in ladder. **")
+        print("Missing energy values:", set(energies) - set(fixed_resonances["E"].tolist()))
+        raise ValueError
+
+    inwindow_res_df = ladder.drop(fixed_resonances.index)
+
+    side_res_df = fixed_side_resonances
+
+    return inwindow_res_df, side_res_df
+
+
+
+def extract_res_var_params(ladder_df: pd.DataFrame, fixed_side_resonances: pd.DataFrame = pd.DataFrame()):
+    """
+    Extract varying parameters in resonances from ladder dataframe and fixed side resonances.
+    Check if all of them have the same values (varying all or only some of them).
+    """
+    # Create a copy of the ladder dataframe to work with
+    ladder = ladder_df.copy()
+
+    # Extract resonances without sides
+    res_wo_sides, _ = separate_side_res_from_inwindow_res(ladder_df = ladder, 
+                                 fixed_side_resonances = fixed_side_resonances)
+    
+    # print('Ladder without defined side resonances:')
+    # print(res_wo_sides)
+
+    # print('Side resonances:')
+    # print(fixed_side_resonances)
+
+    # Columns to check for varying parameters
+    columns_to_check = ['varyE', 'varyGg', 'varyGn1']
+    side_res_vary_params = []
+    main_res_vary_params = []
+
+    # Check if the values in each column are the same for all rows
+    for col in columns_to_check:
+        if fixed_side_resonances[col].nunique() == 1:
+            # All values are the same
+            side_res_vary_params.append(fixed_side_resonances[col].iloc[0])
+        else:
+            # Different values present
+            side_res_vary_params.append(np.inf)
+
+        if res_wo_sides[col].nunique() == 1:
+            # All values are the same
+            main_res_vary_params.append(res_wo_sides[col].iloc[0])
+        else:
+            # Different values present
+            main_res_vary_params.append(np.inf)
+
+    # # Print extracted varying parameters
+    # print('Varying parameters for side resonances:')
+    # print(side_res_vary_params)
+
+    # print('Varying parameters for main resonances:')
+    # print(main_res_vary_params)
+
+    return main_res_vary_params, side_res_vary_params
+
 
 # deleting small resonances limiting up to N based on Gn1
 def reduce_ladder(ladder_df: pd.DataFrame, 
                     Gn1_threshold: float, 
-                    vary_list: list = [0, 0, 1],
+                    vary_list: list = [0],
                     N: int = 0,
                     keep_fixed: bool = True,
                     fixed_side_resonances: pd.DataFrame = pd.DataFrame()
@@ -433,7 +522,8 @@ def reduce_ladder(ladder_df: pd.DataFrame,
         variable_resonances = variable_resonances[variable_resonances.Gn1 >= Gn1_threshold]
 
     # Set column values based on function parameters for variable resonances
-    variable_resonances = set_varying_fixed_params(ladder_df=variable_resonances, vary_list=vary_list)
+    if (len(vary_list)==3):
+        variable_resonances = set_varying_fixed_params(ladder_df=variable_resonances, vary_list=vary_list)
 
     # Combine fixed and variable resonances
     ladder = pd.concat([fixed_resonances, variable_resonances]).drop_duplicates()
@@ -465,6 +555,39 @@ def set_varying_fixed_params(ladder_df: pd.DataFrame,
 
     return ladder_df
 
+
+def get_resonances_from_window(input_res_df: pd.DataFrame, 
+                               energy_range: list, 
+                               N_side_res: int = 0):
+    """
+    Select all resonances from the given window bounded by energy_range 
+    and add N_side_res resonances to the selection - right and left to the window.
+
+    Parameters:
+        input_res_df (pd.DataFrame): DataFrame containing the initial solutions with an 'E' column for energy.
+        energy_range (list): A list with two elements specifying the energy region [min_energy, max_energy].
+        N_side_res (int): Number of additional resonances to select on each side of the energy window, default is 0.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the selected resonances.
+    pd.DataFrame: A DataFrame containing the selected side resonances
+    """
+    
+    # Select resonances within the energy range
+    window_res = input_res_df[(input_res_df['E'] >= np.min(energy_range)) & (input_res_df['E'] <= np.max(energy_range))]
+
+    # Select N_side_res resonances from left and right side of the energy window
+    if N_side_res > 0:
+        left_res = input_res_df[input_res_df['E'] < np.min(energy_range)]
+        left_res = left_res.nlargest(N_side_res, 'E')
+
+        right_res = input_res_df[input_res_df['E'] > np.max(energy_range)]
+        right_res = right_res.nsmallest(N_side_res, 'E')
+
+        # Combine the selected resonances
+        side_res = pd.concat([left_res, right_res])
+
+    return window_res, side_res
 
 
 def find_side_res_df(
@@ -515,13 +638,17 @@ def load_all(savefolder: str,
     hist = load_obj_from_pkl(folder_name=savefolder, pkl_fname=hist_pkl_name)
     case_data_loaded = load_obj_from_pkl(folder_name=savefolder, pkl_fname=dataset_pkl_name)
 
+    energy_range = case_data_loaded['energy_range']
+
     datasets = case_data_loaded['datasets']
     covariance_data = case_data_loaded['covariance_data']
     experiments = case_data_loaded['experiments']
     true_chars = case_data_loaded['true_chars']
     Ta_pair = case_data_loaded['Ta_pair']
 
-    return datasets, covariance_data, experiments, true_chars, Ta_pair, hist
+    elim_OPTS_used = case_data_loaded['elim_opts']
+
+    return energy_range, datasets, covariance_data, experiments, true_chars, Ta_pair, hist, elim_OPTS_used
 
 
 
@@ -545,7 +672,7 @@ def plot_datafits(datasets, experiments,
     fig_size : tuple = (12,9)
     ):
 
-    ioff()
+    #ioff()
 
     colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
     fig, axes = subplots(2,1, figsize=fig_size, sharex=True)
@@ -781,6 +908,7 @@ def plot_history(allexp_data: dict,
         cur_hist = value['hist']
 
         Ta_pair = value['Ta_pair']
+
         theo_ladder = value['true_chars'].par_post
         # energy_grid = fine_egrid(energy = np.array([202, 227]))
 
@@ -853,7 +981,8 @@ def plot_history(allexp_data: dict,
                     energy_grid = energy_grid,
                     reactions_SSE = ['capture', 'elastic'],
                     fig_size = (13,8),
-                    calc_fig = calc_xs_fig
+                    calc_fig = calc_xs_fig,
+                    fig_yscale='linear'
             )
 
             if (xs_figure):
@@ -950,11 +1079,9 @@ def calc_theo_broadened_xs_for_reactions(
     
     for rxn in reactions:
             
-
-
         exp_model_theo = Experimental_Model(title = "theo",
                                reaction = rxn,
-                               #energy_range = energy_range_all,
+                               energy_range = [np.min(energy_grid), np.max(energy_grid)],
                                energy_grid = energy_grid,
 
                                 n = (0.017131,0.0),  
@@ -1018,9 +1145,10 @@ def build_residual_matrix_dict(
 
     energy_grid_fine = fine_egrid(energy=energy_grid)
 
-    print('build_residual_matrix_dict')
-    print('Energy grid fine:')
-    print(len(energy_grid_fine))
+    # print('building residuals matrix')
+    # print('Energy grid fine:')
+    # print(len(energy_grid_fine))
+    # print(energy_grid_fine)
 
     ResidualMatrixDict = {}
 
@@ -1119,7 +1247,7 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
     
     for i in range(R.shape[0]):
 
-        total_case_SSE, total_case_SSE_normalized  = 0 ,0
+        total_case_SSE, total_case_SSE_normalized  = 0, 0
         size_to_norm = 0
 
         for rxn in ResidualMatrixDict.keys():
@@ -1143,10 +1271,12 @@ def calc_all_SSE_gen_XS_plot(
         energy_grid: np.array,
         reactions_SSE : list = ['capture', 'elastic'],
         fig_size: tuple = (8,6),
-        calc_fig: bool = False
+        calc_fig: bool = False,
+        fig_yscale: str = 'log'
 ):
-    print('Input Energy grid')
-    print(len(energy_grid))
+    # print('Input Energy grid')
+    # print(len(energy_grid))
+    # print(energy_grid)
     
     resid_matrix = build_residual_matrix_dict(
         est_par_list = [est_ladder], 
@@ -1155,7 +1285,7 @@ def calc_all_SSE_gen_XS_plot(
         settings = settings,
         energy_grid = energy_grid,
         reactions = reactions_SSE, 
-        print_bool=True
+        print_bool = True
         )
     
     SSE_dict = calculate_SSE_by_cases(ResidualMatrixDict = resid_matrix)
@@ -1180,7 +1310,7 @@ def calc_all_SSE_gen_XS_plot(
             )
         
         # generating the plot to output
-        ioff()
+        #ioff()
         figure = plt.figure(figsize = fig_size)
         
         # # Total
@@ -1209,7 +1339,8 @@ def calc_all_SSE_gen_XS_plot(
 
         plt.legend(loc='upper right')
         plt.grid(color='grey', linestyle='--', linewidth=0.1)
-        plt.yscale('log')
+        
+        plt.yscale(fig_yscale)
         # plt.xlim(208.5,216)
         # plt.ylim(6,600)
         figure.tight_layout()
@@ -1272,17 +1403,26 @@ def format_time_2_str(time_interval):
 
 
 
-def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
+def create_solutions_comparison_table_from_hist(hist,
                                                 Ta_pair: Particle_Pair,
                      datasets: list,
                      experiments: list,
-                     covariance_data: list =[]):
+                     covariance_data: list =[],
+                     true_chars: SammyOutputData = None,
+                     settings: dict = {},
+                     energy_grid_2_compare_on: np.array = np.array([0])
+                    ):
 
     # table for analysis of the models - produce chi2
+    hist = copy.deepcopy(hist)
 
     # sums - for all datasets
+    is_true = []
+    SSE_s = []
     NLLW_s = []
     chi2_s = []
+    chi2_stat_s = []
+
     aicc_s = []
     bicc_s = []
     N_res_s = []
@@ -1290,10 +1430,56 @@ def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
 
     N_res_joint_LL = []
 
+    # incorporate true sol
+    true_sol_key = 0
+
+    if ((true_sol_key not in hist.elimination_history.keys()) and true_chars is not None):
+        hist.elimination_history[true_sol_key] = {
+
+                'input_ladder' : true_chars.par_post, #? questionable
+                'selected_ladder_chars': true_chars, # solution with min chi2 on this level
+                'any_model_passed_test': True, # any model on this level of N-1 res..
+                'final_model_passed_test': True,
+                'level_time': np.inf,
+                'total_time': np.inf,
+                # adding a mark that this is a true solution
+                'assumed_true': True
+            }
+
+    # end incorporate true sol
+
     for level in hist.elimination_history.keys():
         
+        # # adding a mark that this is a true solution
+        if (level != true_sol_key):
+            # adding a mark that this is a true solution
+            hist.elimination_history[level]['assumed_true'] = False
+
         numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
         pass_test = hist.elimination_history[level]['final_model_passed_test']
+
+        is_true.append(hist.elimination_history[level]['assumed_true'])
+
+
+        # SSE
+        if (true_chars is not None):
+            df_est, df_theo, resid_matrix, SSE_dict, xs_figure = calc_all_SSE_gen_XS_plot(
+                        est_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post,
+                        theo_ladder = true_chars.par_post,
+                        Ta_pair = Ta_pair,
+                        settings = settings,
+                        energy_grid = energy_grid_2_compare_on,
+                        reactions_SSE = ['capture', 'elastic'],
+                        fig_size = (13,8),
+                        calc_fig = False,
+                        fig_yscale='linear'
+                )
+            
+            SSE_s.append(SSE_dict['SSE_sum_normalized_casewise'][0])
+        else:
+            SSE_s.append(None)
+
+            # print(SSE_dict)
 
         # print(level)
         # print(f'N_res = {numres}')
@@ -1308,7 +1494,9 @@ def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
         
         N_res_s.append(numres)
         test_pass.append(pass_test)
-        chi2_s.append(sum(cur_ch_dict['chi2_stat']))
+        chi2_s.append(sum(cur_ch_dict['chi2']))
+
+        chi2_stat_s.append(cur_ch_dict['chi2_stat'])
         
         # aicc_s.append(sum(cur_ch_dict['aicc']))
         # bicc_s.append(sum(cur_ch_dict['bicc']))
@@ -1319,7 +1507,6 @@ def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
         NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
         N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
 
-
         # levels.append(level)
         # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
         # N_ress.append(numres)
@@ -1327,13 +1514,16 @@ def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
 
     # combine to one DataFrame
     table_df = pd.DataFrame.from_dict({
+        'AT': is_true,
         'N_res': N_res_s,
         'N_res_joint_LL': N_res_joint_LL,
         'passed': test_pass,
         'sum_chi2': chi2_s,
+        'chi2_s': chi2_stat_s,
+        'SSE': SSE_s,
         'sum_NLLW': NLLW_s,
         'AICc': aicc_s,
-        'BIC': bicc_s
+        'BIC': bicc_s,
     })
 
     # calculating deltas in BIC and AICc
@@ -1343,3 +1533,21 @@ def create_solutions_comparison_table_from_hist(hist, #: eliminator_OUTput,
     table_df['delta_chi2_best'] = table_df['sum_chi2'] - table_df['sum_chi2'].min()
 
     return table_df
+
+
+# def imitate_hist_for_true_solution():
+#     """
+#     creating an elim history object based on one ladder - just for future comparison
+#     """
+
+#     el_out = eliminator_OUTput(
+#             ladder_OUT = ladder_OUT,
+#             ladder_IN = ladder_IN,
+#             elimination_history= {
+
+#             },
+#             success = True,
+#             elim_tot_time = -np.inf
+#             )
+
+#     return el_out

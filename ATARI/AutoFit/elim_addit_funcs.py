@@ -550,8 +550,10 @@ def set_varying_fixed_params(ladder_df: pd.DataFrame,
 
     # Assign values from vary_list to the specified columns
     columns_to_set = ['varyE', 'varyGg', 'varyGn1']
+    
     for col, value in zip(columns_to_set, vary_list):
-        ladder_df[col] = value
+        # ladder_df[col] = value
+        ladder_df.loc[:, col] = value
 
     return ladder_df
 
@@ -1423,6 +1425,9 @@ def create_solutions_comparison_table_from_hist(hist,
     chi2_s = []
     chi2_stat_s = []
 
+    OF_alt1 = []
+    OF_alt2 = []
+
     aicc_s = []
     bicc_s = []
     N_res_s = []
@@ -1507,6 +1512,9 @@ def create_solutions_comparison_table_from_hist(hist,
         NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
         N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
 
+        OF_alt1.append(sum(cur_ch_dict['chi2'])+2 * sum(cur_ch_dict['NLLW'].values()))
+        OF_alt2.append(cur_ch_dict['aicc_entire_ds'] + sum(cur_ch_dict['NLLW'].values()) )
+
         # levels.append(level)
         # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
         # N_ress.append(numres)
@@ -1522,6 +1530,8 @@ def create_solutions_comparison_table_from_hist(hist,
         'chi2_s': chi2_stat_s,
         'SSE': SSE_s,
         'sum_NLLW': NLLW_s,
+        'OF_alt1': OF_alt1,
+        'OF_alt2': OF_alt2,
         'AICc': aicc_s,
         'BIC': bicc_s,
     })

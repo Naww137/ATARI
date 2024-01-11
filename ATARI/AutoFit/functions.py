@@ -60,7 +60,8 @@ def get_starting_feature_bank(energy_range,
     return get_resonance_ladder(Er, Gg, Gn, J_ID, varyE=varyE, varyGg=varyGg, varyGn1=varyGn1)
 
 
-def get_external_resonance_ladder(spin_groups, energy_range):
+def generate_external_resonance_ladder(spin_groups: list[dict], 
+                                  energy_range):
     E = []; Gg = []; Gn1 = []; J_ID = []
     for sg in spin_groups:
         E.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])
@@ -69,3 +70,17 @@ def get_external_resonance_ladder(spin_groups, energy_range):
         J_ID.extend([sg["J_ID"]]*2)
 
     return get_resonance_ladder(E, Gg, Gn1, J_ID, varyE=0, varyGg=1, varyGn1=1)
+
+
+def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
+    external_resonance_ladder = resonance_ladder.iloc[external_resonance_indices, :]
+    internal_resonance_ladder = copy(resonance_ladder)
+    internal_resonance_ladder.drop(index=external_resonance_indices, inplace=True)
+    return internal_resonance_ladder, external_resonance_ladder
+
+
+def concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder):
+    resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], ignore_index=True)
+    external_resonance_indices = list(range(len(external_resonance_ladder)))
+    return resonance_ladder, external_resonance_indices
+    

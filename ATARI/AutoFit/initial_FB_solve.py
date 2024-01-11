@@ -1,5 +1,5 @@
 from typing import Protocol
-from ATARI.AutoFit.functions import eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
+from ATARI.AutoFit.functions import * #eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
 import pandas as pd
@@ -233,31 +233,32 @@ class InitialFBOUT:
                  outs_fit_2: list[sammy_classes.SammyOutputData],
                  external_resonance_indices):
         
-        outs_fit_1.extend(outs_fit_2)
-        self.sammy_outs = outs_fit_1
+        self.sammy_outs_fit_1 = outs_fit_1
+        self.sammy_outs_fit_2 = outs_fit_2
+        # outs_fit_1.extend(outs_fit_2)
+        # self.sammy_outs = outs_fit_1
 
         samout_final = outs_fit_2[-1]
         final_par = copy(samout_final.par_post)
-        assert(isinstance(final_par, pd.DataFrame))
-        self.final_external_resonances = final_par.iloc[external_resonance_indices, :]
-        self.final_internal_resonances = final_par.drop(index = external_resonance_indices)
-
-        # self.final_internal_resonances = 
+        internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(final_par, external_resonance_indices)
+        self.final_internal_resonances = internal_resonance_ladder
+        self.final_external_resonances = external_resonance_indices
+        self.final_resonace_ladder = final_par
 
     
-    @property
-    def chi2(self):
-        chi2_list = []
-        for samout in self.sammy_outs:
-            chi2_list.append(np.sum(samout.chi2n_post))
-        return chi2_list
+    # @property
+    # def chi2(self):
+    #     chi2_list = []
+    #     for samout in self.sammy_outs:
+    #         chi2_list.append(np.sum(samout.chi2n_post))
+    #     return chi2_list
 
-    @property
-    def N_res(self):
-        N_res = []
-        for samout in self.sammy_outs:
-            N_res.append(len(samout.par_post))
-        return N_res
+    # @property
+    # def N_res(self):
+    #     N_res = []
+    #     for samout in self.sammy_outs:
+    #         N_res.append(len(samout.par_post))
+    #     return N_res
 
 
 class InitialFB:
@@ -298,12 +299,10 @@ class InitialFB:
     
         ### setup external resonances
         if self.options.external_resonances:
-            external_resonance_ladder = get_external_resonance_ladder(spin_groups, energy_range)
-            external_resonance_indices = list(range(0,len(external_resonance_ladder)))
+            external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range)
         else:
             external_resonance_ladder = pd.DataFrame()
-            external_resonance_indices = []
-        initial_resonance_ladder = pd.concat([external_resonance_ladder, initial_resonance_ladder], ignore_index=True)
+        initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
 
         ### setup sammy inp
         sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -328,8 +327,7 @@ class InitialFB:
 
         ### Fit 1 on Gn only
         print("========================================\n\tFIT 1\n========================================")
-        outs_fit_1 = self.fit_and_eliminate(rto,
-                                             sammyINPyw)
+        outs_fit_1 = self.fit_and_eliminate(rto, sammyINPyw, external_resonance_indices)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
         reslad_1 = copy(outs_fit_1[-1].par_post)
@@ -337,19 +335,16 @@ class InitialFB:
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
-        external_resonance_ladder = reslad_1.iloc[external_resonance_indices, :]
-        reslad_1.drop(index=external_resonance_indices, inplace=True)
+        internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
         if self.options.fit_Gg:
-            reslad_1 = update_vary_resonance_ladder(reslad_1, varyE=1, varyGg=1, varyGn1=1)
+            internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, varyE=1, varyGg=1, varyGn1=1)
         else:
-            reslad_1 = update_vary_resonance_ladder(reslad_1, varyE=1, varyGg=0, varyGn1=1)
-        reslad_1 = pd.concat([external_resonance_ladder, reslad_1], ignore_index=True)
+            internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, varyE=1, varyGg=0, varyGn1=1)
+        reslad_1, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder)
         sammyINPyw.resonance_ladder = reslad_1
 
-        outs_fit_2 = self.fit_and_eliminate(rto,
-                                             sammyINPyw)
+        outs_fit_2 = self.fit_and_eliminate(rto,sammyINPyw,external_resonance_indices)
         
-
         return InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
     
 
@@ -359,29 +354,30 @@ class InitialFB:
     def fit_and_eliminate(self, 
                rto,
                sammyINPyw,
+               external_resonance_indices
                ):
         
-        print(f"Initial solve from {len(sammyINPyw.resonance_ladder)} resonance features\n")
+        print(f"Initial solve from {len(sammyINPyw.resonance_ladder)-len(external_resonance_indices)} resonance features\n")
         sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
         outs = [sammyOUT_fit]
 
         if self.options.width_elimination:
             eliminating = True
             while eliminating:
-                return_resonance_ladder, fraction_eliminated = eliminate_small_Gn(sammyOUT_fit.par_post, self.options.Gn_threshold)
+                internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
+                resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
                     eliminating = False
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
                         sammyINPyw.step_threshold *= 0.1
                     print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neuton width")
-                    print(f"Resolving with {len(return_resonance_ladder)} resonance features\n----------------------------------------\n")
-                    sammyINPyw.resonance_ladder = return_resonance_ladder
+                    print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
+                    sammyINPyw.resonance_ladder = resonance_ladder
                     sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
                     outs.append(sammyOUT_fit)
             print(f"\nComplete after no neutron width features below threshold\n")
-            
-        # self.fit_Gn_steps = outs
 
         return outs
     

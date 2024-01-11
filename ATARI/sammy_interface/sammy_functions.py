@@ -845,11 +845,17 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list):
             f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
         f.write("################# read chi2 #######################\n#\n")
         for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
+            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter0.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
             f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
         f.write("""\necho "$1""")
         for ds in dataset_titles:
             f.write(f" $chi2_string_{ds}")
+        f.write(""""\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $ndat_string_{ds}")
         f.write(""""\n""")
     
     cov=""
@@ -957,9 +963,11 @@ def run_YWY0_and_get_chi2(rundir, step):
                                 cwd=os.path.realpath(rundir),
                                 capture_output=True, text=True, timeout=60*10
                                 )
-    i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-2].split()]
+    i_ndats = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-2].split()]
+    i=i_ndats[0]; ndats=i_ndats[1:]
+    i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-3].split()]
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
-    return i, [c for c in chi2s]+[np.sum(chi2s)]
+    return i, [c for c in chi2s]+[np.sum(chi2s), np.sum(chi2s)/np.sum(ndats)]
 
 
 def update_fudge_in_parfile(rundir, step, fudge):
@@ -981,7 +989,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
     if sammyRTO.Print:
-        print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
+        print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:

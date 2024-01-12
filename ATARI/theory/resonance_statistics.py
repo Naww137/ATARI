@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import eigvalsh_tridiagonal
-
+from typing import Union
 from scipy.stats.distributions import chi2
 
 
@@ -32,8 +32,19 @@ def make_res_par_avg(J_ID, D_avg, Gn_avg, n_dof, Gg_avg, g_dof, print):
 
     return res_par_avg
 
+def wigner_LL(resonance_levels  : Union[np.ndarray, list], 
+              average_spacing   : float                    ) -> float:
+    
+    Di = np.diff(resonance_levels)
+    probs = wigner_PDF(Di, average_spacing)
+    return np.sum(np.log(probs))
 
 
+def width_LL(resonance_widths   : Union[np.ndarray, list],
+                  average_width : float,
+                  dof           :float                      ) -> float:
+    probs = chisquare_PDF(resonance_widths, dof, average_width)
+    return np.sum(np.log(probs))
 
 
 # =====================================================================
@@ -430,9 +441,9 @@ def chisquare_PDF(x, DOF, avg_reduced_width_square):
     >>> resonance_statistics.chisquare_PDF(np.array([1.0, 2.5, 3.0]), 2, 1)
     array([0.30326533, 0.1432524 , 0.11156508])
     """
-    x = x/avg_reduced_width_square
+    x = x/avg_reduced_width_square*DOF
     y = chi2.pdf(x, DOF)
-    y_norm = y/avg_reduced_width_square
+    y_norm = y/avg_reduced_width_square*DOF
     return y_norm
 
 

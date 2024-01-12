@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from copy import copy
+from ATARI.theory.resonance_statistics import wigner_LL, width_LL
+
 
 
 
@@ -84,3 +86,24 @@ def concat_external_resonance_ladder(internal_resonance_ladder, external_resonan
     external_resonance_indices = list(range(len(external_resonance_ladder)))
     return resonance_ladder, external_resonance_indices
     
+
+def get_LL_by_parameter(ladder, 
+                        spin_groups 
+                        ):
+
+    LL_bypar_bysg = []
+    for sg in ladder.groupby("J_ID"):
+
+        for key, val in spin_groups.items():
+            if float(val['J_ID']) == sg[0]:
+                sg_key = key
+
+        LLw = wigner_LL(sg[1].E, spin_groups[sg_key]['<D>'])
+        LL_Gg = width_LL(sg[1].Gg, spin_groups[sg_key]['<Gg>'], spin_groups[sg_key]['g_dof'])
+        LL_Gn = width_LL(sg[1].Gn1, spin_groups[sg_key]['<Gn>'], spin_groups[sg_key]['n_dof'])
+        LL_bypar_bysg.append([LLw, LL_Gg, LL_Gn])
+    
+    LL_bypar_bysg = np.array(LL_bypar_bysg)
+    LL_bypar = np.sum(LL_bypar_bysg, axis=0)
+
+    return LL_bypar

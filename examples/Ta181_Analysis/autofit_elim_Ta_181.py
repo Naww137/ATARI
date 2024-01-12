@@ -55,7 +55,7 @@ fig_size = (10,6)
 showfigures = False # show figures and block script execution
 
 Gn_thr = 0.01
-N_red = 50 # number of resonances to keep after the initial autofit
+N_red = 40 # number of resonances to keep after the initial autofit
 delta_E = 10 # eV - delta in energy for selection of side resonances from initial dataframe
 
 energy_range_all = [202, 227]
@@ -314,12 +314,12 @@ if (showfigures):
 # ## Fit from ENDF or JEFF
 
 # %%
-sammyRTO = sammy_classes.SammyRunTimeOptions(#'/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
+sammyRTO = sammy_classes.SammyRunTimeOptions(
                             sammyexe=settings['path_to_SAMMY_exe'],
                             options= {"Print"   :   True,
                               "bayes"   :   False,
                               "keep_runDIR"     : True,
-                              "sammy_runDIR": os.path.join(current_dir, 'sammy_rundir_py'),
+                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
                               })
 
 matnum = 7328
@@ -406,10 +406,11 @@ Ta_pair.add_spin_group(Jpi='4.0',
 
 rto = sammy_classes.SammyRunTimeOptions(
     sammyexe=settings['path_to_SAMMY_exe'],
-                             options = {"Print"   :   True,
-                              "bayes"   :   True,
-                              "keep_runDIR"     : True
-                              })
+    options = {"Print"   :   True,
+                "bayes"   :   True,
+                "keep_runDIR"     : True,
+                "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
+                })
 
 
 sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -517,7 +518,8 @@ sammy_rto_fit = sammy_classes.SammyRunTimeOptions(
     sammyexe=settings['path_to_SAMMY_exe'],
                              options = {"Print"   :   True,
                               "bayes"   :   True,
-                              "keep_runDIR"     : True
+                              "keep_runDIR"     : True,
+                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
                               })
 
 

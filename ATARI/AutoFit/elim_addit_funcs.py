@@ -19,6 +19,9 @@ from ATARI.sammy_interface.sammy_functions import run_sammy
 import os
 import pickle
 import copy
+import uuid
+
+from datetime import datetime
 
 from matplotlib.pyplot import *
 from matplotlib import pyplot as plt
@@ -151,7 +154,9 @@ def characterize_sol(Ta_pair: Particle_Pair,
                      datasets: list,
                      experiments: list,
                      sol: SammyOutputData, # ! chi2 is calculated inside?
-                     covariance_data: list =[]
+                     covariance_data: list =[],
+                     energy_grid_2_compare_on: np.array = np.array([]),
+                     printout: bool  = True
                      ):
     
     output_dict = {}
@@ -169,8 +174,16 @@ def characterize_sol(Ta_pair: Particle_Pair,
     aggregated_exp_unc = []
 
     # for e-range and characterization
+    e_range = [np.inf, 0]
+    
+    e_range[0] = np.min(energy_grid_2_compare_on)
+    e_range[1] = np.max(energy_grid_2_compare_on)
 
-    e_range = [np.inf, 0] # min, max
+    if (printout):
+        print(f'Energy grid for analysis: {e_range}')
+
+        
+
 
     # chi2 & AIC calculation based on the datasets & fits
     for index, ds in enumerate(datasets):
@@ -183,10 +196,6 @@ def characterize_sol(Ta_pair: Particle_Pair,
             model_key = "theo_xs"
         else:
             raise ValueError()
-        
-        # energy range - select min and max energy from all datasets we have
-        e_range[0] = min(ds.E.min(), e_range[0])
-        e_range[1] = max(ds.E.max(), e_range[1])
 
         aic_wls, aicc_wls, bic_wls, bicc_wls, chi2, chi2_n = calc_AIC_AICc_BIC_BICc_by_fit(
             data = ds.exp, 
@@ -1264,6 +1273,24 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
 
     return SSE
 
+def calc_all_SF_gen_plot(
+        est_ladder: pd.DataFrame,
+        theo_ladder: pd.DataFrame,
+        Ta_pair: Particle_Pair,
+        settings: dict,
+        energy_grid: np.array,
+        fig_size: tuple = (8,6),
+        calc_fig: bool = False,
+        fig_yscale: str = 'log'
+        ):
+    """Calculates strength function on the parameter using given ladders and energy region
+    """
+
+
+
+    SF_dict = {}
+
+    return SF_dict
 
 def calc_all_SSE_gen_XS_plot(
         est_ladder: pd.DataFrame,
@@ -1412,7 +1439,7 @@ def create_solutions_comparison_table_from_hist(hist,
                      covariance_data: list =[],
                      true_chars: SammyOutputData = None,
                      settings: dict = {},
-                     energy_grid_2_compare_on: np.array = np.array([0])
+                     energy_grid_2_compare_on: np.array = np.array([])
                     ):
 
     # table for analysis of the models - produce chi2
@@ -1466,8 +1493,9 @@ def create_solutions_comparison_table_from_hist(hist,
         is_true.append(hist.elimination_history[level]['assumed_true'])
 
 
-        # SSE
+        # SSE & strength funcs?
         if (true_chars is not None):
+            
             df_est, df_theo, resid_matrix, SSE_dict, xs_figure = calc_all_SSE_gen_XS_plot(
                         est_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post,
                         theo_ladder = true_chars.par_post,
@@ -1481,6 +1509,11 @@ def create_solutions_comparison_table_from_hist(hist,
                 )
             
             SSE_s.append(SSE_dict['SSE_sum_normalized_casewise'][0])
+
+            # TODO: strength funcs calculation & fig production
+
+            # end strength funcs calculation & fig production
+
         else:
             SSE_s.append(None)
 
@@ -1494,7 +1527,8 @@ def create_solutions_comparison_table_from_hist(hist,
                         datasets = datasets,
                         experiments = experiments,
                         sol = hist.elimination_history[level]['selected_ladder_chars'],
-                        covariance_data = covariance_data
+                        covariance_data = covariance_data,
+                        energy_grid_2_compare_on = energy_grid_2_compare_on
                         )
         
         N_res_s.append(numres)
@@ -1545,19 +1579,25 @@ def create_solutions_comparison_table_from_hist(hist,
     return table_df
 
 
-# def imitate_hist_for_true_solution():
-#     """
-#     creating an elim history object based on one ladder - just for future comparison
-#     """
 
-#     el_out = eliminator_OUTput(
-#             ladder_OUT = ladder_OUT,
-#             ladder_IN = ladder_IN,
-#             elimination_history= {
+def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, 
+                                    case_id: int = None, 
+                                    addit_str: str = ''):
 
-#             },
-#             success = True,
-#             elim_tot_time = -np.inf
-#             )
+    if not os.path.exists(path_to_sammy_temps):
+        os.mkdir(path_to_sammy_temps)
 
-#     return el_out
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+    # Combine timestamp and random characters
+    unique_string = timestamp + str(uuid.uuid4())
+    
+    # Truncate the string to 100 characters
+    unique_string = unique_string[:100]
+
+    if (case_id is not None):
+        sammy_rundirname = path_to_sammy_temps+'SAMMY_RD_'+addit_str+'_'+str(case_id)+'_'+unique_string+'/'
+    else:
+        sammy_rundirname = path_to_sammy_temps+'SAMMY_RD_'+addit_str+'_'+unique_string+'/'
+
+    return sammy_rundirname

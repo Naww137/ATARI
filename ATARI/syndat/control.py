@@ -28,7 +28,7 @@ class Syndat_Control:
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
-        self.options = options
+        self.options = deepcopy(options)
 
         # self.clear_samples()
 
@@ -89,7 +89,7 @@ class Syndat_Control:
                 self.particle_pair.sample_resonance_ladder()
                 par_true = self.particle_pair.resonance_ladder
             
-            ### sample correlated model parameters - need to pass to generate_true_exp and generate_true_raw_obs
+            ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
             true_parameters = {}
 
             ### generate true experimental objects with sammy or just take pw_true arguement

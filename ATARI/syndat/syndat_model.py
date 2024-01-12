@@ -73,7 +73,7 @@ class Syndat_Model:
         if reductive_measurement_model is not None:
             self.reductive_measurement_model = reductive_measurement_model
         if options is not None:
-            self.options = options
+            self.options = deepcopy(options)
 
         ### some convenient definitions
         self.title = title
@@ -205,19 +205,9 @@ class Syndat_Model:
 
     def generate_raw_observables(self, pw_true, true_model_parameters):
 
-        ### define raw data attribute as true_df
-        # self.raw_data = deepcopy(pw_true)
-
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
         true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
         self.generative_measurement_model.true_model_parameters = true_model_parameters
-        
-        # ### sample a realization of the true, true-underlying open count spectra
-        # if self.options.sampleTNCS:
-        #     self.true_neutron_spectrum = sample_true_neutron_spectrum(self.neutron_spectrum)
-        # else:
-        #     self.true_neutron_spectrum = deepcopy(self.neutron_spectrum)
-
 
         ### generate raw count data from generative reduction model
         self.raw_data = self.generative_measurement_model.generate_raw_data(pw_true, 

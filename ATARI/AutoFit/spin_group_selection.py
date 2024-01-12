@@ -1,5 +1,5 @@
 from typing import Protocol
-from ATARI.AutoFit.functions import get_parameter_grid, get_resonance_ladder, eliminate_small_Gn, update_vary_resonance_ladder
+from ATARI.AutoFit.functions import * #get_parameter_grid, get_resonance_ladder, eliminate_small_Gn, update_vary_resonance_ladder
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
 import pandas as pd
@@ -132,7 +132,7 @@ class SpinSelect:
                             experiments,
                             covariance_data,
                             sammyRTO,
-                            fixed_resonances_indices):
+                            external_resonance_indices):
         
         # model_Ns = [len(model.par_post) for model in models]
         out = SpinSelectOUT()
@@ -147,7 +147,7 @@ class SpinSelect:
                                                                 experiments,
                                                                 covariance_data,
                                                                 sammyRTO, #sammy_rto_fit,
-                                                                fixed_resonances_indices = fixed_resonances_indices)
+                                                                external_resonance_indices = external_resonance_indices)
             out.add_model(N, all_outs, leading_model)
 
         return out
@@ -161,7 +161,7 @@ class SpinSelect:
                       experiments,
                       covariance_data,
                       sammyRTO,
-                      fixed_resonances_indices=[]):
+                      external_resonance_indices=[]):
 
 
         sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -184,22 +184,24 @@ class SpinSelect:
             initial_parameter_uncertainty = self.options.LevMarV0
             )
 
-        in_window_df = copy(starting_ladder)
-        fixed_resonances_df = in_window_df.iloc[fixed_resonances_indices, :]
-        in_window_df.drop(index = fixed_resonances_indices, inplace=True)
-
-        possible_dfs = get_all_resonance_ladder_combinations(possible_J_ID, in_window_df)
+        # in_window_df = copy(starting_ladder)
+        # fixed_resonances_df = in_window_df.iloc[fixed_resonances_indices, :]
+        # in_window_df.drop(index = fixed_resonances_indices, inplace=True)
+        internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(starting_ladder, external_resonance_indices)
+        possible_dfs = get_all_resonance_ladder_combinations(possible_J_ID, internal_resonance_ladder)
 
         leading_model = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
-        leading_chi2 = leading_model.chi2n_post
+        leading_chi2 = leading_model.chi2_post
 
         all_outs = []
         for each_df in possible_dfs:
-            sammyINPyw.resonance_ladder = pd.concat([each_df, fixed_resonances_df])
+            # sammyINPyw.resonance_ladder = pd.concat([each_df, fixed_resonances_df])
+            resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(each_df, external_resonance_ladder)
+            sammyINPyw.resonance_ladder = resonance_ladder
             sammyOUT_temp = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
             all_outs.append(sammyOUT_temp)
-            if np.sum(sammyOUT_temp.chi2n_post) < np.sum(leading_chi2):
-                leading_chi2 = sammyOUT_temp.chi2n_post
+            if np.sum(sammyOUT_temp.chi2_post) < np.sum(leading_chi2):
+                leading_chi2 = sammyOUT_temp.chi2_post
                 leading_model = sammyOUT_temp
             else:
                 pass

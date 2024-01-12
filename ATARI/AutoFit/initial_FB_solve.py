@@ -242,23 +242,30 @@ class InitialFBOUT:
         final_par = copy(samout_final.par_post)
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(final_par, external_resonance_indices)
         self.final_internal_resonances = internal_resonance_ladder
-        self.final_external_resonances = external_resonance_indices
+        self.final_external_resonances = external_resonance_ladder
+        self.final_external_resonance_indices = external_resonance_indices
         self.final_resonace_ladder = final_par
 
     
-    # @property
-    # def chi2(self):
-    #     chi2_list = []
-    #     for samout in self.sammy_outs:
-    #         chi2_list.append(np.sum(samout.chi2n_post))
-    #     return chi2_list
+    @property
+    def chi2_all(self):
+        chi2_list = []
+        for samout in self.sammy_outs_fit_1:
+            chi2_list.append(np.sum(samout.chi2_post))
+        for samout in self.sammy_outs_fit_2:
+            chi2_list.append(np.sum(samout.chi2_post))
+        return chi2_list
 
-    # @property
-    # def N_res(self):
-    #     N_res = []
-    #     for samout in self.sammy_outs:
-    #         N_res.append(len(samout.par_post))
-    #     return N_res
+    @property
+    def Nres_all(self):
+        N_res = []
+        for samout in self.sammy_outs_fit_1:
+            N_res.append(len(samout.par_post))
+        for samout in self.sammy_outs_fit_2:
+            N_res.append(len(samout.par_post))
+        return N_res
+
+
 
 
 class InitialFB:

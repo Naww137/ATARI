@@ -175,7 +175,7 @@ def characterize_sol(Ta_pair: Particle_Pair,
 
     # for e-range and characterization
     e_range = [np.inf, 0]
-    
+
     e_range[0] = np.min(energy_grid_2_compare_on)
     e_range[1] = np.max(energy_grid_2_compare_on)
 
@@ -1373,6 +1373,7 @@ def calc_all_SSE_gen_XS_plot(
         # plt.xlim(208.5,216)
         # plt.ylim(6,600)
         figure.tight_layout()
+    
     
     else:
         figure = False

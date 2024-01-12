@@ -1003,7 +1003,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     fudge = min(fudge,sammyINPyw.maxF)
                 else:
                     if sammyRTO.Print:
-                        print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum']}")
+                        print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
 
                     while True:
                         fudge /= sammyINPyw.LevMarVd

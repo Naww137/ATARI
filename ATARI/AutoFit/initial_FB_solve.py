@@ -285,7 +285,8 @@ class InitialFB:
             datasets,
             experiments,
             covariance_data,
-            sammyRTO
+            sammyRTO,
+            external_resonance_ladder = pd.DataFrame()
             ):
         
         rto = copy(sammyRTO)
@@ -306,7 +307,10 @@ class InitialFB:
     
         ### setup external resonances
         if self.options.external_resonances:
-            external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range)
+            if external_resonance_ladder.empty:
+                external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range)
+            else:
+                pass
         else:
             external_resonance_ladder = pd.DataFrame()
         initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)

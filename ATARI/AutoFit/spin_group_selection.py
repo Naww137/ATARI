@@ -155,7 +155,7 @@ class SpinSelectOUT:
     def add_model(self, N, spin_models, leading_model):
         self.history[N] = {"all_spin_models": spin_models,
                            "leading_model"  : leading_model,
-                           "all_chi2n"      : [np.sum(each.chi2n_post) for each in spin_models]}
+                           "all_chi2n"      : [np.sum(each.chi2_post)/np.sum([len(i) for i in each.pw]) for each in spin_models]}
 
 
 

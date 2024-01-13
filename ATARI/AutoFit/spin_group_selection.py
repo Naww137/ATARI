@@ -18,6 +18,22 @@ def get_all_resonance_ladder_combinations(possible_J_ID, df):
     return dfs
 
 
+def filter_resonance_ladders_by_LL_of_parameters(all_possible_reslad, 
+                                                 spin_groups,
+                                                 max_ladders,
+                                                 include = [1,1,1]):
+    LLs = []
+    for ladder in all_possible_reslad:
+        LL_par = get_LL_by_parameter(ladder, spin_groups)
+        LL = np.sum(LL_par*include)
+        LLs.append(LL)
+    LLs = np.array(LLs)
+    sort_index = np.argsort(LLs)
+    max_num = min( max_ladders, len(sort_index))
+    indices_to_evaluate = sort_index[-max_num:]
+    prioritized_ladders = [all_possible_reslad[i] for i in indices_to_evaluate]
+
+    return prioritized_ladders
 
 
 
@@ -31,6 +47,10 @@ class SpinSelectOPT:
         self._LevMarV = 2
         self._LevMarVd = 5
         self._LevMarV0 = 0.1
+
+        self._filter_ladders_by_LL = False
+        self._max_ladders = 50
+        self._LL_parameters = ["E", "Gg", "Gn"]
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -94,6 +114,30 @@ class SpinSelectOPT:
     @LevMarV0.setter
     def LevMarV0(self, LevMarV0):
         self._LevMarV0 = LevMarV0
+
+    @property
+    def filter_ladders_by_LL(self):
+        """Filter possible spin group combinations by Log-Likelihood of parameters, by default False"""
+        return self._filter_ladders_by_LL
+    @filter_ladders_by_LL.setter
+    def filter_ladders_by_LL(self, filter_ladders_by_LL):
+        self._filter_ladders_by_LL = filter_ladders_by_LL
+
+    @property
+    def max_ladders(self):
+        """if filtering possible spin group combinations, this number of top performing assignments will be used, by default 50"""
+        return self._max_ladders
+    @max_ladders.setter
+    def max_ladders(self, max_ladders):
+        self._max_ladders = max_ladders
+
+    @property
+    def LL_parameters(self, t = False):
+        """if filtering possible spin group combinations based on LL, which parameters will be used, by default ["E", "Gg", "Gn"]"""
+        return self._LL_parameters
+    @LL_parameters.setter
+    def LL_parameters(self, LL_parameters):
+        self._LL_parameters = LL_parameters
 
 
 
@@ -189,6 +233,10 @@ class SpinSelect:
         # in_window_df.drop(index = fixed_resonances_indices, inplace=True)
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(starting_ladder, external_resonance_indices)
         possible_dfs = get_all_resonance_ladder_combinations(possible_J_ID, internal_resonance_ladder)
+
+        if self.options.filter_ladders_by_LL:
+            include = [1 if par in self.options.LL_parameters else 0 for par in ["E","Gg","Gn"]]
+            possible_dfs = filter_resonance_ladders_by_LL_of_parameters(possible_dfs, particle_pair.spin_groups, self.options.max_ladders, include = include)
 
         leading_model = sammy_functions.run_sammy_YW(sammyINPyw, sammyRTO)
         leading_chi2 = leading_model.chi2_post

@@ -34,7 +34,7 @@ def make_res_par_avg(J_ID, D_avg, Gn_avg, n_dof, Gg_avg, g_dof, print):
 
 def wigner_LL(resonance_levels  : Union[np.ndarray, list], 
               average_spacing   : float                    ) -> float:
-    
+    resonance_levels = np.sort(list(resonance_levels))
     Di = np.diff(resonance_levels)
     probs = wigner_PDF(Di, average_spacing)
     return np.sum(np.log(probs))

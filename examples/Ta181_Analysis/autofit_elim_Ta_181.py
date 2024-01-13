@@ -18,6 +18,8 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.theory.experimental import e_to_t, t_to_e
 
+from ATARI.utils.misc import fine_egrid
+
 from copy import copy
 
 from ATARI.utils.atario import fill_resonance_ladder
@@ -33,7 +35,6 @@ print("Start date and time =", start_date)
 # 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 print(f'Current directory: {current_dir}')
-
 
 # %%
 # all options to run! 
@@ -58,7 +59,14 @@ showfigures = False # show figures and block script execution
 starting_Gn_coeff = 10 # to Gn01
 
 Gn_thr = 0.01
-N_red = 10 # number of resonances to keep after the initial autofit
+N_red = 15 # number of resonances to keep after the initial autofit
+
+# number of resonances for autofit (without size)
+# int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
+N_res_autofit = 20 # for one spin group
+
+
+fit_all_spin_groups = False
 
 energy_range_all = [202, 227]
 
@@ -72,12 +80,9 @@ energy_range_all = [202, 227]
 
 chi2_allowed = 0
 start_deep_fit_from = 15 # excluding the side resonances provided
-fit_all_spin_groups = False
 greedy_mode = True
 
-
 # TODO: define the start_deep_fit_from based on the prob. of having such number of resonances
-
 
 
 
@@ -448,10 +453,12 @@ print(list(Ta_pair.spin_groups.keys()))
 
 # dataset size
 sum_points = 0 
+print(f'Dataset sizes: {len(datasets)}')
+
 for index,el in enumerate(datasets):
     sum_points += el.shape[0]
+    print(f'{experiments[index].title} - {el.shape[0]}')
 
-print(f'Datasets: {len(datasets)}')
 print(f'Num of points: {sum_points}')
 
 # %%
@@ -463,27 +470,10 @@ sammyOUT_SFJ = sammy_functions.run_sammy_YW(sammyINPyw, rto)
 
 
 # %%
-# prior_lsts = lsts
-def printout_chi2(sammyOUT: sammy_classes.SammyOutputData, 
-                       addstr :str = 'Solution chi2 values'):
-    print(f'{addstr}')
-    # print('Chi2_n:')
-    # print('\t Prior:')
-    # print('\t', sammyOUT.chi2n, np.sum(sammyOUT.chi2n))
-    # print('\t Posterior:')
-    # print('\t', sammyOUT.chi2n_post, np.sum(sammyOUT.chi2n_post))
 
-    print('Chi2:')
-    print('\t Prior:')
-    print('\t', sammyOUT.chi2, np.sum(sammyOUT.chi2))
-    print('\t Posterior:')
-    print('\t', sammyOUT.chi2_post, np.sum(sammyOUT.chi2_post))
-
-printout_chi2(sammyOUT_SFJ, 'JEFF')
+elim_addit_funcs.printout_chi2(sammyOUT_SFJ, 'JEFF')
 
 # %%
-# fig2 = plot(datasets, experiments, fits=sammyOUT.pw_post, priors=sammyOUT.pw)
-# fig2.tight_layout()
 
 # plotting using modified func
 
@@ -514,8 +504,6 @@ fig2.savefig(fname=f_name_to_save)
 if (showfigures):
     show()
 
-# %%
-sammyOUT_SFJ.par_post
 
 # %%
 # utilizing the autofit from initial FB
@@ -530,8 +518,6 @@ sammy_rto_fit = sammy_classes.SammyRunTimeOptions(
                               "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=settings['path_to_SAMMY_temps'])
                               })
 
-num_Elam = 10 # int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
-
 options = InitialFBOPT(Gn_threshold = Gn_thr,
                        iterations=2,
                        max_steps = 30,
@@ -539,7 +525,7 @@ options = InitialFBOPT(Gn_threshold = Gn_thr,
                        LevMarV0= 0.05,
                        fit_all_spin_groups = fit_all_spin_groups,
                        fit_Gg = True,
-                       num_Elam = num_Elam,
+                       num_Elam = N_res_autofit,
                        spin_group_keys = ['3.0'],
                        starting_Gn1_multiplier = starting_Gn_coeff,
                        starting_Gg_multiplier = 1.0,
@@ -557,7 +543,9 @@ outs = autofit_initial.fit(Ta_pair,
                                datasets,
                                experiments,
                                covariance_data,
-                               sammy_rto_fit)
+                               sammy_rto_fit,
+                               external_resonance_ladder = sel_jeff_side_res_df
+                               )
 
 IFB_end_time = time.time()
 
@@ -575,21 +563,23 @@ print(f'Fitting from IFB took: {elim_addit_funcs.format_time_2_str(IFB_end_time)
 
 # %%
 
-print(outs.sammy_outs_fit_2)
+# print(outs.sammy_outs_fit_2)
 
-printout_chi2(outs.sammy_outs_fit_2[-1], 'autofit final result')
-print('Posterior parameters:')
-print(outs.sammy_outs_fit_2[-1].par_post)
 
-print('Final ladder after autofit')
+elim_addit_funcs.printout_chi2(outs.sammy_outs_fit_1[0], 'autofit prior')
+elim_addit_funcs.printout_chi2(outs.sammy_outs_fit_2[-1], 'autofit posterior')
+
+print('Full Final ladder after autofit')
 print(outs.final_resonace_ladder)
+
+# print('Posterior parameters:')
+# print(outs.sammy_outs_fit_2[-1].par_post)
 
 print('External resonances:')
 print(outs.final_external_resonances)
+
 print('Internal resonances:')
 print(outs.final_internal_resonances)
-
-printout_chi2(outs.sammy_outs_fit_1[0], 'autofit prior')
 
 # %%
 # saving initial solution & chars
@@ -641,19 +631,17 @@ fig2.savefig(fname=f_name_to_save)
 
 #fig2.show()
 
-# %%
-print(final_fb_output.chi2)
-print(sum(final_fb_output.chi2))
-print(final_fb_output.chi2_post)
-print(sum(final_fb_output.chi2_post))
-print(f'N_res: {final_fb_output.par_post.shape[0]}')
+# # %%
+# print(final_fb_output.chi2)
+# print(sum(final_fb_output.chi2))
+# print(final_fb_output.chi2_post)
+# print(sum(final_fb_output.chi2_post))
+# print(f'N_res: {final_fb_output.par_post.shape[0]}')
 
 # %% [markdown]
 # ***A measure of error***
 
 # %%
-# run
-from ATARI.utils.misc import fine_egrid
 
 energy_grid = fine_egrid(energy = energy_range_all)
 
@@ -682,13 +670,10 @@ xs_figure.savefig(fname=f_name_to_save)
 start_ladder = outs.final_internal_resonances # internal resonances from initial FB
 
 
-# just to make sure we have everything...
 # start_ladder = fill_sammy_ladder(df = start_ladder,
 #                                        particle_pair=Ta_pair,
 #                                        vary_parm = False,
 #                                        J_ID = None)
-
-# assert isinstance(start_ladder, pd.DataFrame)
 
 print('Start ladder without sides:')
 print(start_ladder)
@@ -697,9 +682,8 @@ print(start_ladder)
 # print(start_ladder.columns)
 
 # side resonances if needed, otherways - keep empty
-side_resonances_df = pd.DataFrame()
 
-# # take fron JEFF
+# # take from JEFF
 # side_resonances_df = elim_addit_funcs.find_side_res_df(
 #         initial_sol_df = sel_jeff_parameters,
 #         energy_region = energy_range_all,
@@ -710,13 +694,10 @@ side_resonances_df = pd.DataFrame()
 side_resonances_df = outs.final_external_resonances
 
 # enrich with all required columns
-
 side_resonances_df = elim_addit_funcs.set_varying_fixed_params(ladder_df=side_resonances_df,
                                                                vary_list=[0,1,1])
 
-# enriching it with all variables? Gn2, Gn3, varyGn2, varyGn3??
-print(side_resonances_df)
-
+## enriching it with all variables? Gn2, Gn3, varyGn2, varyGn3??
 # side_resonances_df = fill_sammy_ladder(df = side_resonances_df,
 #                                        particle_pair=Ta_pair,
 #                                        vary_parm = False,
@@ -735,7 +716,6 @@ print('Final ladder to eliminate from')
 print(start_ladder)
 print()
 print(start_ladder.columns)
-
 
 
 

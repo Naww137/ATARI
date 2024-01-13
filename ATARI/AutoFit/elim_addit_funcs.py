@@ -155,6 +155,58 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
     return total_NLLW, all_groups_NLLW
 
 
+# utilizing PT LL
+def calc_PT_LL_by_ladder(ladder_df: pd.DataFrame,
+                             Ta_pair: Particle_Pair,
+                             energy_grid: np.array = np.array([])):
+    
+    """
+    Calculating the -LL value for a given ladder, in a given window
+
+    using PT (chi2) for a given in Ta_pair dof:
+    
+    for each spin group listed in Ta_pair & returning a sum + dict by group
+    NOTE: only inside the provided window
+    """
+
+    all_groups_NLL_PT = {}
+
+    # select all spin groups listed in Ta_Pair
+    separate_j_ids, spin_gr_ids = extract_jids_and_keys(Ta_Pair=Ta_pair)
+
+    # Iterating through unique spin groups and their J_IDs
+    for j_id, sp_gr_id in zip(separate_j_ids, spin_gr_ids):
+        
+        # Access the specific spin group using the key
+        spin_group_data = Ta_pair.spin_groups[sp_gr_id]
+
+        # taking resonances from ladder only from one spin group by j_id
+        spin_gr_res = ladder_df[ladder_df['J_ID']==j_id]
+
+        if (len(energy_grid)>0):
+            # selecting values with energies between min & max in defined window
+            spin_gr_res = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
+        
+        # taking avg dist for current spin group
+        avg_val = spin_group_data['<Gn>']
+
+        # energy calculations
+        Gn1_values = spin_gr_res.Gn1.to_numpy()
+
+        current_gr_NLL_PT = - resonance_statistics.width_LL(resonance_widths=Gn1_values,
+                                           average_width=avg_val,
+                                           dof = spin_group_data['n_dof'])
+        
+
+        all_groups_NLL_PT[sp_gr_id] = current_gr_NLL_PT
+
+    total_NLL_PT = sum(all_groups_NLL_PT.values())
+    
+    return total_NLL_PT, all_groups_NLL_PT
+
+
+
+
 # calculation of AIC & all parameters of current solution
 
 def characterize_sol(Ta_pair: Particle_Pair,
@@ -260,9 +312,17 @@ def characterize_sol(Ta_pair: Particle_Pair,
 
     # Wigner - by spingroups
     NLLW, NLLW_gr = calc_Wigner_LL_by_ladder(ladder_df = sol.par_post,
-                             Ta_pair = Ta_pair)
+                             Ta_pair = Ta_pair,
+                             energy_grid=energy_grid_2_compare_on)
 
     output_dict['NLLW'] = NLLW_gr
+
+    # PT, Gn - by spingroups
+    LL_PT, NLL_PT_Gn1_gr = calc_PT_LL_by_ladder(ladder_df = sol.par_post,
+                             Ta_pair = Ta_pair,
+                             energy_grid=energy_grid_2_compare_on)
+    
+    output_dict['NLL_PT_Gn1'] = NLL_PT_Gn1_gr
 
     joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
                                                              e_range = e_range,
@@ -1461,6 +1521,7 @@ def create_solutions_comparison_table_from_hist(hist,
     is_true = []
     SSE_s = []
     NLLW_s = []
+    NLL_PT_Gn1 = []
     chi2_s = []
     chi2_stat_s = []
 
@@ -1556,6 +1617,11 @@ def create_solutions_comparison_table_from_hist(hist,
         bicc_s.append(cur_ch_dict['bic_entire_ds'])
 
         NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
+
+        NLL_PT_Gn1.append(sum(cur_ch_dict['NLL_PT_Gn1'].values()))
+
+
+
         N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
 
         OF_alt1.append(sum(cur_ch_dict['chi2'])+2 * sum(cur_ch_dict['NLLW'].values()))
@@ -1576,6 +1642,8 @@ def create_solutions_comparison_table_from_hist(hist,
         'chi2_s': chi2_stat_s,
         'SSE': SSE_s,
         'sum_NLLW': NLLW_s,
+        'sum_NLL_PT_Gn1': NLL_PT_Gn1,
+
         'OF_alt1': OF_alt1,
         'OF_alt2': OF_alt2,
         'AICc': aicc_s,
@@ -1613,3 +1681,15 @@ def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str,
         sammy_rundirname = path_to_sammy_temps+'SAMMY_RD_'+addit_str+'_'+unique_string+'/'
 
     return sammy_rundirname
+
+
+# prior_lsts = lsts
+def printout_chi2(sammyOUT: SammyOutputData, 
+                       addstr :str = 'Solution chi2 values'):
+    print(f'{addstr}')
+
+    print('Chi2:')
+    print('\t Prior:')
+    print('\t\t', sammyOUT.chi2, np.sum(sammyOUT.chi2))
+    print('\t Posterior:')
+    print('\t\t', sammyOUT.chi2_post, np.sum(sammyOUT.chi2_post))

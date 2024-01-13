@@ -89,10 +89,11 @@ def extract_jids_and_keys(Ta_Pair: Particle_Pair):
 
 
 def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
-                             Ta_pair: Particle_Pair):
+                             Ta_pair: Particle_Pair,
+                             energy_grid: np.array = np.array([])):
     
     """
-    Calculating the -LL value for a given ladder,
+    Calculating the -LL value for a given ladder, in a given window
 
     using Wigner PDF, defined as:
     wigner_PDF(x, avg_level_spacing)
@@ -102,6 +103,7 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
         TODO: why some normalization in a func?
 
     for each spin group listed in Ta_pair & returning a sum + dict by group
+    NOTE: only inside the provided window
     """
 
     all_groups_NLLW = {}
@@ -117,6 +119,10 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
 
         # taking resonances from ladder only from one spin group by j_id
         spin_gr_res = ladder_df[ladder_df['J_ID']==j_id]
+
+        if (len(energy_grid)>0):
+            # selecting values with energies between min & max in defined window
+            spin_gr_res = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
         
         # taking avg dist for current spin group
         avg_dist = spin_group_data['<D>']

@@ -53,12 +53,12 @@ if not os.path.exists(savefolder):
     print(f'Created folder: {savefolder}')
 
 fig_size = (10,6)
-showfigures = True # show figures and block script execution
+showfigures = False # show figures and block script execution
 
 starting_Gn_coeff = 10 # to Gn01
 
 Gn_thr = 0.01
-N_red = 25 # number of resonances to keep after the initial autofit
+N_red = 10 # number of resonances to keep after the initial autofit
 
 energy_range_all = [202, 227]
 
@@ -72,7 +72,7 @@ energy_range_all = [202, 227]
 
 chi2_allowed = 0
 start_deep_fit_from = 15 # excluding the side resonances provided
-fit_all_spin_groups = True
+fit_all_spin_groups = False
 greedy_mode = True
 
 
@@ -372,6 +372,7 @@ print(sel_jeff_parameters)
 
 print('Min & max E for ladder:')
 print(f'{sel_jeff_parameters.E.min()}..{sel_jeff_parameters.E.max()} eV')
+print(f'Selected energy range: {energy_range_all}')
 
 # testing reading from combined ladder
 start_ladder_main_vary_params, start_ladder_side_vary_params  = elim_addit_funcs.extract_res_var_params(ladder_df = sel_jeff_parameters,
@@ -466,11 +467,11 @@ sammyOUT_SFJ = sammy_functions.run_sammy_YW(sammyINPyw, rto)
 def printout_chi2(sammyOUT: sammy_classes.SammyOutputData, 
                        addstr :str = 'Solution chi2 values'):
     print(f'{addstr}')
-    print('Chi2_n:')
-    print('\t Prior:')
-    print('\t', sammyOUT.chi2n, np.sum(sammyOUT.chi2n))
-    print('\t Posterior:')
-    print('\t', sammyOUT.chi2n_post, np.sum(sammyOUT.chi2n_post))
+    # print('Chi2_n:')
+    # print('\t Prior:')
+    # print('\t', sammyOUT.chi2n, np.sum(sammyOUT.chi2n))
+    # print('\t Posterior:')
+    # print('\t', sammyOUT.chi2n_post, np.sum(sammyOUT.chi2n_post))
 
     print('Chi2:')
     print('\t Prior:')
@@ -529,7 +530,7 @@ sammy_rto_fit = sammy_classes.SammyRunTimeOptions(
                               "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=settings['path_to_SAMMY_temps'])
                               })
 
-num_Elam = int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
+num_Elam = 10 # int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
 
 options = InitialFBOPT(Gn_threshold = Gn_thr,
                        iterations=2,
@@ -790,8 +791,7 @@ elim_opts = chi2_eliminator_v2.elim_OPTs(
     interm_fit_step_thr = 0.01,
     start_fudge_for_deep_stage = 0.05,
     greedy_mode = greedy_mode,
-    start_deep_fit_from = start_deep_fit_from,
-    use_spin_shuffling = False,
+    start_deep_fit_from = start_deep_fit_from
 )
 
 # %%
@@ -806,7 +806,7 @@ print('*'*40)
 print()
 
 # %%
-hist = elimi.eliminate(ladder_df= start_ladder,
+hist = elimi.eliminate(ladder_df = start_ladder,
                        fixed_resonances_df = side_resonances_df)
 
 # %%

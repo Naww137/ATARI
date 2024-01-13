@@ -270,8 +270,7 @@ class eliminator_by_chi2:
             print(ladder)
             print('Side resonances used:')
             print(fixed_res_df)
-            print()
-            
+            print()            
             
 
         ### Start elimination
@@ -395,6 +394,7 @@ class eliminator_by_chi2:
                 if (self.rto.Print):
                     print()
                     print('Starting "deep" fitting of best initial guess by chi2...')
+                    print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}')
                     print()
 
                 posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
@@ -710,7 +710,7 @@ class eliminator_by_chi2:
 
             if (self.rto.Print):
                 print()
-                print(f'Intermediate fitting, deleted {j}, E_λ  = {row_removed["E"].item()}')
+                print(f'Intermediate fitting stage (IA = {self.options.interm_fit_max_iter}/{self.options.interm_fit_step_thr}), deleted {j}, E_λ  = {row_removed["E"].item()}')
                 print(f'\tΣχ²:\t{np.round(interm_step_chi2,4)}\tbase: {np.round(base_chi2,4)} | current best: {best_model_chi2}  ')
                 print(f'\t\t\t{np.round(benefit_chi2,4)}\t{sign}\t{delta_chi2_allowed}\t => \t {test_result}')
                 #print(f'\t\t\t{sol_fit_time_interm} sec for processing')

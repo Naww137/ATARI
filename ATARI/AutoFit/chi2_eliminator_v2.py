@@ -38,9 +38,6 @@ class elim_OPTs:
     chi2_allowed : float
         value of chi2 allowed difference when comparing 2 models
 
-    fixed_resonances_df: pd.Dataframe
-        dataframe with side resonances, fixed to track during elimination
-
     stop_at_chi2_thr: Bool
         Boolean value which tells to stop if during search of a models there was 
         no models that passed the chi2 test, if false - continue to delete resonances until we
@@ -70,11 +67,8 @@ class elim_OPTs:
         and select best of them - it will use first model of current branch that passed the test 
 
     start_deep_fit_from: int
-        this determines the number of resonances in a current level on a path from N->N-1 where deep fit start from (see default value) (TODO: not implemented yet)
-
-    use_spin_shuffling: bool
-        this determines whether shuffling of the spin-groups assignments should be used or not, starts from the same level as start_deep_fit_from (TODO: not implemented yet)
-
+        this determines the number of resonances in a current level on a path from N->N-1 where deep fit start from (see default value)
+   
     **kwargs : dict, optional
         Any keyword arguments are used to set attributes on the instance.
 
@@ -84,8 +78,7 @@ class elim_OPTs:
         # default values for all 
 
         self._chi2_allowed = kwargs.get('chi2_allowed', 0)
-        self._fixed_resonances_df = kwargs.get('fixed_resonances_df', pd.DataFrame())
-        
+                
         self._deep_fit_max_iter = kwargs.get('deep_fit_max_iter', 20)
         self._deep_fit_step_thr = kwargs.get('deep_fit_step_thr', 0.001)
 
@@ -99,8 +92,6 @@ class elim_OPTs:
         self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', True) # by default stops when didn't find the model that passed the test
         
         self._greedy_mode = kwargs.get('greedy_mode', False) # by default False  - search all solutions
-
-        self._use_spin_shuffling = kwargs.get('use_spin_shuffling', False)
 
         self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 10)
 
@@ -140,23 +131,7 @@ class elim_OPTs:
     @start_deep_fit_from.setter
     def start_deep_fit_from(self, start_deep_fit_from):
         self._start_deep_fit_from = start_deep_fit_from
-
-    # use spin shiffling for selection of best model on each level starting from start_deep_fit_from (greedy in time)
-    @property
-    def use_spin_shuffling(self):
-        return self._use_spin_shuffling
-    @use_spin_shuffling.setter
-    def use_spin_shuffling(self, use_spin_shuffling):
-        self._use_spin_shuffling = use_spin_shuffling
-
-    #side resonances (fixed in energy only)
-    @property 
-    def fixed_resonances_df(self):
-        return self._fixed_resonances_df
-    @fixed_resonances_df.setter
-    def fixed_resonances_df(self, fixed_resonances_df):
-        self._fixed_resonances_df = fixed_resonances_df
-
+    
     #deep fitting stage, start fudge value
     @property 
     def start_fudge_for_deep_stage(self):
@@ -238,9 +213,11 @@ class eliminator_by_chi2:
     def __init__(self, 
                  rto: SammyRunTimeOptions, 
                  sammyINPyw: SammyInputDataYW, 
-                 options: elim_OPTs):
+                 options: elim_OPTs,
+                 ):
         """
-        Initialize the class with all parameters specified, all obligatory
+        Initialize the class with all parameters specified
+
         """
 
         self.rto = rto
@@ -249,7 +226,8 @@ class eliminator_by_chi2:
 
 
     def eliminate(self, 
-                  ladder_df : pd.DataFrame = pd.DataFrame() 
+                  ladder_df : pd.DataFrame = pd.DataFrame(),
+                  fixed_resonances_df: pd.DataFrame = pd.DataFrame()
                   ) -> eliminator_OUTput: 
 
         """Main func to eliminate resonances from the input ladder that is in SammyINPyw.resonance_ladder """
@@ -259,18 +237,17 @@ class eliminator_by_chi2:
         delta_chi2_allowed = self.options.chi2_allowed
 
         interm_fit_max_iter = self.options.interm_fit_max_iter # allowed number of iterations for YW if no priors passes the test
-        interm_fit_step_thr = self.options.deep_fit_step_thr
+        interm_fit_step_thr = self.options.interm_fit_step_thr
 
         deep_fit_step_thr = self.options.deep_fit_step_thr # threshold for deep fitting stage
         deep_fit_max_iter = self.options.deep_fit_max_iter
 
-        fixed_res_df = self.options.fixed_resonances_df
+        fixed_res_df = fixed_resonances_df
 
         start_deep_fit_from = self.options.start_deep_fit_from
 
         greedy_mode = self.options.greedy_mode # to save time.. - just take first model that passes the test
-        use_spin_shuffling = self.options.use_spin_shuffling
-
+        
         # Initializing model history dictionary
         model_history = {}
 
@@ -289,16 +266,6 @@ class eliminator_by_chi2:
         # printout
         if (self.rto.Print):
             print('*'*40)
-            print('Elimination cycle printout enabled')
-            print('*'*40)
-            print()
-            print(f'\tChi2 thresold applied for model selection: {delta_chi2_allowed}')
-            print('\tStopping options:')
-            print(f'\tstop_at_chi2_thr: {self.options.stop_at_chi2_thr}')
-            print(f'\t"Greedy" mode: {greedy_mode}')
-            print(f'\tUse spin shuffling: {use_spin_shuffling}')
-            print(f'\tStarting deep fitting and/or reshuffling from N = {start_deep_fit_from} res. (excl. fixed side res.)')
-            print(f'')
             print('Input ladder:')
             print(ladder)
             print('Side resonances used:')

@@ -39,9 +39,10 @@ print(f'Current directory: {current_dir}')
 # all options to run! 
 settings = {
     'path_to_SAMMY_exe': '/home/fire/SAMMY/sammy/build/install/bin/sammy',
-    'path_to_SAMMY_temps': './sammy_temps/',
+    'path_to_SAMMY_temps': os.path.join(current_dir, './sammy_temps/'), # relative to current directory!
     'keep_runDIR_SAMMY': True,
     'shell_SAMMY': 'bash',
+    'running_path': current_dir
 }
 
 # folder where to save all
@@ -52,17 +53,19 @@ if not os.path.exists(savefolder):
     print(f'Created folder: {savefolder}')
 
 fig_size = (10,6)
-showfigures = False # show figures and block script execution
+showfigures = True # show figures and block script execution
+
+starting_Gn_coeff = 10 # to Gn01
 
 Gn_thr = 0.01
-N_red = 40 # number of resonances to keep after the initial autofit
-delta_E = 10 # eV - delta in energy for selection of side resonances from initial dataframe
+N_red = 25 # number of resonances to keep after the initial autofit
 
 energy_range_all = [202, 227]
-energy_range_all = [227, 252]
-energy_range_all = [252, 277]
-energy_range_all = [277, 302]
-energy_range_all = [302, 327]
+
+# energy_range_all = [227, 252]
+# energy_range_all = [252, 277]
+# energy_range_all = [277, 302]
+# energy_range_all = [302, 327]
 
 # energy_range_all = [201, 228]
 # energy_range_all = [201, 210]
@@ -72,6 +75,8 @@ start_deep_fit_from = 15 # excluding the side resonances provided
 fit_all_spin_groups = True
 greedy_mode = True
 
+
+# TODO: define the start_deep_fit_from based on the prob. of having such number of resonances
 
 
 
@@ -83,23 +88,23 @@ greedy_mode = True
 # %%
 ### Determine channel widths
 
-def get_chw_and_upperE(E, FP):
-    E = np.array(E)
-    tof = e_to_t(E, FP, True)
-    dt = np.diff(tof*1e6)
-    widths1, index1 = np.unique(np.round(dt, 4), return_index=True)
-    chw, Emax = np.flipud(widths1), np.flipud(E[index1])
-    strc = ''
-    stre = ''
-    for c,e in zip(chw, Emax):
-        strc += f"{c*1e3:.2f}, "
-        stre += f"{e:.2f}, "
-    return stre, strc
+# def get_chw_and_upperE(E, FP):
+#     E = np.array(E)
+#     tof = e_to_t(E, FP, True)
+#     dt = np.diff(tof*1e6)
+#     widths1, index1 = np.unique(np.round(dt, 4), return_index=True)
+#     chw, Emax = np.flipud(widths1), np.flipud(E[index1])
+#     strc = ''
+#     stre = ''
+#     for c,e in zip(chw, Emax):
+#         strc += f"{c*1e3:.2f}, "
+#         stre += f"{e:.2f}, "
+#     return stre, strc
 
-# Emax, chw = get_chw_and_upperE(transdat6.E, 100.14)
-# Emax, chw = get_chw_and_upperE(capdat1.E, 45.27)
-# print(Emax)
-# print(chw)
+# # Emax, chw = get_chw_and_upperE(transdat6.E, 100.14)
+# # Emax, chw = get_chw_and_upperE(capdat1.E, 45.27)
+# # print(Emax)
+# # print(chw)
 
 
 
@@ -143,7 +148,8 @@ capdat2 = capdat2.loc[(capdat2.E<max(expcap2.energy_range)) & (capdat2.E>min(exp
 transdat1 = sammy_functions.readlst(os.path.join(current_dir, "trans-Ta-1mm.twenty"))
 transdat1_covfile = os.path.join(current_dir, 'trans-Ta-1mm.idc')
 
-chw, Emax = get_chw_and_upperE(transdat1.E, 100.14)
+# # TODO: ask Noah for what?
+# chw, Emax = get_chw_and_upperE(transdat1.E, 100.14)
 
 exptrans1 = Experimental_Model(title = "trans1mm",
                                reaction = "transmission", 
@@ -319,7 +325,7 @@ sammyRTO = sammy_classes.SammyRunTimeOptions(
                             options= {"Print"   :   True,
                               "bayes"   :   False,
                               "keep_runDIR"     : True,
-                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
+                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps = settings['path_to_SAMMY_temps'])
                               })
 
 matnum = 7328
@@ -409,7 +415,7 @@ rto = sammy_classes.SammyRunTimeOptions(
     options = {"Print"   :   True,
                 "bayes"   :   True,
                 "keep_runDIR"     : True,
-                "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
+                "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps= settings['path_to_SAMMY_temps'])
                 })
 
 
@@ -457,7 +463,8 @@ sammyOUT_SFJ = sammy_functions.run_sammy_YW(sammyINPyw, rto)
 
 # %%
 # prior_lsts = lsts
-def printout_chi2_post(sammyOUT: sammy_classes.SammyOutputData, addstr :str = 'Solution chi2 values'):
+def printout_chi2(sammyOUT: sammy_classes.SammyOutputData, 
+                       addstr :str = 'Solution chi2 values'):
     print(f'{addstr}')
     print('Chi2_n:')
     print('\t Prior:')
@@ -471,7 +478,7 @@ def printout_chi2_post(sammyOUT: sammy_classes.SammyOutputData, addstr :str = 'S
     print('\t Posterior:')
     print('\t', sammyOUT.chi2_post, np.sum(sammyOUT.chi2_post))
 
-printout_chi2_post(sammyOUT_SFJ, 'JEFF')
+printout_chi2(sammyOUT_SFJ, 'JEFF')
 
 # %%
 # fig2 = plot(datasets, experiments, fits=sammyOUT.pw_post, priors=sammyOUT.pw)
@@ -519,22 +526,31 @@ sammy_rto_fit = sammy_classes.SammyRunTimeOptions(
                              options = {"Print"   :   True,
                               "bayes"   :   True,
                               "keep_runDIR"     : True,
-                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=os.path.join(current_dir, settings['path_to_SAMMY_temps']))
+                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=settings['path_to_SAMMY_temps'])
                               })
 
+num_Elam = int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
 
-options = InitialFBOPT(GGn_threshold=Gn_thr,
-                       iterations=3,
+options = InitialFBOPT(Gn_threshold = Gn_thr,
+                       iterations=2,
                        max_steps = 30,
                        step_threshold=0.01,
-                       LevMarV0=0.05,
-                       fit_all_spin_groups=fit_all_spin_groups,
-                       spin_group_keys = ['3.0']
+                       LevMarV0= 0.05,
+                       fit_all_spin_groups = fit_all_spin_groups,
+                       fit_Gg = True,
+                       num_Elam = num_Elam,
+                       spin_group_keys = ['3.0'],
+                       starting_Gn1_multiplier = starting_Gn_coeff,
+                       starting_Gg_multiplier = 1.0,
+                       external_resonances = True
                        )
 
 autofit_initial = InitialFB(options)
 
 # %%
+
+IFB_start_time = time.time()
+
 outs = autofit_initial.fit(Ta_pair,
                                energy_range_all,
                                datasets,
@@ -542,12 +558,37 @@ outs = autofit_initial.fit(Ta_pair,
                                covariance_data,
                                sammy_rto_fit)
 
-# %%
-print(f'Num elements in outs (stages): {len(outs)}')
-printout_chi2_post(outs[-1], 'autofit result')
-#print(outs[-1].par_post)
+IFB_end_time = time.time()
 
-printout_chi2_post(outs[0], 'autofit prior')
+print(f'Fitting from IFB took: {elim_addit_funcs.format_time_2_str(IFB_end_time)} seconds')
+
+# # it returns an object
+# start_ladder =  copy(initial_out.final_internal_resonances)
+#     external_resonances = copy(initial_out.final_external_resonances)
+#     assert(isinstance(start_ladder, pd.DataFrame))
+#     assert(isinstance(external_resonances, pd.DataFrame))
+#     start_ladder['varyGg'] = np.zeros(len(start_ladder))*1
+#     start_ladder = pd.concat([external_resonances, start_ladder], ignore_index=True)
+#     external_resonance_indices = [0,1]
+
+
+# %%
+
+print(outs.sammy_outs_fit_2)
+
+printout_chi2(outs.sammy_outs_fit_2[-1], 'autofit final result')
+print('Posterior parameters:')
+print(outs.sammy_outs_fit_2[-1].par_post)
+
+print('Final ladder after autofit')
+print(outs.final_resonace_ladder)
+
+print('External resonances:')
+print(outs.final_external_resonances)
+print('Internal resonances:')
+print(outs.final_internal_resonances)
+
+printout_chi2(outs.sammy_outs_fit_1[0], 'autofit prior')
 
 # %%
 # saving initial solution & chars
@@ -563,7 +604,11 @@ f_name_to_load = f_name_to_save
 
 outs = elim_addit_funcs.load_obj_from_pkl(folder_name=savefolder, 
                                           pkl_fname=f_name_to_load)
-final_fb_output = outs[-1]
+
+final_fb_output = outs.sammy_outs_fit_2[-1]
+
+print('Starting FB:')
+print(outs.sammy_outs_fit_1[0])
 
 # %%
 
@@ -573,7 +618,9 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
     fits_chi2 = final_fb_output.chi2_post, 
     f_model_name = 'AF post',
     
-    priors = final_fb_output.pw, priors_chi2=final_fb_output.chi2, pr_model_name='AF prior', # TODO - what is prior here?
+    priors = outs.sammy_outs_fit_1[0].pw, 
+    priors_chi2 = outs.sammy_outs_fit_1[0].chi2, 
+    pr_model_name='AF prior', # TODO - what is prior here?
 
     true = sammyOUT_SFJ.pw_post, 
     true_chi2 = sammyOUT_SFJ.chi2_post, 
@@ -614,10 +661,10 @@ df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_S
         theo_ladder = sammyOUT_SFJ.par_post,
         Ta_pair = Ta_pair,
         settings = settings,
-        energy_grid=energy_grid,
+        energy_grid = energy_grid,
         reactions_SSE = ['capture', 'elastic'],
-        fig_size=fig_size,
-        calc_fig=True
+        fig_size = fig_size,
+        calc_fig = True
 )
 
 #xs_figure.show()
@@ -630,46 +677,49 @@ xs_figure.savefig(fname=f_name_to_save)
 # # Resonance elimination 
 # 
 
-# %%
-# import importlib
 
-# importlib.reload(chi2_eliminator_v2)
-# importlib.reload(elim_addit_funcs)
+start_ladder = outs.final_internal_resonances # internal resonances from initial FB
 
-start_ladder = final_fb_output.par_post
 
-start_ladder = fill_sammy_ladder(df = start_ladder,
-                                       particle_pair=Ta_pair,
-                                       vary_parm = False,
-                                       J_ID = None)
+# just to make sure we have everything...
+# start_ladder = fill_sammy_ladder(df = start_ladder,
+#                                        particle_pair=Ta_pair,
+#                                        vary_parm = False,
+#                                        J_ID = None)
 
-assert isinstance(start_ladder, pd.DataFrame)
+# assert isinstance(start_ladder, pd.DataFrame)
 
 print('Start ladder without sides:')
 print(start_ladder)
-print('Columns:')
-print(start_ladder.columns)
+
+# print('Columns:')
+# print(start_ladder.columns)
 
 # side resonances if needed, otherways - keep empty
 side_resonances_df = pd.DataFrame()
 
-side_resonances_df = elim_addit_funcs.find_side_res_df(
-        initial_sol_df = sel_jeff_parameters,
-        energy_region = energy_range_all,
-        N_res = 2
-)
+# # take fron JEFF
+# side_resonances_df = elim_addit_funcs.find_side_res_df(
+#         initial_sol_df = sel_jeff_parameters,
+#         energy_region = energy_range_all,
+#         N_res = 2
+# )
+
+# take from autofit
+side_resonances_df = outs.final_external_resonances
 
 # enrich with all required columns
+
 side_resonances_df = elim_addit_funcs.set_varying_fixed_params(ladder_df=side_resonances_df,
                                                                vary_list=[0,1,1])
 
 # enriching it with all variables? Gn2, Gn3, varyGn2, varyGn3??
 print(side_resonances_df)
 
-side_resonances_df = fill_sammy_ladder(df = side_resonances_df,
-                                       particle_pair=Ta_pair,
-                                       vary_parm = False,
-                                       J_ID = None)
+# side_resonances_df = fill_sammy_ladder(df = side_resonances_df,
+#                                        particle_pair=Ta_pair,
+#                                        vary_parm = False,
+#                                        J_ID = None)
 
 print('Side resonances:')
 print(side_resonances_df)
@@ -678,11 +728,12 @@ print(side_resonances_df)
 # compiling to one ladder
 start_ladder = pd.concat([side_resonances_df, start_ladder], ignore_index=True)
 
-# print()
-# print('Final ladder to eliminate from')
-# print(start_ladder)
-# print()
-# print(start_ladder.columns)
+
+print()
+print('Final ladder to eliminate from')
+print(start_ladder)
+print()
+print(start_ladder.columns)
 
 
 
@@ -694,11 +745,11 @@ N_red = min(N_red, start_ladder.shape[0],) # not limiting
 
 # just to reduce processing time
 start_ladder = elim_addit_funcs.reduce_ladder(ladder_df=start_ladder,
-                             Gn1_threshold=Gn_thr,
-                             vary_list=[1,0,1],
-                             N=N_red,
-                             keep_fixed=True,
-                             fixed_side_resonances=side_resonances_df)
+                             Gn1_threshold = Gn_thr,
+                             vary_list = [1,0,1],
+                             N = N_red,
+                             keep_fixed = True,
+                             fixed_side_resonances = side_resonances_df)
 
 print('Start ladder:')
 print(start_ladder)
@@ -733,7 +784,6 @@ elim_sammyINPyw = sammy_classes.SammyInputDataYW(
 elim_opts = chi2_eliminator_v2.elim_OPTs(
     chi2_allowed = chi2_allowed,
     stop_at_chi2_thr = False,
-    fixed_resonances_df = side_resonances_df,
     deep_fit_max_iter = 30,
     deep_fit_step_thr = 0.001,
     interm_fit_max_iter = 10,
@@ -756,7 +806,8 @@ print('*'*40)
 print()
 
 # %%
-hist = elimi.eliminate(ladder_df= start_ladder)
+hist = elimi.eliminate(ladder_df= start_ladder,
+                       fixed_resonances_df = side_resonances_df)
 
 # %%
 # # true - using JEFF? just for comparison
@@ -777,7 +828,8 @@ fitted_elim_case_data = {
     'true_chars': true_chars, # note, jeff are used as true here
     'Ta_pair': Ta_pair,
     # elim parameters
-    'elim_opts': elim_opts 
+    'elim_opts': elim_opts,
+    'side_res_df': side_resonances_df
 }
 
 if (fit_all_spin_groups):

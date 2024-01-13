@@ -13,6 +13,7 @@ from ATARI.theory.resonance_statistics import sample_RRR_levels
 
 from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOptions, SammyOutputData, SammyInputData
 from ATARI.sammy_interface.sammy_functions import run_sammy
+from ATARI.sammy_interface import template_creator
 
 #from ATARI.AutoFit.chi2_eliminator_v2 import eliminator_OUTput
 
@@ -1084,7 +1085,7 @@ def calc_theo_broadened_xs_for_reactions(
         reactions: list = ['capture', 'elastic', 'transmission'],
         ):
 
-    rundirname = './calc_xs_theo/'
+    rundirname = settings['path_to_SAMMY_temps']+'./calc_xs_theo/'
     
     df = pd.DataFrame({"E":energy_grid})
     
@@ -1116,12 +1117,16 @@ def calc_theo_broadened_xs_for_reactions(
                     }
         )
 
-        # template_creator.make_input_template('theo.inp', Ta_pair, exp_model_theo, rto)
+        # Construct the file path in a platform-independent way
+        template_filename = os.path.join(settings['running_path'], 'theo.inp')
+
+        if not os.path.exists(template_filename):
+            template_creator.make_input_template(template_filename, Ta_pair, exp_model_theo, rto)
         
         sammy_INP= SammyInputData(
             particle_pair = Ta_pair,
             resonance_ladder = resonance_ladder,
-            template = '/home/fire/py_projects/ATARI_YW_newstruct/ATARI/examples/Ta181_Analysis/theo.inp',
+            template = template_filename,
             experiment = exp_model_theo,
             experimental_data = exp_model_theo.energy_grid,
             experimental_covariance = None,

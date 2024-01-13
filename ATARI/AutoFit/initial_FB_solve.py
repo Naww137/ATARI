@@ -379,7 +379,7 @@ class InitialFB:
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
                         sammyINPyw.step_threshold *= 0.1
-                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neuton width")
+                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neutron width")
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyINPyw.resonance_ladder = resonance_ladder
                     sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)

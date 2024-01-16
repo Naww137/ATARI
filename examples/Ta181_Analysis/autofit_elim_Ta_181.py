@@ -59,14 +59,13 @@ showfigures = False # show figures and block script execution
 starting_Gn_coeff = 10 # to Gn01
 
 Gn_thr = 0.01
-N_red = 15 # number of resonances to keep after the initial autofit
+N_red = 50 # number of resonances to keep after the initial autofit
 
 # number of resonances for autofit (without size)
 # int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
-N_res_autofit = 20 # for one spin group
 
-
-fit_all_spin_groups = False
+N_res_autofit = 100 # for one spin group
+fit_all_spin_groups = True
 
 energy_range_all = [202, 227]
 
@@ -298,7 +297,7 @@ def plot(datasets, experiments, fits=[], priors=[], true=[]):
 # %%
 ### setup in zipped lists 
 datasets = [capdat1, capdat2, transdat1, transdat3, transdat6]
-experiments= [expcap1, expcap2, exptrans1, exptrans3, exptrans6]
+experiments = [expcap1, expcap2, exptrans1, exptrans3, exptrans6]
 covariance_data = [{}, {}, transdat1_covfile, transdat3_covfile, transdat6_covfile]
 
 
@@ -498,7 +497,7 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
     #fig_size = fig_size
     )
 
-f_name_to_save = savefolder+f'SFJ_Fit_Result_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+f_name_to_save = savefolder+f'SFJ_Fit_Result_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}].png'
 fig2.savefig(fname=f_name_to_save)
 
 if (showfigures):
@@ -549,16 +548,10 @@ outs = autofit_initial.fit(Ta_pair,
 
 IFB_end_time = time.time()
 
-print(f'Fitting from IFB took: {elim_addit_funcs.format_time_2_str(IFB_end_time)} seconds')
+print(f'Fitting from IFB took: {elim_addit_funcs.format_time_2_str(IFB_end_time - IFB_start_time)[1]}')
+N_initial_FB = outs.final_internal_resonances.shape[0]
 
-# # it returns an object
-# start_ladder =  copy(initial_out.final_internal_resonances)
-#     external_resonances = copy(initial_out.final_external_resonances)
-#     assert(isinstance(start_ladder, pd.DataFrame))
-#     assert(isinstance(external_resonances, pd.DataFrame))
-#     start_ladder['varyGg'] = np.zeros(len(start_ladder))*1
-#     start_ladder = pd.concat([external_resonances, start_ladder], ignore_index=True)
-#     external_resonance_indices = [0,1]
+print(f'Initial FB size: {N_initial_FB}')
 
 
 # %%
@@ -583,7 +576,7 @@ print(outs.final_internal_resonances)
 
 # %%
 # saving initial solution & chars
-f_name_to_save = f'Autofit_init_res_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.pkl'
+f_name_to_save = f'Autofit_initres{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.pkl'
 
 save_obj  = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, 
                                              file_name=f_name_to_save,
@@ -599,7 +592,7 @@ outs = elim_addit_funcs.load_obj_from_pkl(folder_name=savefolder,
 final_fb_output = outs.sammy_outs_fit_2[-1]
 
 print('Starting FB:')
-print(outs.sammy_outs_fit_1[0])
+print(outs.sammy_outs_fit_1[0].par)
 
 # %%
 
@@ -626,7 +619,7 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
     #fig_size = fig_size
     )
 
-f_name_to_save = savefolder+f'AF_Result_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+f_name_to_save = savefolder+f'AF_Result_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
 fig2.savefig(fname=f_name_to_save)
 
 #fig2.show()
@@ -658,13 +651,13 @@ df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_S
 
 #xs_figure.show()
 
-f_name_to_save = savefolder+f'xs_AF_Res_sf_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+f_name_to_save = savefolder+f'xs_AF_Res_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
 xs_figure.savefig(fname=f_name_to_save)
 
 
 # %% [markdown]
 # # Resonance elimination 
-# 
+
 
 
 start_ladder = outs.final_internal_resonances # internal resonances from initial FB
@@ -712,10 +705,10 @@ start_ladder = pd.concat([side_resonances_df, start_ladder], ignore_index=True)
 
 
 print()
-print('Final ladder to eliminate from')
+print('Final ladder to eliminate from:')
 print(start_ladder)
 print()
-print(start_ladder.columns)
+# print(start_ladder.columns)
 
 
 
@@ -813,9 +806,9 @@ fitted_elim_case_data = {
 }
 
 if (fit_all_spin_groups):
-    f_name_to_save = f'sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_allspingr_sdf_{start_deep_fit_from}'
+    f_name_to_save = f'{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_allspingr_sdf_{start_deep_fit_from}'
 else:
-    f_name_to_save = f'sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}'
+    f_name_to_save = f'{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}'
 
 saved_hist = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=f'hist_{f_name_to_save}.pkl', obj=hist)
 saved_data = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=f'dataset_{f_name_to_save}.pkl', obj=fitted_elim_case_data)
@@ -875,7 +868,7 @@ ax2.invert_xaxis()
 ax2.grid(True)
 
 tight_layout()
-f_name_to_save = f'hist_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}'
+f_name_to_save = f'hist_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}'
 fig.savefig(savefolder+f'{f_name_to_save}.png')
 #show()
 
@@ -904,7 +897,7 @@ def show_plot_from_hist(
 
     # outfit
     fig = elim_addit_funcs.plot_datafits(datasets, experiments, 
-        fits=fits, fits_chi2=fits_chi2, f_model_name=f'AF + el. {N_red}',
+        fits=fits, fits_chi2=fits_chi2, f_model_name=f'AF {N_initial_FB} + el. {N_red}',
         priors = prior_fit, priors_chi2=priors_chi2, pr_model_name=f'AF, red. to {N_red}',
         true=true_chars.pw, t_model_name='JEFF (w/o autofit)',
         true_chi2 = true_chars.chi2,
@@ -931,7 +924,7 @@ fig = show_plot_from_hist(datasets = datasets,
                           addit_title_str=', $\Delta\chi^2$ = '+str(chi2_allowed)
                           )
 
-fig.savefig(savefolder+f'elim_result_sel_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png')
+fig.savefig(savefolder+f'elim_res_selected_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png')
 
 if (showfigures):
     show()
@@ -949,7 +942,7 @@ df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_S
 )
 #xs_figure.show()
 
-f_name_to_save = savefolder+f'xs_elim_res_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png'
+f_name_to_save = savefolder+f'xs_elim_res_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png'
 xs_figure.savefig(fname=f_name_to_save)
 
 # %%
@@ -965,7 +958,7 @@ table_df = elim_addit_funcs.create_solutions_comparison_table_from_hist(hist = h
                      energy_grid_2_compare_on = energy_grid)
 
 # saving comparison table
-table_df.to_csv(path_or_buf=savefolder+f'comparison_sf_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.csv')
+table_df.to_csv(path_or_buf=savefolder+f'comparison_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.csv')
 
 print('Sol. Comparison table:')
 print(table_df)

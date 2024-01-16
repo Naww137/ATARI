@@ -88,7 +88,7 @@ def extract_jids_and_keys(Ta_Pair: Particle_Pair):
     return j_ids, keys
 
 
-def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
+def calc_LL_by_ladder(ladder_df: pd.DataFrame,
                              Ta_pair: Particle_Pair,
                              energy_grid: np.array = np.array([])):
     
@@ -101,12 +101,16 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
         return (np.pi/2) * x * np.exp(-np.pi*(x**2)/4)
 
         TODO: why some normalization in a func?
+    
+    + using chi2 pdf with all given params in Ta_pair class
 
     for each spin group listed in Ta_pair & returning a sum + dict by group
     NOTE: only inside the provided window
     """
 
     all_groups_NLLW = {}
+    all_groups_NLL_PT_Gn = {}
+    all_groups_NLL_PT_Gg = {}
 
     # select all spin groups listed in Ta_Pair
     separate_j_ids, spin_gr_ids = extract_jids_and_keys(Ta_Pair=Ta_pair)
@@ -124,87 +128,50 @@ def calc_Wigner_LL_by_ladder(ladder_df: pd.DataFrame,
             # selecting values with energies between min & max in defined window
             spin_gr_res = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
         
-        # taking avg dist for current spin group
+        # taking avgs for the current spin group
         avg_dist = spin_group_data['<D>']
+        avg_Gn = spin_group_data['<Gn>']
+        avg_Gg = spin_group_data['<Gg>']
 
-        # energy calculations
+        Gn1_values = spin_gr_res.Gn1.to_numpy()
+        Gg_values = spin_gr_res.Gg.to_numpy()
+
         E_values = spin_gr_res.E.to_numpy()
         E_values_sorted = np.sort(E_values)
-        
         spacings = np.diff(E_values_sorted)
-        # print('Spacings')
-        # print(spacings)
-        wigner_values = resonance_statistics.wigner_PDF(spacings, avg_dist)
-        # print('Wigner values')
-        # print(wigner_values)
 
-        neg_log_likelihood_gr = -np.sum(np.log(wigner_values))
+        
+        # calculating for current sg
+
+        current_gr_NLL_PT_Gn = - resonance_statistics.width_LL(resonance_widths=Gn1_values,
+                                           average_width = avg_Gn,
+                                           dof = spin_group_data['n_dof'])
+        
+        current_gr_NLL_PT_Gg = - resonance_statistics.width_LL(resonance_widths=Gg_values,
+                                           average_width = avg_Gg,
+                                           dof = spin_group_data['g_dof'])
+
+        wigner_values = resonance_statistics.wigner_PDF(spacings, avg_dist)
+        neg_LL_gr = -np.sum(np.log(wigner_values))
 
         # print(f"J_ID: {j_id}, Key: {sp_gr_id}, \n ")
         # print(f"Spin Group info: \n{ spin_group_data }")
         # print(spin_gr_res.shape[0])
-        # print(f'\t NLLW: \t {neg_log_likelihood_gr}')
 
-        all_groups_NLLW[sp_gr_id]=neg_log_likelihood_gr
+        all_groups_NLLW[sp_gr_id] = neg_LL_gr
+
+        all_groups_NLL_PT_Gn[sp_gr_id] = current_gr_NLL_PT_Gn
+        all_groups_NLL_PT_Gg[sp_gr_id] = current_gr_NLL_PT_Gg
+
 
     total_NLLW = sum(all_groups_NLLW.values())
+    total_NLL_PT_Gn = sum(all_groups_NLL_PT_Gn.values())
+    total_NLL_PT_Gg = sum(all_groups_NLL_PT_Gg.values())
 
     # print(all_groups_NLLW)
     # print(total_NLLW)
 
-    return total_NLLW, all_groups_NLLW
-
-
-# utilizing PT LL
-def calc_PT_LL_by_ladder(ladder_df: pd.DataFrame,
-                             Ta_pair: Particle_Pair,
-                             energy_grid: np.array = np.array([])):
-    
-    """
-    Calculating the -LL value for a given ladder, in a given window
-
-    using PT (chi2) for a given in Ta_pair dof:
-    
-    for each spin group listed in Ta_pair & returning a sum + dict by group
-    NOTE: only inside the provided window
-    """
-
-    all_groups_NLL_PT = {}
-
-    # select all spin groups listed in Ta_Pair
-    separate_j_ids, spin_gr_ids = extract_jids_and_keys(Ta_Pair=Ta_pair)
-
-    # Iterating through unique spin groups and their J_IDs
-    for j_id, sp_gr_id in zip(separate_j_ids, spin_gr_ids):
-        
-        # Access the specific spin group using the key
-        spin_group_data = Ta_pair.spin_groups[sp_gr_id]
-
-        # taking resonances from ladder only from one spin group by j_id
-        spin_gr_res = ladder_df[ladder_df['J_ID']==j_id]
-
-        if (len(energy_grid)>0):
-            # selecting values with energies between min & max in defined window
-            spin_gr_res = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
-        
-        # taking avg dist for current spin group
-        avg_val = spin_group_data['<Gn>']
-
-        # energy calculations
-        Gn1_values = spin_gr_res.Gn1.to_numpy()
-
-        current_gr_NLL_PT = - resonance_statistics.width_LL(resonance_widths=Gn1_values,
-                                           average_width=avg_val,
-                                           dof = spin_group_data['n_dof'])
-        
-
-        all_groups_NLL_PT[sp_gr_id] = current_gr_NLL_PT
-
-    total_NLL_PT = sum(all_groups_NLL_PT.values())
-    
-    return total_NLL_PT, all_groups_NLL_PT
-
-
+    return total_NLLW, all_groups_NLLW, total_NLL_PT_Gg, all_groups_NLL_PT_Gg,  total_NLL_PT_Gn, all_groups_NLL_PT_Gn
 
 
 # calculation of AIC & all parameters of current solution
@@ -311,18 +278,13 @@ def characterize_sol(Ta_pair: Particle_Pair,
         output_dict['bic_entire_ds'] = BIC_entire_ds
 
     # Wigner - by spingroups
-    NLLW, NLLW_gr = calc_Wigner_LL_by_ladder(ladder_df = sol.par_post,
+    NLLW, NLLW_gr, NLL_Gg, NLL_PT_Gg_gr, NLL_Gn, NLL_PT_Gn1_gr  = calc_LL_by_ladder(ladder_df = sol.par_post,
                              Ta_pair = Ta_pair,
                              energy_grid=energy_grid_2_compare_on)
 
     output_dict['NLLW'] = NLLW_gr
-
-    # PT, Gn - by spingroups
-    LL_PT, NLL_PT_Gn1_gr = calc_PT_LL_by_ladder(ladder_df = sol.par_post,
-                             Ta_pair = Ta_pair,
-                             energy_grid=energy_grid_2_compare_on)
-    
     output_dict['NLL_PT_Gn1'] = NLL_PT_Gn1_gr
+    output_dict['NLL_PT_Gg'] = NLL_PT_Gg_gr
 
     joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
                                                              e_range = e_range,
@@ -337,7 +299,8 @@ def characterize_sol(Ta_pair: Particle_Pair,
 
 def calc_N_res_probability(Ta_pair: Particle_Pair,
                            e_range: list,
-                           ladder_df: pd.DataFrame):
+                           ladder_df: pd.DataFrame,
+                           num_samples: int = 10000):
     
     """Calculating the probability of having N resonances in a given energy window"""
 
@@ -366,7 +329,7 @@ def calc_N_res_probability(Ta_pair: Particle_Pair,
         # Calculate the probability for the current spin group
         prob = calculate_probability_N_res(avg_distance=spin_group_data['<D>'],
                                                                     N_res = curspingroup_num , 
-                                                                    num_samples=10000, 
+                                                                    num_samples = num_samples, 
                                                                     e_range = e_range)
         
         # to avoid problems with small numbers
@@ -1455,6 +1418,94 @@ def calc_all_SSE_gen_XS_plot(
     return df_est, df_theo, resid_matrix, SSE_dict, figure
 
 
+
+def calc_strength_functions(
+        theoretical_df, 
+        estimated_df, 
+        energy_range, 
+        fig_size=(8, 6), 
+        create_fig=True):
+
+    
+    # Filter dataframes based on the energy range
+
+    filt_theoretical_df = theoretical_df[(theoretical_df['E'] >= energy_range[0]) & (theoretical_df['E'] <= energy_range[1])]
+    filt_estimated_df = estimated_df[(estimated_df['E'] >= energy_range[0]) & (estimated_df['E'] <= energy_range[1])]
+
+    # Combine and sort energy values from both datasets
+    #combined_energy = np.sort(np.unique(np.concatenate((filt_theoretical_df['E'], filt_estimated_df['E']))))
+    combined_energy = fine_egrid(energy_range)
+
+    # Initialize the cumulative sum arrays with zero at the beginning
+    cumulative_theo_gn1 = np.zeros(len(combined_energy))
+    cumulative_est_gn1 = np.zeros(len(combined_energy))
+    cumulative_theo_gg = np.zeros(len(combined_energy))
+    cumulative_est_gg = np.zeros(len(combined_energy))
+
+    # Create step functions (ladders) for cumulative sums
+    for i, e in enumerate(combined_energy):
+        # if i == 0:
+        #     continue
+      
+        cumulative_theo_gn1[i] = filt_theoretical_df[filt_theoretical_df['E'] <= e]['Gn1'].sum()
+        cumulative_est_gn1[i] = filt_estimated_df[filt_estimated_df['E'] <= e]['Gn1'].sum()
+
+        cumulative_theo_gg[i] = filt_theoretical_df[filt_theoretical_df['E'] <= e]['Gg'].sum()
+        cumulative_est_gg[i] = filt_estimated_df[filt_estimated_df['E'] <= e]['Gg'].sum()
+
+    # Calculate squared differences and their integral
+
+    SSE_Gn1 = np.trapz((cumulative_theo_gn1 - cumulative_est_gn1) ** 2, combined_energy) / (np.max(combined_energy) - np.min(combined_energy))
+    SSE_Gg = np.trapz((cumulative_theo_gg - cumulative_est_gg) ** 2, combined_energy) / (np.max(combined_energy) - np.min(combined_energy))
+
+    if create_fig:
+        
+        fig, axs = plt.subplots(2, 1, figsize=fig_size)
+
+        # Plotting for Gn1
+        axs[0].plot(combined_energy, cumulative_theo_gn1, label=f'Theo (N = {filt_theoretical_df.shape[0]})', color='blue')
+        axs[0].plot(combined_energy, cumulative_est_gn1, label=f'Est. (N = {filt_estimated_df.shape[0]})', color='red')
+        label = r'$\frac{1}{E_{2}-E_{1}} \int_{E_{1}}^{E_{2}} {(\Gamma_{true}-\Gamma_{est})^2} dE $ = '+ f'{SSE_Gn1:.2f}'
+        axs[0].fill_between(combined_energy, cumulative_theo_gn1, cumulative_est_gn1, color='purple', alpha=0.3, label = label)
+        axs[0].set_xlabel('Energy (E)')
+        axs[0].set_ylabel('Cumul. SF for $\Gamma_{n1}$')
+        axs[0].legend(loc='upper left')
+        axs[0].grid(True)
+
+        # Plotting for Gg
+        axs[1].plot(combined_energy, cumulative_theo_gg, label='Theo', color='blue')
+        axs[1].plot(combined_energy, cumulative_est_gg, label='Est.', color='red')
+        label = r'$\frac{1}{E_{2}-E_{1}} \int_{E_{1}}^{E_{2}} {(\Gamma_{true}-\Gamma_{est})^2} dE $ = '+ f'{SSE_Gg:.2f}'
+
+        axs[1].fill_between(combined_energy, cumulative_theo_gg, cumulative_est_gg, color='purple', alpha=0.3, label = label)
+        axs[1].set_xlabel('Energy (E)')
+        axs[1].set_ylabel('Cumul. SF for $\Gamma_{\gamma}$')
+        axs[1].legend(loc='upper left')
+        axs[1].grid(True)
+
+        # add vertical lines for both - dashed, 0.5 linewidth
+        for energy in filt_theoretical_df.E:
+            axs[0].axvline(x=energy, color='b', linestyle='--', linewidth=0.5, alpha=0.9)
+            axs[1].axvline(x=energy, color='b', linestyle='--', linewidth=0.5, alpha=0.9)
+        
+        for energy in filt_estimated_df.E:
+            axs[0].axvline(x=energy, color='r', linestyle='--', linewidth=0.5, alpha=0.9)
+            axs[1].axvline(x=energy, color='r', linestyle='--', linewidth=0.5, alpha=0.9)
+        # end add vertical lines for both
+
+        plt.tight_layout()
+
+        return SSE_Gg, SSE_Gn1, fig
+    else:
+        return SSE_Gg, SSE_Gn1, None
+
+
+
+
+
+
+
+
 def format_time_2_str(time_interval):
     """Reformat time interval in sec to present it in a more nice format for vieweing in
     days, hours, minutes, seconds
@@ -1521,12 +1572,16 @@ def create_solutions_comparison_table_from_hist(hist,
     is_true = []
     SSE_s = []
     NLLW_s = []
-    NLL_PT_Gn1 = []
+    NLL_Gn1 = []
+    NLL_Gg = []
+
     chi2_s = []
     chi2_stat_s = []
 
     OF_alt1 = []
     OF_alt2 = []
+    OF_alt3 = []
+
 
     aicc_s = []
     bicc_s = []
@@ -1618,14 +1673,23 @@ def create_solutions_comparison_table_from_hist(hist,
 
         NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
 
-        NLL_PT_Gn1.append(sum(cur_ch_dict['NLL_PT_Gn1'].values()))
+        NLL_Gn1.append(sum(cur_ch_dict['NLL_PT_Gn1'].values()))
+        NLL_Gg.append(sum(cur_ch_dict['NLL_PT_Gg'].values()))
 
 
 
         N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
 
         OF_alt1.append(sum(cur_ch_dict['chi2'])+2 * sum(cur_ch_dict['NLLW'].values()))
-        OF_alt2.append(cur_ch_dict['aicc_entire_ds'] + sum(cur_ch_dict['NLLW'].values()) )
+        #OF_alt2.append(cur_ch_dict['aicc_entire_ds'] + sum(cur_ch_dict['NLLW'].values()) )
+        OF_alt3.append(
+            sum(cur_ch_dict['chi2']) + 
+            2 * (
+                sum(cur_ch_dict['NLLW'].values()) +
+                sum(cur_ch_dict['NLL_PT_Gn1'].values()) +
+                sum(cur_ch_dict['NLL_PT_Gg'].values())
+            )
+        )
 
         # levels.append(level)
         # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
@@ -1642,10 +1706,11 @@ def create_solutions_comparison_table_from_hist(hist,
         'chi2_s': chi2_stat_s,
         'SSE': SSE_s,
         'sum_NLLW': NLLW_s,
-        'sum_NLL_PT_Gn1': NLL_PT_Gn1,
+        'sum_NLL_Gn1': NLL_Gn1,
+        'sum_NLL_Gg': NLL_Gg,
 
         'OF_alt1': OF_alt1,
-        'OF_alt2': OF_alt2,
+        'OF_alt3': OF_alt3,
         'AICc': aicc_s,
         'BIC': bicc_s,
     })

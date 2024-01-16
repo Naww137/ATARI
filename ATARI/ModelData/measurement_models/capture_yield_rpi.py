@@ -388,4 +388,7 @@ class Capture_Yield_RPI:
             diag_tot = unc_data
             Yg.loc[:,'exp_unc'] = diag_tot
 
+        ## fix for zero gamma counts
+        Yg = Yg.loc[Yg.exp!=0]
+
         return Yg

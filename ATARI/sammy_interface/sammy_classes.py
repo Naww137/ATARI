@@ -56,7 +56,8 @@ class SammyRunTimeOptions:
             'iterations'    :   2,
 
             'energy_window' : None,
-            'get_ECSCM'     : False
+            'get_ECSCM'     : False,
+            'ECSCM_rxn'     : 'total'
         }
         options = update_dict(default_options, options)
         self.options = options
@@ -72,6 +73,7 @@ class SammyRunTimeOptions:
 
         self.energy_window = options["energy_window"]
         self.get_ECSCM = options["get_ECSCM"]
+        self.ECSCM_rxn = options["ECSCM_rxn"]
 
     def __repr__(self):
         return str(self.options)

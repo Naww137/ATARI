@@ -392,10 +392,15 @@ def write_saminp(filepath,
                 experimental_model,
                 rto,
                 alphanumeric = None,
-                use_IDC = False):
+                use_IDC = False,
+                use_ecscm_reaction = False):
     
     if alphanumeric is None:
         alphanumeric = []
+    if use_ecscm_reaction:
+        reaction = rto.ECSCM_rxn
+    else:
+        reaction = experimental_model.reaction
         
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
@@ -436,7 +441,7 @@ def write_saminp(filepath,
                 f.write(f'  {float(model.ac):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
-                f.write(f'{experimental_model.reaction}\n')
+                f.write(f'{reaction}\n')
 
             else:
                 f.write(line)
@@ -609,7 +614,8 @@ def get_ECSCM(sammyRTO, sammyINP):
                  sammyINP.particle_pair, 
                  sammyINP.experiment, 
                  sammyRTO,
-                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
+                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
+                 use_ecscm_reaction = True)
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
     _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
 

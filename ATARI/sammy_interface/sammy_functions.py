@@ -510,17 +510,17 @@ echo "$chi2_string $chi2_stringn"
 
 
 
-def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
+def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
     runsammy_process = subprocess.run(
                                 ["sh", "-c", f"./pipe.sh"], 
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*10
                                 )
-    # if sammy_RTO.bayes:
-    chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
-    # else:
-        # chi2=None
-        # chi2n = None
+    if getchi2:
+        chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
+    else:
+        chi2=None
+        chi2n = None
 
     return chi2, chi2n
 
@@ -610,9 +610,8 @@ def get_ECSCM(sammyRTO, sammyINP):
                  sammyINP.experiment, 
                  sammyRTO,
                  alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
-    sammyRTO.bayes = False
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
-    _, _ = runsammy_shellpipe(sammyRTO)
+    _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
 
     df, cov = read_ECSCM(os.path.join(sammyRTO.sammy_runDIR, "SAMCOV.PUB"))
 
@@ -967,6 +966,8 @@ def run_YWY0_and_get_chi2(rundir, step):
     i=i_ndats[0]; ndats=i_ndats[1:]
     i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-3].split()]
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
+    if len(chi2s) != 5:
+        _ =0
     return i, [c for c in chi2s]+[np.sum(chi2s), np.sum(chi2s)/np.sum(ndats)]
 
 
@@ -1004,6 +1005,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
+                        print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
 
                     while True:
                         fudge /= sammyINPyw.LevMarVd

@@ -13,7 +13,7 @@ fort*
 *.gif
 .vscode/
 
-./docs/build/*
+/docs/build/
 
 
 # Byte-compiled / optimized / DLL files

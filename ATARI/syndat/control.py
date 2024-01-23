@@ -28,9 +28,9 @@ class Syndat_Control:
         Dictionary of uncertain parameters that correlate individual Syndat_Models. 
         Format is the same as other model parameters: key:(val, unc).
         If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.
-    sampleRES: bool
-        Option to sample a new resonance ladder with each sample.
-        Will override SyndatOPT.sampleRES for individual Syndat_Models.
+    options
+
+
     """
     
 
@@ -38,13 +38,13 @@ class Syndat_Control:
                  particle_pair: Particle_Pair,
                  syndat_models: list[Syndat_Model],
                  model_correlations, 
-                 sampleRES: bool
+                 options: syndatOPT
                  ):
         
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
-        self.sampleRES = sampleRES
+        self.options = deepcopy(options)
 
         # self.clear_samples()
 
@@ -86,7 +86,7 @@ class Syndat_Control:
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true_list is not None:
-            if self.sampleRES:
+            if self.options.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")
             if len(pw_true_list) != len(self.syndat_models):
                 raise ValueError("User provided a pw_true list not of the same length as syndat_models")
@@ -101,7 +101,7 @@ class Syndat_Control:
         for i in range(num_samples):
             
             ### sample resonance ladder
-            if self.sampleRES:
+            if self.options.sampleRES:
                 self.particle_pair.sample_resonance_ladder()
                 par_true = self.particle_pair.resonance_ladder
             

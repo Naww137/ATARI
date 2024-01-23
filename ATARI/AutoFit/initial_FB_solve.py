@@ -8,26 +8,53 @@ from copy import copy
 
 
 
-class Evaluation_Data:
-    def __init__(self):
-        self.pw_data = []
-        self.covariance_data = []
-        self.experimental_models = []
-
-    def add_dataset(self,
-                    pointwise_data,
-                    covariance_data,
-                    experimental_model
-                    ):
-        self.pw_data.append(pointwise_data)
-        self.covariance_data.append(covariance_data)
-        self.experimental_models.append(experimental_model)
-
-
-
 class InitialFBOPT:
+    """
+    Options for the initial feature bank solver module.
+
+    Parameters
+    ----------
+    **kwargs : dict, optional
+        Any keyword arguments are used to set attributes on the instance.
+
+    Attributes
+    ----------
+    external_resonances: bool = True
+        If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
+    width_elimination: bool = True
+        Option to eliminate resonances during fitting stages based on neutron width.
+    Gn_threshold: bool = True
+        Neutron width threshold for width-based elimination
+    decrease_chi2_threshold_for_width_elimination: bool = True
+        If running width elimination, decrease the chi2 threshold convergence criteria
+    max_steps: bool = True
+        Maximum number of steps in non-linear least squares solution scheme.
+    iterations: bool = True
+        Number of internal SAMMY iterations of G for nonlinearity.
+    step_threshold: bool = True
+        Chi2 improvement threshold convergence criteria.
+    LevMar: bool = True
+
+    LevMarV: bool = True
+
+    LevMarVd: bool = True
+
+    LevMarV0: bool = True
+    
+    fit_Gg: bool = True
+        Fit gamma width in fit 2.
+    fit_all_spin_groups: bool = True
+
+    spin_group_keys: list = []
+
+    num_Elam: Optional[int] = None
+        Number of resonance features in starting feature bank for each spin group
+    starting_Gg_multiplier: float = 1.0
+        Factor of average capture width used in initial feature bank
+    starting_Gn1_multiplier: float = 1.0
+        Factor of Q01 neutron width used in initial feature bank
+    """
     def __init__(self, **kwargs):
-        self._Fit = True
         self._external_resonances = True
 
         self._width_elimination = True
@@ -63,19 +90,8 @@ class InitialFBOPT:
                 string += f"{prop}: {getattr(self, prop)}\n"
         return string
     
-
-    @property
-    def Fit(self):
-        return self._Fit
-    @Fit.setter
-    def Fit(self, Fit):
-        self._Fit = Fit
-
     @property
     def width_elimination(self):
-        """
-        Option to eliminate resonances based on neutron width
-        """
         return self._width_elimination
     @width_elimination.setter
     def width_elimination(self, width_elimination):
@@ -83,9 +99,6 @@ class InitialFBOPT:
 
     @property
     def Gn_threshold(self):
-        """
-        Neutron width threshold for width-based elimination
-        """
         return self._Gn_threshold
     @Gn_threshold.setter
     def Gn_threshold(self, Gn_threshold):
@@ -93,9 +106,6 @@ class InitialFBOPT:
 
     @property
     def decrease_chi2_threshold_for_width_elimination(self):
-        """
-        If running width elimination, decrease the chi2 threshold convergence criteria
-        """
         return self._decrease_chi2_threshold_for_width_elimination
     @decrease_chi2_threshold_for_width_elimination.setter
     def decrease_chi2_threshold_for_width_elimination(self, decrease_chi2_threshold_for_width_elimination):
@@ -103,9 +113,6 @@ class InitialFBOPT:
 
     @property
     def external_resonances(self):
-        """
-        If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
-        """
         return self._external_resonances
     @external_resonances.setter
     def external_resonances(self, external_resonances):
@@ -113,9 +120,6 @@ class InitialFBOPT:
 
     @property
     def max_steps(self):
-        """
-        Maximum number of steps in non-linear least squares solution scheme.
-        """
         return self._max_steps
     @max_steps.setter
     def max_steps(self, max_steps):
@@ -123,9 +127,6 @@ class InitialFBOPT:
 
     @property
     def iterations(self):
-        """
-        Number of internal SAMMY iterations of G for nonlinearity.
-        """
         return self._iterations
     @iterations.setter
     def iterations(self, iterations):
@@ -135,9 +136,6 @@ class InitialFBOPT:
 
     @property
     def step_threshold(self):
-        """
-        Chi2 improvement threshold convergence criteria.
-        """
         return self._step_threshold
     @step_threshold.setter
     def step_threshold(self, step_threshold):
@@ -145,9 +143,6 @@ class InitialFBOPT:
     
     @property
     def LevMar(self):
-        """
-        
-        """
         return self._LevMar
     @LevMar.setter
     def LevMar(self, LevMar):
@@ -199,7 +194,6 @@ class InitialFBOPT:
 
     @property
     def num_Elam(self):
-        """Number of resonance features in starting feature bank for each spin group"""
         return self._num_Elam
     @num_Elam.setter
     def num_Elam(self, num_Elam):
@@ -207,7 +201,6 @@ class InitialFBOPT:
 
     @property
     def starting_Gg_multiplier(self):
-        """Factor of average capture width used in initial feature bank"""
         return self._starting_Gg_multiplier
     @starting_Gg_multiplier.setter
     def starting_Gg_multiplier(self, starting_Gg_multiplier):
@@ -215,7 +208,6 @@ class InitialFBOPT:
 
     @property
     def starting_Gn1_multiplier(self):
-        """Factor of Q01 neutron width used in initial feature bank"""
         return self._starting_Gn1_multiplier
     @starting_Gn1_multiplier.setter
     def starting_Gn1_multiplier(self, starting_Gn1_multiplier):
@@ -330,6 +322,8 @@ class InitialFB:
             LevMar = self.options.LevMar,
             LevMarV = self.options.LevMarV,
             LevMarVd = self.options.LevMarVd,
+            minF = 1e-5,
+            maxF = 2.0,
             initial_parameter_uncertainty = self.options.LevMarV0,
             
             autoelim_threshold = None,

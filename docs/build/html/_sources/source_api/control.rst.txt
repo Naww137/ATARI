@@ -1,0 +1,12 @@
+AutoFit Module
+**************
+
+Autofit module information.
+
+.. automodule:: ATARI.AutoFit
+      :members:
+      :undoc-members:
+
+
+
+

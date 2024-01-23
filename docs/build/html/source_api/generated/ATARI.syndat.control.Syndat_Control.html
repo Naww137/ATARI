@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATARI.syndat.control.Syndat_Control &mdash; atari 1.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=292eb321"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="prev" title="ATARI.syndat.syndat_model.Syndat_Model" href="ATARI.syndat.syndat_model.Syndat_Model.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atari
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../userguide.html">User’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Source API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../syndat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">syndat</span></code> – Synthetic Data Module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../syndat.html#sampling-a-single-syndat-model">Sampling a Single Syndat Model</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../syndat.html#sampling-multiple-syndat-models">Sampling Multiple Syndat Models</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">ATARI.syndat.control.Syndat_Control</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atari</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Source API</a></li>
+          <li class="breadcrumb-item"><a href="../syndat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">syndat</span></code> – Synthetic Data Module</a></li>
+      <li class="breadcrumb-item active">ATARI.syndat.control.Syndat_Control</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/source_api/generated/ATARI.syndat.control.Syndat_Control.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="atari-syndat-control-syndat-control">
+<h1>ATARI.syndat.control.Syndat_Control<a class="headerlink" href="#atari-syndat-control-syndat-control" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="ATARI.syndat.control.Syndat_Control">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ATARI.syndat.control.</span></span><span class="sig-name descname"><span class="pre">Syndat_Control</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">particle_pair</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Particle_Pair</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">syndat_models</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="ATARI.syndat.syndat_model.Syndat_Model.html#ATARI.syndat.syndat_model.Syndat_Model" title="ATARI.syndat.syndat_model.Syndat_Model"><span class="pre">Syndat_Model</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_correlations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampleRES</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/ATARI/syndat/control.html#Syndat_Control"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ATARI.syndat.control.Syndat_Control" title="Link to this definition"></a></dt>
+<dd><p>Syndat Control module for sampling from multiple syndat models.</p>
+<p>_extended_summary_</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>particle_pair</strong> (<em>Particle_Pair</em>) – ATARI class describing the reaction model.</p></li>
+<li><p><strong>syndat_models</strong> (<em>list</em><em>[</em><a class="reference internal" href="ATARI.syndat.syndat_model.Syndat_Model.html#ATARI.syndat.syndat_model.Syndat_Model" title="ATARI.syndat.syndat_model.Syndat_Model"><em>Syndat_Model</em></a><em>]</em>) – list of individual Syndat_Model classes</p></li>
+<li><p><strong>model_correlations</strong> (<em>dict</em>) – Dictionary of uncertain parameters that correlate individual Syndat_Models.
+Format is the same as other model parameters: key:(val, unc).
+If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.</p></li>
+<li><p><strong>sampleRES</strong> (<em>bool</em>) – Option to sample a new resonance ladder with each sample.
+Will override SyndatOPT.sampleRES for individual Syndat_Models.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="ATARI.syndat.syndat_model.Syndat_Model.html" class="btn btn-neutral float-left" title="ATARI.syndat.syndat_model.Syndat_Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Noah A.W. Walton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

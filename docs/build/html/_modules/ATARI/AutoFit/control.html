@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATARI.AutoFit.control &mdash; atari 1.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=292eb321"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            atari
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../userguide.html">User’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../source_api/index.html">Source API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">atari</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ATARI.AutoFit.control</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ATARI.AutoFit.control</h1><div class="highlight"><pre>
+<span></span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ATARI.syndat.control</span> <span class="kn">import</span> <span class="n">Syndat_Control</span><span class="p">,</span> <span class="n">Syndat_Model</span>
+<span class="kn">from</span> <span class="nn">ATARI.AutoFit.initial_FB_solve</span> <span class="kn">import</span> <span class="n">InitialFB</span><span class="p">,</span> <span class="n">InitialFBOPT</span><span class="p">,</span> <span class="n">InitialFBOUT</span>
+<span class="kn">from</span> <span class="nn">ATARI.AutoFit.chi2_eliminator_v2</span> <span class="kn">import</span> <span class="n">elim_OPTs</span><span class="p">,</span> <span class="n">eliminator_by_chi2</span><span class="p">,</span> <span class="n">eliminator_OUTput</span>
+<span class="kn">from</span> <span class="nn">ATARI.AutoFit.spin_group_selection</span> <span class="kn">import</span> <span class="n">SpinSelectOPT</span><span class="p">,</span> <span class="n">SpinSelect</span><span class="p">,</span> <span class="n">SpinSelectOUT</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">ATARI.sammy_interface</span> <span class="kn">import</span> <span class="n">sammy_classes</span>
+
+<span class="k">class</span> <span class="nc">Evaluation_Data</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pw_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">covariance_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">experimental_models</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">add_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                    <span class="n">pointwise_data</span><span class="p">,</span>
+                    <span class="n">covariance_data</span><span class="p">,</span>
+                    <span class="n">experimental_model</span>
+                    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pw_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pointwise_data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">covariance_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">covariance_data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">experimental_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">experimental_model</span><span class="p">)</span>
+
+
+
+<div class="viewcode-block" id="AutoFitOPT">
+<a class="viewcode-back" href="../../../source_api/generated/ATARI.AutoFit.control.AutoFitOPT.html#ATARI.AutoFit.control.AutoFitOPT">[docs]</a>
+<span class="k">class</span> <span class="nc">AutoFitOPT</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">featurebankOPT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">InitialFBOPT</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">eliminateOPT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">elim_OPTs</span><span class="p">]</span>      <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">spinselectOPT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SpinSelectOPT</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="o">**</span><span class="n">kwargs</span>
+                 <span class="p">):</span>
+        
+        <span class="k">if</span> <span class="n">featurebankOPT</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">featurebankOPT</span> <span class="o">=</span> <span class="n">InitialFBOPT</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">featurebankOPT</span> <span class="o">=</span> <span class="n">featurebankOPT</span>
+        <span class="k">if</span> <span class="n">eliminateOPT</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">elimOPT</span> <span class="o">=</span> <span class="n">elim_OPTs</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">eliminateOPT</span> <span class="o">=</span> <span class="n">eliminateOPT</span>
+        <span class="k">if</span> <span class="n">spinselectOPT</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spinselectOPT</span> <span class="o">=</span> <span class="n">SpinSelectOPT</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">spinselectOPT</span> <span class="o">=</span> <span class="n">spinselectOPT</span></div>
+
+
+
+        <span class="c1"># for key, value in kwargs.items():</span>
+        <span class="c1">#     setattr(self, key, value)</span>
+
+
+
+<div class="viewcode-block" id="AutoFitOUT">
+<a class="viewcode-back" href="../../../source_api/generated/ATARI.AutoFit.control.AutoFitOUT.html#ATARI.AutoFit.control.AutoFitOUT">[docs]</a>
+<span class="k">class</span> <span class="nc">AutoFitOUT</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">initialFBOUT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">InitialFBOUT</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">eliminateOUT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">eliminator_OUTput</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">eliminateFiltered</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">spinselectOUT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SpinSelectOUT</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial</span> <span class="o">=</span> <span class="n">initialFBOUT</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eliminate</span> <span class="o">=</span> <span class="n">eliminateOUT</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eliminate_filtered</span> <span class="o">=</span> <span class="n">eliminateFiltered</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spinselect</span> <span class="o">=</span> <span class="n">spinselectOUT</span></div>
+
+
+
+<div class="viewcode-block" id="AutoFit_Control">
+<a class="viewcode-back" href="../../../source_api/generated/ATARI.AutoFit.control.AutoFit_Control.html#ATARI.AutoFit.control.AutoFit_Control">[docs]</a>
+<span class="k">class</span> <span class="nc">AutoFit_Control</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                 <span class="n">sammy_rto</span><span class="p">:</span> <span class="n">sammy_classes</span><span class="o">.</span><span class="n">SammyRunTimeOptions</span><span class="p">,</span>
+                 <span class="n">autofitOPT</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AutoFitOPT</span><span class="p">]</span>
+                 <span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">sammy_rto</span> <span class="o">=</span> <span class="n">sammy_rto</span>
+
+        <span class="k">if</span> <span class="n">autofitOPT</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">autofitOPT</span> <span class="o">=</span> <span class="n">AutoFitOPT</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">autofitOPT</span> <span class="o">=</span> <span class="n">autofitOPT</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_fit</span> <span class="o">=</span> <span class="n">InitialFB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autofitOPT</span><span class="o">.</span><span class="n">featurebankOPT</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eliminator</span> <span class="o">=</span> <span class="n">eliminator_by_chi2</span><span class="p">(</span><span class="n">options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">autofitOPT</span><span class="o">.</span><span class="n">eliminateOPT</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spinselect</span> <span class="o">=</span> <span class="n">SpinSelect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autofitOPT</span><span class="o">.</span><span class="n">spinselectOPT</span><span class="p">)</span>
+
+    
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+            <span class="n">particle_pair</span><span class="p">,</span>
+            <span class="n">energy_range</span><span class="p">,</span>
+            <span class="n">datasets</span><span class="p">,</span>
+            <span class="n">experiments</span><span class="p">,</span>
+            <span class="n">covariance_data</span><span class="p">,</span>
+            <span class="n">sammy_rto_fit</span>
+            <span class="p">):</span>
+        
+        <span class="c1">### initial feature bank solve</span>
+        <span class="n">initial_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_fit</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">particle_pair</span><span class="p">,</span>
+                                           <span class="n">energy_range</span><span class="p">,</span>
+                                           <span class="n">datasets</span><span class="p">,</span>
+                                           <span class="n">experiments</span><span class="p">,</span>
+                                           <span class="n">covariance_data</span><span class="p">,</span>
+                                           <span class="n">sammy_rto_fit</span>
+                                           <span class="p">)</span>
+        
+        <span class="n">initial_out_final_par</span> <span class="o">=</span> <span class="n">initial_out</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">par_post</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">initial_out_final_par</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
+        <span class="n">initial_out_final_par</span><span class="p">[</span><span class="s2">&quot;varyGg&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">initial_out_final_par</span><span class="p">))</span>
+        <span class="c1"># need to get side resonances here </span>
+
+
+        <span class="c1">### eliminator solve</span>
+        <span class="n">eliminate_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eliminator</span><span class="o">.</span><span class="n">eliminate</span><span class="p">(</span><span class="n">initial_out_final_par</span><span class="p">)</span>
+
+        <span class="c1"># return models 5 res - 20 res </span>
+
+        <span class="c1">### spin group selector</span>
+
+
+
+
+
+    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">Syndat_Control</span><span class="p">):</span>
+            <span class="c1"># sample syndat each time</span>
+            <span class="c1"># option to save each sample</span>
+            <span class="k">pass</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># read saved training data from hdf5 file</span>
+            <span class="k">pass</span>
+            
+        <span class="c1"># do training</span>
+        <span class="c1"># update internal hyperparameters (dchi2 for AIC, starting widths)</span>
+
+
+
+    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validation_data</span><span class="p">,</span> <span class="n">Syndat_Control</span><span class="p">):</span>
+            <span class="c1"># sample syndat each time</span>
+            <span class="c1"># option to save each sample</span>
+            <span class="k">pass</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">validation_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># read saved training data from hdf5 file</span>
+            <span class="k">pass</span></div>
+
+            
+        <span class="c1"># do validation on trained hyperparameters</span>
+        <span class="c1"># report performance</span>
+
+
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Noah A.W. Walton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

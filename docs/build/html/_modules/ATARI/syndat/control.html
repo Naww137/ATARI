@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATARI.syndat.control &mdash; atari 1.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=292eb321"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            atari
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../userguide.html">User’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../source_api/index.html">Source API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">atari</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">ATARI.syndat.control</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ATARI.syndat.control</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">ATARI.syndat.general_functions</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">ATARI.theory.experimental</span> <span class="kn">import</span> <span class="n">e_to_t</span> 
+<span class="kn">import</span> <span class="nn">ATARI.utils.hdf5</span> <span class="k">as</span> <span class="nn">h5io</span>
+
+<span class="kn">from</span> <span class="nn">ATARI.ModelData.particle_pair</span> <span class="kn">import</span> <span class="n">Particle_Pair</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">from</span> <span class="nn">ATARI.syndat.syndat_model</span> <span class="kn">import</span> <span class="n">Syndat_Model</span>
+<span class="kn">from</span> <span class="nn">ATARI.syndat.data_classes</span> <span class="kn">import</span> <span class="n">syndatOPT</span><span class="p">,</span> <span class="n">syndatOUT</span>
+
+
+<div class="viewcode-block" id="Syndat_Control">
+<a class="viewcode-back" href="../../../source_api/generated/ATARI.syndat.control.Syndat_Control.html#ATARI.syndat.control.Syndat_Control">[docs]</a>
+<span class="k">class</span> <span class="nc">Syndat_Control</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Syndat Control module for sampling from multiple syndat models.</span>
+
+<span class="sd">    _extended_summary_</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    particle_pair: Particle_Pair</span>
+<span class="sd">        ATARI class describing the reaction model.</span>
+<span class="sd">    syndat_models: list[Syndat_Model]</span>
+<span class="sd">        list of individual Syndat_Model classes</span>
+<span class="sd">    model_correlations: dict</span>
+<span class="sd">        Dictionary of uncertain parameters that correlate individual Syndat_Models. </span>
+<span class="sd">        Format is the same as other model parameters: key:(val, unc).</span>
+<span class="sd">        If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.</span>
+<span class="sd">    sampleRES: bool</span>
+<span class="sd">        Option to sample a new resonance ladder with each sample.</span>
+<span class="sd">        Will override SyndatOPT.sampleRES for individual Syndat_Models.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+                 <span class="n">particle_pair</span><span class="p">:</span> <span class="n">Particle_Pair</span><span class="p">,</span>
+                 <span class="n">syndat_models</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Syndat_Model</span><span class="p">],</span>
+                 <span class="n">model_correlations</span><span class="p">,</span> 
+                 <span class="n">sampleRES</span><span class="p">:</span> <span class="nb">bool</span>
+                 <span class="p">):</span>
+        
+        <span class="c1">### user supplied options</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">particle_pair</span> <span class="o">=</span> <span class="n">particle_pair</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span> <span class="o">=</span> <span class="n">syndat_models</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sampleRES</span> <span class="o">=</span> <span class="n">sampleRES</span>
+
+        <span class="c1"># self.clear_samples()</span>
+
+
+    <span class="c1"># @property</span>
+    <span class="c1"># def samples(self) -&gt; list:</span>
+    <span class="c1">#     return self._samples</span>
+    <span class="c1"># @samples.setter</span>
+    <span class="c1"># def samples(self, samples):</span>
+    <span class="c1">#     self._samples = samples</span>
+    <span class="c1"># def clear_samples(self):</span>
+    <span class="c1">#     self.samples = []  </span>
+    
+    
+    <span class="k">def</span> <span class="nf">get_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">i</span><span class="p">):</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">syn_mod</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">syn_mod</span><span class="o">.</span><span class="n">title</span><span class="p">]</span> <span class="o">=</span> <span class="n">syn_mod</span><span class="o">.</span><span class="n">samples</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">data</span>
+    
+    <span class="c1"># @samples.setter</span>
+    <span class="c1"># def samples(self, samples):</span>
+    <span class="c1">#     self._samples = samples</span>
+    <span class="c1"># def clear_samples(self):</span>
+    <span class="c1">#     self.samples = []  </span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">titles</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">syn_mod</span><span class="o">.</span><span class="n">title</span> <span class="k">for</span> <span class="n">syn_mod</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">]</span>
+
+
+
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> 
+               <span class="n">sammyRTO</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+               <span class="n">pw_true_list</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+               <span class="p">):</span>
+
+        <span class="n">generate_pw_true_with_sammy</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">par_true</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">pw_true_list</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampleRES</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;User provided a pw_true but also asked to sampleRES&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pw_true_list</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;User provided a pw_true list not of the same length as syndat_models&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pw_true_list</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">generate_pw_true_with_sammy</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">sammyRTO</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;User did not supply a sammyRTO or a pw_true, one of these is needed&quot;</span><span class="p">)</span>
+            <span class="n">par_true</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">particle_pair</span><span class="o">.</span><span class="n">resonance_ladder</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pw_true_list</span> <span class="o">=</span> <span class="n">pw_true_list</span>
+
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
+            
+            <span class="c1">### sample resonance ladder</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampleRES</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">particle_pair</span><span class="o">.</span><span class="n">sample_resonance_ladder</span><span class="p">()</span>
+                <span class="n">par_true</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">particle_pair</span><span class="o">.</span><span class="n">resonance_ladder</span>
+            
+            <span class="c1">### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs</span>
+            <span class="n">true_parameters</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="c1">### generate true experimental objects with sammy or just take pw_true arguement</span>
+            <span class="n">pw_true_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">syn_mod</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">:</span>
+                <span class="n">pw_true</span> <span class="o">=</span> <span class="n">syn_mod</span><span class="o">.</span><span class="n">generate_true_experimental_objects</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">particle_pair</span><span class="p">,</span> 
+                                                                     <span class="n">sammyRTO</span><span class="p">,</span> 
+                                                                     <span class="n">generate_pw_true_with_sammy</span><span class="p">)</span>
+                <span class="n">pw_true_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pw_true</span><span class="p">)</span>
+
+
+            <span class="c1">### generate raw datasets from samples model parameters</span>
+            <span class="k">for</span> <span class="n">syn_mod</span><span class="p">,</span> <span class="n">pw_true</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">,</span> <span class="n">pw_true_list</span><span class="p">):</span>
+                <span class="n">syn_mod</span><span class="o">.</span><span class="n">generate_raw_observables</span><span class="p">(</span><span class="n">pw_true</span><span class="p">,</span> <span class="n">true_parameters</span><span class="p">)</span>
+
+
+            <span class="c1">### reduce raw data with reductive reduction model </span>
+                <span class="c1">### Perhaps I could sample correlated reductive parameters?</span>
+            <span class="k">for</span> <span class="n">syn_mod</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">:</span>
+                <span class="n">syn_mod</span><span class="o">.</span><span class="n">reduce_raw_observables</span><span class="p">()</span>
+
+
+            <span class="c1">### for each model, append syndat out</span>
+            <span class="c1"># sample_dict = {}</span>
+            <span class="k">for</span> <span class="n">syn_mod</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">syndat_models</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">syn_mod</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">save_raw_data</span><span class="p">:</span>
+                    <span class="n">out</span> <span class="o">=</span> <span class="n">syndatOUT</span><span class="p">(</span><span class="n">par_true</span><span class="o">=</span><span class="n">par_true</span><span class="p">,</span>
+                                    <span class="n">pw_reduced</span><span class="o">=</span><span class="n">syn_mod</span><span class="o">.</span><span class="n">red_data</span><span class="p">,</span> 
+                                    <span class="n">pw_raw</span><span class="o">=</span><span class="n">syn_mod</span><span class="o">.</span><span class="n">raw_data</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">out</span> <span class="o">=</span> <span class="n">syndatOUT</span><span class="p">(</span><span class="n">par_true</span><span class="o">=</span><span class="n">par_true</span><span class="p">,</span>
+                                    <span class="n">pw_reduced</span><span class="o">=</span><span class="n">syn_mod</span><span class="o">.</span><span class="n">red_data</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">syn_mod</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">calculate_covariance</span><span class="p">:</span>
+                    <span class="n">out</span><span class="o">.</span><span class="n">covariance_data</span> <span class="o">=</span> <span class="n">syn_mod</span><span class="o">.</span><span class="n">covariance_data</span>
+                    
+                <span class="n">syn_mod</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+                <span class="c1"># sample_dict[syn_mod.title] = out</span>
+            
+            <span class="c1"># self.samples.append(sample_dict)</span>
+
+        <span class="k">return</span></div>
+
+    
+
+
+    <span class="c1"># def to_hdf5(self, filepath):</span>
+
+    <span class="c1">#     for isample, sample_dict in enumerate(self.samples):</span>
+
+    <span class="c1">#         assert all(sample_dict[self.titles[0]].par_true.equals(sample_dict[t].par_true for t in self.titles))</span>
+    <span class="c1">#         h5io.write_par(filepath, isample, sample_dict[self.titles[0]].par_true, &#39;true&#39;)</span>
+
+    <span class="c1">#         for syn_mod in self.syndat_models:</span>
+    <span class="c1">#             # syn_mod.to_hdf5(filepath)</span>
+    <span class="c1">#             h5io.write_pw_exp(filepath, isample, sample_dict[t].pw_reduced, title=t, CovT=None, CovXS=None)</span>
+
+
+
+
+<span class="c1"># class syndat:</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#     Syndat model for a single experimental dataset that can be used to generate similar statistical realizations.</span>
+<span class="c1">#     This class holds all the necessary subclasses for the reaction model, experimental model, and reduction model.</span>
+    
+<span class="c1">#     Parameters</span>
+<span class="c1">#     ----------</span>
+<span class="c1">#     particle_pair: Particle_Pair</span>
+<span class="c1">#         Class describing the reaction model.</span>
+<span class="c1">#     experimental_model: Experimental_Model</span>
+<span class="c1">#         Class describing the experimental model, used with the SAMMY code.</span>
+<span class="c1">#     generative_measurement_model: Generative_Measurement_Model</span>
+<span class="c1">#         Class describing the measurement model used for data generation.</span>
+<span class="c1">#     reductive_measurement_model: Reductive_Measurement_Model</span>
+<span class="c1">#         Class describing the measurement model used for data reduction.</span>
+<span class="c1">#     options: syndatOPT</span>
+<span class="c1">#         Syndat options class, providing information about how to run syndat.</span>
+<span class="c1">#     neutron_spectrum: pd.DataFrame = pd.DataFrame()</span>
+<span class="c1">#         Optional input of a measured, experimental neutron spectrum if this data is accessable.</span>
+
+<span class="c1">#     Attributes</span>
+<span class="c1">#     ----------</span>
+<span class="c1">#     particle_pair: Particle_Pair</span>
+<span class="c1">#         Class describing the reaction model.</span>
+<span class="c1">#     experimental_model: Experimental_Model</span>
+<span class="c1">#         Class describing the experimental model, used with the SAMMY code.</span>
+<span class="c1">#     generative_measurement_model: Generative_Measurement_Model</span>
+<span class="c1">#         Class describing the measurement model used for data generation.</span>
+<span class="c1">#     reductive_measurement_model: Reductive_Measurement_Model</span>
+<span class="c1">#         Class describing the measurement model used for data reduction.</span>
+<span class="c1">#     options: syndatOPT</span>
+<span class="c1">#         Syndat options class, providing information about how to run syndat.</span>
+<span class="c1">#     neutron_spectrum: pd.DataFrame = pd.DataFrame()</span>
+<span class="c1">#         Optional input of a measured, experimental neutron spectrum if this data is accessable.</span>
+    
+<span class="c1">#     datasets: list</span>
+<span class="c1">#         List of sampled syndatOUT samples from the current model.</span>
+    
+<span class="c1">#     &quot;&quot;&quot;</span>
+
+<span class="c1">#     def __init__(self, </span>
+<span class="c1">#                  particle_pair: Particle_Pair,</span>
+<span class="c1">#                  experimental_model: Experimental_Model,</span>
+<span class="c1">#                  generative_measurement_model: Generative_Measurement_Model,</span>
+<span class="c1">#                  reductive_measurement_model: Reductive_Measurement_Model,</span>
+<span class="c1">#                  options: syndatOPT,</span>
+<span class="c1">#                  neutron_spectrum: pd.DataFrame = pd.DataFrame()</span>
+<span class="c1">#                  ):</span>
+        
+<span class="c1">#         ### user supplied options</span>
+<span class="c1">#         self.particle_pair = particle_pair</span>
+<span class="c1">#         self.experimental_model = experimental_model</span>
+<span class="c1">#         self.generative_measurement_model = generative_measurement_model</span>
+<span class="c1">#         self.reductive_measurement_model = reductive_measurement_model</span>
+    
+<span class="c1">#         self.options = options</span>
+<span class="c1">#         self.neutron_spectrum = neutron_spectrum</span>
+
+<span class="c1">#         ### some conveinient definitions</span>
+<span class="c1">#         self.reaction = self.experimental_model.reaction</span>
+<span class="c1">#         self.pw_true = pd.DataFrame()</span>
+<span class="c1">#         self.datasets = []</span>
+
+    
+<span class="c1">#     @property</span>
+<span class="c1">#     def datasets(self):</span>
+<span class="c1">#         return self._datasets</span>
+<span class="c1">#     @datasets.setter</span>
+<span class="c1">#     def datasets(self, datasets):</span>
+<span class="c1">#         self._datasets = datasets</span>
+
+    <span class="c1"># def sample(self, </span>
+    <span class="c1">#            sammyRTO=None,</span>
+    <span class="c1">#            num_samples=1,</span>
+    <span class="c1">#            pw_true = pd.DataFrame()</span>
+    <span class="c1">#            ):</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     Sample from the syndat model. </span>
+    <span class="c1">#     The samples are stored in the datasets attribute.</span>
+
+    <span class="c1">#     Parameters</span>
+    <span class="c1">#     ----------</span>
+    <span class="c1">#     sammyRTO : _type_</span>
+    <span class="c1">#         Sammy runtime options</span>
+    <span class="c1">#     num_samples : int, optional</span>
+    <span class="c1">#         Number of samples to draw from the syndat model, by default 1</span>
+    <span class="c1">#     pw_true : _type_, optional</span>
+    <span class="c1">#         _description_, by default pd.DataFrame()</span>
+
+    <span class="c1">#     Raises</span>
+    <span class="c1">#     ------</span>
+    <span class="c1">#     ValueError</span>
+    <span class="c1">#         _description_</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+        
+    <span class="c1">#     if not pw_true.empty and self.options.sampleRES:</span>
+    <span class="c1">#             raise ValueError(&quot;User provided a pw_true but also asked to sampleRES&quot;)</span>
+    <span class="c1">#     if pw_true.empty and sammyRTO is None:</span>
+    <span class="c1">#         raise ValueError(&quot;User did not supply a sammyRTO or a pw_true, one of these is needed&quot;)</span>
+    <span class="c1">#     self.pw_true = pw_true</span>
+
+    <span class="c1">#     datasets = []</span>
+    <span class="c1">#     for i in range(num_samples):</span>
+            
+    <span class="c1">#         if self.options.sampleRES:</span>
+    <span class="c1">#             self.particle_pair.sample_resonance_ladder(self.experimental_model.energy_range)</span>
+            
+    <span class="c1">#         ### generate pointwise true from experimental model</span>
+    <span class="c1">#         if self.pw_true.empty or False or self.options.sampleRES: #options.sample_experimental_model</span>
+    <span class="c1">#             assert sammyRTO is not None</span>
+    <span class="c1">#             self.pw_true = self.generate_true_experimental_objects(sammyRTO) # calculate pw_truw with sammy</span>
+    <span class="c1">#         else:</span>
+    <span class="c1">#             pass # use existing pw_true from experimental model</span>
+    <span class="c1">#         self.pw_true[&quot;tof&quot;] = e_to_t(self.pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]</span>
+
+    <span class="c1">#         ### generate raw data from generative reduction model</span>
+    <span class="c1">#         self.generate_raw_observables(self.neutron_spectrum)</span>
+    <span class="c1">#         ### reduce raw data with reductive reduction model </span>
+    <span class="c1">#         self.reduce_raw_observables()</span>
+
+    <span class="c1">#         if self.options.save_raw_data:</span>
+    <span class="c1">#             out = syndatOUT(pw_reduced=self.red_data, </span>
+    <span class="c1">#                             pw_raw = self.raw_data)</span>
+    <span class="c1">#         else:</span>
+    <span class="c1">#             out = syndatOUT(pw_reduced=self.red_data)</span>
+    <span class="c1">#         if self.options.calculate_covariance:</span>
+    <span class="c1">#             out.covariance_data = self.covariance_data</span>
+                
+    <span class="c1">#         datasets.append(out)</span>
+
+    <span class="c1">#     self.datasets = datasets</span>
+    <span class="c1">#     return</span>
+
+
+    <span class="c1"># def tohdf5(self):</span>
+    <span class="c1">#     return</span>
+
+
+
+    <span class="c1"># def generate_true_experimental_objects(self, </span>
+    <span class="c1">#                                        sammyRTO:sammy_classes.SammyRunTimeOptions</span>
+    <span class="c1">#                                        ):</span>
+    <span class="c1">#     rto = deepcopy(sammyRTO)</span>
+    <span class="c1">#     rto.bayes = False</span>
+    <span class="c1">#     template = self.experimental_model.template</span>
+
+    <span class="c1">#     if template is None: raise ValueError(&quot;Experimental model sammy template has not been assigned&quot;)</span>
+
+    <span class="c1">#     sammyINP = sammy_classes.SammyInputData(</span>
+    <span class="c1">#         self.particle_pair,</span>
+    <span class="c1">#         self.particle_pair.resonance_ladder,</span>
+    <span class="c1">#         template= template,</span>
+    <span class="c1">#         experiment= self.experimental_model,</span>
+    <span class="c1">#         energy_grid= self.experimental_model.energy_grid</span>
+    <span class="c1">#     )</span>
+    <span class="c1">#     sammyOUT = sammy_functions.run_sammy(sammyINP, rto)</span>
+
+    <span class="c1">#     if self.reaction == &quot;transmission&quot;:</span>
+    <span class="c1">#         true = &quot;theo_trans&quot;</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         true = &quot;theo_xs&quot;</span>
+    <span class="c1">#     pw_true = sammyOUT.pw.loc[:, [&quot;E&quot;, true]]</span>
+    <span class="c1">#     pw_true.rename(columns={true: &quot;true&quot;}, inplace=True)</span>
+    <span class="c1">#     # pw_true[&quot;tof&quot;] = e_to_t(pw_true.E.values, self.experimental_model.FP[0], True)*1e9+self.experimental_model.t0[0]</span>
+        
+    <span class="c1">#     return pw_true</span>
+
+
+    
+    
+    <span class="c1"># def generate_raw_observables(self, neutron_spectrum):</span>
+
+    <span class="c1">#     ### define raw data attribute as true_df</span>
+    <span class="c1">#     self.raw_data = deepcopy(self.pw_true)</span>
+
+    <span class="c1">#     ### if no open spectra supplied, approximate it         #!!! Should I use true reduction parameters here?</span>
+    <span class="c1">#     if neutron_spectrum.empty:</span>
+    <span class="c1">#         self.neutron_spectrum = approximate_neutron_spectrum_Li6det(self.pw_true.E, </span>
+    <span class="c1">#                                                                     self.options.smoothTNCS, </span>
+    <span class="c1">#                                                                     self.experimental_model.FP[0],</span>
+    <span class="c1">#                                                                     self.experimental_model.t0[0],</span>
+    <span class="c1">#                                                                     self.generative_measurement_model.neutron_spectrum_triggers)</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         self.neutron_spectrum = neutron_spectrum</span>
+        
+    <span class="c1">#     ### sample a realization of the true, true-underlying open count spectra</span>
+    <span class="c1">#     if self.options.sampleTNCS:</span>
+    <span class="c1">#         self.true_neutron_spectrum = sample_true_neutron_spectrum(self.neutron_spectrum)</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         self.true_neutron_spectrum = deepcopy(self.neutron_spectrum)</span>
+
+    <span class="c1">#     ### generate raw count data from generative reduction model</span>
+    <span class="c1">#     self.raw_data = self.generative_measurement_model.generate_raw_data(self.pw_true, self.true_neutron_spectrum, self.options)</span>
+
+    <span class="c1">#     return</span>
+    
+
+    <span class="c1"># def reduce_raw_observables(self):</span>
+    <span class="c1">#     self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.neutron_spectrum, self.options)</span>
+    <span class="c1">#     self.covariance_data = self.reductive_measurement_model.covariance_data</span>
+    <span class="c1">#     return</span>
+
+
+
+
+
+<span class="c1"># # ================================================================</span>
+<span class="c1"># #  testing!</span>
+<span class="c1"># # ================================================================</span>
+
+
+
+<span class="c1"># from ATARI.models.particle_pair import Particle_Pair</span>
+<span class="c1"># from ATARI.sammy_interface import sammy_classes, sammy_functions, template_creator</span>
+<span class="c1"># import os </span>
+<span class="c1"># from copy import copy</span>
+
+<span class="c1"># ### define reaction model</span>
+<span class="c1"># Ta_pair = Particle_Pair()  </span>
+<span class="c1"># Ta_pair.add_spin_group(Jpi=&#39;3.0&#39;,</span>
+<span class="c1">#                        J_ID=1,</span>
+<span class="c1">#                        D_avg=8.79,</span>
+<span class="c1">#                        Gn_avg=46.5,</span>
+<span class="c1">#                        Gn_dof=1,</span>
+<span class="c1">#                        Gg_avg=64.0,</span>
+<span class="c1">#                        Gg_dof=1000)</span>
+
+<span class="c1"># # energy_range = [200, 250]</span>
+<span class="c1"># # resonance_ladder = Ta_pair.sample_resonance_ladder(energy_range)</span>
+
+<span class="c1"># ### define experimental model</span>
+<span class="c1"># exp_model_T = Experimental_Model()</span>
+<span class="c1"># generation_T1 = transmission_rpi()</span>
+<span class="c1"># generative_model = GenerativeModel(Ta_pair, exp_model_T, generation_T1)</span>
+
+<span class="c1"># rto = sammy_classes.SammyRunTimeOptions(&#39;/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy&#39;,</span>
+<span class="c1">#                                         {&quot;Print&quot;:   True,</span>
+<span class="c1">#                                          &quot;bayes&quot;:   False,</span>
+<span class="c1">#                                          &quot;keep_runDIR&quot;: False,</span>
+<span class="c1">#                                          &quot;sammy_runDIR&quot;: &quot;/Users/noahwalton/Documents/GitHub/ATARI/ATARI/syndat/sammy_runDIR&quot;</span>
+<span class="c1">#                                          })</span>
+
+<span class="c1"># template_creator.make_input_template(&#39;/Users/noahwalton/Documents/GitHub/ATARI/ATARI/syndat/template_T.inp&#39;, Ta_pair, exp_model_T, rto)</span>
+<span class="c1"># exp_model_T.template = &#39;/Users/noahwalton/Documents/GitHub/ATARI/ATARI/syndat/template_T.inp&#39;</span>
+
+
+
+<span class="c1"># reduction_T1 = transmission_rpi()</span>
+
+<span class="c1"># options=syndatOPT()</span>
+<span class="c1"># synT = syndat(generative_model, reductive_model=reduction_T1, options=options)</span>
+
+<span class="c1"># test = synT.sample(rto)</span>
+
+<span class="c1"># print(test.pw_raw)</span>
+<span class="c1"># print(test.pw_reduced)</span>
+
+
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Noah A.W. Walton.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

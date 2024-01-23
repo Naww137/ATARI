@@ -14,7 +14,23 @@ from ATARI.syndat.data_classes import syndatOPT, syndatOUT
 
 class Syndat_Control:
     """
-    Syndat control module for generating synthetic data samples.
+    Syndat Control module for sampling from multiple syndat models.
+
+    _extended_summary_
+
+    Parameters
+    ----------
+    particle_pair: Particle_Pair
+        ATARI class describing the reaction model.
+    syndat_models: list[Syndat_Model]
+        list of individual Syndat_Model classes
+    model_correlations: dict
+        Dictionary of uncertain parameters that correlate individual Syndat_Models. 
+        Format is the same as other model parameters: key:(val, unc).
+        If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.
+    sampleRES: bool
+        Option to sample a new resonance ladder with each sample.
+        Will override SyndatOPT.sampleRES for individual Syndat_Models.
     """
     
 
@@ -22,13 +38,13 @@ class Syndat_Control:
                  particle_pair: Particle_Pair,
                  syndat_models: list[Syndat_Model],
                  model_correlations, 
-                 options: syndatOPT
+                 sampleRES: bool
                  ):
         
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
-        self.options = deepcopy(options)
+        self.sampleRES = sampleRES
 
         # self.clear_samples()
 
@@ -70,7 +86,7 @@ class Syndat_Control:
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true_list is not None:
-            if self.options.sampleRES:
+            if self.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")
             if len(pw_true_list) != len(self.syndat_models):
                 raise ValueError("User provided a pw_true list not of the same length as syndat_models")
@@ -85,7 +101,7 @@ class Syndat_Control:
         for i in range(num_samples):
             
             ### sample resonance ladder
-            if self.options.sampleRES:
+            if self.sampleRES:
                 self.particle_pair.sample_resonance_ladder()
                 par_true = self.particle_pair.resonance_ladder
             

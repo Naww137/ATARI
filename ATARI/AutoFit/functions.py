@@ -63,7 +63,7 @@ def get_starting_feature_bank(energy_range,
 
 
 def generate_external_resonance_ladder(spin_groups: list[dict], 
-                                  energy_range):
+                                        energy_range):
     E = []; Gg = []; Gn1 = []; J_ID = []
     for sg in spin_groups:
         E.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])

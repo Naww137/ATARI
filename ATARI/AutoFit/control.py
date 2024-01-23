@@ -2,18 +2,35 @@
 import pandas as pd
 import numpy as np
 from ATARI.syndat.control import Syndat_Control, Syndat_Model
-from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
-from ATARI.AutoFit.chi2_eliminator_v2 import elim_OPTs, eliminator_by_chi2
-from ATARI.AutoFit.spin_group_selection import SpinSelectOPT, SpinSelect
+from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT, InitialFBOUT
+from ATARI.AutoFit.chi2_eliminator_v2 import elim_OPTs, eliminator_by_chi2, eliminator_OUTput
+from ATARI.AutoFit.spin_group_selection import SpinSelectOPT, SpinSelect, SpinSelectOUT
 from typing import Optional
+from ATARI.sammy_interface import sammy_classes
+
+class Evaluation_Data:
+    def __init__(self):
+        self.pw_data = []
+        self.covariance_data = []
+        self.experimental_models = []
+
+    def add_dataset(self,
+                    pointwise_data,
+                    covariance_data,
+                    experimental_model
+                    ):
+        self.pw_data.append(pointwise_data)
+        self.covariance_data.append(covariance_data)
+        self.experimental_models.append(experimental_model)
+
 
 
 class AutoFitOPT:
     def __init__(self,
                  featurebankOPT: Optional[InitialFBOPT] = None,
                  eliminateOPT: Optional[elim_OPTs]      = None,
-                 spinselectOPT: Optional[SpinSelectOPT] = None#,
-                #  **kwargs
+                 spinselectOPT: Optional[SpinSelectOPT] = None,
+                 **kwargs
                  ):
         
         if featurebankOPT is None:
@@ -29,6 +46,7 @@ class AutoFitOPT:
         else:
             self.spinselectOPT = spinselectOPT
 
+
         # for key, value in kwargs.items():
         #     setattr(self, key, value)
 
@@ -36,20 +54,26 @@ class AutoFitOPT:
 
 class AutoFitOUT:
     def __init__(self, 
-                 initialFBOUT,
-                 eliminateOUT,
-                 spinselectOUT):
+                 initialFBOUT: Optional[InitialFBOUT] = None,
+                 eliminateOUT: Optional[eliminator_OUTput] = None,
+                 eliminateFiltered: Optional[dict] = None,
+                 spinselectOUT: Optional[SpinSelectOUT] = None,
+                 ):
+        
         self.initial = initialFBOUT
         self.eliminate = eliminateOUT
+        self.eliminate_filtered = eliminateFiltered
         self.spinselect = spinselectOUT
 
 
 class AutoFit_Control:
 
     def __init__(self,
+                 sammy_rto: sammy_classes.SammyRunTimeOptions,
                  autofitOPT: Optional[AutoFitOPT]
                  ):
         
+        self.sammy_rto = sammy_rto
 
         if autofitOPT is None:
             self.autofitOPT = AutoFitOPT()
@@ -57,9 +81,7 @@ class AutoFit_Control:
             self.autofitOPT = autofitOPT
 
         self.initial_fit = InitialFB(self.autofitOPT.featurebankOPT)
-        self.eliminator = eliminator_by_chi2(rto=sammy_rto_fit,
-                                             sammyINPyw = elim_sammyINPyw, 
-                                             options = self.autofitOPT.eliminateOPT)
+        self.eliminator = eliminator_by_chi2(options = self.autofitOPT.eliminateOPT)
         self.spinselect = SpinSelect(self.autofitOPT.spinselectOPT)
 
     

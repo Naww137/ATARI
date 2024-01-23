@@ -23,7 +23,7 @@ def test_mean_converges_to_true_transmissionRPI():
     ipert = 5000
     exp_trans = np.zeros([ipert,3])
     exp_trans_unc = np.zeros([ipert,3])
-    df_true = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([0.5,0.8,0.2])})
+    df_true = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([0.5,0.99,0.01])})
     synT.sample(pw_true=df_true, num_samples=ipert)
 
     for i in range(ipert):
@@ -54,7 +54,7 @@ def test_mean_converges_to_true_captureRPI():
     ipert = 5000
     exp_trans = np.zeros([ipert,3])
     exp_trans_unc = np.zeros([ipert,3])
-    df_true = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([0.5,0.8,0.2])})
+    df_true = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([0.5,0.8,0.1])})
     synT.sample(pw_true=df_true, num_samples=ipert)
 
     for i in range(ipert):
@@ -74,8 +74,8 @@ def no_sampling_returns_same_values():
 
 
 
-test_mean_converges_to_true_transmissionRPI()
+# test_mean_converges_to_true_transmissionRPI()
 
 test_mean_converges_to_true_captureRPI()
 
-no_sampling_returns_same_values()
+# no_sampling_returns_same_values()

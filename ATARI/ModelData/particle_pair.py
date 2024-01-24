@@ -50,6 +50,64 @@ class Particle_Pair:
     """
     Particle_Pair is a class that stores information regarding the reacting isotopes, the
     resonances, energy range, spingroups, and more.
+
+    Parameters
+    ----------
+    isotope:
+        The name of the isotope
+    resonance_ladder:
+        The resonance ladder
+    formalism:
+        R-matrix approximation
+    spin_groups:
+        The recorded spingroups
+    ac:
+        Channel radius
+    target:
+        The target particle
+    projectile:
+        The target particle
+    M:
+        Mass of the target isotope
+    m:
+        Mass of the projectile
+    I:
+        Target isotope intrinsic spin
+    i:
+        Projectile intrinsic spin
+    l_max:
+        Maximum angular momentum
+    total_energy_range:
+        Modelled energy range
+
+    Attributes
+    ----------
+    isotope:
+        The name of the isotope
+    resonance_ladder:
+        The resonance ladder
+    formalism:
+        R-matrix approximation
+    spin_groups:
+        The recorded spingroups
+    ac:
+        Channel radius
+    target:
+        The target particle
+    projectile:
+        The target particle
+    M:
+        Mass of the target isotope
+    m:
+        Mass of the projectile
+    I:
+        Target isotope intrinsic spin
+    i:
+        Projectile intrinsic spin
+    l_max:
+        Maximum angular momentum
+    total_energy_range:
+        Modelled energy range
     """
 
     # Class attribute constants:
@@ -82,7 +140,6 @@ class Particle_Pair:
 
     @property
     def isotope(self):
-        'The name of the isotope'
         return self._isotope
     @isotope.setter
     def isotope(self, isotope):
@@ -90,7 +147,6 @@ class Particle_Pair:
 
     @property
     def resonance_ladder(self):
-        'The resonance ladder'
         return self._resonance_ladder
     @resonance_ladder.setter
     def resonance_ladder(self, resonance_ladder):
@@ -98,7 +154,6 @@ class Particle_Pair:
 
     @property
     def formalism(self):
-        'R-matrix approximation'
         return self._formalism
     @formalism.setter
     def formalism(self, formalism):
@@ -108,7 +163,6 @@ class Particle_Pair:
 
     @property
     def spin_groups(self):
-        'The recorded spingroups'
         return self._spin_groups
     @spin_groups.setter
     def spin_groups(self, spin_groups):
@@ -116,7 +170,6 @@ class Particle_Pair:
 
     @property
     def ac(self):
-        'Channel radius'
         return self._ac
     @ac.setter
     def ac(self, ac):
@@ -124,7 +177,6 @@ class Particle_Pair:
 
     @property
     def target(self):
-        'The target particle'
         raise AttributeError('Cannot access target information. It can only be set.')
     @target.setter
     def target(self, target):
@@ -136,7 +188,6 @@ class Particle_Pair:
 
     @property
     def projectile(self):
-        'The target particle'
         raise AttributeError('Cannot access projectile information. It can only be set.')
     @projectile.setter
     def projectile(self, projectile):
@@ -147,7 +198,6 @@ class Particle_Pair:
 
     @property
     def M(self):
-        'Mass of the target isotope'
         return self._M
     @M.setter
     def M(self, M):
@@ -155,7 +205,6 @@ class Particle_Pair:
 
     @property
     def m(self):
-        'Mass of the projectile'
         return self._m
     @m.setter
     def m(self, m):
@@ -163,7 +212,6 @@ class Particle_Pair:
     
     @property
     def I(self):
-        'Target isotope intrinsic spin'
         return self._I
     @I.setter
     def I(self, I):
@@ -171,7 +219,6 @@ class Particle_Pair:
 
     @property
     def i(self):
-        'Projectile intrinsic spin'
         return self._i
     @i.setter
     def i(self, i):
@@ -179,7 +226,6 @@ class Particle_Pair:
 
     @property
     def l_max(self):
-        'Maximum angular momentum'
         return self._l_max
     @l_max.setter
     def l_max(self, l_max):
@@ -187,7 +233,6 @@ class Particle_Pair:
 
     @property
     def total_energy_range(self):
-        'Modelled energy range'
         return self._total_energy_range
     @total_energy_range.setter
     def total_energy_range(self, total_energy_range):

@@ -69,7 +69,7 @@ class Particle_Pair:
     spin_groups:
         The recorded spingroups
     ac:
-        Channel radius
+        Channel radius in square-root barns or 1e-12 cm
     target:
         The target particle
     projectile:
@@ -102,7 +102,7 @@ class Particle_Pair:
 
         self.target     = Ta181
         self.projectile = Neutron
-        self.ac = 8.127 # fm
+        self.ac = 0.8127 # square-root barns or 1e-12 cm
 
         self.l_max = 1
 
@@ -423,7 +423,7 @@ class Particle_Pair:
             else:
                 L = Jinfo["Ls"][0]
             _, P_array, _, _ = FofE_recursive(levels, self.ac, self.M, self.m, L)
-            Gg_samples = Gg = 2*gg2_samples
+            Gg_samples = 2*gg2_samples
             Gn1_samples = 2*P_array[0]*gn2_samples
             zeros = np.zeros(len(levels))
             E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples, zeros, zeros, zeros, [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],

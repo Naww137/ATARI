@@ -62,7 +62,7 @@ def k_wavenumber(E, M, m):
     constant = (np.sqrt(2*mn_eV)/c/hbar)*(1e-14) # 0.002197 #sqrt(2Mn)/hbar 
 
     k = (M/(M+m))*constant*np.sqrt(E)
-    return k
+    return k # 1/√barns 
     
 
 def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
@@ -78,7 +78,7 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
         E : numpy.ndarray
             Energy of the incident neutron.
         ac : float
-            Scattering channel radius in meters.
+            Scattering channel radius in square-root barns or 1e-12 cm.
         M : float or int
             Mass of the target nucleus.
         m : float or int
@@ -149,7 +149,7 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     E : float or numpy.ndarray
         Energy of the incident neutron.
     ac : float
-        Scattering channel radius in meters.
+        Scattering channel radius in square-root barns or 1e-12 cm.
     M : float or int
             Mass of the target nucleus.
     m : float or int

@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import eigvalsh_tridiagonal
-from typing import Union
+from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
 
@@ -8,27 +8,21 @@ def getD(xi,res_par_avg):
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
 
 
-def make_res_par_avg(J_ID, D_avg, Gn_avg, n_dof, Gg_avg, g_dof, print):
+def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):
 
-    res_par_avg = {'J_ID':J_ID, '<D>':D_avg, '<Gn>':Gn_avg, 'n_dof':n_dof, '<Gg>':Gg_avg, 'g_dof':g_dof}
+    res_par_avg = {'Jpi':Jpi, 'J_ID':J_ID, '<D>':D_avg, '<gn2>':gn_avg, 'n_dof':n_dof, '<gg2>':gg_avg, 'g_dof':g_dof}
 
-    res_par_avg['D01']  = getD(0.01,res_par_avg)
-    res_par_avg['D99']  = getD(0.99,res_par_avg)
-    res_par_avg['Gn01'] = res_par_avg['<Gn>']*chi2.ppf(0.01, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
-    res_par_avg['Gn99'] = res_par_avg['<Gn>']*chi2.ppf(0.99, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
-    res_par_avg['Gg01'] = res_par_avg['<Gg>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
-    res_par_avg['Gg99'] = res_par_avg['<Gg>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
-    res_par_avg['Gt01'] = res_par_avg['Gn01'] + res_par_avg['Gg01']
-    res_par_avg['Gt99'] = res_par_avg['Gn99'] + res_par_avg['Gg99']
+    quantiles = {}
+    quantiles['D01']  = getD(0.01,res_par_avg)
+    quantiles['D99']  = getD(0.99,res_par_avg)
+    quantiles['gn01'] = res_par_avg['<gn2>']*chi2.ppf(0.01, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
+    quantiles['gn99'] = res_par_avg['<gn2>']*chi2.ppf(0.99, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
+    quantiles['gg01'] = res_par_avg['<gg2>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+    quantiles['gg99'] = res_par_avg['<gg2>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+    quantiles['gt01'] = quantiles['gn01'] + quantiles['gg01']
+    quantiles['gt99'] = quantiles['gn99'] + quantiles['gg99']
 
-    if print:
-        print('D99  =',res_par_avg['D99'])
-        print('Gn01 =',res_par_avg['Gn01'])
-        print('Gn99 =',res_par_avg['Gn99'])
-        print('Gg01 =',res_par_avg['Gg01'])
-        print('Gg99 =',res_par_avg['Gg99'])
-        print('Gt01 =',res_par_avg['Gt01'])
-        print('Gt99 =',res_par_avg['Gt99'])
+    res_par_avg['quantiles'] = quantiles
 
     return res_par_avg
 
@@ -146,7 +140,7 @@ def wigner_semicircle_CDF(x):
     return (x/np.pi) * np.sqrt(1.0 - x**2) + np.arcsin(x)/np.pi + 0.5
 
 def sample_GE_eigs(num_eigs:int, beta:int=1,
-                   rng=None, seed:int=None):
+                   rng=None, seed:Optional[int]=None):
     """
     Samples the eigenvalues of n by n Gaussian Ensemble random matrices efficiently using the
     tridiagonal representation. The time complexity of this method is O( n**2 ) using scipy's
@@ -198,7 +192,7 @@ def sample_GE_eigs(num_eigs:int, beta:int=1,
     return eigs
 
 def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
-                       rng=None, seed:int=None):
+                       rng=None, seed:Optional[int]=None):
     """
     Samples GOE (β = 1), GUE (β = 2), or GSE (β = 4) resonance energies within a given energy
     range, `EB` and with a specified mean level-density, `freq`.
@@ -448,17 +442,19 @@ def chisquare_PDF(x, DOF, avg_reduced_width_square):
 
 
 
-def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF,
+def sample_RRR_widths(N_levels, 
+                      avg_reduced_width_square, 
+                      DOF,
                       rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
 
     This function uses the porter thomas distribution to sample a vector of
-    reduced width amplitudes (gn^2) corresponding to a vector of resonance level energies.
+    reduced widths (gn^2) corresponding to a vector of resonance level energies.
 
     Parameters
     ----------
-    level_vector : numpy.ndarray
+    N_levels : numpy.ndarray
         Ladder of resonance energy levels.
     avg_reduced_width_square : float or int
         Average value for the reduced width for rescale of the PT distribution.
@@ -481,11 +477,8 @@ def sample_RRR_widths(level_vector, avg_reduced_width_square, DOF,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    reduced_widths_square = avg_reduced_width_square*sample_chisquare(len(level_vector), DOF, rng=rng)/DOF
-    
-    # vlads code:
-    # res_par_avg['<Gg>']*np.random.chisquare(df=res_par_avg['g_dof'],size=sample_size)/res_par_avg['g_dof'] 
-    
+    reduced_widths_square = avg_reduced_width_square*sample_chisquare(N_levels, DOF, rng=rng)/DOF
+
     return np.array(reduced_widths_square)
 
 

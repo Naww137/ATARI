@@ -11,6 +11,9 @@ from ATARI.theory import resonance_statistics
 from ATARI.utils.misc import fine_egrid
 from ATARI.theory.resonance_statistics import sample_RRR_levels
 
+from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.utils.atario import fill_resonance_ladder
+
 from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOptions, SammyOutputData, SammyInputData
 from ATARI.sammy_interface.sammy_functions import run_sammy
 from ATARI.sammy_interface import template_creator
@@ -21,11 +24,45 @@ import os
 import pickle
 import copy
 import uuid
+import glob
 
 from datetime import datetime
 
 from matplotlib.pyplot import *
 from matplotlib import pyplot as plt
+
+from scipy.stats import gaussian_kde, norm
+
+
+def make_ladder_correct_types(ladder_df: pd.DataFrame) -> pd.DataFrame:
+    # Dictionary of desired column types
+    desired_types = {
+        'E': 'float64',
+        'Gg': 'float64',
+        'Gn1': 'float64',
+        #'gnx2': 'float64',
+        'J': 'float64',
+        'chs': 'float64',
+        'lwave': 'float64',
+        'J_ID': 'float64',
+        'varyE': 'int',
+        'varyGg': 'int',
+        'varyGn1': 'int'
+    }
+
+    # Make a copy of the DataFrame
+    output_ladder = ladder_df.copy()
+
+    # Iterate through the desired columns and types
+    for column, dtype in desired_types.items():
+        if column in output_ladder.columns:
+            # Convert column to desired type
+            output_ladder[column] = output_ladder[column].astype(dtype, errors='ignore')
+        else:
+            # Warn if the column is not in the DataFrame
+            print(f"Warning: Column '{column}' not found in the DataFrame.")
+
+    return output_ladder
 
 #     calc return aic, aicc, bic, bicc for models that were fittes using WLS
 def calc_AIC_AICc_BIC_BICc_by_fit(
@@ -88,6 +125,54 @@ def extract_jids_and_keys(Ta_Pair: Particle_Pair):
     return j_ids, keys
 
 
+def find_spin_group_info(Ta_Pair: Particle_Pair,
+                         j_id: float):
+    
+    """Getting info from Ta_pair spin groups dict"""
+    
+    for key, value in Ta_Pair.spin_groups.items():
+        # Check if the J_ID matches the input J_ID
+        if value.get('J_ID') == j_id:
+            return key, value
+    return None, None
+
+
+def find_deleted_res_spingroup_J_ID(ladder1, ladder2):
+
+    # Count J_ID occurrences in both DataFrames
+    count_df1 = ladder1['J_ID'].value_counts()
+    count_df2 = ladder2['J_ID'].value_counts()
+
+    # Find J_IDs with decreased counts
+    deleted_counts = count_df1 - count_df2
+    deleted_counts = deleted_counts[deleted_counts > 0]
+
+    return deleted_counts
+
+
+def norm_log_likelihood(y_hat, mean_Y, std_dev_Y):
+    """
+    Calculate the negative log likelihood for given values from a normal distribution.
+
+    Parameters:
+    y_hats (array-like): The observed values for which to calculate the likelihood.
+    mean_Y (float): The mean of the normal distribution.
+    std_dev_Y (float): The standard deviation of the normal distribution.
+
+    Returns:
+    float: The negative log likelihood.
+    """
+    # Calculate the likelihood for each y_hat
+    likelihoods = norm.pdf(y_hat, mean_Y, std_dev_Y)
+
+    # Calculate the log likelihoods (add a small constant to prevent log(0))
+    epsilon = 1e-323
+    NLL = - np.log(likelihoods + epsilon)
+        
+    return likelihoods, NLL
+
+
+
 def calc_LL_by_ladder(ladder_df: pd.DataFrame,
                              Ta_pair: Particle_Pair,
                              energy_grid: np.array = np.array([])):
@@ -104,13 +189,29 @@ def calc_LL_by_ladder(ladder_df: pd.DataFrame,
     
     + using chi2 pdf with all given params in Ta_pair class
 
+    + using normal pdf with all assumed params for a Gn
+
+
     for each spin group listed in Ta_pair & returning a sum + dict by group
     NOTE: only inside the provided window
     """
 
-    all_groups_NLLW = {}
-    all_groups_NLL_PT_Gn = {}
-    all_groups_NLL_PT_Gg = {}
+    ladder_df = ladder_df.copy()
+
+    by_groups_NLLW = {}
+    by_groups_NLL_PT_Gn = {}
+    by_groups_NLL_PT_Gg = {}
+
+    by_groups_NLL_gn_normal_on_reduced_width_amp = {}
+    by_groups_NLLW_all_energy = {}
+
+    # calc the gn values for a given ladder
+    # reduced_width_amplitude
+
+    # not squarred
+    ladder_df['gn'] = ladder_df.apply(lambda row: convert_gn1_by_Gn1(row, Ta_pair), axis=1)
+    
+    print(ladder_df)
 
     # select all spin groups listed in Ta_Pair
     separate_j_ids, spin_gr_ids = extract_jids_and_keys(Ta_Pair=Ta_pair)
@@ -126,52 +227,91 @@ def calc_LL_by_ladder(ladder_df: pd.DataFrame,
 
         if (len(energy_grid)>0):
             # selecting values with energies between min & max in defined window
-            spin_gr_res = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
+            spin_gr_res_internal = spin_gr_res[(spin_gr_res['E'] >= np.min(energy_grid)) & (spin_gr_res['E'] <= np.max(energy_grid))]
         
         # taking avgs for the current spin group
         avg_dist = spin_group_data['<D>']
         avg_Gn = spin_group_data['<Gn>']
         avg_Gg = spin_group_data['<Gg>']
 
-        Gn1_values = spin_gr_res.Gn1.to_numpy()
-        Gg_values = spin_gr_res.Gg.to_numpy()
+        Gn1_values = spin_gr_res_internal.Gn1.to_numpy()
+        Gg_values = spin_gr_res_internal.Gg.to_numpy()
 
-        E_values = spin_gr_res.E.to_numpy()
+        E_values = spin_gr_res_internal.E.to_numpy()
         E_values_sorted = np.sort(E_values)
         spacings = np.diff(E_values_sorted)
 
-        
-        # calculating for current sg
+        # the same but for all energy we have in our ladder (without limitation)
+        gn_values_allenergy = spin_gr_res.gn.to_numpy()
 
-        current_gr_NLL_PT_Gn = - resonance_statistics.width_LL(resonance_widths=Gn1_values,
+        # calc likellihood in assumption that gn has normal distr..
+        std_dev_gn = np.sqrt(avg_Gn)
+
+        likelihoods_gn, NLL_gn = norm_log_likelihood(gn_values_allenergy, 0, std_dev_gn)
+
+
+        E_values_allenergy = spin_gr_res.E.to_numpy()
+        E_values_allenergy_sorted = np.sort(E_values_allenergy)
+        spacings_allenergy = np.diff(E_values_allenergy_sorted)
+
+        # for combined ladder (all levels)
+        wigner_values_allenergy = resonance_statistics.wigner_PDF(spacings_allenergy, avg_dist)
+        neg_LL_W_gr_allenergy = -np.sum(np.log(wigner_values_allenergy))
+
+
+        # calculating for current sg
+        current_sgr_NLL_PT_Gn = - resonance_statistics.width_LL(resonance_widths=Gn1_values,
                                            average_width = avg_Gn,
                                            dof = spin_group_data['n_dof'])
         
-        current_gr_NLL_PT_Gg = - resonance_statistics.width_LL(resonance_widths=Gg_values,
+        current_sgr_NLL_PT_Gg = - resonance_statistics.width_LL(resonance_widths=Gg_values,
                                            average_width = avg_Gg,
                                            dof = spin_group_data['g_dof'])
 
         wigner_values = resonance_statistics.wigner_PDF(spacings, avg_dist)
-        neg_LL_gr = -np.sum(np.log(wigner_values))
+        neg_sgr_NLLW = -np.sum(np.log(wigner_values))
 
         # print(f"J_ID: {j_id}, Key: {sp_gr_id}, \n ")
         # print(f"Spin Group info: \n{ spin_group_data }")
         # print(spin_gr_res.shape[0])
 
-        all_groups_NLLW[sp_gr_id] = neg_LL_gr
+        by_groups_NLLW[sp_gr_id] = neg_sgr_NLLW
 
-        all_groups_NLL_PT_Gn[sp_gr_id] = current_gr_NLL_PT_Gn
-        all_groups_NLL_PT_Gg[sp_gr_id] = current_gr_NLL_PT_Gg
+        by_groups_NLL_PT_Gn[sp_gr_id] = current_sgr_NLL_PT_Gn
+        by_groups_NLL_PT_Gg[sp_gr_id] = current_sgr_NLL_PT_Gg
+
+        by_groups_NLLW_all_energy[sp_gr_id] = neg_LL_W_gr_allenergy
+        by_groups_NLL_gn_normal_on_reduced_width_amp[sp_gr_id] = np.sum(NLL_gn)
 
 
-    total_NLLW = sum(all_groups_NLLW.values())
-    total_NLL_PT_Gn = sum(all_groups_NLL_PT_Gn.values())
-    total_NLL_PT_Gg = sum(all_groups_NLL_PT_Gg.values())
+    total_NLLW = sum(by_groups_NLLW.values())
+    total_NLL_PT_Gn = sum(by_groups_NLL_PT_Gn.values())
+    total_NLL_PT_Gg = sum(by_groups_NLL_PT_Gg.values())
+
+    # for all energy region - not filtering any resonances + assuming normal distribution for gn
+    total_NLLW_all_energy = sum(by_groups_NLLW_all_energy.values())
+    total_NLL_gn_normal_on_reduced_width_amp = sum(by_groups_NLL_gn_normal_on_reduced_width_amp.values())
+    # end for all energy region - not filtering any resonances + assuming normal distribution for gn
 
     # print(all_groups_NLLW)
     # print(total_NLLW)
 
-    return total_NLLW, all_groups_NLLW, total_NLL_PT_Gg, all_groups_NLL_PT_Gg,  total_NLL_PT_Gn, all_groups_NLL_PT_Gn
+    result_dict = {
+        'total_NLLW': total_NLLW,
+        'by_groups_NLLW': by_groups_NLLW,
+        'total_NLL_PT_Gg': total_NLL_PT_Gg,
+        'by_groups_NLL_PT_Gg': by_groups_NLL_PT_Gg,
+        'total_NLL_PT_Gn': total_NLL_PT_Gn,
+        'by_groups_NLL_PT_Gn': by_groups_NLL_PT_Gn,
+
+        'total_NLLW_all_energy': total_NLLW_all_energy,
+        'by_groups_NLLW_all_energy': by_groups_NLLW_all_energy,
+
+        'total_NLL_gn_normal_on_reduced_width_amp': total_NLL_gn_normal_on_reduced_width_amp,
+        'by_groups_NLL_gn_normal_on_reduced_width_amp': by_groups_NLL_gn_normal_on_reduced_width_amp,
+        }
+
+    return result_dict
 
 
 # calculation of AIC & all parameters of current solution
@@ -278,13 +418,16 @@ def characterize_sol(Ta_pair: Particle_Pair,
         output_dict['bic_entire_ds'] = BIC_entire_ds
 
     # Wigner - by spingroups
-    NLLW, NLLW_gr, NLL_Gg, NLL_PT_Gg_gr, NLL_Gn, NLL_PT_Gn1_gr  = calc_LL_by_ladder(ladder_df = sol.par_post,
+    LL_dict = calc_LL_by_ladder(ladder_df = sol.par_post,
                              Ta_pair = Ta_pair,
                              energy_grid=energy_grid_2_compare_on)
 
-    output_dict['NLLW'] = NLLW_gr
-    output_dict['NLL_PT_Gn1'] = NLL_PT_Gn1_gr
-    output_dict['NLL_PT_Gg'] = NLL_PT_Gg_gr
+    output_dict['NLLW'] = LL_dict['by_groups_NLLW']
+    output_dict['NLL_PT_Gn1'] = LL_dict['by_groups_NLL_PT_Gn']
+    output_dict['NLL_PT_Gg'] = LL_dict['by_groups_NLL_PT_Gg']
+
+    output_dict['NLL_gn_normal_all_energy'] = LL_dict['by_groups_NLL_gn_normal_on_reduced_width_amp']
+    output_dict['NLL_W_all_energy'] = LL_dict['by_groups_NLLW_all_energy']
 
     joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
                                                              e_range = e_range,
@@ -1555,6 +1698,201 @@ def format_time_2_str(time_interval):
 
 
 
+def update_u_by_p(ladder_full, Ta_pair):
+    """
+    Recalculating values of u using p in ladder as input.
+    """
+    # print(ladder_full)
+    # print(ladder_full.dtypes)
+    
+    # ladder_full = fill_resonance_ladder(resonance_ladder=ladder_full,
+    #                       particle_pair=Ta_pair,
+    #                       J=ladder_full.J,
+    #                                                 chs=1,
+    #                                                 lwave=0,
+    #                                                 J_ID= ladder_full.J_ID )
+
+    # e lambda
+    
+    #ladder_full['u_e'] = np.sqrt(ladder_full['E'])
+
+    def compute_u_e(row):
+        if (row['E'] < 0):
+            print(f'Warning! Negative E: {row["E"]}')
+            return  - np.sqrt(-row['E'])
+        else:
+            return  np.sqrt(row['E'])
+
+    ladder_full['u_e'] = ladder_full.apply(compute_u_e, axis=1)
+    
+    
+    # G_gamma
+    #ladder_full['u_g'] = np.sqrt(ladder_full['Gg'].values * 1e-3 / 2)
+
+    def compute_u_g(row):
+        if (row['Gg'] < 0):
+            print(f'Warning! Negative Gg: {row["Gg"]} @ {row["E"]} eV')
+            return  - np.sqrt(-row['Gg'] * 1e-3 / 2)
+        else:
+            return  np.sqrt(row['Gg'] * 1e-3 / 2)
+
+    ladder_full['u_g'] = ladder_full.apply(compute_u_g, axis=1)
+
+    # Gn1 - this requires a more complex calculation
+    def compute_u_n(row):
+        
+        # S_array, P_array, arcphi_array, k = FofE_recursive([row.E], Ta_pair.ac, Ta_pair.M, Ta_pair.m, row.lwave)
+        S_array, P_array, arcphi_array, k = FofE_recursive([row.E], Ta_pair.ac, Ta_pair.M, Ta_pair.m, 0)
+        Pl = np.sum(P_array)
+        if (row['Gn1'] < 0):
+            print(f'Warning! Negative Gn: {row["Gn1"]} @ {row["E"]}')
+            return  - np.sqrt(-row['Gn1'] / 1000 / (2 * Pl))
+        else:
+            return  np.sqrt(row['Gn1'] / 1000 / (2 * Pl))
+        
+    # Use apply with axis=1 to apply function to each row
+    ladder_full['u_n1'] = ladder_full.apply(compute_u_n, axis=1)
+
+    return ladder_full
+
+
+
+def norm_log_likelihood(y_hat, mean_Y, std_dev_Y):
+    """
+    Calculate the negative log likelihood for given values from a normal distribution.
+
+    Parameters:
+    y_hats (array-like): The observed values for which to calculate the likelihood.
+    mean_Y (float): The mean of the normal distribution.
+    std_dev_Y (float): The standard deviation of the normal distribution.
+
+    Returns:
+    float: The negative log likelihood.
+    """
+    # Calculate the likelihood for each y_hat
+    likelihoods = norm.pdf(y_hat, mean_Y, std_dev_Y)
+
+    # Calculate the log likelihoods (add a small constant to prevent log(0))
+    epsilon = 1e-323
+    NLL = - np.log(likelihoods + epsilon)
+        
+    return likelihoods, NLL
+
+
+
+
+
+def create_solution_comparison_table_from_sol_list():
+    """taking list of ladders and producing comparison table """
+
+    return None
+
+
+# 
+# function to update 'Gn1' using recalculation of the most likely gnx2 taken from the mean params of 
+# the chi2 distribution for reduced with amplitude = gamma
+# gamma^2  has chi2 distr. with 1 dof,
+# TODO: check on units!!
+
+def update_Gn1_using_assumed_mode_gnx2(row, Ta_Pair):
+    # get the spin group id from the row
+    j_id = row['J_ID']
+
+    spin_group_key, current_spin_group_info = find_spin_group_info(Ta_Pair = Ta_Pair, 
+                                                                   j_id = j_id)
+    
+    # mode
+    likely_value_gnx2 = max(current_spin_group_info["<Gn>"] - 2, 0)
+            
+    _, P_array, _, _ = FofE_recursive([row['E']], Ta_Pair.ac, Ta_Pair.M, Ta_Pair.m, 0)
+    Pl = np.sum(P_array)
+    
+    New_GN = 2 * Pl * likely_value_gnx2
+
+    return New_GN
+
+
+
+def convert_gn1_by_Gn1(row, Ta_Pair):
+         
+    _, P_array, _, _ = FofE_recursive([row['E']], Ta_Pair.ac, Ta_Pair.M, Ta_Pair.m, 0)
+    Pl = np.sum(P_array)
+    
+    # mode
+    if (row['Gn1']>=0):
+        gn = np.sqrt( row['Gn1'] / 2 * Pl ) # TODO: do we need to divide by 1000 here??
+    else:
+        gn = - np.sqrt( row['Gn1'] / 2 * Pl ) # TODO: do we need to divide by 1000 here??
+
+    return gn
+
+
+def produce_art_ladder(input_ladder: pd.DataFrame,
+                       res_to_add: pd.Series,
+                       energy_range: list,
+                       Ta_Pair: Particle_Pair):
+    
+    """Produces ladder based on Ta_pair and average parameters and given ladder with """
+
+    art_res = input_ladder.copy()
+    # emptying this dataframe but keeping the structure & columns
+    art_res = art_res.iloc[0:0]
+    #print(art_res)
+
+    varyE, varyGg, varyGn1 = 0, 0, 0
+
+    # shift in energy
+    delta_E = np.max(energy_range) + 5
+
+    for j_id, count in res_to_add.items():
+        print(f"J_ID {j_id} was deleted {count} times")
+
+        # adding {count} resonances to art_res with the corresponding J_ID value
+        # columns to fill: E - starting from given delta_E + <D> for current spin group,  
+        # Gn1, Gg - use average values for all
+
+        spin_group_key, current_spin_group_info = find_spin_group_info(Ta_Pair = Ta_Pair,
+                         j_id = j_id)
+        #current_spin_group_info = Ta_Pair.spin_groups[spin_group_key]
+
+        print(current_spin_group_info)
+        
+        Gg = np.repeat(current_spin_group_info["<Gg>"], count)
+
+        current_Gn = current_spin_group_info["<Gn>"]
+
+        Gn = np.repeat(current_Gn, count)
+        Er = np.linspace(start = delta_E, 
+                         stop = delta_E + (count - 1) * np.sqrt(2/np.pi) * current_spin_group_info['<D>'],
+                         num = count)
+        J_ID = np.repeat(current_spin_group_info["J_ID"], count)
+        # combine it into a dataframe
+
+        sg_dataframe = pd.DataFrame(
+            {"E":Er, 
+             "Gg":Gg, 
+             "Gn1":Gn, 
+             "varyE":np.ones(len(Er))*varyE, 
+             "varyGg":np.ones(len(Er))*varyGg, 
+             "varyGn1":np.ones(len(Er))*varyGn1 ,
+             "J_ID":J_ID}
+             )
+        
+        # update Gn1 everywhere using for each row of sg_dataframe
+        sg_dataframe['Gn1'] = sg_dataframe.apply(lambda row: update_Gn1_using_assumed_mode_gnx2(row, Ta_Pair), axis=1)
+        sg_dataframe['Gn1'] = 0
+        
+        art_res = pd.concat([art_res, sg_dataframe], ignore_index = True)
+
+    # print(art_res)
+    # print()
+
+    return art_res
+
+    
+
+
+
 def create_solutions_comparison_table_from_hist(hist,
                                                 Ta_pair: Particle_Pair,
                      datasets: list,
@@ -1582,10 +1920,21 @@ def create_solutions_comparison_table_from_hist(hist,
     OF_alt2 = []
     OF_alt3 = []
 
+    OF_alt4 = [] # function values that are calculated by artificial ladder (remaining resonances + added ones)
+    sum_NLLW_al = []
+    sum_NLL_gn_normal = []
+
+    # SF
+    SF_Gn1 = []
+    SF_Gg = []
+    # end SF
+
 
     aicc_s = []
     bicc_s = []
     N_res_s = []
+    N_res_art_s = []
+
     test_pass = []
 
     N_res_joint_LL = []
@@ -1607,6 +1956,10 @@ def create_solutions_comparison_table_from_hist(hist,
             }
 
     # end incorporate true sol
+        
+    max_level = np.max(list(hist.elimination_history.keys()))
+    previous_ladder = hist.elimination_history[max_level ]['selected_ladder_chars'].par_post
+    combined_ladder = previous_ladder
 
     for level in hist.elimination_history.keys():
         
@@ -1615,11 +1968,56 @@ def create_solutions_comparison_table_from_hist(hist,
             # adding a mark that this is a true solution
             hist.elimination_history[level]['assumed_true'] = False
 
+        if (level == max_level):
+            """This is the initial number of resonances"""
+            N_res_initial = hist.elimination_history[level]['selected_ladder_chars'].par.shape[0]
+            # empty dataframe
+            arificial_res = pd.DataFrame()
+        else:
+            # produce artificial resonances
+
+            # get the difference with previous remaining resonances - which spin group res. was deleted?
+            # compare current ladder vs. previous
+
+            # remaining resonances
+            current_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+
+            # we got count of deleted resonances by each J_ID
+            deleted_res = find_deleted_res_spingroup_J_ID(ladder1=previous_ladder, ladder2 = current_ladder)
+            
+            # print('Deleted count resonances by each group:')
+            # print(deleted_res)
+
+            # for j_id, count in deleted_res.items():
+            #     print(f"J_ID {j_id} was deleted {count} times")
+
+            art_ladder = produce_art_ladder(input_ladder=current_ladder,
+                                            res_to_add=deleted_res,
+                                            energy_range=energy_grid_2_compare_on,
+                                            Ta_Pair=Ta_pair)
+            
+            print()
+            print('Artificial ladder:')
+            print(art_ladder)
+            print()
+
+            # adding artificial resonance 
+            print()
+            combined_ladder = pd.concat([current_ladder, art_ladder], ignore_index=True)
+            print('Combined ladder:')
+            print(combined_ladder)
+            print()
+
+
+        # # update prev. ladder - to track changes in spin groups
+        # previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+
         numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+        numres_combined = combined_ladder.shape[0]
+
         pass_test = hist.elimination_history[level]['final_model_passed_test']
 
         is_true.append(hist.elimination_history[level]['assumed_true'])
-
 
         # SSE & strength funcs?
         if (true_chars is not None):
@@ -1639,11 +2037,20 @@ def create_solutions_comparison_table_from_hist(hist,
             SSE_s.append(SSE_dict['SSE_sum_normalized_casewise'][0])
 
             # TODO: strength funcs calculation & fig production
-
+            SSE_Gg, SSE_Gn1, SSE_sf_fig = calc_strength_functions(theoretical_df = true_chars.par_post, 
+                                    estimated_df = hist.elimination_history[level]['selected_ladder_chars'].par_post, 
+                                    energy_range = energy_grid_2_compare_on,
+                                    fig_size=(8, 6), 
+                                    create_fig=False)
+            
+            SF_Gn1.append(SSE_Gn1)
+            SF_Gg.append(SSE_Gg)
             # end strength funcs calculation & fig production
 
         else:
             SSE_s.append(None)
+            SF_Gg.append(None)
+            SF_Gn1.append(None)
 
             # print(SSE_dict)
 
@@ -1658,6 +2065,23 @@ def create_solutions_comparison_table_from_hist(hist,
                         covariance_data = covariance_data,
                         energy_grid_2_compare_on = energy_grid_2_compare_on
                         )
+        
+        # characterizing the combined ladder with side resonances - using Likellihoods
+
+        LL_dict_combined = calc_LL_by_ladder(ladder_df = combined_ladder,
+                                             Ta_pair = Ta_pair,
+                                             energy_grid = energy_grid_2_compare_on)
+        
+        sum_NLLW_al.append(LL_dict_combined['total_NLLW_all_energy'])
+
+        sum_NLL_gn_normal.append(LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'])
+        
+        combined_NLL = LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'] + LL_dict_combined['total_NLLW_all_energy']
+
+        OF_alt4.append( sum(cur_ch_dict['chi2']) + 2 * combined_NLL    )
+
+        # 
+
         
         N_res_s.append(numres)
         test_pass.append(pass_test)
@@ -1686,8 +2110,8 @@ def create_solutions_comparison_table_from_hist(hist,
             sum(cur_ch_dict['chi2']) + 
             2 * (
                 sum(cur_ch_dict['NLLW'].values()) +
-                sum(cur_ch_dict['NLL_PT_Gn1'].values()) +
-                sum(cur_ch_dict['NLL_PT_Gg'].values())
+                sum(cur_ch_dict['NLL_PT_Gn1'].values())
+                # sum(cur_ch_dict['NLL_PT_Gg'].values())
             )
         )
 
@@ -1711,6 +2135,15 @@ def create_solutions_comparison_table_from_hist(hist,
 
         'OF_alt1': OF_alt1,
         'OF_alt3': OF_alt3,
+
+        # for function that contain NLLW - with all resonances (artificial = remaining + art deleted)
+        'sum_NLLW_al': sum_NLLW_al,
+        'sum_NLL_gn_normal': sum_NLL_gn_normal,
+        'OF_alt4': OF_alt4,
+
+
+        'SF_Gn1': SF_Gn1,
+        'SF_Gg': SF_Gg,
         'AICc': aicc_s,
         'BIC': bicc_s,
     })
@@ -1753,8 +2186,185 @@ def printout_chi2(sammyOUT: SammyOutputData,
                        addstr :str = 'Solution chi2 values'):
     print(f'{addstr}')
 
+    print(f'N_Dat: {sum(df.shape[0] for df in sammyOUT.pw)}')
+
     print('Chi2:')
     print('\t Prior:')
     print('\t\t', sammyOUT.chi2, np.sum(sammyOUT.chi2))
     print('\t Posterior:')
     print('\t\t', sammyOUT.chi2_post, np.sum(sammyOUT.chi2_post))
+
+    print('Chi2_n:')
+    print('\t Prior:')
+    print('\t\t', sammyOUT.chi2n, np.sum(sammyOUT.chi2n))
+    print('\t Posterior:')
+    print('\t\t', sammyOUT.chi2n_post, np.sum(sammyOUT.chi2n_post))
+
+
+def load_fit_res(
+        fit_res_folder : str,
+        case_id : int = 0):
+    """Loading fitting results from pkl file (sammyOUT_YW)"""
+    
+    sammyOUT_YW_obj = load_obj_from_pkl(folder_name = fit_res_folder,
+                                                         pkl_fname = f'fit_res_{case_id}.pkl')
+    
+    return sammyOUT_YW_obj
+
+def load_case_data(cases_folder_name: str,
+                   case_id: int = 0):
+    
+    case_filename = f'sample_{case_id}.pkl'
+    gen_params_filename =  f'params_gen.pkl'
+
+    case_data_dict = {}
+    
+    sample_data = load_obj_from_pkl(folder_name = cases_folder_name,
+                                                     pkl_fname = case_filename )
+
+    params_loaded = load_obj_from_pkl(folder_name = cases_folder_name,
+                                                     pkl_fname= gen_params_filename)
+    
+    case_data_dict['params'] = params_loaded
+    case_data_dict['sample_data'] = sample_data
+
+    return case_data_dict
+
+
+def coefficient_of_variation(exp):
+    """ Calculate the Coefficient of Variation (CV) of the signal. """
+    return np.std(exp) / np.mean(exp)
+
+def mean_uncertainty_percentage(exp, exp_unc):
+    """ Calculate the Mean Uncertainty Percentage. """
+    return np.mean(exp_unc / np.abs(exp)) * 100
+
+def uncertainty_to_signal_ratio(exp, exp_unc):
+    """ Calculate the Uncertainty-to-Signal Ratio (USR). mUSR! """
+    return np.mean(exp_unc) / np.mean(exp)
+
+def mean_signal_to_noise_ratio(exp, exp_unc):
+    """ Calculate the Signal-to-Noise Ratio (SNR) in dB. """
+    signal_power = np.mean(np.square(exp))
+    noise_power = np.mean(np.square(exp_unc))
+    return 10 * np.log10(signal_power / noise_power)
+
+import pandas as pd
+
+def create_comparison_dataframe(SammyOut_YW, cols_to_show, cols_to_keep=['J_ID']):
+    """
+    Compares parameters between 'par' and 'par_post' in the SammyOut_YW DataFrame.
+
+    Args:
+    SammyOut_YW (DataFrame): The original DataFrame containing 'par' and 'par_post' attributes.
+    cols_to_show (list): List of columns to compare.
+    cols_to_keep (list): List of columns to keep for both dataframes.
+
+    Returns:
+    DataFrame: A new DataFrame with comparisons.
+    """
+
+    # Select the required columns from 'par' and 'par_post'
+    # df1 = SammyOut_YW['par'][cols_to_show + cols_to_keep]
+    # df2 = SammyOut_YW['par_post'][cols_to_show + cols_to_keep]
+
+    df1 = getattr(SammyOut_YW, 'par')[cols_to_show + cols_to_keep]
+    df2 = getattr(SammyOut_YW, 'par_post')[cols_to_show + cols_to_keep]
+    
+
+    # Rename columns for differentiation
+    df1_renamed = df1.rename(columns={col: col + '_1' for col in cols_to_show})
+    df2_renamed = df2.rename(columns={col: col + '_2' for col in cols_to_show})
+
+    # Concatenate the DataFrames horizontally and keep the specified columns
+    result_df = pd.concat([df1_renamed, df2_renamed], axis=1)
+
+    # Calculate differences for specified parameters
+    for col in cols_to_show:
+        result_df[f'delta_{col}'] = result_df[f'{col}_2'] - result_df[f'{col}_1']
+
+    # Specify the order of columns and reorder the DataFrame
+    columns_order = cols_to_keep + [f'{col}_1' for col in cols_to_show] + \
+                    [f'{col}_2' for col in cols_to_show] + [f'delta_{col}' for col in cols_to_show]
+    result_df = result_df[columns_order]
+
+    return result_df
+
+
+
+def analyze_max_min(result_diff_df, col_name):
+    res = {
+        'mean': np.mean(result_diff_df[col_name]),
+        'median': np.median(result_diff_df[col_name]),
+        'min': np.min(result_diff_df[col_name]),
+        'max': np.max(result_diff_df[col_name]),
+        'q_01': np.quantile(a = result_diff_df[col_name], q=0.01),
+        'q_99': np.quantile(a = result_diff_df[col_name], q=0.99),
+        'q_95': np.quantile(a = result_diff_df[col_name], q=0.95)
+    }
+    return res 
+
+
+def plot_multiple_hist(values_list: list, 
+                        bins: int, 
+                        cumulative: bool, 
+                        colors: list, 
+                        captions: list, 
+                        title: str = '',
+                        show_kde: bool = True,
+                        stacked: bool = False,
+                        show_numbers: bool = False):
+    
+    # create a new figure and axis
+    fig_new, ax_new = plt.subplots()
+
+    # checking the range of values to compare the distr
+    min_val = min([min(values) for values in values_list])
+    max_val = max([max(values) for values in values_list])
+    bins = np.linspace(min_val, max_val, num=bins)
+
+    # create the histograms
+    for i, values in enumerate(values_list):
+        counts, edges, bars = ax_new.hist(values, 
+                                          bins=bins, 
+                                          density=False, 
+                                          stacked=stacked, 
+                                          alpha=0.4, 
+                                          cumulative=cumulative, 
+                                          color=colors[i], 
+                                          label=captions[i])
+        
+        # kde
+        if show_kde: 
+            kde = gaussian_kde(values)
+            x = bins #np.linspace(min(values), max(values), 50)
+            plt.plot(x, kde(x), colors[i], label='KDE '+captions[i])
+
+        if (show_numbers):
+            for c in ax_new.containers:
+                ax_new.bar_label(c)
+
+    # set the title and legend
+    if(len(title)>0):
+        ax_new.set_title(title)
+    ax_new.legend()
+
+    return fig_new
+
+
+
+def get_filenames_and_cases_ids(folder_name, filename_pattern):
+    # Create the full pattern including the folder name
+    full_pattern = os.path.join(folder_name, filename_pattern)
+
+    # List all files matching the pattern
+    matched_files = glob.glob(full_pattern)
+
+    # Sort the files based on the integer part in the filename
+    matched_files.sort(key=lambda f: int(os.path.basename(f).split('_')[-1].split('.pkl')[0]))
+
+    # Extract filenames and numbers
+    filenames = [os.path.basename(f) for f in matched_files]
+    numbers = [int(filename.split('_')[-1].split('.pkl')[0]) for filename in filenames]
+
+    return filenames, numbers

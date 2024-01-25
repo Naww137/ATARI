@@ -75,7 +75,7 @@ class InitialFBOPT:
 
         self._num_Elam = None
         self._starting_Gg_multiplier = 1
-        self._starting_Gn1_multiplier = 1
+        self._starting_Gn1_multiplier = 50
 
 
 
@@ -189,7 +189,7 @@ class InitialFBOPT:
         return self._spin_group_keys
     @spin_group_keys.setter
     def spin_group_keys(self, spin_group_keys):
-        self._spin_group_keys = spin_group_keys
+        self._spin_group_keys = [float(each) for each in spin_group_keys]
 
 
     @property
@@ -290,8 +290,11 @@ class InitialFB:
         else:
             assert len(self.options.spin_group_keys)>0
             spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
+        
+        ### generate intial_feature bank
         initial_resonance_ladder = get_starting_feature_bank(energy_range,
-                                                            spin_groups,
+                                                             particle_pair,
+                                                             spin_groups,
                                                             num_Elam= self.options.num_Elam,
                                                             starting_Gg_multiplier = self.options.starting_Gg_multiplier,
                                                             starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
@@ -300,7 +303,7 @@ class InitialFB:
         ### setup external resonances
         if self.options.external_resonances:
             if external_resonance_ladder.empty:
-                external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range)
+                external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range, particle_pair)
             else:
                 pass
         else:
@@ -374,6 +377,8 @@ class InitialFB:
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
                     eliminating = False
+                elif fraction_eliminated == 100.0:
+                    raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
                         sammyINPyw.step_threshold *= 0.1

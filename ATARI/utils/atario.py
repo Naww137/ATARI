@@ -55,6 +55,7 @@ def add_Gw_from_gw(resonance_ladder, particle_pair):
     _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
     ladder['Gg'] = Gg = 2*ladder.gg2.values
     ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
+    ladder = ladder[["E", "Gg", "Gn1"]+ [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
     return ladder
 
 
@@ -71,9 +72,9 @@ def expand_sammy_ladder_2_atari(particle_pair, ladder) -> pd.DataFrame:
         # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
         gn2 = row.Gn1/2/P_array[0].item()
 
-        return gg2, gn2, J, Ls
+        return gg2, gn2, J, L
 
-    ladder[["gg2","gn2","Jpi","Ls"]] = ladder.apply(lambda row: get_J_L_Wred(row), axis=1,result_type='expand')
+    ladder[["gg2","gn2","Jpi","L"]] = ladder.apply(lambda row: get_J_L_Wred(row), axis=1,result_type='expand')
 
     return ladder
 

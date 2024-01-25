@@ -203,7 +203,7 @@ class Syndat_Model:
     #     h5io.write_pw_exp(filepath, isample, sample_dict[t].pw_reduced, title=t, CovT=None, CovXS=None)
         
 
-    def generate_raw_observables(self, pw_true, true_model_parameters):
+    def generate_raw_observables(self, pw_true, true_model_parameters: dict):
 
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
         true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
@@ -232,6 +232,21 @@ class Syndat_Model:
                                            generate_pw_true_with_sammy: bool,
                                            pw_true: Optional[pd.DataFrame] = None,
                                            ):
+        """
+        Generates true experimental object using sammy as defined by self.generative_experimental_model.
+        Experimental object = theory + experimental corrections (Doppler, resolution, MS, tranmission/yield).
+
+        Parameters
+        ----------
+        particle_pair : Optional[Particle_Pair]
+            _description_
+        sammyRTO : Optional[sammy_classes.SammyRunTimeOptions]
+            _description_
+        generate_pw_true_with_sammy : bool
+            _description_
+        pw_true : Optional[pd.DataFrame], optional
+            _description_, by default None
+        """
         
         if generate_pw_true_with_sammy:
             assert sammyRTO is not None

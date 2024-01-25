@@ -12,6 +12,13 @@ from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
 
 
+class Model_Correlations:
+
+    def __init__(self):
+        pass
+
+
+
 class Syndat_Control:
     """
     Syndat Control module for sampling from multiple syndat models.
@@ -28,9 +35,9 @@ class Syndat_Control:
         Dictionary of uncertain parameters that correlate individual Syndat_Models. 
         Format is the same as other model parameters: key:(val, unc).
         If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.
-    options
-
-
+    options: syndatOPT
+        Syndat Options object, only option that will be used is SampleRES.
+        Otherwise, individual syndat_models have their own options.
     """
     
 
@@ -44,6 +51,7 @@ class Syndat_Control:
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
+        self.model_correlations = model_correlations
         self.options = deepcopy(options)
 
         # self.clear_samples()
@@ -106,7 +114,7 @@ class Syndat_Control:
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
-            true_parameters = {}
+            true_parameters = self.sample_model_correlations()
 
             ### generate true experimental objects with sammy or just take pw_true arguement
             pw_true_list = []
@@ -150,6 +158,10 @@ class Syndat_Control:
 
         return
     
+
+    def sample_model_correlations(self):
+        true_parameters = {}
+        return true_parameters
 
 
     # def to_hdf5(self, filepath):

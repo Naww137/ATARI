@@ -1,4 +1,0 @@
-Source API
-==========
-This API houses documentation on each of the modules in the atari source code. 
-More information on the high-level usage of atari can be found in the :ref:`User's Guide <usersguide>`

@@ -74,7 +74,7 @@ def no_sampling_returns_same_values():
 
 
 
-# test_mean_converges_to_true_transmissionRPI()
+test_mean_converges_to_true_transmissionRPI()
 
 test_mean_converges_to_true_captureRPI()
 

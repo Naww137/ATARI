@@ -521,6 +521,9 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*10
                                 )
+    if 'STOP' in runsammy_process.stderr:
+        raise ValueError(f"\n\n===========================\nSAMMY Failed with output:\n\n {runsammy_process.stdout}")
+    
     if getchi2:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
     else:
@@ -659,11 +662,15 @@ def delta_chi2(lst_df):
     
 #     return recursive_sammy(pw_posterior, par_posterior, sammy_INP, sammy_RTO, itter + 1)
 
-
+def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
+    if sammyRTO.bayes:
+        if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
+            raise ValueError("Bayes is set to True but no varied parameters.")
 
 def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
     sammyINP.resonance_ladder = copy(sammyINP.resonance_ladder)
+    check_inputs(sammyINP, sammyRTO)
 
     #### setup 
     make_runDIR(sammyRTO.sammy_runDIR)

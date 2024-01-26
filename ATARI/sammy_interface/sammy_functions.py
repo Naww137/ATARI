@@ -437,7 +437,7 @@ def write_saminp(filepath,
                 else:
                     pass
 
-            elif line.startswith('%%%card7%%%'):
+            elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
                 f.write(f'  {round(float(particle_pair.ac)*10, 7):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):

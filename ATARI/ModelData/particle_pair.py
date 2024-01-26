@@ -69,7 +69,7 @@ class Particle_Pair:
     spin_groups:
         The recorded spingroups
     ac:
-        Channel radius in square-root barns or 1e-12 cm
+        Channel radius in √barns or 1e-12 cm
     target:
         The target particle
     projectile:
@@ -102,7 +102,7 @@ class Particle_Pair:
 
         self.target     = Ta181
         self.projectile = Neutron
-        self.ac = 0.8127 # square-root barn or 1e-12 cm
+        self.ac = 0.8127 # √barns or 1e-12 cm
 
         self.l_max = 1
 
@@ -244,11 +244,11 @@ class Particle_Pair:
         D : float
             Average level spacing.
         gn2_avg : float
-            Average reduced neutron width.
+            Average reduced neutron width in meV.
         gn2_dof : int
             Degrees of freedom in neutron width, corresponds to the contributing channels.
         gg2_avg : float
-            Average reduced capture width.
+            Average reduced capture width in meV.
         gg2_dof : int
             Degrees of freedom in capture width, corresponds to the contributing channels.
         """
@@ -425,9 +425,9 @@ class Particle_Pair:
             _, P_array, _, _ = FofE_recursive(levels, self.ac, self.M, self.m, L)
             Gg_samples = 2*gg2_samples
             Gn1_samples = 2*P_array[0]*gn2_samples
-            zeros = np.zeros(len(levels))
-            E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples, zeros, zeros, zeros, [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],
-                                     index=['E', 'Gg', 'Gn1', "varyE", "varyGg", "varyGn1", 'J_ID', 'gg2', 'gn2', 'Jpi', 'L',])
+            zeros = np.zeros(len(levels)) #"varyE", "varyGg", "varyGn1", #zeros, zeros, zeros,
+            E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples,  [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],
+                                     index=['E', 'Gg', 'Gn1',  'J_ID', 'gg2', 'gn2', 'Jpi', 'L',])
             # assert len(np.unique(j[2]))==1, "Code cannot consider different l-waves contributing to a spin group"
             resonance_ladders.append(E_Gn_gnx2.T)
 

@@ -33,7 +33,7 @@ class Particle:
         mass   : float
             Nuclei mass in atomic mass units (amu)
         radius : float
-            Nuclear mean square radius in square-root barns or 1e-12 cm. Default is automatically approximated
+            Nuclear mean square radius in √barns or 1e-12 cm. Default is automatically approximated
             using `0.123 * A**(1/3)`.
         name   : str
             Name of the particle. Default is ZZAAA MCNP ID form.
@@ -79,7 +79,7 @@ class Particle:
         return self._mass
     @property
     def radius(self):
-        'Nuclear mean square radius in square-root barns or 1e-12 cm'
+        'Nuclear mean square radius in √barns or 1e-12 cm'
         return self._radius
     @property
     def name(self):

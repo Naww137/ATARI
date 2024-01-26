@@ -33,8 +33,8 @@ class Particle:
         mass   : float
             Nuclei mass in atomic mass units (amu)
         radius : float
-            Nuclear mean square radius in femtometers (fm). Default is automatically approximated
-            using `1.23 * A**(1/3)`.
+            Nuclear mean square radius in square-root barns or 1e-12 cm. Default is automatically approximated
+            using `0.123 * A**(1/3)`.
         name   : str
             Name of the particle. Default is ZZAAA MCNP ID form.
         """
@@ -49,10 +49,10 @@ class Particle:
         # Mass: (amu)
         self._mass = mass
         
-        # Nuclear Radius: (fm)
+        # Nuclear Radius: (1e-12 cm)
         if radius is not None:
-            if   radius > 1e2:      print(Warning(f'The channel radius, {radius} fm, is quite high. Make sure it is in units of femtometers.'))
-            elif radius < 1e-2:     print(Warning(f'The channel radius, {radius} fm, is quite low. Make sure it is in units of femtometers.'))
+            if   radius > 1e2:      print(Warning(f'The channel radius, {radius} 1e-12 cm, is quite high. Make sure it is in units of square-root barns or 1e-12 cm.'))
+            elif radius < 1e-2:     print(Warning(f'The channel radius, {radius} 1e-12 cm, is quite low. Make sure it is in units of square-root barns or 1e-12 cm.'))
             self._radius = float(radius)
         else:
             self._radius = 1.23 * self._A**(1/3)
@@ -79,7 +79,7 @@ class Particle:
         return self._mass
     @property
     def radius(self):
-        'Nuclear mean square radius in femtometers (fm)'
+        'Nuclear mean square radius in square-root barns or 1e-12 cm'
         return self._radius
     @property
     def name(self):
@@ -100,12 +100,12 @@ class Particle:
         txt += f'Atomic Mass    = {self._A}\n'
         txt += f'Nuclear Spin   = {self._I}\n'
         txt += f'Mass           = {self._mass:.7f} (amu)\n'
-        txt += f'Nuclear Radius = {self._radius:.7f} (fm)\n'
+        txt += f'Nuclear Radius = {self._radius:.7f} (√b)\n'
         return txt
     
     def __str__(self):
         return self.name
     
-Neutron = Particle(Z=0 , A=1  , I=0.5, mass=mass_neutron, radius=0.8  , name='neutron')
-Proton  = Particle(Z=1 , A=1  , I=0.5, mass=mass_proton , radius=0.833, name='proton')
-Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94803   , radius=None , name='Ta181')
+Neutron = Particle(Z=0 , A=1  , I=0.5, mass=mass_neutron, radius=0.08  , name='neutron')
+Proton  = Particle(Z=1 , A=1  , I=0.5, mass=mass_proton , radius=0.0833, name='proton')
+Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94803   , radius=None  , name='Ta181')

@@ -102,7 +102,7 @@ class Particle_Pair:
 
         self.target     = Ta181
         self.projectile = Neutron
-        self.ac = 0.8127 # square-root barns or 1e-12 cm
+        self.ac = 0.8127 # square-root barn or 1e-12 cm
 
         self.l_max = 1
 

@@ -481,6 +481,129 @@ def sample_RRR_widths(N_levels,
 
     return np.array(reduced_widths_square)
 
+# =====================================================================
+# GOE, GUE, and GSE distributions
+# =====================================================================
+
+def general_wigner_pdf(x, mean_level_spacing:float=1.0, beta:int=1):
+    """
+    Wigner Distribution PDF for GOE, GUE, and GSE.
+
+    Parameters
+    ----------
+    x                  : float or float array
+        The nearest level-spacing.
+    mean_level_spacing : float
+        The mean level spacing of the distribution.
+    beta               : 1, 2, or 4
+        The parameter that determines the assumed ensemble. For GOE, GUE, and GSE, `beta` = 1, 2,
+        or 4, respectively. The default is 1 (GOE).
+
+    Returns
+    -------
+    prob_dens : float or float array
+        The probability density for the distribution evaluated at each level-spacing.
+    """
+    if   beta == 1:
+        coef = np.pi/(4*mean_level_spacing**2)
+        return 2*coef * x * np.exp(-coef*x**2)
+    elif beta == 2:
+        coef1 = 4/(np.pi*mean_level_spacing**2)
+        coef2 = coef1 * (8/(np.pi*mean_level_spacing))
+        return coef2 * x**2 * np.exp(-coef1*x**2)
+    elif beta == 4:
+        coef1 = 64/(9*np.pi*mean_level_spacing**2)
+        coef2 = 262144/(729*np.pi**3*mean_level_spacing**5)
+        return coef2 * x**4 * np.exp(-coef1*x**2)
+    else:
+        raise NotImplementedError(f'beta = {beta} has not been implemented. Choose beta = 1, 2, or 4.')
+    
+def level_spacing_ratio_pdf(ratio:float, beta:int=1):
+    """
+    This function returns the probability density on the ensemble's nearest level-spacing ratio,
+    evaluated at `ratio`. The ensemble can be chosen from GOE, GUE, and GSE for `beta` = 1, 2, or
+    4, respectively.
+
+    Source: https://arxiv.org/pdf/1806.05958.pdf (Eq. 1)
+
+    Parameters
+    ----------
+    ratio : float or float array
+        The nearest level-spacing ratio(s).
+    beta  : 1, 2, or 4
+        The parameter that determines the assumed ensemble. For GOE, GUE, and GSE, `beta` = 1, 2,
+        or 4, respectively. The default is 1 (GOE).
+
+    Returns
+    -------
+    level_spacing_ratio_pdf : float or float array
+        The probability density (or densities) evaluated at the the provided level-spacing
+        ratio(s).
+    """
+    if   beta == 1:     C_beta = 27/8
+    elif beta == 2:     C_beta = 81*np.sqrt(3)/(4*np.pi)
+    elif beta == 4:     C_beta = 729*np.sqrt(3)/(4*np.pi)
+    else:               raise ValueError('"beta" can only be 1, 2, or 4.')
+    level_spacing_ratio_pdf = C_beta * (ratio+ratio**2)**beta / (1+ratio+ratio**2)**(1+(3/2)*beta)
+    return level_spacing_ratio_pdf
+    
+def dyson_mehta_delta_3(E, EB:tuple):
+    """
+    Finds the Dyson-Mehta ∆3 metric for the given data.
+
+    Source: https://arxiv.org/pdf/2011.04633.pdf (Eq. 21 & 22)
+
+    Parameters
+    ----------
+    E  : float, array-like
+        The recorded resonance energies.
+    EB : float [2]
+        The lower and upper energies for the resonance ladder.
+
+    Returns
+    -------
+    delta3 : float
+        The Dyson-Mehta ∆3 metric.
+    """
+
+    E = np.sort(E) # sort energies if not already sorted
+    z = (E-EB[0])/(EB[1]-EB[0]) # renormalize energies
+    s1 = np.sum(z)
+    s2 = np.sum(z**2)
+    a = np.arange( len(z)-1, -1, -1 )
+    s3 = np.sum((2*a+1)*z)
+    delta3 = 6*s1*s2 - 4*s1**2 - 3*s2**2 + s3
+    return delta3
+
+def dyson_mehta_delta_3_predict(L:int, ensemble:str='GOE'):
+    """
+    A function that predicts the value of the Dyson-Mehta ∆3 metric based on the number of
+    observed resonances and type of ensemble.
+
+    Source: https://www.osti.gov/servlets/purl/1478482 (Eq. 31 & 32 & 33)
+
+    Parameters
+    ----------
+    L        : int
+        The expected number of resonances.
+    ensemble : 'GOE', 'Poisson', or 'picket'
+        The ensemble to assumed under the calculation of the Dyson-Mehta ∆3 metric.
+
+    Returns
+    -------
+    delta_3 : float
+        The prediction on the Dyson-Mehta ∆3 metric.
+    """
+
+    if   ensemble.lower() == 'goe':
+        delta_3 = np.pi**(-2) * (np.log(L) - 0.0687)
+    elif ensemble.lower() == 'poisson':
+        delta_3 = L/15
+    elif ensemble.lower() == 'picket':
+        delta_3 = 1/12   # "picket" refers to "picket fence", where the levels are uniformly distributed
+    else:
+        raise ValueError(f'Unknown ensemble, {ensemble}. Please choose from "GOE", "Poisson" or "picket".')
+    return delta_3
 
 # def compare_pdf_to_samples(reduced_widths_square_vector, avg_reduced_width_square, dof):
 #     """

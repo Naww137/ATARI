@@ -1,5 +1,5 @@
 # HOW TO RUN
-# python3 -u autofit_elim_Ta_181.py | tee test_output.txt
+# python3 -u autofit_elim_syn_data.py | tee test_output.txt
 
 # %%
 from matplotlib.pyplot import *
@@ -11,29 +11,79 @@ import importlib
 from datetime import datetime
 
 from ATARI.sammy_interface import sammy_interface, sammy_classes, sammy_functions, template_creator
-from ATARI.sammy_interface.sammy_functions import fill_sammy_ladder
+# from ATARI.sammy_interface.sammy_functions import fill_sammy_ladder
 
 from ATARI.ModelData.particle_pair import Particle_Pair
 
 from ATARI.ModelData.experimental_model import Experimental_Model
-from ATARI.theory.experimental import e_to_t, t_to_e
+
+#from ATARI.theory.experimental import e_to_t, t_to_e
 
 from ATARI.utils.misc import fine_egrid
 
 from copy import copy
+import argparse
 
-from ATARI.utils.atario import fill_resonance_ladder
+#from ATARI.utils.atario import fill_resonance_ladder
 
 from ATARI.AutoFit import chi2_eliminator_v2
 from ATARI.AutoFit import elim_addit_funcs
 
+
+
 global_st_time = time.time()
+
+
 
 start_date = datetime.fromtimestamp(global_st_time).strftime("%d.%m.%Y %H:%M:%S")
 print("Start date and time =", start_date)
 
-# 
+#### main settings #### 
+
+# taken from inputs
+parser = argparse.ArgumentParser(description="Fitter parameters",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+parser.add_argument("--cases_dir", 
+                    type=str, 
+                    default = './data_raw/data_1_correct_cap.hdf5',
+                    help="file with t, cap, cov...")
+
+parser.add_argument("--case_id", 
+                    type=int, 
+                    default=0, 
+                    help="Case_id to process")
+
+parser.add_argument("--save_to_folder", 
+                    type=str, 
+                    default='./proc_cases/', 
+                    help="Case_id to process")
+
+parser.add_argument("--start_from_true", 
+                    type=int, 
+                    default=0, 
+                    help="start from true solution")
+
+parser.add_argument("--keep_fixed",
+                    type = int,
+                      default = 1,
+                      help="keep fixed side resonances")
+
+args = parser.parse_args()
+config = vars(args)
+
+# number of resonances to reduce autofit result usign threshold in Gn (after all stages!)
+N_red
+
+greedy
+
+fit_all_spin_groups = True
+
+
+
+# generated
 current_dir = os.path.dirname(os.path.realpath(__file__))
+
 print(f'Current directory: {current_dir}')
 
 # %%
@@ -46,7 +96,7 @@ settings = {
     'running_path': current_dir
 }
 
-# folder where to save all
+# folder where to save all results
 savefolder = os.path.join(current_dir, 'data_new/')
 
 if not os.path.exists(savefolder):
@@ -69,15 +119,7 @@ fit_all_spin_groups = True
 
 energy_range_all = [202, 227]
 
-# energy_range_all = [227, 252]
-# energy_range_all = [252, 277]
-# energy_range_all = [277, 302]
-# energy_range_all = [302, 327]
-
-# energy_range_all = [201, 228]
-# energy_range_all = [201, 210]
-
-energy_range_all = [270, 340]
+# for elimination
 
 chi2_allowed = 0
 start_deep_fit_from = 15 # excluding the side resonances provided
@@ -89,166 +131,7 @@ greedy_mode = True
 
 
 # %% [markdown]
-# ## Measurement Data
-
-# %%
-### Determine channel widths
-
-# def get_chw_and_upperE(E, FP):
-#     E = np.array(E)
-#     tof = e_to_t(E, FP, True)
-#     dt = np.diff(tof*1e6)
-#     widths1, index1 = np.unique(np.round(dt, 4), return_index=True)
-#     chw, Emax = np.flipud(widths1), np.flipud(E[index1])
-#     strc = ''
-#     stre = ''
-#     for c,e in zip(chw, Emax):
-#         strc += f"{c*1e3:.2f}, "
-#         stre += f"{e:.2f}, "
-#     return stre, strc
-
-# # Emax, chw = get_chw_and_upperE(transdat6.E, 100.14)
-# # Emax, chw = get_chw_and_upperE(capdat1.E, 45.27)
-# # print(Emax)
-# # print(chw)
-
-
-
-# %%
-### 1mm capture data
-capdat1 = sammy_functions.readlst(os.path.join(current_dir, "yield_ta1b_unsmooth.dat"))
-expcap1 = Experimental_Model(title = "cap1mm",
-                                reaction ="capture", 
-                                energy_range = energy_range_all,
-                                n = (0.005631, 0),
-                                FP = (45.27, 0.05),
-                                burst= (8.0,1.0), 
-                                temp= (294.2610, 0.0),
-                                channel_widths={
-                                    "maxE": [68.20,  122.68, 330.48, 547.57, 199359.52], 
-                                    "chw":  [821.40, 410.70, 102.70, 51.30,  25.70],
-                                    "dchw": [0.8,    0.8,    0.8,    0.8,    0.8]
-                                }
-                               )
-
-capdat1 = capdat1.loc[(capdat1.E<max(expcap1.energy_range)) & (capdat1.E>min(expcap1.energy_range)), :]
-
-### 2mm capture data
-capdat2 = sammy_functions.readlst(os.path.join(current_dir, "yield_ta2_unsmooth.dat"))
-expcap2 = Experimental_Model(   title = "cap2mm",
-                                reaction = "capture", 
-                                energy_range = energy_range_all,
-                                n = (0.011179, 0.0),
-                                FP = (45.27, 0.05),
-                                burst = (8.0,1.0),
-                                temp = (294.2610, 0.0),
-                                channel_widths={
-                                    "maxE": [68.20,  122.68, 330.48, 547.57, 199359.52], 
-                                    "chw":  [821.40, 410.70, 102.70, 51.30,  25.70],
-                                    "dchw": [0.8,    0.8,    0.8,    0.8,    0.8]
-                                }
-                               )
-capdat2 = capdat2.loc[(capdat2.E<max(expcap2.energy_range)) & (capdat2.E>min(expcap2.energy_range)), :]
-
-### 1mm Transmission data
-transdat1 = sammy_functions.readlst(os.path.join(current_dir, "trans-Ta-1mm.twenty"))
-transdat1_covfile = os.path.join(current_dir, 'trans-Ta-1mm.idc')
-
-# # TODO: ask Noah for what?
-# chw, Emax = get_chw_and_upperE(transdat1.E, 100.14)
-
-exptrans1 = Experimental_Model(title = "trans1mm",
-                               reaction = "transmission", 
-                               energy_range = energy_range_all,
-
-                                n = (0.00566,0.0),  
-                                FP = (100.14,0.0), 
-                                burst = (8, 0.0), 
-                                temp = (294.2610, 0.0),
-
-                               channel_widths={
-                                    "maxE": [216.16, 613.02, 6140.23], 
-                                    "chw": [204.7, 102.4, 51.2],
-                                    "dchw": [1.6, 1.6, 1.6]
-                                }
-                                
-                               )
-transdat1 = transdat1.loc[(transdat1.E<max(exptrans1.energy_range)) & (transdat1.E>min(exptrans1.energy_range)), :]
-
-### 3mm transmission data
-transdat3 = sammy_functions.readlst(os.path.join(current_dir, "trans-Ta-3mm.twenty"))
-transdat3_covfile = os.path.join(current_dir, "trans-Ta-3mm.idc")
-
-exptrans3 = Experimental_Model(title = "trans3mm",
-                               reaction = "transmission", 
-                               energy_range = energy_range_all,
-
-                                n = (0.017131,0.0),  
-                                FP = (100.14,0.0), 
-                                burst = (8, 0.0), 
-                                temp = (294.2610, 0.0),
-
-                               channel_widths={
-                                    "maxE": [216.16, 613.02, 6140.23], 
-                                    "chw": [204.7, 102.4, 51.2],
-                                    "dchw": [1.6, 1.6, 1.6]
-                                }
-                                
-                               )
-transdat3 = transdat3.loc[(transdat3.E<max(exptrans3.energy_range)) & (transdat3.E>min(exptrans3.energy_range)), :]
-
-
-### 6mm transmission data
-transdat6 = sammy_functions.readlst(os.path.join(current_dir, "trans-Ta-6mm.twenty"))
-transdat6_covfile = os.path.join(current_dir, "trans-Ta-6mm.idc")
-
-exptrans6 = Experimental_Model(title = "trans6mm",
-                               reaction = "transmission", 
-                               energy_range = energy_range_all,
-
-                                n = (0.03356,0.0),  
-                                FP = (100.14,0.0), 
-                                burst = (8, 0.0), 
-                                temp = (294.2610, 0.0),
-
-                               channel_widths={
-                                    "maxE": [216.16, 613.02, 6140.23], 
-                                    "chw": [204.7, 102.4, 51.2],
-                                    "dchw": [1.6, 1.6, 1.6]
-                                }
-                                
-                               )
-transdat6 = transdat6.loc[(transdat6.E<max(exptrans6.energy_range)) & (transdat6.E>min(exptrans6.energy_range)), :]
-
-
-### Not using 12mm measurement for evaluation - this is a validation measurement
-
-# transdat12 = sammy_functions.readlst("/Users/noahwalton/research_local/resonance_fitting/ATARI_workspace/measurement_data/trans-Ta-12mm.dat")
-# # transdat12_covfile = Need to generate from sys and stat covariances
-# exptrans12 = Experimental_Model(title = "trans12",
-#                                 reaction = "transmission",
-#                                 energy_range = erange_all,
-
-#                                 sammy_inputs = {
-#                                     'alphanumeric'       :   ["BROADENING IS WANTED"],
-#                                     'ResFunc'            :   "ORRES"
-#                                         },
-
-#                                 n = (0.067166, 0.0),  
-#                                 FP = (35.185,0.0), 
-#                                 burst = (8,0.0), 
-#                                 temp = (294.2610, 0.0),
-
-#                                 channel_widths={
-#                                         "maxE": [270], 
-#                                         "chw": [102.7],
-#                                         "dchw": [0.8]
-#                                         },
-
-#                                 additional_resfunc_lines=["WATER 0004 5.6822000 -0.54425 0.07733000", "WATER      0.5000000  0.05000 0.00700000", "LITHI 000  -1.000000  -1.0000 6.00000000", "LITHI      0.1000000  0.10000 0.60000000", "LITHI      166.87839 -28.7093 1.260690", "LITHI      0.2574580 -0.06871 0.004915"]
-#                                )
-
-# transdat12 = transdat12[(transdat12.E<max(exptrans12.energy_range)) & (transdat12.E>min(exptrans12.energy_range))]
+# ## Measurement Data, loading by case number
 
 
 # %%
@@ -303,211 +186,25 @@ experiments = [expcap1, expcap2, exptrans1, exptrans3, exptrans6]
 covariance_data = [{}, {}, transdat1_covfile, transdat3_covfile, transdat6_covfile]
 
 
-# important - templates!!!
-templates = []
-for data, exp in zip(datasets, experiments):
-    #filepath = f'template_{exp.title}_edited'
-    filepath = os.path.join(current_dir, f'template_{exp.title}_edited')
-    exp.template = os.path.realpath(filepath)
-
-
 fig = plot(datasets, experiments)
 fig.tight_layout()
-# fig.show(block = True)
-if (showfigures):
-    show()
 
-# input("Press Enter to continue...")
-
-# %%
-## Could also plot covariance here
-
-# %% [markdown]
-# ## Fit from ENDF or JEFF
-
-# %%
-sammyRTO = sammy_classes.SammyRunTimeOptions(
-                            sammyexe=settings['path_to_SAMMY_exe'],
-                            options= {"Print"   :   True,
-                              "bayes"   :   False,
-                              "keep_runDIR"     : True,
-                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps = settings['path_to_SAMMY_temps'])
-                              })
-
-matnum = 7328
-
-# endf_file = "/Users/noahwalton/research_local/data/neutrons_ENDF-B-VII.1/n-073_Ta_181.endf"
-# endf_parameters = sammy_functions.get_endf_parameters(endf_file, matnum, sammyRTO)
-
-# endf_parameters = endf_parameters[(endf_parameters.E<260) & (endf_parameters.E>190)]
-# endf_parameters["varyGn1"] = np.ones(len(endf_parameters))
-# endf_parameters["varyGg"] = np.ones(len(endf_parameters))*0
-# endf_parameters["varyE"] = np.ones(len(endf_parameters))
-
-jeff_file = "/Users/noahwalton/research_local/data/JEFF33_endf6/73-Ta-181g.jeff33"
-jeff_file = os.path.join(current_dir, "73-Ta-181g.jeff33")
-
-jeff_parameters = sammy_functions.get_endf_parameters(jeff_file, matnum, sammyRTO)
-
-
-
-# cutting jeff parameters to required energy region, but adding side resonances
-
-# jeff_parameters = jeff_parameters[(jeff_parameters.E<max(energy_range_all)+delta_E) & (jeff_parameters.E>min(energy_range_all)-delta_E)]
-sel_jeff_res_in_window, sel_jeff_side_res_df = elim_addit_funcs.get_resonances_from_window(
-    input_res_df = jeff_parameters,
-    energy_range = energy_range_all,
-    N_side_res=1
-)
-
-# don't touch Gg?
-sel_jeff_res_in_window = elim_addit_funcs.set_varying_fixed_params(ladder_df = sel_jeff_res_in_window,
-                                                                   vary_list=[1,0,1])
-
-sel_jeff_side_res_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = sel_jeff_side_res_df,
-                                                                 vary_list=[0,1,1])
-
-sel_jeff_parameters = pd.concat([sel_jeff_res_in_window,
-                                 sel_jeff_side_res_df])
-
-# sort by E & reindex
-sel_jeff_parameters = sel_jeff_parameters.sort_values(by='E').reset_index(drop=True)
-
-print("Selected JEFF parameters")
-print(sel_jeff_parameters)
-
-print('Min & max E for ladder:')
-print(f'{sel_jeff_parameters.E.min()}..{sel_jeff_parameters.E.max()} eV')
-print(f'Selected energy range: {energy_range_all}')
-
-# testing reading from combined ladder
-start_ladder_main_vary_params, start_ladder_side_vary_params  = elim_addit_funcs.extract_res_var_params(ladder_df = sel_jeff_parameters,
-                                        fixed_side_resonances = sel_jeff_side_res_df)
-
-print('Main resonances, vary params:')
-print(start_ladder_main_vary_params)
-print('Side resonances, vary params:')
-print(start_ladder_side_vary_params)
-
-# %%
-
-Ta_pair = Particle_Pair(isotope="Ta181",
-                        formalism="XCT",
-                        ac=8.1271,     # scattering radius
-                        M=180.948030,  # amu of target nucleus
-                        m=1,           # amu of incident neutron
-                        I=3.5,         # intrinsic spin, positive parity
-                        i=0.5,         # intrinsic spin, positive parity
-                        l_max=2)       # highest order l-wave to consider
-
-Ta_pair.add_spin_group(Jpi='3.0',
-                       J_ID=1,
-                       D_avg=8.79,
-                       Gn_avg=46.5,
-                       Gn_dof=1,
-                       Gg_avg=64.0,
-                       Gg_dof=1000)
-
-Ta_pair.add_spin_group(Jpi='4.0',
-                       J_ID=2,
-                       D_avg=4.99,
-                       Gn_avg=35.5,
-                       Gn_dof=1,
-                       Gg_avg=64.0,
-                       Gg_dof=1000)
-
-
-rto = sammy_classes.SammyRunTimeOptions(
-    sammyexe=settings['path_to_SAMMY_exe'],
-    options = {"Print"   :   True,
-                "bayes"   :   True,
-                "keep_runDIR"     : True,
-                "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps= settings['path_to_SAMMY_temps'])
-                })
-
-
-sammyINPyw = sammy_classes.SammyInputDataYW(
-    particle_pair = Ta_pair,
-    resonance_ladder = sel_jeff_parameters, #jeff_parameters,  
-
-    datasets= datasets,
-    experiments = experiments,
-    experimental_covariance = covariance_data,  #[{}, {}, {}, {}, {}], # 
-    
-    max_steps = 10,
-    iterations = 2,
-    step_threshold = 0.1,
-    autoelim_threshold = None,
-
-    LS = False,
-    LevMar = True,
-    LevMarV = 2,
-    LevMarVd= 5,
-    initial_parameter_uncertainty = 0.1
-    )
-
-print('Spin group keys:')
-print(list(Ta_pair.spin_groups.keys()))
-
-# %%
-# size of the dataset - to compare
-
-# dataset size
-sum_points = 0 
-print(f'Dataset sizes: {len(datasets)}')
-
-for index,el in enumerate(datasets):
-    sum_points += el.shape[0]
-    print(f'{experiments[index].title} - {el.shape[0]}')
-
-print(f'Num of points: {sum_points}')
-
-# %%
-sammyOUT_SFJ = sammy_functions.run_sammy_YW(sammyINPyw, rto)
-
-# %%
-# assuming that it's "true" solution
-
-
-
-# %%
-
-elim_addit_funcs.printout_chi2(sammyOUT_SFJ, 'JEFF')
-
-# %%
-
-# plotting using modified func
-
-fig2 = elim_addit_funcs.plot_datafits(datasets, experiments, 
-    fits = sammyOUT_SFJ.pw_post, 
-    fits_chi2 = sammyOUT_SFJ.chi2_post, 
-    f_model_name = 'SFJ post',
-    
-    priors = sammyOUT_SFJ.pw, priors_chi2 = sammyOUT_SFJ.chi2, pr_model_name='SFJ prior',
-
-    true = sammyOUT_SFJ.pw_post, 
-    true_chi2 = sammyOUT_SFJ.chi2_post, 
-    t_model_name ='SFJ post',
-    
-    true_pars = Ta_pair.resonance_ladder,
-    
-    fit_pars = sammyOUT_SFJ.par_post,
-    prior_pars = sammyOUT_SFJ.par,
-      
-    title = 'Models Comparison',
-    show_spingroups = False,
-    #fig_size = fig_size
-    )
-
-f_name_to_save = savefolder+f'SFJ_Fit_Result_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}].png'
-fig2.savefig(fname=f_name_to_save)
 
 if (showfigures):
     show()
 
 
 # %%
-# utilizing the autofit from initial FB
+## Could also plot all covariance here
+
+# # testing reading from combined ladder
+# start_ladder_main_vary_params, start_ladder_side_vary_params  = elim_addit_funcs.extract_res_var_params(ladder_df = sel_jeff_parameters,
+#                                         fixed_side_resonances = sel_jeff_side_res_df)
+
+# print('Main resonances, vary params:')
+# print(start_ladder_main_vary_params)
+# print('Side resonances, vary params:')
+# print(start_ladder_side_vary_params)
 
 from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
 
@@ -555,7 +252,6 @@ N_initial_FB = outs.final_internal_resonances.shape[0]
 
 print(f'Initial FB size: {N_initial_FB}')
 
-
 # %%
 
 # print(outs.sammy_outs_fit_2)
@@ -564,8 +260,10 @@ print(f'Initial FB size: {N_initial_FB}')
 elim_addit_funcs.printout_chi2(outs.sammy_outs_fit_1[0], 'autofit prior')
 elim_addit_funcs.printout_chi2(outs.sammy_outs_fit_2[-1], 'autofit posterior')
 
+
 print('Full Final ladder after autofit')
 print(outs.final_resonace_ladder)
+
 
 # print('Posterior parameters:')
 # print(outs.sammy_outs_fit_2[-1].par_post)
@@ -624,17 +322,6 @@ fig2 = elim_addit_funcs.plot_datafits(datasets, experiments,
 f_name_to_save = savefolder+f'AF_Result_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
 fig2.savefig(fname=f_name_to_save)
 
-#fig2.show()
-
-# # %%
-# print(final_fb_output.chi2)
-# print(sum(final_fb_output.chi2))
-# print(final_fb_output.chi2_post)
-# print(sum(final_fb_output.chi2_post))
-# print(f'N_res: {final_fb_output.par_post.shape[0]}')
-
-# %% [markdown]
-# ***A measure of error***
 
 # %%
 
@@ -661,14 +348,7 @@ xs_figure.savefig(fname=f_name_to_save)
 # # Resonance elimination 
 
 
-
-start_ladder = outs.final_internal_resonances # internal resonances from initial FB
-
-
-# start_ladder = fill_sammy_ladder(df = start_ladder,
-#                                        particle_pair=Ta_pair,
-#                                        vary_parm = False,
-#                                        J_ID = None)
+start_ladder = outs.final_internal_resonances
 
 print('Start ladder without sides:')
 print(start_ladder)
@@ -676,9 +356,6 @@ print(start_ladder)
 # print('Columns:')
 # print(start_ladder.columns)
 
-# side resonances if needed, otherways - keep empty
-
-# # take from JEFF
 # side_resonances_df = elim_addit_funcs.find_side_res_df(
 #         initial_sol_df = sel_jeff_parameters,
 #         energy_region = energy_range_all,
@@ -692,12 +369,6 @@ side_resonances_df = outs.final_external_resonances
 side_resonances_df = elim_addit_funcs.set_varying_fixed_params(ladder_df=side_resonances_df,
                                                                vary_list=[0,1,1])
 
-## enriching it with all variables? Gn2, Gn3, varyGn2, varyGn3??
-# side_resonances_df = fill_sammy_ladder(df = side_resonances_df,
-#                                        particle_pair=Ta_pair,
-#                                        vary_parm = False,
-#                                        J_ID = None)
-
 print('Side resonances:')
 print(side_resonances_df)
 
@@ -707,17 +378,17 @@ start_ladder = pd.concat([side_resonances_df, start_ladder], ignore_index=True)
 
 
 print()
-print('Final ladder to eliminate from:')
+print('Starting ladder to eliminate from:')
 print(start_ladder)
 print()
-# print(start_ladder.columns)
+print(start_ladder.columns)
 
 
 
-
-# %%
 # if we do not want to wait hours...
 N_red = min(N_red, start_ladder.shape[0],) # not limiting
+
+print(f'Ladder will be reduced to {N_red} resonances...')
 
 # just to reduce processing time
 start_ladder = elim_addit_funcs.reduce_ladder(ladder_df=start_ladder,
@@ -797,11 +468,12 @@ print(f'Elim took {np.round(hist.elim_tot_time,2)} sec')
 # save history?
 fitted_elim_case_data = {
     'energy_range': energy_range_all,
-        'datasets' : datasets,
-        'covariance_data' : covariance_data,
+    'datasets' : datasets,
+    'covariance_data' : covariance_data,
     'experiments': experiments,
     'true_chars': true_chars, # note, jeff are used as true here
     'Ta_pair': Ta_pair,
+    
     # elim parameters
     'elim_opts': elim_opts,
     'side_res_df': side_resonances_df
@@ -970,6 +642,3 @@ print(f'Entire cycle took {elim_addit_funcs.format_time_2_str(global_end_time-gl
 
 end_date = datetime.fromtimestamp(global_end_time ).strftime("%d.%m.%Y %H:%M:%S")
 print("End date and time =", end_date)
-
-
-

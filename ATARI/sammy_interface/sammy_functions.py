@@ -388,7 +388,7 @@ def create_sammyinp(filename='sammy.inp', \
     return
 
 def write_saminp(filepath, 
-                model,
+                particle_pair,
                 experimental_model,
                 rto,
                 alphanumeric = None,
@@ -412,7 +412,7 @@ def write_saminp(filepath,
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
     
-    alphanumeric = [model.formalism, bayes_cmd] + alphanumeric
+    alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -428,7 +428,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{model.isotope: <9} {model.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope: <9} {particle_pair.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
@@ -438,7 +438,7 @@ def write_saminp(filepath,
                     pass
 
             elif line.startswith('%%%card7%%%'):
-                f.write(f'  {float(model.ac):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
+                f.write(f'  {round(float(particle_pair.ac)*10, 7):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
                 f.write(f'{reaction}\n')

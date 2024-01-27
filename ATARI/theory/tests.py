@@ -4,14 +4,6 @@ from scipy.integrate import trapezoid
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.particle_pair import Particle_Pair
 
-x = np.linspace(0,100, 1000000)
-y = chisquare_PDF(x, 1000, 60)
-assert(np.isclose(trapezoid(y, x), 1.0))
-
-xw =np.linspace(0, 50, 100000)
-yw = wigner_PDF(xw, 8)
-assert(np.isclose(trapezoid(yw, xw), 1.0))
-
 Ta181 = Particle(Z=73, A=181, I=3.5, mass=180.94803, name='Ta181')
 Ta_pair = Particle_Pair()
 

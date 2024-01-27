@@ -78,7 +78,7 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
         E : numpy.ndarray
             Energy of the incident neutron.
         ac : float
-            Scattering channel radius in square-root barns or 1e-12 cm.
+            Scattering channel radius in √barns or 1e-12 cm.
         M : float or int
             Mass of the target nucleus.
         m : float or int
@@ -149,7 +149,7 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     E : float or numpy.ndarray
         Energy of the incident neutron.
     ac : float
-        Scattering channel radius in square-root barns or 1e-12 cm.
+        Scattering channel radius in √barns or 1e-12 cm.
     M : float or int
             Mass of the target nucleus.
     m : float or int

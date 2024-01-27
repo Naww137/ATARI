@@ -145,4 +145,4 @@ def get_LL_by_parameter(ladder,
     LL_bypar_bysg = np.array(LL_bypar_bysg)
     LL_bypar = np.sum(LL_bypar_bysg, axis=0)
 
-    return LL_bypar
+    return LL_bypar, LL_bypar_bysg

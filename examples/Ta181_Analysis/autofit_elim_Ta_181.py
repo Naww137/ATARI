@@ -64,7 +64,7 @@ N_red = 50 # number of resonances to keep after the initial autofit
 # number of resonances for autofit (without size)
 # int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
 
-N_res_autofit = 100 # for one spin group
+N_res_autofit = 5 # for one spin group
 fit_all_spin_groups = True
 
 energy_range_all = [202, 227]
@@ -77,7 +77,7 @@ energy_range_all = [202, 227]
 # energy_range_all = [201, 228]
 # energy_range_all = [201, 210]
 
-energy_range_all = [270, 340]
+# energy_range_all = [270, 340]
 
 chi2_allowed = 0
 start_deep_fit_from = 15 # excluding the side resonances provided
@@ -512,12 +512,13 @@ if (showfigures):
 from ATARI.AutoFit.initial_FB_solve import InitialFB, InitialFBOPT
 
 sammy_rto_fit = sammy_classes.SammyRunTimeOptions(
-    sammyexe=settings['path_to_SAMMY_exe'],
-                             options = {"Print"   :   True,
-                              "bayes"   :   True,
-                              "keep_runDIR"     : True,
-                              "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=settings['path_to_SAMMY_temps'])
-                              })
+    sammyexe = settings['path_to_SAMMY_exe'],
+    options = {"Print"   :   True,
+                "bayes"   :   True,
+                "keep_runDIR"     : True,
+                "sammy_runDIR": elim_addit_funcs.generate_sammy_rundir_uniq_name(path_to_sammy_temps=settings['path_to_SAMMY_temps'])
+                }
+    )
 
 options = InitialFBOPT(Gn_threshold = Gn_thr,
                        iterations=2,
@@ -638,32 +639,30 @@ fig2.savefig(fname=f_name_to_save)
 
 # %%
 
-energy_grid = fine_egrid(energy = energy_range_all)
+# energy_grid = fine_egrid(energy = energy_range_all)
 
-df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
-        est_ladder = final_fb_output.par_post,
-        theo_ladder = sammyOUT_SFJ.par_post,
-        Ta_pair = Ta_pair,
-        settings = settings,
-        energy_grid = energy_grid,
-        reactions_SSE = ['capture', 'elastic'],
-        fig_size = fig_size,
-        calc_fig = True
-)
+# df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
+#         est_ladder = final_fb_output.par_post,
+#         theo_ladder = sammyOUT_SFJ.par_post,
+#         Ta_pair = Ta_pair,
+#         settings = settings,
+#         energy_grid = energy_grid,
+#         reactions_SSE = ['capture', 'elastic'],
+#         fig_size = fig_size,
+#         calc_fig = True
+# )
 
-#xs_figure.show()
+# #xs_figure.show()
 
-f_name_to_save = savefolder+f'xs_AF_Res_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
-xs_figure.savefig(fname=f_name_to_save)
+# f_name_to_save = savefolder+f'xs_AF_Res_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
+# xs_figure.savefig(fname=f_name_to_save)
 
 
 # %% [markdown]
 # # Resonance elimination 
 
 
-
 start_ladder = outs.final_internal_resonances # internal resonances from initial FB
-
 
 # start_ladder = fill_sammy_ladder(df = start_ladder,
 #                                        particle_pair=Ta_pair,
@@ -673,45 +672,11 @@ start_ladder = outs.final_internal_resonances # internal resonances from initial
 print('Start ladder without sides:')
 print(start_ladder)
 
-# print('Columns:')
-# print(start_ladder.columns)
-
-# side resonances if needed, otherways - keep empty
-
-# # take from JEFF
-# side_resonances_df = elim_addit_funcs.find_side_res_df(
-#         initial_sol_df = sel_jeff_parameters,
-#         energy_region = energy_range_all,
-#         N_res = 2
-# )
-
 # take from autofit
 side_resonances_df = outs.final_external_resonances
 
-# enrich with all required columns
-side_resonances_df = elim_addit_funcs.set_varying_fixed_params(ladder_df=side_resonances_df,
-                                                               vary_list=[0,1,1])
-
-## enriching it with all variables? Gn2, Gn3, varyGn2, varyGn3??
-# side_resonances_df = fill_sammy_ladder(df = side_resonances_df,
-#                                        particle_pair=Ta_pair,
-#                                        vary_parm = False,
-#                                        J_ID = None)
-
-print('Side resonances:')
-print(side_resonances_df)
-
-
-# compiling to one ladder
-start_ladder = pd.concat([side_resonances_df, start_ladder], ignore_index=True)
-
-
-print()
-print('Final ladder to eliminate from:')
-print(start_ladder)
-print()
-# print(start_ladder.columns)
-
+print('Side resonances used:')
+side_resonances_df
 
 
 
@@ -719,42 +684,23 @@ print()
 # if we do not want to wait hours...
 N_red = min(N_red, start_ladder.shape[0],) # not limiting
 
-# just to reduce processing time
-start_ladder = elim_addit_funcs.reduce_ladder(ladder_df=start_ladder,
-                             Gn1_threshold = Gn_thr,
-                             vary_list = [1,0,1],
-                             N = N_red,
-                             keep_fixed = True,
-                             fixed_side_resonances = side_resonances_df)
 
-print('Start ladder:')
+# to reduce processing time
+start_ladder = elim_addit_funcs.reduce_ladder(ladder_df = start_ladder,
+                             Gn1_threshold = Gn_thr,
+                             vary_list = [1,0,1], # do not vary Gg
+                             N = N_red,
+                             #keep_fixed = True,
+                             #fixed_side_resonances = side_resonances_df
+                             )
+
+print(f'Start ladder after reduction to {N_red} res.:')
 print(start_ladder)
 
 
 # %%
 
-# defining rto & inputs
-elim_sammyINPyw = sammy_classes.SammyInputDataYW(
-    particle_pair = Ta_pair,
-    resonance_ladder = start_ladder,
-
-    datasets = datasets,
-    experimental_covariance=covariance_data,
-    experiments = experiments,
-
-    max_steps = 0,
-    iterations = 2,
-    step_threshold = 0.01,
-    autoelim_threshold = None,
-
-    LS = False,
-    LevMar = True,
-    LevMarV = 1.5,
-
-    minF = 1e-5,
-    maxF = 10,
-    initial_parameter_uncertainty = 0.05
-    )
+# defining rto & optins for eliminations
 
 # defining the elim_opts
 elim_opts = chi2_eliminator_v2.elim_OPTs(
@@ -771,14 +717,15 @@ elim_opts = chi2_eliminator_v2.elim_OPTs(
 
 # %%
 elimi = chi2_eliminator_v2.eliminator_by_chi2(rto=sammy_rto_fit,
-                                            sammyINPyw = elim_sammyINPyw , 
-                                            options = elim_opts)
-print()
-print('Elimination options used:')
-print('*'*40)
-print(elim_opts)
-print('*'*40)
-print()
+                                            options = elim_opts,
+                                            Ta_pair=Ta_pair,
+
+                                            #provide data
+                                            datasets = datasets,
+                                            covariance_data  = covariance_data,
+                                            experiments = experiments
+                                            )
+
 
 # %%
 hist = elimi.eliminate(ladder_df = start_ladder,
@@ -791,7 +738,18 @@ true_chars = sammyOUT_SFJ
 # %%
 # just to show how much we aliminated with the given threshold value.
 print(f'Eliminated from {hist.ladder_IN.shape[0]} res -> {hist.ladder_OUT.shape[0]}')
+print(f'Selection done using chi2 threshold: {elim_opts.chi2_allowed}')
+print(f'Total models tested: {len(hist.elimination_history.keys())}')
+print(f'N_res for models tested (without sides!): ')
+print(hist.elimination_history.keys())
+# all chi2
+print('Models chi2:')
+
+print()
 print(f'Elim took {np.round(hist.elim_tot_time,2)} sec')
+print()
+
+
 
 # %%
 # save history?
@@ -826,31 +784,28 @@ print(f'Initial ladder, num of res.: {prior_numres}')
 min_level_passed_test = prior_level # level - key in the hist..
 min_N_res_passed_test = prior_level - 1
 
-levels = []
-N_ress = []
-chi2_s = []
+levels, N_ress, chi2_s = [], [], []
 
 for level in hist.elimination_history.keys():
-        
     numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+    numres_wo_sides = level
     pass_test = hist.elimination_history[level]['final_model_passed_test']
 
-    #print(f'level {level}, # of resonances: {numres},  passed the test: {pass_test}')
+    print(f'level {level}, # of resonances: {numres_wo_sides}/{numres}, passed the test: {pass_test}')
 
     if (pass_test and level<min_level_passed_test):
         min_level_passed_test = level
 
-        min_N_res_passed_test = numres
+        min_N_res_passed_test = numres_wo_sides
     
     levels.append(level)
     chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
-    N_ress.append(numres)
+    N_ress.append(numres_wo_sides)
 
 
 # plotting    
 # differences in chi2 values between 2 models
 chi2_diffs = np.diff(chi2_s, prepend=chi2_s[0]) 
-
 fig, (ax1, ax2) = subplots(2, 1, figsize = fig_size, sharex=True, gridspec_kw={'height_ratios': [2, 1]})
 
 # First subplot for the original chi2 values
@@ -901,7 +856,8 @@ def show_plot_from_hist(
     fig = elim_addit_funcs.plot_datafits(datasets, experiments, 
         fits=fits, fits_chi2=fits_chi2, f_model_name=f'AF {N_initial_FB} + el. {N_red}',
         priors = prior_fit, priors_chi2=priors_chi2, pr_model_name=f'AF, red. to {N_red}',
-        true=true_chars.pw, t_model_name='JEFF (w/o autofit)',
+        true=true_chars.pw, 
+        t_model_name='JEFF (w/o autofit)',
         true_chi2 = true_chars.chi2,
         true_pars = true_pars,
         fit_pars = elim_hist[level_to_compare]['selected_ladder_chars'].par_post,
@@ -931,45 +887,42 @@ fig.savefig(savefolder+f'elim_res_selected_{N_initial_FB}_red_{N_red}_greedy_{gr
 if (showfigures):
     show()
 
-# in xs space
-df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
-        est_ladder = hist.elimination_history[level_to_compare]['selected_ladder_chars'].par_post,
-        theo_ladder = sammyOUT_SFJ.par_post,
-        Ta_pair = Ta_pair,
-        settings = settings,
-        energy_grid=energy_grid,
-        reactions_SSE = ['capture', 'elastic'],
-        fig_size=fig_size,
-        calc_fig=True
-)
-#xs_figure.show()
+# # in xs space
+# df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
+#         est_ladder = hist.elimination_history[level_to_compare]['selected_ladder_chars'].par_post,
+#         theo_ladder = sammyOUT_SFJ.par_post,
+#         Ta_pair = Ta_pair,
+#         settings = settings,
+#         energy_grid=energy_grid,
+#         reactions_SSE = ['capture', 'elastic'],
+#         fig_size=fig_size,
+#         calc_fig=True
+# )
+# #xs_figure.show()
 
-f_name_to_save = savefolder+f'xs_elim_res_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png'
-xs_figure.savefig(fname=f_name_to_save)
+# f_name_to_save = savefolder+f'xs_elim_res_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.png'
+# xs_figure.savefig(fname=f_name_to_save)
 
 # %%
 # table for analysis of the models - produce chi2
 
-table_df = elim_addit_funcs.create_solutions_comparison_table_from_hist(hist = hist,
-                                                Ta_pair = Ta_pair,
-                     datasets = datasets,
-                     experiments = experiments,
-                     covariance_data = covariance_data,
-                     true_chars = true_chars,
-                     settings = settings,
-                     energy_grid_2_compare_on = energy_grid)
+# table_df = elim_addit_funcs.create_solutions_comparison_table_from_hist(hist = hist,
+#                                                 Ta_pair = Ta_pair,
+#                      datasets = datasets,
+#                      experiments = experiments,
+#                      covariance_data = covariance_data,
+#                      true_chars = true_chars,
+#                      settings = settings,
+#                      energy_grid_2_compare_on = energy_grid)
 
-# saving comparison table
-table_df.to_csv(path_or_buf=savefolder+f'comparison_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.csv')
+# # saving comparison table
+# table_df.to_csv(path_or_buf=savefolder+f'comparison_{N_initial_FB}_red_{N_red}_greedy_{greedy_mode}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}_sdf_{start_deep_fit_from}.csv')
 
-print('Sol. Comparison table:')
-print(table_df)
+# print('Sol. Comparison table:')
+# print(table_df)
 
 global_end_time = time.time()
 print(f'Entire cycle took {elim_addit_funcs.format_time_2_str(global_end_time-global_st_time)[1]}')
 
 end_date = datetime.fromtimestamp(global_end_time ).strftime("%d.%m.%Y %H:%M:%S")
 print("End date and time =", end_date)
-
-
-

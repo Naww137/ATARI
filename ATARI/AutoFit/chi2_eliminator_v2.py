@@ -212,21 +212,50 @@ class eliminator_OUTput:
 class eliminator_by_chi2:
     def __init__(self, 
                  rto: SammyRunTimeOptions, 
-                 sammyINPyw: SammyInputDataYW, 
+                 #sammyINPyw: SammyInputDataYW, 
                  options: elim_OPTs,
+
+                Ta_pair: Particle_Pair,
+                datasets: list,
+                covariance_data: list,
+                experiments: list,
+
                  ):
         """
         Initialize the class with all parameters specified
-
         """
 
+        # creating a sammyINPyw object for internal use
+        elim_sammyINPyw = SammyInputDataYW(
+            particle_pair = Ta_pair,
+            resonance_ladder = pd.DataFrame(),
+
+            datasets = datasets,
+            experimental_covariance=covariance_data,
+            experiments = experiments,
+
+            max_steps = 0,
+            iterations = 2,
+            step_threshold = 0.01,
+            autoelim_threshold = None,
+
+            LS = False,
+            LevMar =  True,
+            LevMarV = 1.5,
+
+            minF = 1e-5,
+            maxF = 10,
+            initial_parameter_uncertainty = 0.05
+        )
+
+
         self.rto = rto
-        self.sammyINPyw = sammyINPyw
+        self.sammyINPyw = elim_sammyINPyw
         self.options = options
 
 
     def eliminate(self, 
-                  ladder_df : pd.DataFrame = pd.DataFrame(),
+                  ladder_df : pd.DataFrame,
                   fixed_resonances_df: pd.DataFrame = pd.DataFrame()
                   ) -> eliminator_OUTput: 
 
@@ -236,40 +265,60 @@ class eliminator_by_chi2:
 
         delta_chi2_allowed = self.options.chi2_allowed
 
-        interm_fit_max_iter = self.options.interm_fit_max_iter # allowed number of iterations for YW if no priors passes the test
-        interm_fit_step_thr = self.options.interm_fit_step_thr
-
         deep_fit_step_thr = self.options.deep_fit_step_thr # threshold for deep fitting stage
         deep_fit_max_iter = self.options.deep_fit_max_iter
-
-        fixed_res_df = fixed_resonances_df
-
         start_deep_fit_from = self.options.start_deep_fit_from
 
-        greedy_mode = self.options.greedy_mode # to save time.. - just take first model that passes the test
         
         # Initializing model history dictionary
         model_history = {}
 
         final_model_passed_test = True # set it from the start.
 
-        # ladder for processing - from direct input or from sammyINPyw
-        if (ladder_df.shape[0]==0):
-            ladder = self.sammyINPyw.resonance_ladder.copy()
-        else:
-            ladder = ladder_df
+        # ladder for processing - from direct input
+        ladder_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = ladder_df,
+                                                                    vary_list=[1,0,1]
+                                                                    )
+        
+        if (self.rto.Print):
+            print('*'*40)
+            print('Input ladder:')
+            print(ladder_df)
+        
+
+        # set all req. vary fields
+        fixed_res_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = fixed_resonances_df,
+                                                                    vary_list=[0,1,1] # do not allow to change energy
+                                                                    )
+        
+        if (self.rto.Print):
+            print('Side resonances used:')
+            print(fixed_res_df)
+            print()
+
+
+        # compiling to one ladder
+        ladder = pd.concat([fixed_res_df, ladder_df], ignore_index=True)
+
+        self.sammyINPyw.resonance_ladder = ladder
+
+        if (self.rto.Print):
+            print('Combined ladder to start from:')
+            print(self.sammyINPyw.resonance_ladder)
+            print()
+
 
         # saving initial input
         ladder_IN = ladder.copy()
         ladder_OUT = ladder.copy()
 
         # printout
-        if (self.rto.Print):
+        if (self.rto.Print):           
+            print()
+            print('Elimination options used:')
             print('*'*40)
-            print('Input ladder:')
-            print(ladder)
-            print('Side resonances used:')
-            print(fixed_res_df)
+            print(self.options)
+            print('*'*40)
             print()            
             
 
@@ -432,7 +481,7 @@ class eliminator_by_chi2:
 
                 print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)[1]}')
                 print()
-                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {interm_fit_max_iter} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
+                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {self.options.interm_fit_max_iter} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
     
                 print('Deep fitting decision about model selection:')
                 print()
@@ -481,7 +530,7 @@ class eliminator_by_chi2:
                 print('*'*40)
                 print()
 
-            model_history[current_level] = {
+            model_history[current_level-fixed_res_df.shape[0]] = {
                 
                 'input_ladder' : ladder,
                 'selected_ladder_chars': selected_ladder_chars, # solution with min chi2 on this level

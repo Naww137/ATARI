@@ -1256,8 +1256,8 @@ def calc_theo_broadened_xs_for_reactions(
         settings: dict,
         reactions: list = ['capture', 'elastic', 'transmission'],
         ):
-
-    rundirname = settings['path_to_SAMMY_temps']+'./calc_xs_theo/'
+    
+    rundirname = settings['path_to_SAMMY_temps']+'calc_xs_theo/'
     
     df = pd.DataFrame({"E":energy_grid})
     
@@ -1267,19 +1267,20 @@ def calc_theo_broadened_xs_for_reactions(
                                reaction = rxn,
                                energy_range = [np.min(energy_grid), np.max(energy_grid)],
                                energy_grid = energy_grid,
-
-                                n = (0.017131,0.0),  
-                                FP = (100.14,0.0), 
-                                burst = (8, 0.0), 
-                                temp = (300.0, 0.0),
-
+                               n = (0.017131,0.0),  
+                               FP = (100.14,0.0), 
+                               burst = (8, 0.0), 
+                               temp = (300.0, 0.0),
                                channel_widths={
                                     "maxE": [216.16, 613.02, 6140.23], 
                                     "chw": [204.7, 102.4, 51.2],
                                     "dchw": [1.6, 1.6, 1.6]
                                 }
-                               )
+        )
 
+        exp_model_theo.sammy_inputs['ResFunc'] = ''
+
+        
         rto = SammyRunTimeOptions(
             sammyexe = settings['path_to_SAMMY_exe'],
             options = {"Print"   :   True,
@@ -1289,9 +1290,11 @@ def calc_theo_broadened_xs_for_reactions(
                     }
         )
 
-        # Construct the file path in a platform-independent way
-        template_filename = os.path.join(settings['running_path'], 'theo.inp')
-
+        # Construct the file path..
+        # we need to construct it for each reaction type?? 
+        # What the difference then for each reaction type?
+        template_filename = os.path.join(settings['running_path'], 'theo.inp') # current working directory!!
+        
         if not os.path.exists(template_filename):
             template_creator.make_input_template(template_filename, Ta_pair, exp_model_theo, rto)
         
@@ -1305,18 +1308,13 @@ def calc_theo_broadened_xs_for_reactions(
             energy_grid = exp_model_theo.energy_grid,
             initial_parameter_uncertainty = None
         )
-
         sammyOUT = run_sammy(sammy_INP, rto)
         
         if rxn == "capture" and resonance_ladder.empty: ### if no resonance parameters - sammy does not return a column for capture theo xs
             sammyOUT.pw["theo_xs"] = np.zeros(len(sammyOUT.pw))
-
-
         if rxn == "transmission": 
             df[f'trans_{rxn}'] = sammyOUT.pw.theo_trans
-
         df[f'xs_{rxn}'] = sammyOUT.pw.theo_xs
-
     return df
 
 
@@ -1491,7 +1489,7 @@ def calc_all_SSE_gen_XS_plot(
         settings = settings,
         energy_grid = energy_grid,
         reactions = reactions_SSE, 
-        print_bool = True
+        print_bool = False
         )
     
     SSE_dict = calculate_SSE_by_cases(ResidualMatrixDict = resid_matrix)

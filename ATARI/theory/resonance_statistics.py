@@ -3,6 +3,7 @@ from scipy.linalg import eigvalsh_tridiagonal
 from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
+from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
 
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
@@ -133,12 +134,6 @@ def sample_NNE_energies(E_range, avg_level_spacing:float,
     res_E = res_E[res_E < E_limits[1]]
     return res_E
 
-def wigner_semicircle_CDF(x):
-    """
-    CDF of Wigner's semicircle law distribution.
-    """
-    return (x/np.pi) * np.sqrt(1.0 - x**2) + np.arcsin(x)/np.pi + 0.5
-
 def sample_GE_eigs(num_eigs:int, beta:int=1,
                    rng=None, seed:Optional[int]=None):
     """
@@ -240,18 +235,10 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
 
     # Using semicircle law CDF to make the resonances uniformly spaced:
     # Source: https://github.com/LLNL/fudge/blob/master/brownies/BNL/restools/level_generator.py
-    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (wigner_semicircle_CDF(eigs) - wigner_semicircle_CDF(-1.0+margin))
+    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+margin))
     E_res = E_res[E_res < E_limits[1]]
     E_res = np.sort(E_res)
     return E_res
-
-def wigner_PDF(x, avg_level_spacing):
-    x = x/avg_level_spacing
-    y = (np.pi/2) * x * np.exp(-np.pi*(x**2)/4)
-    y = y/avg_level_spacing
-    return y
-
-
 
 def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
                       rng=None, seed=None):
@@ -335,116 +322,16 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
     spacings = np.diff(levels) # I do not think this output is used anywhere
     return levels, spacings
 
-
-
-
-
-
-
-
-
-
+def wigner_PDF(x, avg_level_spacing:float, beta:int=1):
+    return wigner_dist.pdf(x, scale=avg_level_spacing, beta=beta)
 
 # =====================================================================
 # Resonance width sampling
 # =====================================================================
 
-
-def sample_chisquare(N_samples, DOF,
-                     rng=None, seed=None):
-    """
-    Sample the chi-squared distribution.
-
-    This function simply samples from the chi-square distribution and is used
-    by other functions for generating reduced resonance width samples.
-
-    Parameters
-    ----------
-    N_samples : int
-        Number of samples and/or length of sample vector.
-    DOF : float
-        Degrees of freedom for the chi-squared distribution.
-    rng : np.random.Generator or None
-        Numpy random number generator object. Default is None.
-    seed : int or None
-        Random number generator seed. Only used when rng is None. Default is None.
-
-    Returns
-    -------
-    numpy.ndarray or float
-        Array of i.i.d. samples from chi-squared distribution.
-
-    See Also
-    --------
-    chisquare_PDF : Calculate probability density function for chi-squared distribution.
-
-    Notes
-    -----
-    
-    
-    Examples
-    --------
-    >>> from theory import resonance_statistics
-    >>> np.random.seed(7)
-    >>> resonance_statistics.sample_chisquare(2,10)
-    array([18.7081546 ,  7.46151704])
-    """
-    # Random number generator:
-    if rng is None:
-        if seed is None:
-            rng = np.random # uses np.random.seed
-        else:
-            rng = np.random.default_rng(seed) # generates rng from provided seed
-
-    samples = np.random.chisquare(DOF, size=N_samples)
-    # if N_samples == 1:
-    #     samples = samples.item()
-    return samples
-    
-def chisquare_PDF(x, DOF, avg_reduced_width_square):
-    """
-    Calculate probability density function for chi-squared distribution.
-
-    This function simply houses the probaility density function for the 
-    chi-squared distribution and allows for a rescaling factor to be applied.
-    The rescaling factor represents the average resonance width value s.t.
-    this PDF will represent the distribution of widths for a specific isotope.
-
-    Parameters
-    ----------
-    x : numpy.ndarray
-        Values at which to evaluation the PDF.
-    DOF : float or int
-        Degrees of freedom for the chi-squared distribution.
-    avg_reduced_width_square : float or int
-        Re-scaling factor for isotope specific distribution.
-
-    Returns
-    -------
-    numpy.ndarray
-        Pointwise function evaluated at x, given DOF and rescaling factor.
-
-    See Also
-    --------
-    sample_chisquare : Sample the chi-squared distribution.
-    
-    Examples
-    --------
-    >>> from theory import resonance_statistics
-    >>> import scipy.stats as stats
-    >>> resonance_statistics.chisquare_PDF(np.array([1.0, 2.5, 3.0]), 2, 1)
-    array([0.30326533, 0.1432524 , 0.11156508])
-    """
-    x = x/avg_reduced_width_square*DOF
-    y = chi2.pdf(x, DOF)
-    y_norm = y/avg_reduced_width_square*DOF
-    return y_norm
-
-
-
 def sample_RRR_widths(N_levels, 
                       avg_reduced_width_square, 
-                      DOF,
+                      DOF:int=1, trunc:float=0.0,
                       rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
@@ -458,8 +345,10 @@ def sample_RRR_widths(N_levels,
         Ladder of resonance energy levels.
     avg_reduced_width_square : float or int
         Average value for the reduced width for rescale of the PT distribution.
-    DOF : float or int
+    DOF : int
         Degrees of freedom applied to the PT distiribution (chi-square).
+    trunc : float
+        All reduced widths below this value are ignored. Default = 0.0.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -477,9 +366,46 @@ def sample_RRR_widths(N_levels,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    reduced_widths_square = avg_reduced_width_square*sample_chisquare(N_levels, DOF, rng=rng)/DOF
-
+    reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
     return np.array(reduced_widths_square)
+
+def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):
+    """
+    Calculate probability density function for chi-squared distribution.
+
+    This function simply houses the probaility density function for the 
+    chi-squared distribution and allows for a rescaling factor to be applied.
+    The rescaling factor represents the average resonance width value s.t.
+    this PDF will represent the distribution of widths for a specific isotope.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Values at which to evaluation the PDF.
+    DOF : int
+        Degrees of freedom for the chi-squared distribution.
+    avg_reduced_width_square : float or int
+        Re-scaling factor for isotope specific distribution.
+    trunc : float
+        All reduced widths below this value are ignored. Default = 0.0.
+
+    Returns
+    -------
+    numpy.ndarray
+        Pointwise function evaluated at x, given DOF and rescaling factor.
+
+    See Also
+    --------
+    sample_RRR_widths : Sample the widths according to Porter-Thomas distribution.
+    
+    Examples
+    --------
+    >>> from theory import resonance_statistics
+    >>> import scipy.stats as stats
+    >>> resonance_statistics.chisquare_PDF(np.array([1.0, 2.5, 3.0]), 2, 1)
+    array([0.30326533, 0.1432524 , 0.11156508])
+    """
+    return porter_thomas_dist.pdf(x=x, mean=avg_reduced_width_square, df=DOF, trunc=trunc)
 
 # =====================================================================
 # GOE, GUE, and GSE distributions

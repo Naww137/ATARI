@@ -12,6 +12,18 @@ class Experimental_Model:
     temp = parameter()
 
     def __init__(self, **kwargs):
+        """
+        Experimental Model is a class that holds information 
+
+        Parameters
+        ----------
+        **kwargs : dict, optional
+            Any keyword arguments are used to set attributes on the instance.
+
+        Attributes
+        ----------
+      
+        """
         self.title = "T12mm"
         self.reaction = "transmission"
         self.energy_range = [200, 250]
@@ -26,6 +38,7 @@ class Experimental_Model:
         
         self.additional_resfunc_lines = []
 
+        # self.theoretical = False
         # update kwargs to get user input for some parameters
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -87,17 +100,14 @@ class Experimental_Model:
                 else:
                     tof_min_max = e_to_t(np.array([maxE[i-1], maxE[i]]),
                                          self.FP[0], True)*1e9 + self.t0[0]
-
-                tof_grid = np.arange(
-                    min(tof_min_max), max(tof_min_max), chw[i])
-                E = t_to_e(
-                    (tof_grid-self.t0[0])*1e-9, self.FP[0], True)
-                self.energy_grid = np.concatenate(
-                    [self.energy_grid, np.flipud(E)])
+                tof_grid = np.arange(min(tof_min_max), max(tof_min_max), chw[i])
+                E = t_to_e((tof_grid-self.t0[0])*1e-9, self.FP[0], True)
+                self.energy_grid = np.concatenate([self.energy_grid, np.flipud(E)])
         else:
-            pass 
-        # TODO: ask if I always need to use energy range too??
+            self.energy_grid = np.sort(self.energy_grid)
+
         self.energy_grid = self.energy_grid[(self.energy_grid>=min(self.energy_range)) & (self.energy_grid<=max(self.energy_range)) ]
+
     @property
     def title(self):
         'The name of the experiment'

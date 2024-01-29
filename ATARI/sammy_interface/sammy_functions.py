@@ -523,6 +523,8 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
                                 )
     if 'STOP' in runsammy_process.stderr:
         raise ValueError(f"\n\n===========================\nSAMMY Failed with output:\n\n {runsammy_process.stdout}")
+    elif "SAMMY.LPT: No such file or directory" in runsammy_process.stderr:
+        raise ValueError(f"No SAMMY.LPT was generated, check executable path bash scripting.")
     
     if getchi2:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
@@ -839,6 +841,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
                 idc.append(False)
         else:
             write_estruct_file(d, os.path.join(rundir,f"{exp.title}.dat"))
+            idc.append(False)
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 

@@ -2,14 +2,14 @@
 __doc__ = """
 This file stores the "Particle" class. The "Particle" class contains all relevent information to a
 specific particle. Objects of this class are used when defining a reaction's properties in
-"Reaction" objects. The "Neutron" and "Proton" objects has already been defined for convenience.
+"Particle_Pair" objects. The "Neutron", "Proton", and "Ta181" objects has already been defined for convenience.
 """
 
 # =================================================================================================
 #    Particle:
 # =================================================================================================
 
-mass_neutron = 1.00866491588 #  amu  (source: ENDF-6 manual Table H.2)
+mass_neutron = 1.00866491588  # amu  (source: ENDF-6 manual Table H.2)
 mass_proton  = 1.007276466621 # amu  (source: ENDF-6 manual Table H.2)
 
 class Particle:

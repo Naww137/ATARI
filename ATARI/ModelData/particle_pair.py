@@ -84,7 +84,7 @@ class Particle_Pair:
         Projectile intrinsic spin
     l_max:
         Maximum angular momentum
-    total_energy_range:
+    energy_range:
         Modelled energy range
     """
 
@@ -98,7 +98,7 @@ class Particle_Pair:
         self.resonance_ladder = pd.DataFrame()
         self.formalism = "XCT"
         self._spin_groups = {}
-        self.total_energy_range = [200,250]
+        self.energy_range = [200,250]
 
         self.target     = Ta181
         self.projectile = Neutron
@@ -214,11 +214,11 @@ class Particle_Pair:
         self._l_max = l_max
 
     @property
-    def total_energy_range(self):
-        return self._total_energy_range
-    @total_energy_range.setter
-    def total_energy_range(self, total_energy_range):
-        self._total_energy_range = total_energy_range
+    def energy_range(self):
+        return self._energy_range
+    @energy_range.setter
+    def energy_range(self, energy_range):
+        self._energy_range = energy_range
 
 
     def clear_spin_groups(self):
@@ -408,7 +408,7 @@ class Particle_Pair:
         for Jpi, Jinfo in self.spin_groups.items():
 
             # sample resonance levels for each spin group with negative parity
-            [levels, level_spacing] = sample_RRR_levels(self.total_energy_range, Jinfo["<D>"], ensemble=ensemble, rng=rng)
+            [levels, level_spacing] = sample_RRR_levels(self.energy_range, Jinfo["<D>"], ensemble=ensemble, rng=rng)
             N = len(levels)
             # if no resonance levels sampled, dont try to sample widths
             if N == 0:

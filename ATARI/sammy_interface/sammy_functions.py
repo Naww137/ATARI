@@ -482,7 +482,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
             if use_RPCM:
                 f.write("SAMMY.COV\n")
             if use_IDC:
-                f.write("sammy.IDC\n")
+                f.write("sammy.idc\n")
             f.write("\n")
 
         # energy windowed solves

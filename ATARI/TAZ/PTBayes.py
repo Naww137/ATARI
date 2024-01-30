@@ -87,7 +87,8 @@ def PTBayes(particle_pair:Particle_Pair, lvl_dens_false:float=0.0, false_width_d
 
     # Gamma widths: (if gamma_width_on is True)
     if gamma_width_on:
-        posterior[:,:-1] *= chi2.pdf(Gg.reshape(-1,1), df=gDOF, scale=(gDOF/(gg2m*2)).reshape(1,-1))
+        scale = (2*(1.0)) * (gg2m/gDOF).reshape(1,-1)
+        posterior[:,:-1] *= chi2.pdf(Gg.reshape(-1,1), df=gDOF, scale=scale)
 
     # False distribution:
     if (lvl_dens_false != 0.0) and (false_width_dist is not None):

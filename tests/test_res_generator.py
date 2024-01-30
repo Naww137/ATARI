@@ -314,7 +314,7 @@ The {self.ensemble} level-spacing ratios do not follow the expected curve accord
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 """)
         
-class TestGUESampler(unittest.TestCase):
+class TestGSESampler(unittest.TestCase):
 
     E0 = 200 # eV
     num_res = 10_000 # resonances

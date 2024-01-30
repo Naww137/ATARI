@@ -88,9 +88,9 @@ print(sammyOUT_fit.par_post)
 
 atari_par_post = expand_sammy_ladder_2_atari(Ta_pair, sammyOUT_fit.par_post)
 
-assert(np.all([each in atari_par_post.keys() for each in ["gg2", "gn2", "Jpi", "Ls"]]))
+assert(np.all([each in atari_par_post.keys() for each in ["gg2", "gn2", "Jpi", "L"]]))
 
-
+print("Passed tests")
 # resonance_ladder = pd.DataFrame({'E':[50, 55], 'Gg':[50,50], 'Gnx':[-50,50], 'chs':[1.0,1.0], 'lwave':[0.0,0.0], 'J':[3.0,3.0], 'J_ID':[1,1]})
 # pw_exp = pd.DataFrame({'E':[10,100], 'exp_trans': [0.8,0.8], 'exp_trans_unc':[0.1,0.1]})
 

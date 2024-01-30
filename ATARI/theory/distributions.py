@@ -10,6 +10,7 @@ from scipy.special import erf, erfc, expm1, gamma
 class __WignerDistribution(rv_continuous):
     'Wigner Distribution'
     def _pdf(self, x, beta:int):
+        beta = beta[0]
         if   beta == 1:
             coef1 = pi/4
             coef2 = pi/2
@@ -23,6 +24,7 @@ class __WignerDistribution(rv_continuous):
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
         return coef2 * x**beta * np.exp(-coef1*x**2)
     def _cdf(self, x, beta:int):
+        beta = beta[0]
         if   beta == 1:
             coef = pi/4
             return -expm1(-coef*x**2)
@@ -35,6 +37,7 @@ class __WignerDistribution(rv_continuous):
         else:
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
     def _sf(self, x, beta:int):
+        beta = beta[0]
         if   beta == 1:
             coef = pi/4
             return np.exp(-coef*x**2)
@@ -47,6 +50,7 @@ class __WignerDistribution(rv_continuous):
         else:
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
     # def _ppf(self, q, beta:int):
+    #     beta = beta[0]
     #     if beta == 1:
     #         coef = pi/4
     #         return np.sqrt(-np.log(1-q)/coef)
@@ -61,6 +65,7 @@ wigner_dist = __WignerDistribution(name='Wigner distribution', a=0.0, b=np.inf, 
 class __LevelSpacingRatioDistribution(rv_continuous):
     'Level-spacing Ratio Distribution'
     def _pdf(self, x, beta:int):
+        beta = beta[0]
         if   beta == 1:     C_beta = 27/8
         elif beta == 2:     C_beta = 81*sqrt(3)/(4*pi)
         elif beta == 4:     C_beta = 729*sqrt(3)/(4*pi)
@@ -68,6 +73,7 @@ class __LevelSpacingRatioDistribution(rv_continuous):
         gamma = 1+(3/2)*beta
         return C_beta * (x + x**2)**beta / (1 + x + x**2)**gamma
     def _cdf(self, x, beta:int):
+        beta = beta[0]
         if   beta == 1:
             numerator = np.polyval([2,3,-3,-2], x)
             return (1/4) * (numerator/((1+x+x**2)**(3/2))) + 0.5
@@ -108,6 +114,7 @@ class __GEDistribution(rv_continuous):
     Distribution of eigenvalues in a Gaussian Ensemble matrix.
     """
     def _pdf(self, x, beta:int):
+        beta = beta[0]
         x = np.sort(x)
         n = len(x)
         prob = np.exp(-(1/4) * np.sum(x**2))

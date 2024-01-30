@@ -34,7 +34,6 @@ def wigner_LL(resonance_levels  : Union[np.ndarray, list],
     probs = wigner_PDF(Di, average_spacing)
     return np.sum(np.log(probs))
 
-
 def width_LL(resonance_widths   : Union[np.ndarray, list],
                   average_width : float,
                   dof           :float                      ) -> float:
@@ -324,6 +323,8 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
 
 def wigner_PDF(x, avg_level_spacing:float, beta:int=1):
     return wigner_dist.pdf(x, scale=avg_level_spacing, beta=beta)
+    # wigner = wigner_dist(scale=avg_level_spacing, beta=beta)
+    # return wigner.pdf(x)
 
 # =====================================================================
 # Resonance width sampling
@@ -408,70 +409,8 @@ def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=
     return porter_thomas_dist.pdf(x=x, mean=avg_reduced_width_square, df=DOF, trunc=trunc)
 
 # =====================================================================
-# GOE, GUE, and GSE distributions
+# Dyson Mehta ∆3 Metric
 # =====================================================================
-
-def general_wigner_pdf(x, mean_level_spacing:float=1.0, beta:int=1):
-    """
-    Wigner Distribution PDF for GOE, GUE, and GSE.
-
-    Parameters
-    ----------
-    x                  : float or float array
-        The nearest level-spacing.
-    mean_level_spacing : float
-        The mean level spacing of the distribution.
-    beta               : 1, 2, or 4
-        The parameter that determines the assumed ensemble. For GOE, GUE, and GSE, `beta` = 1, 2,
-        or 4, respectively. The default is 1 (GOE).
-
-    Returns
-    -------
-    prob_dens : float or float array
-        The probability density for the distribution evaluated at each level-spacing.
-    """
-    if   beta == 1:
-        coef = np.pi/(4*mean_level_spacing**2)
-        return 2*coef * x * np.exp(-coef*x**2)
-    elif beta == 2:
-        coef1 = 4/(np.pi*mean_level_spacing**2)
-        coef2 = coef1 * (8/(np.pi*mean_level_spacing))
-        return coef2 * x**2 * np.exp(-coef1*x**2)
-    elif beta == 4:
-        coef1 = 64/(9*np.pi*mean_level_spacing**2)
-        coef2 = 262144/(729*np.pi**3*mean_level_spacing**5)
-        return coef2 * x**4 * np.exp(-coef1*x**2)
-    else:
-        raise NotImplementedError(f'beta = {beta} has not been implemented. Choose beta = 1, 2, or 4.')
-    
-def level_spacing_ratio_pdf(ratio:float, beta:int=1):
-    """
-    This function returns the probability density on the ensemble's nearest level-spacing ratio,
-    evaluated at `ratio`. The ensemble can be chosen from GOE, GUE, and GSE for `beta` = 1, 2, or
-    4, respectively.
-
-    Source: https://arxiv.org/pdf/1806.05958.pdf (Eq. 1)
-
-    Parameters
-    ----------
-    ratio : float or float array
-        The nearest level-spacing ratio(s).
-    beta  : 1, 2, or 4
-        The parameter that determines the assumed ensemble. For GOE, GUE, and GSE, `beta` = 1, 2,
-        or 4, respectively. The default is 1 (GOE).
-
-    Returns
-    -------
-    level_spacing_ratio_pdf : float or float array
-        The probability density (or densities) evaluated at the the provided level-spacing
-        ratio(s).
-    """
-    if   beta == 1:     C_beta = 27/8
-    elif beta == 2:     C_beta = 81*np.sqrt(3)/(4*np.pi)
-    elif beta == 4:     C_beta = 729*np.sqrt(3)/(4*np.pi)
-    else:               raise ValueError('"beta" can only be 1, 2, or 4.')
-    level_spacing_ratio_pdf = C_beta * (ratio+ratio**2)**beta / (1+ratio+ratio**2)**(1+(3/2)*beta)
-    return level_spacing_ratio_pdf
     
 def dyson_mehta_delta_3(E, EB:tuple):
     """

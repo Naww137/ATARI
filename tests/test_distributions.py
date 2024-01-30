@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../ATARI')
-# from ATARI.theory.resonance_statistics import chisquare_PDF
+from ATARI.theory.resonance_statistics import wigner_PDF
 from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, semicircle_dist
 
 import numpy as np
@@ -91,6 +91,21 @@ class TestDistributions(unittest.TestCase):
             f1 = semicircle.cdf(x)
             I = quad(semicircle.pdf, -1.0, x)[0]
             self.assertAlmostEqual(I, f1, self.places, f'"semicircle.cdf" does not match integration of "semicircle.pdf".')
+
+    # def test_wigner_LL(self):
+    #     'Tests log likelihood wigner equations'
+    #     MLS = 42.0
+    #     func = lambda x: wigner_PDF(x, MLS)
+    #     I = quad(func, 0.0, np.inf)[0]
+    #     self.assertAlmostEqual(I, 1.0, self.places, f'"wigner_PDF" does not integrate to 1, but instead {I}.')
+
+    #     funcx = lambda x: x*func(x)
+    #     M = quad(funcx, 0.0, np.inf)[0]
+    #     self.assertAlmostEqual(M, MLS, self.places, f'"wigner_PDF" does not have a mean of {MLS}, but instead {M}.')
+
+    #     X = np.array([1.0, 2.0, 4.0, 3.0, 1.5])
+    #     Y = wigner_PDF(X, MLS)
+    #     print(Y)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,9 +1,12 @@
 
 from typing import Optional, Union
 from dataclasses import dataclass, field
-from ATARI.models.particle_pair import Particle_Pair
+from ATARI.ModelData.particle_pair import Particle_Pair
+from ATARI.ModelData.experimental_model import Experimental_Model
 from pandas import DataFrame, Series
 from numpy import ndarray
+
+
 # from ATARI.utils.stats import chi2_val
 
 # @dataclass
@@ -44,25 +47,33 @@ class SammyRunTimeOptions:
 
     def __init__(self, sammyexe: str, options={}):
         default_options = {
-            'sh'            :   'zsh',
+            # 'sh'            :   'zsh',
             'sammy_runDIR'  :   'SAMMY_runDIR',
             'keep_runDIR'   :   False,
             'Print'         :   False,
 
             'bayes'         :   False,
-            'iterations'    :   2
+            'iterations'    :   2,
+
+            'energy_window' : None,
+            'get_ECSCM'     : False,
+            'ECSCM_rxn'     : 'total'
         }
         options = update_dict(default_options, options)
         self.options = options
 
         self.path_to_SAMMY_exe = sammyexe
-        self.shell =  options["sh"]
+        # self.shell =  options["sh"]
         self.sammy_runDIR =  options["sammy_runDIR"]
         self.keep_runDIR = options["keep_runDIR"]
         self.Print =  options["Print"]
         
         self.bayes = options["bayes"]
         self.iterations = options["iterations"]
+
+        self.energy_window = options["energy_window"]
+        self.get_ECSCM = options["get_ECSCM"]
+        self.ECSCM_rxn = options["ECSCM_rxn"]
 
     def __repr__(self):
         return str(self.options)
@@ -82,14 +93,11 @@ class SammyInputData:
     """
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
-    experimental_data: Optional[DataFrame] = None
-    experimental_cov: Optional[DataFrame] = None
+    template: str
+    experiment: Experimental_Model
+    experimental_data: Optional[Union[DataFrame,ndarray]] = None
+    experimental_covariance: Optional[dict] = None
     energy_grid: Optional[arraytype_id] = None
-
-    target_thickness: Optional[arraytype_broadparm] = ''
-    temp: Optional[arraytype_broadparm] = ''
-    FP: Optional[arraytype_broadparm] = ''
-    frac_res_FP: Optional[arraytype_broadparm] = ''
 
     initial_parameter_uncertainty: Optional[float] = 1.0
     
@@ -97,12 +105,14 @@ class SammyInputData:
 
 @dataclass
 class SammyOutputData:
-    pw: Union[DataFrame, list]
+    pw: Union[DataFrame, list[DataFrame]]
     par: DataFrame
     chi2: Union[float, list[float]]
+    chi2n: Union[float, list[float]]
     pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
     chi2_post: Optional[Union[float, list[float]]] = None
+    chi2n_post : Optional[Union[float, list[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 
@@ -125,22 +135,6 @@ def update_dict(old, additional):
 
 
 
-class theory:
-    
-    def __init__(self, isotope, amu, ac, formalism, resonance_ladder=DataFrame()) -> None:
-        self.isotope = isotope
-        self.amu = amu
-        self.ac = ac
-        self.resonance_ladder = resonance_ladder
-        self.formalism = formalism
-        self.spin_groups = """
-  1      1    0  3.0       1.0  3.5
-    1    1    0    0       3.0
-  2      1    0  4.0       1.0  3.5
-    1    1    0    0       4.0
-"""
-
-
 
 
 
@@ -154,12 +148,11 @@ class SammyInputDataYW:
     The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
     """
     particle_pair: Particle_Pair
-    model: theory
     resonance_ladder: DataFrame
 
-    datasets : list
-    templates : list
-    experiments: list
+    datasets : list[DataFrame]
+    experimental_covariance: Optional[list[Union[dict, str]]]
+    experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
 
     max_steps: int = 1
     iterations: int = 2
@@ -168,7 +161,8 @@ class SammyInputDataYW:
 
     LS: bool = False
     LevMar: bool = True
-    LevMarV: float = 2.0
+    LevMarV: float = 1.5
+    LevMarVd: float = 5.0
     minF:   float = 1e-5
     maxF:   float = 10
     initial_parameter_uncertainty: float = 1.0

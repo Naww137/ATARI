@@ -3,7 +3,7 @@ from scipy.linalg import block_diag
 
 
 
-def t_to_e(t,d,rel):
+def t_to_e(t, d, rel:bool):
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s
@@ -15,7 +15,7 @@ def t_to_e(t,d,rel):
     return E
 
 
-def e_to_t(E,d,rel):
+def e_to_t(E, d, rel:bool):
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s

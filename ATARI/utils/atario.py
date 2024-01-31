@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from ATARI.theory.scattering_params import FofE_recursive
-from copy import deepcopy
+from copy import deepcopy, copy
 
 
 # ----------------------------------------------------------------------------------
@@ -28,13 +28,6 @@ def update_dict(old, additional):
 # ATARI internal object utilities
 # ----------------------------------------------------------------------------------
 
-# def take_syndat_spingroups(theo_par_df, est_par_df):
-#     if all(item in est_par_df.columns for item in ['J', 'chs', 'lwave', 'J_ID']):
-#         pass
-#     else:
-#         standard_spingroups = np.array([theo_par_df[['J', 'chs', 'lwave', 'J_ID']].iloc[0]])
-#         est_par_df[['J', 'chs', 'lwave', 'J_ID']] = np.repeat(standard_spingroups, len(est_par_df), axis=0)
-#     return est_par_df
 
 
 def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
@@ -50,6 +43,50 @@ def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
                 raise ValueError("Spin group information is missing and not provided")
             resonance_ladder.loc[:,key] = [item]*len(resonance_ladder.index)
     return 
+
+
+def add_Gw_from_gw(resonance_ladder, particle_pair):
+    ladder = copy(resonance_ladder)
+    Ls_present = np.unique(ladder.L)
+    if len(Ls_present) == 1 and Ls_present[0] == 0:
+        pass
+    else:
+        raise NotImplementedError("Need to update Gw_from_gw function for multiple L-waves")
+    _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
+    ladder['Gg'] = Gg = 2*ladder.gg2.values
+    ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
+    ladder = ladder[["E", "Gg", "Gn1"]+ [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
+    return ladder
+
+
+def expand_sammy_ladder_2_atari(particle_pair, ladder) -> pd.DataFrame:
+
+    def get_J_L_Wred(row):
+        J, Ls = [[key, val["Ls"]] for key, val in particle_pair.spin_groups.items() if val["J_ID"] == row.J_ID][0]
+        if len(Ls) > 1:
+            raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+        else:
+            L = Ls[0]
+        _, P_array, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, L)
+        gg2 = row.Gg/2
+        # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
+        gn2 = row.Gn1/2/P_array[0].item()
+
+        return gg2, gn2, J, L
+
+    ladder[["gg2","gn2","Jpi","L"]] = ladder.apply(lambda row: get_J_L_Wred(row), axis=1,result_type='expand')
+
+    return ladder
+
+
+# def take_syndat_spingroups(theo_par_df, est_par_df):
+#     if all(item in est_par_df.columns for item in ['J', 'chs', 'lwave', 'J_ID']):
+#         pass
+#     else:
+#         standard_spingroups = np.array([theo_par_df[['J', 'chs', 'lwave', 'J_ID']].iloc[0]])
+#         est_par_df[['J', 'chs', 'lwave', 'J_ID']] = np.repeat(standard_spingroups, len(est_par_df), axis=0)
+#     return est_par_df
+
 
 
 def fill_resonance_ladder(resonance_ladder, particle_pair, 

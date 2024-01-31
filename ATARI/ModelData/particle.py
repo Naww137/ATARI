@@ -51,11 +51,11 @@ class Particle:
         
         # Nuclear Radius: (1e-12 cm)
         if radius is not None:
-            if   radius > 1e2:      print(Warning(f'The channel radius, {radius} 1e-12 cm, is quite high. Make sure it is in units of square-root barns or 1e-12 cm.'))
-            elif radius < 1e-2:     print(Warning(f'The channel radius, {radius} 1e-12 cm, is quite low. Make sure it is in units of square-root barns or 1e-12 cm.'))
+            if   radius > 1.00:     print(Warning(f'The nuclear radius, {radius} 1e-12 cm, is quite high. Make sure it is in units of square-root barns or 1e-12 cm.'))
+            elif radius < 0.05:     print(Warning(f'The nuclear radius, {radius} 1e-12 cm, is quite low. Make sure it is in units of square-root barns or 1e-12 cm.'))
             self._radius = float(radius)
         else:
-            self._radius = 1.23 * self._A**(1/3)
+            self._radius = 0.123 * self._A**(1/3)
         
         # Particle Name:
         if name is not None:    self._name = str(name)

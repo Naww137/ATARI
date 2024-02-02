@@ -1451,24 +1451,86 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
 
     return SSE
 
-def calc_all_SF_gen_plot(
-        est_ladder: pd.DataFrame,
-        theo_ladder: pd.DataFrame,
-        Ta_pair: Particle_Pair,
-        settings: dict,
-        energy_grid: np.array,
-        fig_size: tuple = (8,6),
-        calc_fig: bool = False,
-        fig_yscale: str = 'log'
-        ):
-    """Calculates strength function on the parameter using given ladders and energy region
+
+# PLOTTING ALL cs calculated data and comparing it to some assumed true sol?
+
+def plot_xs_differences(cand_sol : list,
+                        cand_sol_names : list,
+                        cand_sol_colors : list,
+                        Ta_pair : Particle_Pair,
+                        energy_grid : np.array,
+                        settings : dict,
+                        reactions : list = ['transmission', 'capture', 'elastic'],
+
+                        addit_str : str = ''
+                        ):
     """
+    given a true solution and a list of candidate solutions - output each type of cs or transmission 
+    for a specific reaction to compare on corresponding plots
 
+    """
+    cs_calc_res_dfs_list = []
 
+    for sol in cand_sol:
+        
+        cur_cs_df = calc_theo_broadened_xs_for_reactions(
+            resonance_ladder = sol,
+            Ta_pair = Ta_pair,
+            energy_grid = energy_grid,
+            settings = settings,
+            reactions = reactions,
+        )
+        
+        # Identifying columns starting with "xs_"
+        #xs_columns = [col for col in cur_cs_df.columns if (col.startswith('xs_') or col.startswith('trans_'))]
+        xs_columns = [col for col in cur_cs_df.columns if (col.startswith('xs_'))]
 
-    SF_dict = {}
+        cs_calc_res_dfs_list.append(cur_cs_df)
 
-    return SF_dict
+        
+    # Counting the number of xs_ columns to create subplots
+    num_xs_columns = len(xs_columns)
+
+    # Creating subplots
+    fig_all_reacts, axs = subplots(num_xs_columns, 1, figsize=(8, 3 * num_xs_columns))
+
+    if num_xs_columns == 1:
+        axs = [axs]
+
+    # Looping through each column to plot
+    for idx, column in enumerate(xs_columns):
+
+        for index_sol, sol in enumerate(cs_calc_res_dfs_list):
+            
+            axs[idx].plot(sol["E"], sol[column], label=f'{column} {cand_sol_names[index_sol]}')
+
+            # vertical lines where we assume res.
+            for index_res, res in cand_sol[index_sol].iterrows():
+                axs[idx].axvline(x=res.E, linestyle='--', linewidth=0.5, alpha=0.5, color = cand_sol_colors[index_sol])
+        
+        # fill between if we have 2 sol in a list
+        if len(cs_calc_res_dfs_list) == 2:
+            axs[idx].fill_between(cs_calc_res_dfs_list[0].E, 
+                                  cs_calc_res_dfs_list[0][column], 
+                                  cs_calc_res_dfs_list[1][column], 
+                                  color='red', 
+                                  alpha=0.5,
+                                  label = 'diff')
+        # end fill between two lines
+
+        axs[idx].set_title(column)
+        axs[idx].set_xlabel("E")
+        axs[idx].set_ylabel(column)
+        axs[idx].legend(loc='right')
+    
+    
+    # Adding a title for the entire figure
+    fig_all_reacts.suptitle(f"Cross-section & Transm. Comparison {addit_str}", fontsize=14)
+
+    tight_layout()
+
+    return fig_all_reacts
+
 
 def calc_all_SSE_gen_XS_plot(
         est_ladder: pd.DataFrame,

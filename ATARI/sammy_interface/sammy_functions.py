@@ -407,10 +407,10 @@ def write_saminp(filepath,
     
     if rto.bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
-        if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    if use_IDC:
+            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     
     alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
 

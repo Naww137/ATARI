@@ -64,7 +64,7 @@ N_red = 50 # number of resonances to keep after the initial autofit
 # number of resonances for autofit (without size)
 # int( 1.5 *(energy_range_all[1]-energy_range_all[0])) #) # / (Ta_pair.spin_groups['3.0']['Gt01']/1000)
 
-N_res_autofit = 5 # for one spin group
+N_res_autofit = 20 # for one spin group
 fit_all_spin_groups = True
 
 energy_range_all = [202, 227]
@@ -80,8 +80,11 @@ energy_range_all = [202, 227]
 # energy_range_all = [270, 340]
 
 chi2_allowed = 0
+
 start_deep_fit_from = 15 # excluding the side resonances provided
-greedy_mode = True
+
+greedy_mode = True # if true - then first resonance that passed the test is deleted,
+# otherwise - resonance that adter deletion has best chi2 (fair for both for prior and intermediate tests)
 
 # TODO: define the start_deep_fit_from based on the prob. of having such number of resonances
 
@@ -309,6 +312,33 @@ for data, exp in zip(datasets, experiments):
     #filepath = f'template_{exp.title}_edited'
     filepath = os.path.join(current_dir, f'template_{exp.title}_edited')
     exp.template = os.path.realpath(filepath)
+
+
+### NOISE amount estimation
+        # calculation of values specific for a dataset
+for index, el in enumerate(experiments):
+
+    print(index)
+    print(el.title)
+
+    # exp & unc to estimate for current case
+    case_ds_exp = datasets[index].exp
+    case_ds_unc = datasets[index].exp_unc
+
+    # calculating all the noise related parameters
+    # CoV = elim_addit_funcs.coefficient_of_variation(case_ds_exp)
+    mSNR = elim_addit_funcs.mean_signal_to_noise_ratio(case_ds_exp, case_ds_unc)
+    mUP = elim_addit_funcs.mean_uncertainty_percentage(case_ds_exp, case_ds_unc)
+    mums_R = elim_addit_funcs.uncertainty_to_signal_ratio(case_ds_exp, case_ds_unc)
+
+    SNR_s, mean_SNR = elim_addit_funcs.calc_SNR(case_ds_exp, case_ds_unc)
+
+    print(f'mSNR: {mSNR} dB \t {mean_SNR}')
+    print(f'mUP: {mUP} ')
+    print(f'mums_R: {mums_R}')
+
+
+###
 
 
 fig = plot(datasets, experiments)
@@ -639,20 +669,20 @@ fig2.savefig(fname=f_name_to_save)
 
 # %%
 
-# energy_grid = fine_egrid(energy = energy_range_all)
+energy_grid = fine_egrid(energy = energy_range_all)
 
-# df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
-#         est_ladder = final_fb_output.par_post,
-#         theo_ladder = sammyOUT_SFJ.par_post,
-#         Ta_pair = Ta_pair,
-#         settings = settings,
-#         energy_grid = energy_grid,
-#         reactions_SSE = ['capture', 'elastic'],
-#         fig_size = fig_size,
-#         calc_fig = True
-# )
+df_est, df_theo, resid_matrix, SSE_dict, xs_figure = elim_addit_funcs.calc_all_SSE_gen_XS_plot(
+        est_ladder = final_fb_output.par_post,
+        theo_ladder = sammyOUT_SFJ.par_post,
+        Ta_pair = Ta_pair,
+        settings = settings,
+        energy_grid = energy_grid,
+        reactions_SSE = ['capture', 'elastic'],
+        fig_size = fig_size,
+        calc_fig = True
+)
 
-# #xs_figure.show()
+xs_figure.show()
 
 # f_name_to_save = savefolder+f'xs_AF_Res_{N_initial_FB}_red_{N_red}_er[{np.min(energy_range_all)}_{np.max(energy_range_all)}]_chi2allowed_{chi2_allowed}.png'
 # xs_figure.savefig(fname=f_name_to_save)
@@ -778,7 +808,8 @@ saved_data = elim_addit_funcs.save_obj_as_pkl(folder_name=savefolder, file_name=
 # plot the final selected fit?
 
 prior_level = max(hist.elimination_history.keys())
-prior_numres = hist.elimination_history[prior_level]['input_ladder'].shape[0]
+prior_numres = prior_level # hist.elimination_history[prior_level]['input_ladder'].shape[0]
+
 print(f'Initial ladder, num of res.: {prior_numres}')
 
 min_level_passed_test = prior_level # level - key in the hist..
@@ -787,11 +818,13 @@ min_N_res_passed_test = prior_level - 1
 levels, N_ress, chi2_s = [], [], []
 
 for level in hist.elimination_history.keys():
-    numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+    
+    numres_all = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
     numres_wo_sides = level
+
     pass_test = hist.elimination_history[level]['final_model_passed_test']
 
-    print(f'level {level}, # of resonances: {numres_wo_sides}/{numres}, passed the test: {pass_test}')
+    print(f'level {level}, # of resonances: {numres_wo_sides}/{numres_all}, passed the test: {pass_test}')
 
     if (pass_test and level<min_level_passed_test):
         min_level_passed_test = level

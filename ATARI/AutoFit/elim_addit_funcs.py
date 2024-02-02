@@ -400,6 +400,8 @@ def characterize_sol(Ta_pair: Particle_Pair,
     output_dict['chi2'] = all_chi2
 
     output_dict['chi2_stat'] = np.sum(all_chi2) / ( len(aggregated_exp_data) - len(sol.par_post) * 3)
+    output_dict['chi2_stat_ndat'] = np.sum(all_chi2) / ( len(aggregated_exp_data))
+    
 
     # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
     if(len(covariance_data)>0 and (len(sol.chi2_post)>0)):
@@ -1324,7 +1326,7 @@ def build_residual_matrix_dict(
         Ta_pair : Particle_Pair, 
         settings: dict,
         energy_grid : np.array,
-        reactions: list = ['capture', 'elastic', 'transmission'],
+        reactions: list = ['capture', 'elastic'],
         print_bool=False
         ):
     """Calculating the residuals disctionaries on the fine grid for provided reactions"""
@@ -1518,8 +1520,8 @@ def calc_all_SSE_gen_XS_plot(
         figure = plt.figure(figsize = fig_size)
         
         # # Total
-        plt.plot(df_est.E, df_est.xs_transmission, label='Fit result', color = 'b', alpha=1.0, linewidth=1.0)
-        plt.plot(df_theo.E, df_theo. xs_transmission, label='Theo', color = 'r', alpha=1.0, linewidth=1.0)
+        plt.plot(df_est.E, df_est.xs_transmission, label=f'Fit result (N={len(est_ladder)})', color = 'b', alpha=1.0, linewidth=1.0)
+        plt.plot(df_theo.E, df_theo. xs_transmission, label=f'Theo (N={len(theo_ladder)})', color = 'r', alpha=1.0, linewidth=1.0)
         
         # just fill in area between two xs
         plt.fill_between(df_est.E, df_est.xs_transmission, df_theo.xs_transmission, 
@@ -1843,6 +1845,7 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
     delta_E = np.max(energy_range) + 5
 
     for j_id, count in res_to_add.items():
+
         print(f"J_ID {j_id} was deleted {count} times")
 
         # adding {count} resonances to art_res with the corresponding J_ID value
@@ -1853,7 +1856,7 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
                          j_id = j_id)
         #current_spin_group_info = Ta_Pair.spin_groups[spin_group_key]
 
-        print(current_spin_group_info)
+        # print(current_spin_group_info)
         
         Gg = np.repeat(current_spin_group_info["<Gg>"], count)
 
@@ -1881,6 +1884,9 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
         sg_dataframe['Gn1'] = 0
         
         art_res = pd.concat([art_res, sg_dataframe], ignore_index = True)
+
+        # del all NANs
+        art_res.fillna(0.0, inplace=True)
 
     # print(art_res)
     # print()
@@ -1912,7 +1918,8 @@ def create_solutions_comparison_table_from_hist(hist,
     NLL_Gg = []
 
     chi2_s = []
-    chi2_stat_s = []
+    chi2_stat_s_npar = []
+    chi2_stat_s_ndat = []
 
     OF_alt1 = []
     OF_alt2 = []
@@ -1937,7 +1944,7 @@ def create_solutions_comparison_table_from_hist(hist,
 
     N_res_joint_LL = []
 
-    # incorporate true sol
+    # # incorporate true sol
     true_sol_key = 0
 
     if ((true_sol_key not in hist.elimination_history.keys()) and true_chars is not None):
@@ -1953,7 +1960,7 @@ def create_solutions_comparison_table_from_hist(hist,
                 'assumed_true': True
             }
 
-    # end incorporate true sol
+    # # end incorporate true sol
         
     max_level = np.max(list(hist.elimination_history.keys()))
     previous_ladder = hist.elimination_history[max_level ]['selected_ladder_chars'].par_post
@@ -1966,7 +1973,7 @@ def create_solutions_comparison_table_from_hist(hist,
             # adding a mark that this is a true solution
             hist.elimination_history[level]['assumed_true'] = False
 
-        if (level == max_level):
+        if (level == max_level or level == true_sol_key):
             """This is the initial number of resonances"""
             N_res_initial = hist.elimination_history[level]['selected_ladder_chars'].par.shape[0]
             # empty dataframe
@@ -1981,7 +1988,7 @@ def create_solutions_comparison_table_from_hist(hist,
             current_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
 
             # we got count of deleted resonances by each J_ID
-            deleted_res = find_deleted_res_spingroup_J_ID(ladder1=previous_ladder, ladder2 = current_ladder)
+            deleted_res = find_deleted_res_spingroup_J_ID(ladder1 = previous_ladder, ladder2 = current_ladder)
             
             # print('Deleted count resonances by each group:')
             # print(deleted_res)
@@ -1989,10 +1996,10 @@ def create_solutions_comparison_table_from_hist(hist,
             # for j_id, count in deleted_res.items():
             #     print(f"J_ID {j_id} was deleted {count} times")
 
-            art_ladder = produce_art_ladder(input_ladder=current_ladder,
-                                            res_to_add=deleted_res,
-                                            energy_range=energy_grid_2_compare_on,
-                                            Ta_Pair=Ta_pair)
+            art_ladder = produce_art_ladder(input_ladder = current_ladder,
+                                            res_to_add = deleted_res,
+                                            energy_range = energy_grid_2_compare_on,
+                                            Ta_Pair = Ta_pair)
             
             print()
             print('Artificial ladder:')
@@ -2085,7 +2092,9 @@ def create_solutions_comparison_table_from_hist(hist,
         test_pass.append(pass_test)
         chi2_s.append(sum(cur_ch_dict['chi2']))
 
-        chi2_stat_s.append(cur_ch_dict['chi2_stat'])
+        chi2_stat_s_npar.append(cur_ch_dict['chi2_stat'])
+
+        chi2_stat_s_ndat.append(cur_ch_dict['chi2_stat_ndat'])
         
         # aicc_s.append(sum(cur_ch_dict['aicc']))
         # bicc_s.append(sum(cur_ch_dict['bicc']))
@@ -2125,7 +2134,8 @@ def create_solutions_comparison_table_from_hist(hist,
         'N_res_joint_LL': N_res_joint_LL,
         'passed': test_pass,
         'sum_chi2': chi2_s,
-        'chi2_s': chi2_stat_s,
+        'chi2_s': chi2_stat_s_npar,
+        'chi2_s_ndat': chi2_stat_s_ndat,
         'SSE': SSE_s,
         'sum_NLLW': NLLW_s,
         'sum_NLL_Gn1': NLL_Gn1,
@@ -2184,7 +2194,9 @@ def printout_chi2(sammyOUT: SammyOutputData,
                        addstr :str = 'Solution chi2 values'):
     print(f'{addstr}')
 
-    print(f'N_Dat: {sum(df.shape[0] for df in sammyOUT.pw)}')
+    N_dat = np.sum([df.shape[0] for df in sammyOUT.pw])
+    N_par = 3 * sammyOUT.par_post.shape[0]
+
 
     print('Chi2:')
     print('\t Prior:')
@@ -2197,6 +2209,21 @@ def printout_chi2(sammyOUT: SammyOutputData,
     print('\t\t', sammyOUT.chi2n, np.sum(sammyOUT.chi2n))
     print('\t Posterior:')
     print('\t\t', sammyOUT.chi2n_post, np.sum(sammyOUT.chi2n_post))
+
+    print('chi2_stat sum/(Ndat-Npar):')
+    print(f'\tN_Dat: {N_dat}')
+    print(f'\tN_Par: {N_par}')
+    print()
+    print(f'\t Prior: {np.sum(sammyOUT.chi2) / (N_dat - N_par)}')
+    print(f'\t Posterior: {np.sum(sammyOUT.chi2_post) / (N_dat - N_par)}')
+    print()
+    print('\t Sum/Ndat')
+    print(f'\t Prior: {np.sum(sammyOUT.chi2) / (N_dat)}')
+    print(f'\t Posterior: {np.sum(sammyOUT.chi2_post) / (N_dat)}')
+    print()
+
+
+    
 
 
 def load_fit_res(
@@ -2247,7 +2274,43 @@ def mean_signal_to_noise_ratio(exp, exp_unc):
     noise_power = np.mean(np.square(exp_unc))
     return 10 * np.log10(signal_power / noise_power)
 
-import pandas as pd
+
+def calc_SNR(exp, exp_unc):
+    """ 
+    Calculate the Signal-to-Noise Ratio (SNR) in dB. 
+    and mean.
+    """
+    signal_power = np.square(exp)
+    noise_power = np.square(exp_unc)
+    SNR_s = 10 * np.log10(signal_power / noise_power)
+
+    mean_SNR = np.mean(SNR_s)
+
+    return SNR_s, mean_SNR
+
+
+
+
+
+
+# just to display the struct of a dict
+def display_dict_structure(my_dict, indent=0):
+    for key, value in my_dict.items():
+        value_type = type(value).__name__
+        value_shape = ""
+        if hasattr(value, "shape"):
+            value_shape = f" (shape={value.shape})"
+        elif hasattr(value, "__len__"):
+            value_shape = f" (size={len(value)})"
+        print(f"{' ' * indent}- {key}: {value_type}{value_shape}")
+        if isinstance(value, dict):
+            display_dict_structure(value, indent=indent+2)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    display_dict_structure(item, indent=indent+2)
+
+
 
 def create_comparison_dataframe(SammyOut_YW, cols_to_show, cols_to_keep=['J_ID']):
     """

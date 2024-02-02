@@ -67,7 +67,15 @@ class elim_OPTs:
         and select best of them - it will use first model of current branch that passed the test 
 
     start_deep_fit_from: int
-        this determines the number of resonances in a current level on a path from N->N-1 where deep fit start from (see default value)
+        determines the number of resonances on a current level on a path from N->N-1 where deep fit start from (see default value)
+
+    TODO:
+    path_selection_mode: string
+        TBD: determines how on each elimination level the candidate solution will be selected
+        by default - using just chi2 value, 
+        chi2 + 2 NLL_W
+        chi2 + 2 (NLLW + NLL_gn)
+        chi2 + 2 (NLLW + NLL_gn) (keeping cardinality)
    
     **kwargs : dict, optional
         Any keyword arguments are used to set attributes on the instance.
@@ -299,6 +307,10 @@ class eliminator_by_chi2:
 
         # compiling to one ladder
         ladder = pd.concat([fixed_res_df, ladder_df], ignore_index=True)
+        
+        # sorting by energy
+        ladder = ladder.sort_values(by='E')
+        ladder = ladder.reset_index(drop=True)
 
         self.sammyINPyw.resonance_ladder = ladder
 
@@ -320,7 +332,37 @@ class eliminator_by_chi2:
             print(self.options)
             print('*'*40)
             print()            
-            
+        
+        # Do we need to keep initial level in history of elimination?
+        # TODO: add initial level 
+        
+        input_ladder_chars = self.evaluate_prior(ladder)
+
+        # set the post = to prior
+        input_ladder_chars.par_post = input_ladder_chars.par
+        input_ladder_chars.chi2_post = input_ladder_chars.chi2 
+        input_ladder_chars.chi2n_post = input_ladder_chars.chi2n 
+
+        input_ladder_chars.pw_post = input_ladder_chars.pw
+        
+        model_history[ladder.shape[0]-fixed_res_df.shape[0]] = {
+                
+                'input_ladder' : ladder,
+                'selected_ladder_chars': input_ladder_chars, # solution with min chi2 on this level
+                'any_model_passed_test': True, # any model on this level of N-1 res..
+                'final_model_passed_test': True,
+                'level_time': 0,
+                'total_time': time.time() - start_time
+            }
+        
+        if (self.rto.Print): 
+            print('Initial model embedded to history')
+            # print('*'*40)
+            # print(input_ladder_chars)
+            # print('*'*40)
+            # print()
+
+        # End to add initial level
 
         ### Start elimination
         while True: 
@@ -334,6 +376,11 @@ class eliminator_by_chi2:
             best_model_chars = None
 
             current_level = len(ladder) # note - from which we are going to N-1!
+
+            if (self.options.greedy_mode):
+                # sort ladder by Gn - to del smallest res. first
+                ladder = ladder.sort_values(by='Gn1')
+                #ladder = ladder.reset_index(drop=True)
 
             ### Identify fixed resonances
             if (fixed_res_df.shape[0] > 0):
@@ -358,19 +405,20 @@ class eliminator_by_chi2:
 
             if (self.rto.Print):
                 print('*'*40)
-                print(f'Current level: {current_level}')
+                print(f'Current level: {current_level}, "internal resonances": {ladder.shape[0]-fixed_resonances.shape[0]}')
                 print(f'\t Searching for models with {current_level - 1} resonances...')
                 print('*'*40)
                 print()
             
             fit_code_init_level = f'init_sol_level_{current_level}'
+
             initial_ladder_chars = self.evaluate_prior(ladder)
 
             if (self.rto.Print):        
 
                 print()
                 print(f'\t{fit_code_init_level}')
-                print(f'\tBase chi2 for level: {initial_ladder_chars.chi2}')
+                print(f'\tBase chi2 for level: {np.sum(initial_ladder_chars.chi2)}')
                 print()
             
             best_model_chars = initial_ladder_chars
@@ -431,9 +479,6 @@ class eliminator_by_chi2:
             ### Do deep fitting after selecting model from prior or deep fit       
             
             # if we are doing deep fit on this stage
-            # TODO: change this code
-            # deep fitting stage - using best_model_chars - 
-            # the problem is that after 2 different stages we have different params..
             if (any_prior_passed_test):
                 deep_stage_ladder_start = best_model_chars.par
             else:
@@ -530,7 +575,9 @@ class eliminator_by_chi2:
                 print('*'*40)
                 print()
 
-            model_history[current_level-fixed_res_df.shape[0]] = {
+            current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]
+
+            model_history[current_num_of_res_wo_sides] = {
                 
                 'input_ladder' : ladder,
                 'selected_ladder_chars': selected_ladder_chars, # solution with min chi2 on this level
@@ -539,6 +586,35 @@ class eliminator_by_chi2:
                 'level_time': level_time,
                 'total_time': time.time() - start_time
             }
+
+
+            # printout the history of chi2 - for all the elimination
+            all_curr_levels = []
+            all_curr_chi2 = []
+            all_curr_chi2_stat = []
+
+            for hist_level in model_history.keys():
+
+                curr_sol_chars = model_history[hist_level]['selected_ladder_chars']
+
+                cur_N_dat = np.sum([df.shape[0] for df in curr_sol_chars.pw])
+                cur_N_par = 3 * curr_sol_chars.par_post.shape[0]
+                cur_sum_chi2 = np.sum(curr_sol_chars.chi2_post)
+
+                cur_sum_chi2_stat = cur_sum_chi2 / (cur_N_dat - cur_N_par)
+                
+                all_curr_levels.append(hist_level)
+                all_curr_chi2.append(cur_sum_chi2)
+                all_curr_chi2_stat.append(cur_sum_chi2_stat)
+            
+            if (self.rto.Print):
+                print('Chi2_s tracking...')
+                for index, hist_level in enumerate(all_curr_levels):
+
+                    print(f'\t{hist_level}\t->\t{np.round(all_curr_chi2_stat[index],4)} ({np.round(all_curr_chi2[index],2)})')
+                print()
+            
+            # end prinout the history of chi2 at each step
 
             # stopping criteria
             if (self.options.stop_at_chi2_thr):
@@ -554,7 +630,8 @@ class eliminator_by_chi2:
                 
                 # not stopping continuing up to 1 res..
                 print('Skipping stopping by chi2 test, going to 1 res model')
-                if(ladder.shape[0]==fixed_res_df.shape[0]+1):
+                if(selected_ladder_chars.par_post.shape[0]==fixed_res_df.shape[0]+1):
+                #if(ladder.shape[0]==fixed_res_df.shape[0]+1):
                     print('Reached one resonance model.. stopping')
                     break
                 else:

@@ -1259,7 +1259,8 @@ def calc_theo_broadened_xs_for_reactions(
         reactions: list = ['capture', 'elastic', 'transmission'],
         ):
     
-    rundirname = settings['path_to_SAMMY_temps']+'calc_xs_theo/'
+    rundirname = generate_sammy_rundir_uniq_name(path_to_sammy_temps = settings['path_to_SAMMY_temps'], addit_str='calc_xs_theo') 
+    # old value was settings['path_to_SAMMY_temps']+'calc_xs_theo/'
     
     df = pd.DataFrame({"E":energy_grid})
     
@@ -2429,3 +2430,51 @@ def get_filenames_and_cases_ids(folder_name, filename_pattern):
     numbers = [int(filename.split('_')[-1].split('.pkl')[0]) for filename in filenames]
 
     return filenames, numbers
+
+
+def check_and_change_template_paths(experiments,
+                                    current_dir_with_templates):
+    
+    """checking if the template defined in the experiment.template exists
+    and if not - change the path to 
+    the same filename but current_dir_with_templates also checking """
+
+    all_success = True
+
+    for experiment in experiments:
+        
+        current_success = False
+
+        given_filepath = experiment.template
+
+        # Extract the filename 
+        filename = os.path.basename(given_filepath)
+
+        alternative_filepath = os.path.join(current_dir_with_templates, filename)
+
+        if not os.path.exists(given_filepath):
+            print("WARNING! File does not exist:", given_filepath)
+
+            # check if alternative path exists
+            if os.path.exists(alternative_filepath):
+                print("Changing the path to existing template:", given_filepath, '->', alternative_filepath)
+                experiment.template = alternative_filepath
+                current_success = True
+
+            else:
+                print('Error, we have no appropriate templates for exp. objects!')
+                print(given_filepath)
+                print(alternative_filepath)
+        
+        else:
+            current_success = True
+
+        all_success = all_success * current_success
+    
+    return all_success
+
+
+        # checkif file exists
+
+    
+    return 

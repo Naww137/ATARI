@@ -58,6 +58,7 @@ class AutoFitOUT:
                  eliminateOUT: Optional[eliminator_OUTput] = None,
                  eliminateFiltered: Optional[dict] = None,
                  spinselectOUT: Optional[SpinSelectOUT] = None,
+                 total_time: Optional[float]= None
                  ):
         
         self.initial = initialFBOUT

@@ -1975,6 +1975,8 @@ def create_solutions_comparison_table_from_hist(hist,
 
     # sums - for all datasets
     is_true = []
+    elaps_time = []
+
     SSE_s = []
     NLLW_s = []
     NLL_Gn1 = []
@@ -2081,11 +2083,16 @@ def create_solutions_comparison_table_from_hist(hist,
         # previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
 
         numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+
         numres_combined = combined_ladder.shape[0]
+
+        time_elaps = hist.elimination_history[level]['total_time']
 
         pass_test = hist.elimination_history[level]['final_model_passed_test']
 
         is_true.append(hist.elimination_history[level]['assumed_true'])
+
+        elaps_time.append(time_elaps)
 
         # SSE & strength funcs?
         if (true_chars is not None):
@@ -2217,6 +2224,7 @@ def create_solutions_comparison_table_from_hist(hist,
         'SF_Gg': SF_Gg,
         'AICc': aicc_s,
         'BIC': bicc_s,
+        'ET': elaps_time, # time
     })
 
     # calculating deltas in BIC and AICc

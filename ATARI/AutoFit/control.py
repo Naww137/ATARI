@@ -65,6 +65,7 @@ class AutoFitOUT:
         self.eliminate = eliminateOUT
         self.eliminate_filtered = eliminateFiltered
         self.spinselect = spinselectOUT
+        self.total_time = total_time
 
 
 class AutoFit_Control:

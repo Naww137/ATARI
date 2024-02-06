@@ -2114,9 +2114,10 @@ def create_solutions_comparison_table_from_hist(hist,
             # TODO: strength funcs calculation & fig production
             SSE_Gg, SSE_Gn1, SSE_sf_fig = calc_strength_functions(theoretical_df = true_chars.par_post, 
                                     estimated_df = hist.elimination_history[level]['selected_ladder_chars'].par_post, 
-                                    energy_range = energy_grid_2_compare_on,
+                                    energy_range = [np.min(energy_grid_2_compare_on), np.max(energy_grid_2_compare_on)],
                                     fig_size=(8, 6), 
-                                    create_fig=False)
+                                    create_fig=False
+                                    )
             
             SF_Gn1.append(SSE_Gn1)
             SF_Gg.append(SSE_Gg)

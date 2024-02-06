@@ -61,19 +61,25 @@ class Syndat_Model:
                  title = 'Title'
                  ):
 
-        self.generative_experimental_model = Experimental_Model()
-        self.generative_measurement_model = Transmission_RPI()  # Generative_Reduction_Model()
-        self.reductive_measurement_model = Transmission_RPI()
-        self.options = syndatOPT()
-
         if generative_experimental_model is not None:
             self.generative_experimental_model = generative_experimental_model
+        else:
+            self.generative_experimental_model = Experimental_Model()
+
         if generative_measurement_model is not None:
             self.generative_measurement_model = generative_measurement_model
+        else:
+            self.generative_measurement_model = Transmission_RPI()  # Generative_Reduction_Model()
+
         if reductive_measurement_model is not None:
             self.reductive_measurement_model = reductive_measurement_model
+        else:
+            self.reductive_measurement_model = Transmission_RPI()
+
         if options is not None:
             self.options = deepcopy(options)
+        else:
+            self.options = syndatOPT()
 
         ### some convenient definitions
         self.title = title
@@ -81,8 +87,8 @@ class Syndat_Model:
         self.pw_true = pd.DataFrame()
         self.clear_samples()
 
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model)
-        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model)
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
         
 
     @property
@@ -206,7 +212,11 @@ class Syndat_Model:
     def generate_raw_observables(self, pw_true, true_model_parameters: dict):
 
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
-        true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+        if self.options.sampleTMP:
+            true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+        else:
+            true_model_parameters = self.generative_measurement_model.model_parameters
+
         self.generative_measurement_model.true_model_parameters = true_model_parameters
 
         ### generate raw count data from generative reduction model

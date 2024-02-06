@@ -411,16 +411,19 @@ class Transmission_RPI:
         return self.model_parameters.sample_parameters(true_model_parameters)
     
 
-    def approximate_unknown_data(self, exp_model):
+    def approximate_unknown_data(self, exp_model, smooth):
         if self.model_parameters.open_neutron_spectrum is None:
             open_neutron_spectrum = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
-                                                                    False, #self.options.smoothTNCS, 
+                                                                    smooth, #self.options.smoothTNCS, 
                                                                     exp_model.FP[0],
                                                                     exp_model.t0[0],
                                                                     self.model_parameters.trigo[0])
             
             self.model_parameters.open_neutron_spectrum = open_neutron_spectrum
-            # self.model_parameters.open_neutron_spectrum = neutron_spectrum
+        # else:
+        #     if 'tof' not in self.model_parameters.open_neutron_spectrum:
+        #         self.model_parameters.open_neutron_spectrum["tof"] = e_to_t(self.model_parameters.open_neutron_spectrum.E, exp_model.FP[0], True)*1e9
+        #     # self.model_parameters.open_neutron_spectrum = neutron_spectrum
 
 
         
@@ -447,7 +450,7 @@ class Transmission_RPI:
         raw_data, true_c = inverse_reduction(pw_true ,
                                              true_model_parameters.open_neutron_spectrum ,
                                              options.sample_counting_noise ,
-                                             options.sampleTURP ,
+                                             options.sampleTMP ,
                                              true_model_parameters.trigo[0],
                                              true_model_parameters.trigs[0],
                                              true_model_parameters.ks[0],

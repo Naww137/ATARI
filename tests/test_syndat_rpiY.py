@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import normaltest
-from ATARI.syndat.yield_rpi import syndat_Y
+from ATARI.ModelData.measurement_models.capture_yield_rpi import Capture_Yield_RPI
 
 """Summary
 ----------
@@ -61,7 +61,7 @@ def basic_functionality_test():
     
     true_yield = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([1000,1000,1000])})
     
-    exp = syndat_Y()
+    exp = Capture_Yield_RPI()
     exp.run(true_yield)
     
     try:
@@ -97,7 +97,7 @@ def test_mean_converges_to_true():
     exp_yield_unc = np.zeros([ipert,3])
     df_true = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([0.8,0.8,0.8])})
 
-    exp = syndat_Y(options=input_options)
+    exp = Capture_Yield_RPI(options=input_options)
     exp.run(df_true)
 
     for i in range(ipert):
@@ -148,7 +148,7 @@ def no_sampling_returns_same_values(success_logging=False,failure_logging=True):
     #Simple test space for the function
     true_yield = pd.DataFrame({'E':[10, 1000, 3000], 'true':np.array([1000,1000,1000])})
     
-    exp = syndat_Y(options=input_options)
+    exp = Capture_Yield_RPI(options=input_options)
     exp.run(true_yield)
     
     exp_yield = np.array(exp.data.exp)
@@ -214,7 +214,7 @@ def sampling_returns_different_values(success_logging=False,failure_logging=True
                      'Sample TURP'           : False,
                      'Sample TNCS'           : False}
 
-    exp = syndat_Y(options=input_options)
+    exp = Capture_Yield_RPI(options=input_options)
     exp.run(true_yield)
     
     CN_exp_yield = np.array(exp.data.exp)
@@ -231,7 +231,7 @@ def sampling_returns_different_values(success_logging=False,failure_logging=True
                      'Sample TURP'           : True,
                      'Sample TNCS'           : False}
 
-    exp = syndat_Y(options=input_options)
+    exp = Capture_Yield_RPI(options=input_options)
     exp.run(true_yield)
     
     TURP_exp_yield = np.array(exp.data.exp)
@@ -248,7 +248,7 @@ def sampling_returns_different_values(success_logging=False,failure_logging=True
                      'Sample TURP'           : False,
                      'Sample TNCS'           : True}
 
-    exp = syndat_Y(options=input_options)
+    exp = Capture_Yield_RPI(options=input_options)
     exp.run(true_yield)
     
     TNCS_exp_yield = np.array(exp.data.exp)

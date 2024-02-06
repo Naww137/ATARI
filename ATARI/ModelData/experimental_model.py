@@ -22,7 +22,28 @@ class Experimental_Model:
 
         Attributes
         ----------
-      
+        title: str
+            Title
+        reaction: str
+            Title
+        energy_range: str
+            Title
+        template: str
+            Title
+        energy_grid: str
+            Title
+        n: str
+            Title
+        FP: str
+            Title
+        t0: str
+            Title
+        burst: str
+            Title
+        temp: str
+            Title
+        additional_resfunc_lines: str
+            Title
         """
         self.title = "T12mm"
         self.reaction = "transmission"
@@ -38,7 +59,12 @@ class Experimental_Model:
         
         self.additional_resfunc_lines = []
 
-        # self.theoretical = False
+        self.channel_widths = {
+            "maxE": [np.max(self.energy_range)],
+            "chw": [100.0],
+            "dchw": [0.8]
+        }
+
         # update kwargs to get user input for some parameters
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -72,21 +98,18 @@ class Experimental_Model:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-
         if self.energy_range is None:
             if self.energy_grid is None:
                 raise ValueError("Neither energy range or energy grid was given")
             else:
                 self.energy_range = [np.min(self.energy_grid), np.max(self.energy_grid)]
 
-        self.channel_widths = {
-            "maxE": [np.max(self.energy_range)],
-            "chw": [100.0],
-            "dchw": [0.8]
-        }
-
         # define energy grid
         if self.energy_grid is None:
+
+            if "channel_widths" not in kwargs.keys():
+                print("WARNING: no energy grid or channel width information provided, using defaults")
+
             maxE, chw, dchw = [self.channel_widths[key]
                                for key in ["maxE", "chw", "dchw"]]
             

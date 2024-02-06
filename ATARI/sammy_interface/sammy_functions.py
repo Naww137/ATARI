@@ -242,7 +242,6 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
     if df.empty:
         par_array = []
     else:
-        df = fill_sammy_ladder(df, pair, vary_parm)
         par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
         if np.any([each is None for each in df.J_ID]):
@@ -428,7 +427,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {particle_pair.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,6): <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
@@ -665,6 +664,7 @@ def delta_chi2(lst_df):
 #     return recursive_sammy(pw_posterior, par_posterior, sammy_INP, sammy_RTO, itter + 1)
 
 def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
+    sammyINP.resonance_ladder = fill_sammy_ladder(sammyINP.resonance_ladder, sammyINP.particle_pair, False)
     if sammyRTO.bayes:
         if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
             raise ValueError("Bayes is set to True but no varied parameters.")

@@ -204,11 +204,11 @@ class Capture_Yield_RPI:
         return self.model_parameters.sample_parameters(true_model_parameters)
 
 
-    def approximate_unknown_data(self, exp_model):
+    def approximate_unknown_data(self, exp_model, smooth):
 
         if self.model_parameters.background_spectrum_bg is None:
             background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
-                                                                           False, 
+                                                                           smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
                                                                            self.model_parameters.trig_bg[0])
@@ -216,7 +216,7 @@ class Capture_Yield_RPI:
 
         if self.model_parameters.incident_neutron_spectrum_f is None:
             incident_neutron_spectrum_f = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
-                                                                            False, #self.options.smoothTNCS, 
+                                                                            smooth, #self.options.smoothTNCS, 
                                                                             exp_model.FP[0],
                                                                             exp_model.t0[0],
                                                                             self.model_parameters.trig_f[0])
@@ -226,7 +226,7 @@ class Capture_Yield_RPI:
 
         if self.model_parameters.background_spectrum_bf is None:
             background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 
-                                                                           False, 
+                                                                           smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
                                                                            self.model_parameters.trig_bf[0])

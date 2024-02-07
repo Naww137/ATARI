@@ -86,9 +86,6 @@ class Syndat_Model:
         self.reaction = self.generative_experimental_model.reaction
         self.pw_true = pd.DataFrame()
         self.clear_samples()
-
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
-        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
         
 
     @property
@@ -120,6 +117,11 @@ class Syndat_Model:
     @reductive_measurement_model.setter
     def reductive_measurement_model(self, reductive_measurement_model):
         self._reductive_measurement_model = reductive_measurement_model
+
+
+    # def recalculate_unknown_data(self):
+    #     self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+    #     self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
 
     def sample(self,
@@ -157,7 +159,11 @@ class Syndat_Model:
         ValueError
             _description_
         """
-        
+        ### first, approximate unknown data
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+
+        ### Then, generate pw true
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true is not None:
@@ -228,12 +234,9 @@ class Syndat_Model:
     
 
     def reduce_raw_observables(self):
-        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, 
-                                                                        #  self.reductive_measurement_model.model_parameters.neutron_spectrum, 
-                                                                         self.options)
+        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.options)
         self.covariance_data = self.reductive_measurement_model.covariance_data
         
-    
 
 
     def generate_true_experimental_objects(self,

@@ -107,7 +107,7 @@ class Experimental_Model:
         # define energy grid
         if self.energy_grid is None:
 
-            if "channel_widths" not in kwargs.keys():
+            if "energy_range" in kwargs.keys() and "channel_widths" not in kwargs.keys():
                 print("WARNING: no energy grid or channel width information provided, using defaults")
 
             maxE, chw, dchw = [self.channel_widths[key]

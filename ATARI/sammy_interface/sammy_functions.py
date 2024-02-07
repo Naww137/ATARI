@@ -242,6 +242,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
     if df.empty:
         par_array = []
     else:
+        df = fill_sammy_ladder(df, pair, vary_parm)
         par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
         if np.any([each is None for each in df.J_ID]):

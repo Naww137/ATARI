@@ -3,7 +3,7 @@ import pandas as pd
 from ATARI.syndat.general_functions import *
 from ATARI.ModelData.structuring import parameter, vector_parameter
 from ATARI.syndat.data_classes import syndatOPT
-
+from copy import copy
 
 # ========================================================================================
 #         Transmission reduction/generation functions for RPI methodology
@@ -14,7 +14,7 @@ def transmission(cr,Cr, Bi, k,K, b0,B0, alpha):
     return (m1*cr - m2*k*Bi - b0) / (m3*Cr - m4*K*Bi - B0) 
 
 
-def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov):
+def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, calc_cov):
         """
         Calculates the output covariance matrix of transmission from input uncertainties.
 
@@ -71,7 +71,7 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
         C = np.array(C); dC = np.array(dC)
         tof = np.array(tof)
         Bi = np.array(Bi)
-        sys_unc = np.array(sys_unc)
+        sys_unc_inp = np.array(sys_unc_inp)
 
         # numerator and denominator
         D = alpha[2]*C - alpha[3]*K*Bi - B0
@@ -85,18 +85,25 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
         # systematic derivatives
         # dTi_da = -1*(k*D+K*N)/(a*D**2)  
         # dTi_db = (k*D+K*N)*Bi*tof/D**2 
-        dTi_da = -(k*alpha[1]*D+K*alpha[3]*N)*np.exp(-b*tof) / (D**2)
-        dTi_db =  (k*alpha[1]*D-N*alpha[3]*K)*Bi*tof / (D**2)
+        dTi_da = -(k*alpha[1]*D+K*alpha[3]*N)*np.exp(-b*tof*1e-3) / (D**2)
+        dTi_db =  (k*alpha[1]*D-N*alpha[3]*K)*Bi*tof*1e-3 / (D**2)
         dTi_dk = -alpha[1]*Bi/D       
         dTi_dK = N*alpha[3]*Bi/D**2
         dTi_db0 = -1/D
         dTi_dB0 = N/D**2
         dTi_dalpha = [ c/D, -k*Bi/D, -C*N/D**2, K*Bi*N/D**2 ]
 
+
+        sys_unc = [ab_cov[0][0]]+[ab_cov[1][1]] + list(sys_unc_inp)
+        diag_sys = (sys_unc[0]**2)*(dTi_da**2) + (sys_unc[1]**2)*(dTi_db**2) + (sys_unc[2]**2)*(dTi_dk**2) + (sys_unc[3]**2)*(dTi_dK**2) + (sys_unc[4]**2)*(dTi_db0**2) \
+                + (sys_unc[5]**2)*(dTi_dB0**2) + (sys_unc[6]**2)*(dTi_dalpha[0]**2) + (sys_unc[7]**2)*(dTi_dalpha[1]**2) + (sys_unc[8]**2)*(dTi_dalpha[2]**2) + (sys_unc[9]**2)*(dTi_dalpha[3]**2)
+
+        Jac_sys = None
+        Cov_sys = None
+    
         if calc_cov:
 
-            ### systematic covariance
-            Cov_sys = np.diag(sys_unc**2)
+            Cov_sys = np.diag(sys_unc_inp**2)
             ab_cov = np.array(ab_cov)
             Cov_sys = np.block([
                                 [ab_cov,                                        np.zeros((ab_cov.shape[0], Cov_sys.shape[1]))   ],
@@ -104,24 +111,11 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_
                             ])   
             Jac_sys = np.array([dTi_da, dTi_db, dTi_dk, dTi_dK, dTi_db0, dTi_dB0, dTi_dalpha[0], dTi_dalpha[1],dTi_dalpha[2],dTi_dalpha[3]])
 
-            CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
-
+            # CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
             ### T covariance is sum of systematic and statistical covariance 
-            CovT = np.diag(diag_stat) + CovT_sys
+            # CovT = np.diag(diag_stat) + CovT_sys
 
-            data = [CovT, diag_stat, CovT_sys, Jac_sys, Cov_sys]
-            
-        else:
-            sys_unc = [ab_cov[0][0]]+[ab_cov[1][1]] + list(sys_unc)
-            diag_sys = (sys_unc[0]**2)*(dTi_da**2) + (sys_unc[1]**2)*(dTi_db**2) + (sys_unc[2]**2)*(dTi_dk**2) + (sys_unc[3]**2)*(dTi_dK**2) + (sys_unc[4]**2)*(dTi_db0**2) \
-                    + (sys_unc[5]**2)*(dTi_dB0**2) + (sys_unc[6]**2)*(dTi_dalpha[0]**2) + (sys_unc[7]**2)*(dTi_dalpha[1]**2) + (sys_unc[8]**2)*(dTi_dalpha[2]**2) + (sys_unc[9]**2)*(dTi_dalpha[3]**2)
-
-            diag_tot = diag_stat + diag_sys
-
-            data = [diag_tot, diag_stat, diag_sys]
-
-
-        return data
+        return [diag_stat, diag_sys, Jac_sys, Cov_sys]
 
     
 def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov):
@@ -240,12 +234,14 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     """
     # calculate open count rates
     Cr, dCr = cts_to_ctr(open_df.c, open_df.dc, open_df.bw, trigo) # cts_o/(bw*trig)
-    # open_df['cps'] = Cr; open_df['dcps'] = dCr
+    open_df.loc[:,'O_cps'] = Cr; 
+    open_df.loc[:,'O_dcps'] = dCr
     
     # calculate sample in count rate from theoretical transmission, bkg, m,k, and open count rate
     [m1,m2,m3,m4] = alpha
     cr = (sample_df["true"]*(m3*Cr - m4*K*Bi - B0) + m2*k*Bi + b0)/m1
-    
+    sample_df.loc[:,'cps_true'] = cr
+
     # calculate expected sample in counts from count rate
     c = cr*open_df.bw*trigs
     theo_c = c
@@ -277,8 +273,9 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     
     sample_df.loc[:,'c'] = c
     sample_df.loc[:,'dc'] = dc
+    sample_df.loc[:,'c_true'] = theo_c
 
-    return sample_df, theo_c
+    return sample_df, open_df
 
 
 
@@ -445,9 +442,10 @@ class Transmission_RPI:
         # true_model_parameters = transmission_rpi_parameters(**true_parameter_dict)
 
         monitor_array = [true_model_parameters.m1[0], true_model_parameters.m2[0], true_model_parameters.m3[0], true_model_parameters.m4[0]]
-        true_Bi = neutron_background_function(true_model_parameters.open_neutron_spectrum.tof, true_model_parameters.a_b[0][0], true_model_parameters.a_b[0][1])
+        true_Bi = neutron_background_function(true_model_parameters.open_neutron_spectrum.tof*1e-3, true_model_parameters.a_b[0][0], true_model_parameters.a_b[0][1])
+        true_model_parameters.Bi = true_Bi
 
-        raw_data, true_c = inverse_reduction(pw_true ,
+        sample_data, open_data = inverse_reduction(copy(pw_true) ,
                                              true_model_parameters.open_neutron_spectrum ,
                                              options.sample_counting_noise ,
                                              options.sampleTMP ,
@@ -459,8 +457,14 @@ class Transmission_RPI:
                                              true_model_parameters.b0s[0],
                                              true_model_parameters.b0o[0],
                                              monitor_array, true_model_parameters.m1[1])
+        
+        # open_data.rename(columns={"c":"O_c", "dc":"O_dc","cps":"O_cps", "dcps":"O_dcps"}, inplace=True)
+        # open_data = open_data.round({'E':6})
+        # sample_data = sample_data.round({'E':6})
+        # pw_raw = open_data.merge(sample_data, how='left', on=['tof','E'])
+        # pw_raw["bkg_true"] = 
 
-        return raw_data
+        return sample_data
 
 
 
@@ -499,7 +503,8 @@ class Transmission_RPI:
         # self.odat['cps'], self.odat['dcps'] = exp_effects.cts_to_ctr(self.odat.c, self.odat.dc, self.odat.bw*1e-6, self.redpar.val.trigs)
 
         # estimated background function
-        Bi = neutron_background_function(self.model_parameters.open_neutron_spectrum.tof, self.model_parameters.a_b[0][0], self.model_parameters.a_b[0][1])
+        Bi = neutron_background_function(self.model_parameters.open_neutron_spectrum.tof*1e-3, self.model_parameters.a_b[0][0], self.model_parameters.a_b[0][1])
+        self.model_parameters.Bi = Bi
 
         # define systematic uncertainties
         # sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)
@@ -527,44 +532,29 @@ class Transmission_RPI:
                                                               self.model_parameters.a_b[1],
                                                               options.calculate_covariance)
 
+        diag_stat, diag_sys, Jac_sys, Cov_sys = unc_data
+
         if options.calculate_covariance:
-            CovT, diag_stat, CovT_sys, Jac_sys, Cov_sys = unc_data
+            # TODO: update options to be like sammy - if not explicit covariance then trans['exp_unc'] should be statistical error
+            CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
+            CovT = np.diag(diag_stat) + CovT_sys
+            CovT = pd.DataFrame(CovT, columns=trans.E, index=trans.E)
+            CovT.index.name = None
             trans['exp_unc'] = np.sqrt(np.diag(CovT))
+
             if options.explicit_covariance:
-                CovT = pd.DataFrame(CovT, columns=trans.E, index=trans.E)
-                CovT.index.name = None
                 self.covariance_data['CovT'] = CovT
-
-                # CovT_stat = pd.DataFrame(CovT_stat, columns=trans.E)
-                # CovT_stat.index.name = None
-                # self.covariance_data['CovT_stat'] = CovT_stat
-                self.covariance_data["diag_stat"] = pd.DataFrame({'var_stat':diag_stat}, index=trans.E)
-
-                # CovT_sys = pd.DataFrame(CovT_sys, columns=trans.E)
-                # CovT_sys.index.name = None
-                # self.covariance_data['CovT_sys'] = CovT_sys
-
-                self.covariance_data['Cov_sys'] = Cov_sys
-                Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
-                self.covariance_data['Jac_sys'] = Jac_sys
             else:
-                
-                self.covariance_data['Cov_sys'] = Cov_sys
+                pass
 
-                Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
-                self.covariance_data['Jac_sys'] = Jac_sys
-
-                self.covariance_data["diag_stat"] = pd.DataFrame({'var_stat':diag_stat}, index=trans.E)
-
+            self.covariance_data['Cov_sys'] = Cov_sys
+            Jac_sys = pd.DataFrame(Jac_sys, columns=trans.E)
+            self.covariance_data['Jac_sys'] = Jac_sys
+            self.covariance_data["diag_stat"] = pd.DataFrame({'var_stat':diag_stat}, index=trans.E)
+        
+        
         else:
-            diag_tot, diag_stat, diag_sys = unc_data
-            trans['exp_unc'] = np.sqrt(diag_tot)
-
-        # define data cps
-        # self.neutron_spectrum['cps'] = rates[0]
-        # self.neutron_spectrum['dcps'] = rates[1]
-        # self.neutron_spectrum['cps'] = rates[2]
-        # self.neutron_spectrum['dcps'] = rates[3]
+            trans['exp_unc'] = np.sqrt(diag_stat + diag_sys)
 
         return trans
 

@@ -47,6 +47,9 @@ class InitialFBOPT:
         self._spin_group_keys = []
 
         self._num_Elam = None
+        
+        self._Elam_shift = 0
+
         self._starting_Gg_multiplier = 1
         self._starting_Gn1_multiplier = 1
 
@@ -205,6 +208,16 @@ class InitialFBOPT:
     def num_Elam(self, num_Elam):
         self._num_Elam = num_Elam
 
+    
+    @property
+    def Elam_shift(self):
+        """Shift in energy for all res. beginning from left border of the window (used for each spin group) """
+        return self._Elam_shift
+    @Elam_shift.setter
+    def Elam_shift(self, Elam_shift):
+        self._Elam_shift = Elam_shift
+
+
     @property
     def starting_Gg_multiplier(self):
         """Factor of average capture width used in initial feature bank"""
@@ -298,9 +311,11 @@ class InitialFB:
         else:
             assert len(self.options.spin_group_keys)>0
             spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
+
         initial_resonance_ladder = get_starting_feature_bank(energy_range,
                                                             spin_groups,
                                                             num_Elam= self.options.num_Elam,
+                                                            Elam_shift = self.options.Elam_shift,
                                                             starting_Gg_multiplier = self.options.starting_Gg_multiplier,
                                                             starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
                                                             varyE = 0, varyGg = 0, varyGn1 = 1)

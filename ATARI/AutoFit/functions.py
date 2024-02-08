@@ -6,7 +6,7 @@ from ATARI.theory.resonance_statistics import wigner_LL, width_LL
 
 
 
-def get_parameter_grid(energy_range, res_par_avg, num_Er, starting_Gg_multiplier, starting_Gn1_multiplier):
+def get_parameter_grid(energy_range, res_par_avg, num_Er, Elam_shift, starting_Gg_multiplier, starting_Gn1_multiplier):
 
     # allow Elambda to be just outside of the window
     max_Elam = max(energy_range) + res_par_avg['Gt99']/10e3
@@ -15,7 +15,9 @@ def get_parameter_grid(energy_range, res_par_avg, num_Er, starting_Gg_multiplier
     Gg = np.repeat(res_par_avg["<Gg>"], num_Er)*starting_Gg_multiplier
     Gn = np.repeat(res_par_avg["Gn01"], num_Er)*starting_Gn1_multiplier
         
-    Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+    #Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+    Er = np.linspace(min_Elam, max_Elam, num_Er) + Elam_shift
+
     J_ID = np.repeat(res_par_avg["J_ID"], num_Er)
 
     return Er, Gg, Gn, J_ID
@@ -40,7 +42,8 @@ def eliminate_small_Gn(resonance_ladder, threshold):
 
 def get_starting_feature_bank(energy_range,
                             spin_groups,
-                            num_Elam= None,
+                            num_Elam = None,
+                            Elam_shift = 0,
                             starting_Gg_multiplier = 1,
                             starting_Gn1_multiplier = 1, 
                             varyE = 0,
@@ -52,7 +55,7 @@ def get_starting_feature_bank(energy_range,
 
     Er, Gg, Gn, J_ID = [], [], [], []
     for sg in spin_groups:
-        Er_1, Gg_1, Gn_1, J_ID_1 = get_parameter_grid(energy_range, sg, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier)
+        Er_1, Gg_1, Gn_1, J_ID_1 = get_parameter_grid(energy_range, sg, num_Elam, Elam_shift, starting_Gg_multiplier, starting_Gn1_multiplier)
         Er.append(Er_1); Gg.append(Gg_1); Gn.append(Gn_1); J_ID.append(J_ID_1); 
     Er = np.concatenate(Er)
     Gg = np.concatenate(Gg)

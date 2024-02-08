@@ -1,5 +1,5 @@
 
-from typing import Optional, Union
+from typing import Optional, Union, List
 from dataclasses import dataclass, field
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
@@ -105,14 +105,14 @@ class SammyInputData:
 
 @dataclass
 class SammyOutputData:
-    pw: Union[DataFrame, list[DataFrame]]
+    pw: Union[DataFrame, List[DataFrame]]
     par: DataFrame
-    chi2: Union[float, list[float]]
-    chi2n: Union[float, list[float]]
-    pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
+    chi2: Union[float, List[float]]
+    chi2n: Union[float, List[float]]
+    pw_post: Optional[Union[DataFrame, List[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
-    chi2_post: Optional[Union[float, list[float]]] = None
-    chi2n_post : Optional[Union[float, list[float]]] = None
+    chi2_post: Optional[Union[float, List[float]]] = None
+    chi2n_post : Optional[Union[float, List[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 
@@ -150,9 +150,9 @@ class SammyInputDataYW:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
 
-    datasets : list[DataFrame]
-    experimental_covariance: Optional[list[Union[dict, str]]]
-    experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
+    datasets : List[DataFrame]
+    experimental_covariance: Optional[List[Union[dict, str]]]
+    experiments: List[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
 
     max_steps: int = 1
     iterations: int = 2

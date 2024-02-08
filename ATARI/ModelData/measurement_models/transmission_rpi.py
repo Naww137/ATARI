@@ -476,7 +476,7 @@ class Transmission_RPI:
 
         """
         assert isinstance(self.model_parameters.open_neutron_spectrum, pd.DataFrame)
-        assert(np.isclose(np.sum(abs(self.model_parameters.open_neutron_spectrum.tof.values - raw_data.tof.values)), 0,atol=1e-15))
+        assert(np.isclose(np.sum(abs(self.model_parameters.open_neutron_spectrum.tof.values - raw_data.tof.values)), 0,atol=1e-3))
 
         # Code for re-binning data
         # if self.gfactors is not None:

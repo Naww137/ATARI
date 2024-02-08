@@ -293,7 +293,8 @@ class Syndat_Model:
 
             pw_true = pw_true
         
-        pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_experimental_model.FP[0], True)*1e9+self.generative_experimental_model.t0[0]
+        if "tof" not in pw_true:
+            pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_experimental_model.FP[0], True)*1e9+self.generative_experimental_model.t0[0]
         
         return pw_true
     

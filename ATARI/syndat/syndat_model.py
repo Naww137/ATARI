@@ -61,28 +61,31 @@ class Syndat_Model:
                  title = 'Title'
                  ):
 
-        self.generative_experimental_model = Experimental_Model()
-        self.generative_measurement_model = Transmission_RPI()  # Generative_Reduction_Model()
-        self.reductive_measurement_model = Transmission_RPI()
-        self.options = syndatOPT()
-
         if generative_experimental_model is not None:
             self.generative_experimental_model = generative_experimental_model
+        else:
+            self.generative_experimental_model = Experimental_Model()
+
         if generative_measurement_model is not None:
             self.generative_measurement_model = generative_measurement_model
+        else:
+            self.generative_measurement_model = Transmission_RPI()  # Generative_Reduction_Model()
+
         if reductive_measurement_model is not None:
             self.reductive_measurement_model = reductive_measurement_model
+        else:
+            self.reductive_measurement_model = Transmission_RPI()
+
         if options is not None:
             self.options = deepcopy(options)
+        else:
+            self.options = syndatOPT()
 
         ### some convenient definitions
         self.title = title
         self.reaction = self.generative_experimental_model.reaction
         self.pw_true = pd.DataFrame()
         self.clear_samples()
-
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model)
-        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model)
         
 
     @property
@@ -114,6 +117,11 @@ class Syndat_Model:
     @reductive_measurement_model.setter
     def reductive_measurement_model(self, reductive_measurement_model):
         self._reductive_measurement_model = reductive_measurement_model
+
+
+    # def recalculate_unknown_data(self):
+    #     self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+    #     self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
 
     def sample(self,
@@ -151,7 +159,11 @@ class Syndat_Model:
         ValueError
             _description_
         """
-        
+        ### first, approximate unknown data
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+
+        ### Then, generate pw true
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true is not None:
@@ -206,7 +218,11 @@ class Syndat_Model:
     def generate_raw_observables(self, pw_true, true_model_parameters: dict):
 
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
-        true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+        if self.options.sampleTMP:
+            true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+        else:
+            true_model_parameters = self.generative_measurement_model.model_parameters
+
         self.generative_measurement_model.true_model_parameters = true_model_parameters
 
         ### generate raw count data from generative reduction model
@@ -218,12 +234,9 @@ class Syndat_Model:
     
 
     def reduce_raw_observables(self):
-        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, 
-                                                                        #  self.reductive_measurement_model.model_parameters.neutron_spectrum, 
-                                                                         self.options)
+        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.options)
         self.covariance_data = self.reductive_measurement_model.covariance_data
         
-    
 
 
     def generate_true_experimental_objects(self,
@@ -280,7 +293,8 @@ class Syndat_Model:
 
             pw_true = pw_true
         
-        pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_experimental_model.FP[0], True)*1e9+self.generative_experimental_model.t0[0]
+        if "tof" not in pw_true:
+            pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_experimental_model.FP[0], True)*1e9+self.generative_experimental_model.t0[0]
         
         return pw_true
     

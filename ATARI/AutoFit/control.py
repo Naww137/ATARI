@@ -58,12 +58,14 @@ class AutoFitOUT:
                  eliminateOUT: Optional[eliminator_OUTput] = None,
                  eliminateFiltered: Optional[dict] = None,
                  spinselectOUT: Optional[SpinSelectOUT] = None,
+                 total_time: Optional[float]= None
                  ):
         
         self.initial = initialFBOUT
         self.eliminate = eliminateOUT
         self.eliminate_filtered = eliminateFiltered
         self.spinselect = spinselectOUT
+        self.total_time = total_time
 
 
 class AutoFit_Control:

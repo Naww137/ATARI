@@ -61,6 +61,10 @@ def reduce_raw_count_data(raw_data, model_parameters):
                                +np.power(np.multiply(partial_Y_flux   , relative_flux_rate_uncertainty),2)
                                +np.power(partial_Y_fn*model_parameters.fn[1]        ,2))
     
+    # diag_stat = None
+    # diag_sys = None
+    # data =[diag_stat, diag_sys, Jac_sys, Cov_sys]
+
     return Yield, Yield_uncertainty
 
 
@@ -204,11 +208,11 @@ class Capture_Yield_RPI:
         return self.model_parameters.sample_parameters(true_model_parameters)
 
 
-    def approximate_unknown_data(self, exp_model):
+    def approximate_unknown_data(self, exp_model, smooth):
 
         if self.model_parameters.background_spectrum_bg is None:
             background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
-                                                                           False, 
+                                                                           smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
                                                                            self.model_parameters.trig_bg[0])
@@ -216,7 +220,7 @@ class Capture_Yield_RPI:
 
         if self.model_parameters.incident_neutron_spectrum_f is None:
             incident_neutron_spectrum_f = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
-                                                                            False, #self.options.smoothTNCS, 
+                                                                            smooth, #self.options.smoothTNCS, 
                                                                             exp_model.FP[0],
                                                                             exp_model.t0[0],
                                                                             self.model_parameters.trig_f[0])
@@ -226,7 +230,7 @@ class Capture_Yield_RPI:
 
         if self.model_parameters.background_spectrum_bf is None:
             background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 
-                                                                           False, 
+                                                                           smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
                                                                            self.model_parameters.trig_bf[0])
@@ -300,8 +304,8 @@ class Capture_Yield_RPI:
             c = pois_noise(true_gamma_counts)
         else:
             c = true_gamma_counts
-        
-        assert(c.all() >= 0)
+        c[c==0] = 1
+        assert(all(c> 0))
         dc = np.sqrt(c)
 
         raw_data.loc[:, 'cg'] = c
@@ -375,20 +379,24 @@ class Capture_Yield_RPI:
         #I will implement covariance later once we get to defining that.
         Yg.loc[:,'exp'], unc_data = reduce_raw_count_data(raw_data, self.model_parameters)
 
+        diag_tot = unc_data**2
         if options.calculate_covariance:
-            raise ValueError("not implemented")
+            CovY = np.diag(diag_tot)
+            CovY = pd.DataFrame(CovY, columns=Yg.E, index=Yg.E)
+            CovY.index.name = None
+            Yg['exp_unc'] = np.sqrt(np.diag(CovY))
 
             if options.explicit_covariance:
-                pass
-
+                self.covariance_data['CovY'] = CovY
             else:
-                pass
+                raise ValueError("not implemented")
 
         else:
             diag_tot = unc_data
             Yg.loc[:,'exp_unc'] = diag_tot
 
         ## fix for zero gamma counts
-        Yg = Yg.loc[Yg.exp!=0]
+        # Yg = Yg.loc[Yg.exp!=0]
+        assert(np.all(Yg.exp!=0))
 
         return Yg

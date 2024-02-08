@@ -4,7 +4,7 @@ import pandas as pd
 
 
 
-def XS_to_Yield(reaction_xs, total_xs, target_per_barn):
+def XS_to_Yield(reaction_xs, total_xs, target_per_barn,test_xs_total_covariance,test_xs_react_covariance,propogate_error):
     """Calculates the theoretical yield and count rate distributions
 
     Arguments:
@@ -15,10 +15,23 @@ def XS_to_Yield(reaction_xs, total_xs, target_per_barn):
     Returns:
         yield_theo      -- (n) array of floats: The theoretical capture yield distribtuion for Energy
     """
-    Yield            = np.multiply(np.divide(reaction_xs[0],total_xs[0]), (1-np.exp(np.multiply(-target_per_barn,total_xs[0]))))
-    Yield_uncertainty= np.zeros(len(Yield))
+    Yield               = np.multiply(np.divide(reaction_xs[0],total_xs[0]), (1-np.exp(np.multiply(-target_per_barn,total_xs[0]))))
     
-    return([Yield,Yield_uncertainty])
+    if(propogate_error):
+        reaction_derivative = np.multiply(np.divide(1,total_xs[0]), (1-np.exp(np.multiply(-target_per_barn,total_xs[0]))))
+        total_derivative    = np.multiply(reaction_xs[0],(np.divide(np.exp(np.multiply(-target_per_barn,total_xs[0])),np.power(total_xs[0],2))+np.divide(target_per_barn*np.exp(np.multiply(-target_per_barn,total_xs[0])),total_xs[0])-np.divide(1,np.power(total_xs[0],2))))
+        derivative_matrix   = np.concatenate((np.diag(reaction_derivative),np.diag(total_derivative)),1)
+        
+        reaction_matrix     = np.ones((len(reaction_xs[1]),len(reaction_xs[1])))*test_xs_react_covariance
+        np.fill_diagonal(reaction_matrix,reaction_xs[1])
+        total_matrix        = np.ones((len(total_xs[1]),len(total_xs[1])))*test_xs_total_covariance
+        np.fill_diagonal(total_matrix,total_xs[1])
+        covariance_matrix   = np.concatenate((np.concatenate((reaction_matrix,total_matrix*0),1),np.concatenate((reaction_matrix*0,total_matrix),1)),0)
+        
+        Yield_uncertainty=derivative_matrix@covariance_matrix@(derivative_matrix.T)
+    else:
+        Yield_uncertainty=np.zeros((len(Yield),len(Yield)))
+    return(Yield,Yield_uncertainty)
 
 
 

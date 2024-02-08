@@ -56,7 +56,7 @@ class syndatOPT:
     ----------
     sampleRES : bool = True
         Sample a new resonance ladder with each sample.
-    sample_counting_noise : bool = False
+    sample_counting_noise : bool = True
         Option to sample counting statistic noise for data generation, if False, no statistical noise will be sampled.
     calculate_covariance : bool = True
         Indicate whether to calculate off-diagonal elements of the data covariance matrix.
@@ -76,6 +76,7 @@ class syndatOPT:
         self._sample_counting_noise = True
         self._calculate_covariance = False
         self._explicit_covariance = False
+        self._sampleTMP = True
         self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
@@ -99,6 +100,13 @@ class syndatOPT:
     def sampleRES(self, sampleRES):
         self._sampleRES = sampleRES
         
+    @property
+    def sampleTMP(self):
+        return self._sampleTMP
+    @sampleTMP.setter
+    def sampleTMP(self, sampleTMP):
+        self._sampleTMP = sampleTMP
+
     @property
     def sampleTURP(self):
         return self._sampleTURP

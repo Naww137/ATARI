@@ -407,10 +407,10 @@ def write_saminp(filepath,
     
     if rto.bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
-        if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    if use_IDC:
+            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     
     alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
 
@@ -428,7 +428,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {particle_pair.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,6): <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
@@ -482,7 +482,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
             if use_RPCM:
                 f.write("SAMMY.COV\n")
             if use_IDC:
-                f.write("sammy.IDC\n")
+                f.write("sammy.idc\n")
             f.write("\n")
 
         # energy windowed solves
@@ -523,6 +523,8 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
                                 )
     if 'STOP' in runsammy_process.stderr:
         raise ValueError(f"\n\n===========================\nSAMMY Failed with output:\n\n {runsammy_process.stdout}")
+    elif "SAMMY.LPT: No such file or directory" in runsammy_process.stderr:
+        raise ValueError(f"No SAMMY.LPT was generated, check executable path bash scripting.")
     
     if getchi2:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
@@ -663,6 +665,7 @@ def delta_chi2(lst_df):
 #     return recursive_sammy(pw_posterior, par_posterior, sammy_INP, sammy_RTO, itter + 1)
 
 def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
+    sammyINP.resonance_ladder = fill_sammy_ladder(sammyINP.resonance_ladder, sammyINP.particle_pair, False)
     if sammyRTO.bayes:
         if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
             raise ValueError("Bayes is set to True but no varied parameters.")
@@ -839,6 +842,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
                 idc.append(False)
         else:
             write_estruct_file(d, os.path.join(rundir,f"{exp.title}.dat"))
+            idc.append(False)
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 

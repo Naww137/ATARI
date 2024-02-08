@@ -87,6 +87,10 @@ class Syndat_Model:
         self.pw_true = pd.DataFrame()
         self.clear_samples()
         
+        ### first, approximate unknown data
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+
 
     @property
     def samples(self) -> list:
@@ -159,9 +163,9 @@ class Syndat_Model:
         ValueError
             _description_
         """
-        ### first, approximate unknown data
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
-        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        # ### first, approximate unknown data
+        # self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        # self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
         ### Then, generate pw true
         generate_pw_true_with_sammy = False

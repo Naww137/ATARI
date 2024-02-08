@@ -112,7 +112,7 @@ class Experimental_Model:
                 print("WARNING: no energy grid or channel width information provided, using defaults")
 
             maxE, chw, dchw = [self.channel_widths[key] for key in ["maxE", "chw", "dchw"]]
-            if max(maxE) < max(self.energy_range): raise ValueError("Channel width maxE is less than max(energy_range)")
+            if max(maxE) < max(self.energy_range): print("WARNING: channel width maxE is less than max(energy_range)")
 
             self.energy_grid = np.array([])
             self.tof_grid = np.array([])

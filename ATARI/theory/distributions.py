@@ -137,17 +137,20 @@ class __PorterThomasDistribution(rv_continuous):
                 & np.isfinite(mean) & (mean >= 0) \
                 & (df >= 1) & (df % 1 == 0)
     def _pdf(self, x, mean:float, df:int, trunc:float):
+        x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         y = np.zeros(x.shape)
         y[x >  trunc] = chi2.pdf(x[x >  trunc], df=df, scale=mean/df) / norm
         y[(x < 0) & (df == 1)] = 0
         return y
     def _cdf(self, x, mean:float, df:int, trunc:float):
+        x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         y = np.zeros(x.shape)
         y[x >  trunc] = 1 + (chi2.cdf(x, df=df, scale=mean/df)-1) / norm
         return y
     def _sf(self, x, mean:float, df:int, trunc:float):
+        x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         y = np.ones(x.shape)
         y[x >  trunc] = chi2.sf(x, df=df, scale=mean/df) / norm
@@ -160,4 +163,4 @@ class __PorterThomasDistribution(rv_continuous):
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = q * norm
         return chi2.isf(qp, df=df, scale=mean/df)
-porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', shapes='mean, df, trunc')
+porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', a=-np.inf, b=np.inf, shapes='mean, df, trunc')

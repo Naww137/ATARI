@@ -97,9 +97,18 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         Gg = self.res_ladder['Gg']
         gg2 = Gg / 2.0
         dist = porter_thomas_dist(mean=self.mean_gamma_width, df=self.gg2_dof, trunc=0.0)
-        chi2_bar, p = chi2_test(dist, gg2, NUM_BINS)
+        chi2_bar, p = chi2_test(dist, abs(gg2), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
-The gamma widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
+The gamma (capture) widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
+Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
+""")
+        
+        obs_counts = np.bincount(np.array(gg2>=0, dtype=int), minlength=2)
+        exp_counts = np.array([0.5, 0.5]) * len(gg2)
+        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
+        chi2_bar = chi2 / 2
+        self.assertGreater(p, 0.001, f"""
+The gamma (capture) widths do not have 50% positive-negative split.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 """)
         
@@ -114,9 +123,18 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         Gn = np.array(self.res_ladder['Gn1'])
         gn2 = Gn / (2.0*P)
         dist = porter_thomas_dist(mean=self.mean_neutron_width, df=self.gn2_dof, trunc=0.0)
-        chi2_bar, p = chi2_test(dist, gn2, NUM_BINS)
+        chi2_bar, p = chi2_test(dist, abs(gn2), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
 The neutron widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
+Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
+""")
+        
+        obs_counts = np.bincount(np.array(gn2>=0, dtype=int), minlength=2)
+        exp_counts = np.array([0.5, 0.5]) * len(gn2)
+        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
+        chi2_bar = chi2 / 2
+        self.assertGreater(p, 0.001, f"""
+The neutron widths do not have 50% positive-negative split.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 """)
         

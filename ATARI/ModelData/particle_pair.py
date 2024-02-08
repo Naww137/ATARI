@@ -155,6 +155,8 @@ class Particle_Pair:
         return self._ac
     @ac.setter
     def ac(self, ac):
+        if   ac > 1.00: print(Warning(f'The channel radius, {ac} 1e-12 cm, is quite high. Make sure it is in units of square-root barns or 1e-12 cm.'))
+        elif ac < 0.08: print(Warning(f'The channel radius, {ac} 1e-12 cm, is quite low. Make sure it is in units of square-root barns or 1e-12 cm.'))
         self._ac = ac
 
     @property
@@ -183,6 +185,9 @@ class Particle_Pair:
         return self._M
     @M.setter
     def M(self, M):
+        if M is not None:
+            if   M > 300.0:     print(Warning(f'The target mass, {M} amu, is quite high. Make sure it is in units of amu.'))
+            elif M <   1.0:     print(Warning(f'The target mass, {M} amu, is quite low. Make sure it is in units of amu.'))
         self._M = M
 
     @property
@@ -190,6 +195,9 @@ class Particle_Pair:
         return self._m
     @m.setter
     def m(self, m):
+        if m is not None:
+            if   m > 300.0:     print(Warning(f'The projectile mass, {m} amu, is quite high. Make sure it is in units of amu.'))
+            elif m <   1.0:     print(Warning(f'The projectile mass, {m} amu, is quite low. Make sure it is in units of amu.'))
         self._m = m
     
     @property

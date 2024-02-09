@@ -18,11 +18,13 @@ all systems. If your python environment is not active, run :code:`python -m pip 
 
 Installing Dependencies
 =======================
-ATARI has several dependencies. Most of the dependencies can be read from `requirements.txt`. To install
-these dependencies, run the following line.
+ATARI has several dependencies. Most of the dependencies can be read from `requirements.txt`. To
+install these dependencies, run the following line.
 
 :code:`pip install -r requirements.txt`
 
 Most of ATARI's capabilities requires `SAMMY <https://code.ornl.gov/RNSD/SAMMY>`_ to be installed.
+SAMMY is open source and can be coupled to ATARI simply by providing a path to the local SAMMY
+executable after build/install of SAMMY.
 
 ...

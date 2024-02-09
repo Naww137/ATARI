@@ -41,13 +41,14 @@ def readlst(filepath):
         DataFrame with headers.
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        #df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
         if df.index.equals(pd.RangeIndex(len(df))):
             pass
         else:
-            df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
+            df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
     else:
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
+        df = pd.read_csv(filepath, sep='\s+', names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):

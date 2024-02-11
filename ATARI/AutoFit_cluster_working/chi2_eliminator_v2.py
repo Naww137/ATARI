@@ -611,7 +611,7 @@ class eliminator_by_chi2:
                 print('Chi2_s tracking...')
                 for index, hist_level in enumerate(all_curr_levels):
 
-                    print(f"\t{hist_level}\t->\t{np.round(all_curr_chi2_stat[index],4)} ({np.round(all_curr_chi2[index],2)})\t->\t{np.round(model_history[hist_level]['level_time'],1)} s")
+                    print(f'\t{hist_level}\t->\t{np.round(all_curr_chi2_stat[index],4)} ({np.round(all_curr_chi2[index],2)})')
                 print()
             
             # end prinout the history of chi2 at each step
@@ -782,10 +782,6 @@ class eliminator_by_chi2:
             # Create a ladder with the j-th resonance removed
             # note - always keep the side-resonances
             prior_ladder, row_removed = self.remove_resonance(ladder, j)
-
-            print('prior ladder passed to fit')
-            print(prior_ladder)
-            print()
 
             posterior_interm_SO, sol_fit_time_interm = self.fit_YW_by_ig(
                 ladder_df = prior_ladder,

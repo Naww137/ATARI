@@ -1,16 +1,15 @@
 Title
-Ta181     180.94803 180.0     270.0          2     
-XCT
-SOLVE BAYES EQUATIONS
-BROADENING IS WANTED
+%%%card2%%%
 TWENTY
 EV
 GENERATE PLOT FILE AUTOMATICALLY
 %%%alphanumeric%%%
+BROADENING IS WANTED
+DO NOT SHIFT RPI RESOLUTION
 
-294.2610    35.185    0.01            
-  8.1271    0.067166                       0.00000          
-transmission
+%%%card5/6%%%
+%%%card7%%%
+%%%card8%%%
   1      1    0  3.0       1.0  3.5
     1    1    0    0       3.0
   2      1    0  4.0       1.0  3.5
@@ -24,4 +23,13 @@ LITHI 000  -1.000000  -1.0000 6.00000000
 LITHI      0.1000000  0.10000 0.60000000
 LITHI      166.87839 -28.7093 1.260690
 LITHI      0.2574580 -0.06871 0.004915
-CHANN 0   270.0     102.0     0.8      
+CHANN 0    1.62      104857.6 0.8
+CHANN 0    2.39       52428.8 0.8
+CHANN 0    3.32        6553.6 0.8
+CHANN 0    6.51        1638.4 0.8
+CHANN 0    26.23        409.6 0.8
+CHANN 0    110.79       204.8 0.8
+CHANN 0    2014.67       25.6 0.8
+CHANN 0    30889.79      25.6 0.8
+CHANN 0    40287.59     819.2 0.8
+CHANN 0    120329.56    409.6 0.8

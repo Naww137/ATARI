@@ -428,17 +428,17 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,6): <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,5): <9} {np.round(float(min(experimental_model.energy_range)),3)-0.001: <9} {np.round(float(max(experimental_model.energy_range)),3)+0.001: <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(experimental_model.temp[0]):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
+                    f.write(f'  {np.round(float(experimental_model.temp[0]),4):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {round(float(particle_pair.ac)*10, 7):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
+                f.write(f'  {np.round(float(particle_pair.ac)*10, 7):<8}  {np.round(float(experimental_model.n[0]),6):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
                 f.write(f'{reaction}\n')
@@ -578,7 +578,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     runsammy_process = subprocess.run(
                                     [f"sh", "-c", f"{sammyRTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammyRTO.sammy_runDIR),
-                                    capture_output=True, timeout=60*2
+                                    capture_output=True, timeout=60*10
                                     )
 
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
@@ -731,6 +731,8 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         sammy_OUT.par_post = par_df
         sammy_OUT.chi2_post = chi2
         sammy_OUT.chi2n_post = chi2n
+        sammy_OUT.chi2 = None
+        sammy_OUT.chi2n = None
 
         if sammyRTO.get_ECSCM:
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
@@ -952,7 +954,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
-                            capture_output=True, timeout=60*5
+                            capture_output=True, timeout=60*10
                             )
 
     for i in range(1, iterations+1):
@@ -963,7 +965,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
 
         runsammy_bay0 = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*5
+                                    capture_output=True, timeout=60*10
                                     )
 
     # Move par file from final iteration 
@@ -1074,7 +1076,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
-                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*5
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*10
                         )
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []

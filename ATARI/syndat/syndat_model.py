@@ -88,7 +88,7 @@ class Syndat_Model:
         self.clear_samples()
         
         ### first, approximate unknown data
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS, check_trig=True)
         self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
 
@@ -198,19 +198,19 @@ class Syndat_Model:
                                                     generate_pw_true_with_sammy,
                                                     pw_true)
 
-            self.generate_raw_observables(pw_true, true_model_parameters={})
+            raw_data = self.generate_raw_observables(pw_true, true_model_parameters={})
 
-            self.reduce_raw_observables()
+            reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
 
             if self.options.save_raw_data:
                 out = syndatOUT(par_true=par_true,
-                                pw_reduced=self.red_data, 
-                                pw_raw=self.raw_data)
+                                pw_reduced=reduced_data, 
+                                pw_raw=raw_data)
             else:
                 out = syndatOUT(par_true=par_true,
-                                pw_reduced=self.red_data)
+                                pw_reduced=reduced_data)
             if self.options.calculate_covariance:
-                out.covariance_data = self.covariance_data
+                out.covariance_data = covariance_data
 
             self.samples.append(out)
 
@@ -230,16 +230,19 @@ class Syndat_Model:
         self.generative_measurement_model.true_model_parameters = true_model_parameters
 
         ### generate raw count data from generative reduction model
-        self.raw_data = self.generative_measurement_model.generate_raw_data(pw_true, 
-                                                                            true_model_parameters, 
-                                                                            self.options)
+        raw_data = self.generative_measurement_model.generate_raw_data(pw_true, 
+                                                                        true_model_parameters, 
+                                                                        self.options)
+        
+        return raw_data
 
         
     
 
-    def reduce_raw_observables(self):
-        self.red_data = self.reductive_measurement_model.reduce_raw_data(self.raw_data, self.options)
-        self.covariance_data = self.reductive_measurement_model.covariance_data
+    def reduce_raw_observables(self, raw_data):
+        red_data, covariance_data, raw_data = self.reductive_measurement_model.reduce_raw_data(raw_data, self.options)
+        # self.covariance_data = self.reductive_measurement_model.covariance_data
+        return red_data, covariance_data, raw_data
         
 
 

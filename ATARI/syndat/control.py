@@ -124,6 +124,10 @@ class Syndat_Control:
                                                                      generate_pw_true_with_sammy)
                 pw_true_list.append(pw_true)
 
+            # ### first, approximate unknown data
+            # self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+            # self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+
 
             ### generate raw datasets from samples model parameters
             for syn_mod, pw_true in zip(self.syndat_models, pw_true_list):

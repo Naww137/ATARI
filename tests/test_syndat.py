@@ -28,19 +28,21 @@ class TestTransmissionRPIModel(unittest.TestCase):
     def setUpClass(cls):
         cls.pair = Particle_Pair()
 
+        cls.print_out = False
+
         ## parameters to reduce default uncertainties to be in linear regime
         # but don't eliminate covariance because we want to test it 
         cls.model_par = {
-        'trigs' :   (1e12,  0),
-        'trigo' :   (1e12,  0),
-        'm1'    :   (1,     0.00016) ,#0.016
-        'm2'    :   (1,     0.00008) ,#0.008
-        'm3'    :   (1,     0.00018) ,#0.018
-        'm4'    :   (1,     0.00005) ,#0.005
-        'ks'    :   (0.563, 0.000240), #0.02402339737495515
-        'ko'    :   (1.471, 0.000557), #0.05576763648617445
-        'b0s'   :   (9.9,   0.001) ,#0.1
-        'b0o'   :   (13.4,  0.007) ,#0.7
+        'trigs' :   (1e10,  0),
+        'trigo' :   (1e10,  0),
+        # 'm1'    :   (1,     0.0016) ,#0.016
+        # 'm2'    :   (1,     0.0008) ,#0.008
+        # 'm3'    :   (1,     0.0018) ,#0.018
+        # 'm4'    :   (1,     0.0005) ,#0.005
+        # 'ks'    :   (0.563, 0.00240), #0.02402339737495515
+        # 'ko'    :   (1.471, 0.00557), #0.05576763648617445
+        # 'b0s'   :   (9.9,   0.01) ,#0.1
+        # 'b0o'   :   (13.4,  0.07) ,#0.7
         }
 
 
@@ -54,32 +56,27 @@ class TestTransmissionRPIModel(unittest.TestCase):
         self.assertAlmostEqual(residual, 0, places=10)
 
 
-    # def test_random_energy(self):
+    def test_random_energy(self):
 
-    #     energy_grid = np.sort(np.random.default_rng().uniform(10,3000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
-    #     df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.7,1.0,10)})
-    #     df_true.sort_values('E', ascending=True, inplace=True)
+        energy_grid = np.sort(np.random.default_rng().uniform(10,3000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
+        df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1.0,10)})
+        df_true.sort_values('E', ascending=True, inplace=True)
 
-    #     generative_model = Transmission_RPI(**self.model_par)
-    #     reductive_model = Transmission_RPI(**self.model_par)
+        generative_model = Transmission_RPI(**self.model_par)
+        reductive_model = Transmission_RPI(**self.model_par)
 
-    #     synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
-    #     # exp_model = Experimental_Model(energy_grid=energy_grid, energy_range = [min(energy_grid), max(energy_grid)])
-    #     SynMod = Syndat_Model(generative_experimental_model=None, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
-        
-    #     # reset energy grid, and open neutron spectrum
-    #     SynMod.generative_experimental_model.energy_grid = energy_grid
-    #     SynMod.generative_experimental_model.energy_range = [10,3000]
-    #     SynMod.generative_measurement_model.model_parameters.open_neutron_spectrum = None
-    #     SynMod.reductive_measurement_model.model_parameters.open_neutron_spectrum = None
+        synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+        exp_model = Experimental_Model(energy_grid=energy_grid, energy_range = [min(energy_grid), max(energy_grid)])
+        SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
 
-    #     mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=500, print_out=True) #noise_distribution_test(SynMod, print_out=True)
-    #     self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
-    #                     "Mean of residuals is not 0")
-    #     self.assertTrue( norm_test_on_residual.pvalue>1e-5, 
-    #                     "Normalized residuals are not standard normal")
-    #     self.assertTrue( kstest_on_chi2.pvalue>1e-5, 
-    #                     "Chi2 of data does not have appropriate DOF")
+
+        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) #noise_distribution_test(SynMod, print_out=True)
+        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
+                        "Mean of residuals is not 0")
+        self.assertTrue( norm_test_on_residual.pvalue>1e-5, 
+                        "Normalized residuals are not standard normal")
+        self.assertTrue( kstest_on_chi2.pvalue>1e-5, 
+                        "Chi2 of data does not have appropriate DOF")
         
 
     def test_default_energy_window(self):
@@ -93,8 +90,8 @@ class TestTransmissionRPIModel(unittest.TestCase):
         synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
         
-        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=True) #noise_distribution_test(SynMod, print_out=True)
-        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-2), 
+        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) #noise_distribution_test(SynMod, print_out=True)
+        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
                         "Mean of residuals is not 0")
         self.assertTrue( norm_test_on_residual.pvalue>1e-5, 
                         "Normalized residuals are not standard normal")
@@ -105,13 +102,13 @@ class TestTransmissionRPIModel(unittest.TestCase):
     def test_with_given_TNCS(self):
 
         exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
-        df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.7,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
+        df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
 
         open_df = pd.DataFrame({"E":exp_model.energy_grid, 
                                 'tof': exp_model.tof_grid,
                                 'bw': abs(np.append(np.diff(exp_model.tof_grid), np.diff(exp_model.tof_grid)[-1])*1e-9),
-                               'c':np.ones(len(exp_model.energy_grid))*1e9,
-                               'dc': np.ones(len(exp_model.energy_grid))*np.sqrt(1e9)})
+                               'c':np.ones(len(exp_model.energy_grid))*1e10,
+                               'dc': np.ones(len(exp_model.energy_grid))*np.sqrt(1e10)})
         # open_df = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, True, exp_model.FP[0], exp_model.t0[0], self.model_par['trigo'][0])
 
         generative_model = Transmission_RPI(**self.model_par, open_neutron_spectrum=open_df)
@@ -120,15 +117,65 @@ class TestTransmissionRPIModel(unittest.TestCase):
         synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
         
-        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=True) #noise_distribution_test(SynMod, print_out=True)
-        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-2), 
+        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) #noise_distribution_test(SynMod, print_out=True)
+        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
                         "Mean of residuals is not 0")
         self.assertTrue( norm_test_on_residual.pvalue>1e-5, 
-                        "Normalized residuals are not standard normal")
+                        f"Normalized residuals are not standard normal: pvalue = {norm_test_on_residual.pvalue}")
         self.assertTrue( kstest_on_chi2.pvalue>1e-5, 
                         "Chi2 of data does not have appropriate DOF")
 
+
+
+    def test_covariance(self):
+
+        exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
+        df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
+
+        generative_model = Transmission_RPI(**self.model_par)
+        reductive_model = Transmission_RPI(**self.model_par)
+
+        synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+        SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
+
+        SynMod.sample(pw_true=df_true, num_samples=5)
+        s1 = SynMod.samples[0]
+        s5 = SynMod.samples[4]
+
+        self.assertTrue(all(np.isclose(np.diag(s1.covariance_data['CovT']), s1.pw_reduced.exp_unc**2, atol=1e-5)))
+        self.assertTrue(all(np.isclose(np.diag(s5.covariance_data['CovT']), s5.pw_reduced.exp_unc**2, atol=1e-5)))
+
+        self.assertTrue(np.all(np.isclose(np.diag(s1.covariance_data['diag_stat']) + s1.covariance_data['Jac_sys'].values.T @ s1.covariance_data['Cov_sys'] @ s1.covariance_data['Jac_sys'].values, s1.covariance_data['CovT'], atol=1e-5)))
+        self.assertTrue(np.all(np.isclose(np.diag(s5.covariance_data['diag_stat']) + s5.covariance_data['Jac_sys'].values.T @ s5.covariance_data['Cov_sys'] @ s5.covariance_data['Jac_sys'].values, s5.covariance_data['CovT'], atol=1e-5)))
         
+        self.assertFalse(any([np.all(s1.covariance_data[key] == s5.covariance_data[key]) for key in s1.covariance_data.keys() if key not in ['Cov_sys']]))
+
+
+    # def test_sample_saving(self, sammy_path):
+    #     self.pair.add_spin_group(Jpi='3.0', J_ID=1, D=9.0030, gn2_avg=452.56615, gn2_dof=1, gg2_avg=32.0, gg2_dof=1000)
+
+    #     exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
+    #     df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
+
+    #     generative_model = Transmission_RPI(**self.model_par)
+    #     reductive_model = Transmission_RPI(**self.model_par)
+
+    #     synOPT = syndatOPT(sampleRES=True, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+    #     SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
+
+    #     SynMod.sample(pw_true=df_true, num_samples=5)
+    #     s1 = SynMod.samples[0]
+    #     s5 = SynMod.samples[4]
+
+                
+    #     self.assertTrue(all(s1.pw_reduced.tof == s5.pw_reduced.tof))
+    #     self.assertFalse(all(s1.pw_reduced.exp_unc == s5.pw_reduced.exp_unc))
+    #     self.assertFalse(all(s1.pw_reduced.exp == s5.pw_reduced.exp))
+
+    #     self.assertTrue([np.all(np.isclose(s1.covariance_data[key], s5.covariance_data[key], atol=1e-5)) for key in s1.covariance_data.keys()])
+
+
+
 
 
 class TestYieldRPIModel(unittest.TestCase):
@@ -137,11 +184,13 @@ class TestYieldRPIModel(unittest.TestCase):
     def setUpClass(cls):
         cls.pair = Particle_Pair()
 
+        cls.print_out = False
+
         ## parameters to reduce default uncertainties to be in linear regime
         # but don't eliminate covariance because we want to test it 
         cls.model_par = {
-        'trigs' :   (1e12,  0),
-        'trigo' :   (1e12,  0),
+        'trigs' :   (1e7,  0),
+        'trigo' :   (1e7,  0),
         }
 
 
@@ -164,7 +213,7 @@ class TestYieldRPIModel(unittest.TestCase):
 
         synOPT = syndatOPT(smoothTNCS=True, sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
-        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=True) 
+        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) 
 
         self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
                         "Mean of residuals is not 0")

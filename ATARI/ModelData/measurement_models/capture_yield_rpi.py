@@ -30,18 +30,18 @@ def get_covT():
 def reduce_raw_count_data(raw_data, model_parameters):
 
     ### counts to count rates for target gamma and background measurements
-    crg, dcrg = cts_to_ctr(raw_data.cg, raw_data.dcg, model_parameters.incident_neutron_spectrum_f.bw, model_parameters.trig_g[0])
-    brg, dbrg = cts_to_ctr(model_parameters.background_spectrum_bg.c, 
-                           model_parameters.background_spectrum_bg.dc,
+    crg, dcrg = cts_to_ctr(raw_data.ctg, raw_data.dctg, model_parameters.incident_neutron_spectrum_f.bw, model_parameters.trig_g[0])
+    brg, dbrg = cts_to_ctr(model_parameters.background_spectrum_bg.ct, 
+                           model_parameters.background_spectrum_bg.dct,
                            model_parameters.incident_neutron_spectrum_f.bw, 
                            model_parameters.trig_bg[0])
     ### counts to count rates for incident flux measurement
-    cr_flux, dcr_flux = cts_to_ctr(model_parameters.incident_neutron_spectrum_f.c,
-                         model_parameters.incident_neutron_spectrum_f.dc,
+    cr_flux, dcr_flux = cts_to_ctr(model_parameters.incident_neutron_spectrum_f.ct,
+                         model_parameters.incident_neutron_spectrum_f.dct,
                          model_parameters.incident_neutron_spectrum_f.bw,
                          model_parameters.trig_f[0])
-    br_flux, dbr_flux = cts_to_ctr(model_parameters.background_spectrum_bf.c,
-                         model_parameters.background_spectrum_bf.dc,
+    br_flux, dbr_flux = cts_to_ctr(model_parameters.background_spectrum_bf.ct,
+                         model_parameters.background_spectrum_bf.dct,
                          model_parameters.incident_neutron_spectrum_f.bw,
                          model_parameters.trig_bf[0])
 
@@ -64,6 +64,8 @@ def reduce_raw_count_data(raw_data, model_parameters):
     # diag_stat = None
     # diag_sys = None
     # data =[diag_stat, diag_sys, Jac_sys, Cov_sys]
+    if np.any(Yield==0):
+        pass
 
     return Yield, Yield_uncertainty
 
@@ -75,20 +77,20 @@ def inverse_reduction(pw_true, true_model_parameters):
     #                       'dc'   :   np.ones(len(pw_true.E))*TURP.Scaling[1]})
     
     ### relative flux rate measurement
-    cr_flux, dcr_flux = cts_to_ctr(true_model_parameters.incident_neutron_spectrum_f.c,
-                                true_model_parameters.incident_neutron_spectrum_f.dc,
+    cr_flux, dcr_flux = cts_to_ctr(true_model_parameters.incident_neutron_spectrum_f.ct,
+                                true_model_parameters.incident_neutron_spectrum_f.dct,
                                 true_model_parameters.incident_neutron_spectrum_f.bw,
                                 true_model_parameters.trig_f[0])
-    br_flux, dbr_flux = cts_to_ctr(true_model_parameters.background_spectrum_bf.c,
-                                true_model_parameters.background_spectrum_bf.dc,
+    br_flux, dbr_flux = cts_to_ctr(true_model_parameters.background_spectrum_bf.ct,
+                                true_model_parameters.background_spectrum_bf.dct,
                                 true_model_parameters.incident_neutron_spectrum_f.bw,
                                 true_model_parameters.trig_bf[0])
 
     relative_flux_rate = cr_flux - br_flux # need to normalize by yield here!
     
     ### target gamma background and count rate
-    br_gamma, dbr_gamma = cts_to_ctr(true_model_parameters.background_spectrum_bg.c,
-                                    true_model_parameters.background_spectrum_bg.dc,
+    br_gamma, dbr_gamma = cts_to_ctr(true_model_parameters.background_spectrum_bg.ct,
+                                    true_model_parameters.background_spectrum_bg.dct,
                                     true_model_parameters.incident_neutron_spectrum_f.bw,
                                     true_model_parameters.trig_bg[0])
     cr_gamma_true = np.multiply(pw_true.true, relative_flux_rate)/true_model_parameters.fn[0] + br_gamma
@@ -130,10 +132,10 @@ class capture_yield_rpi_parameters:
 
     def __init__(self, **kwargs):
 
-        self.trig_g     =  (10000000,   0)
-        self.trig_bg    =  (1000000,  0)
-        self.trig_f     =  (10000000,   0)
-        self.trig_bf    =  (1000000,  0)
+        self.trig_g     =  (12000000,   0)
+        self.trig_bg    =  (10000000,  0)
+        self.trig_f     =  (12000000,   0)
+        self.trig_bf    =  (10000000,  0)
         self.fn         =  (1,          0)
     
         self.background_spectrum_bg = None
@@ -159,10 +161,10 @@ class capture_yield_rpi_parameters:
                         sample = np.random.normal(loc=mean, scale=uncertainty)
                     sampled_params[param_name] = (sample, 0.0)
                 if isinstance(param_values, pd.DataFrame):
-                    new_c = np.random.poisson(param_values.c)#, scale=param_values.dc)
+                    new_c = np.random.poisson(param_values.ct)#, scale=param_values.dc)
                     df = deepcopy(param_values)
-                    df.loc[:,'c'] = new_c
-                    df.loc[:,'dc'] = np.sqrt(new_c)
+                    df.loc[:,'ct'] = new_c
+                    df.loc[:,'dct'] = np.sqrt(new_c)
                     sampled_params[param_name] = df
 
         return capture_yield_rpi_parameters(**sampled_params)
@@ -208,7 +210,12 @@ class Capture_Yield_RPI:
         return self.model_parameters.sample_parameters(true_model_parameters)
 
 
-    def approximate_unknown_data(self, exp_model, smooth):
+    def approximate_unknown_data(self, exp_model, smooth, check_trig=False):
+        
+        if check_trig:
+            for each in [self.model_parameters.trig_g, self.model_parameters.trig_bg, self.model_parameters.trig_f, self.model_parameters.trig_bf]:
+                if exp_model.channel_widths['chw'][0]*1e-9 * each[0] < 1:
+                    print("WARNING: the linac trigers in you generative measurement model are not large enough for the channel bin width. This will result in many bins with 0 counts")
 
         if self.model_parameters.background_spectrum_bg is None:
             background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
@@ -305,11 +312,12 @@ class Capture_Yield_RPI:
         else:
             c = true_gamma_counts
         c[c==0] = 1
-        assert(all(c> 0))
+        # assert(all(c> 0))
         dc = np.sqrt(c)
 
-        raw_data.loc[:, 'cg'] = c
-        raw_data.loc[:, 'dcg'] = dc
+        raw_data.loc[:, 'ctg_true'] = true_gamma_counts
+        raw_data.loc[:, 'ctg'] = c
+        raw_data.loc[:, 'dctg'] = dc
         
         # count_rate=pd.DataFrame({'c'    :   count_rate,
         #                          'dc'   :   count_rate_uncertainty})
@@ -385,18 +393,19 @@ class Capture_Yield_RPI:
             CovY = pd.DataFrame(CovY, columns=Yg.E, index=Yg.E)
             CovY.index.name = None
             Yg['exp_unc'] = np.sqrt(np.diag(CovY))
-
+            covariance_data = {}
             if options.explicit_covariance:
-                self.covariance_data['CovY'] = CovY
+                covariance_data['CovY'] = CovY
             else:
                 raise ValueError("not implemented")
 
         else:
             diag_tot = unc_data
             Yg.loc[:,'exp_unc'] = diag_tot
+            covariance_data = {}
 
         ## fix for zero gamma counts
         # Yg = Yg.loc[Yg.exp!=0]
-        assert(np.all(Yg.exp!=0))
+        # assert(np.all(Yg.exp!=0))
 
-        return Yg
+        return Yg, covariance_data, raw_data

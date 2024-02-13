@@ -47,17 +47,18 @@ class SammyRunTimeOptions:
 
     def __init__(self, sammyexe: str, options={}):
         default_options = {
-            # 'sh'            :   'zsh',
-            'sammy_runDIR'  :   'SAMMY_runDIR',
-            'keep_runDIR'   :   False,
-            'Print'         :   False,
+            # 'sh'               : 'zsh',
+            'sammy_runDIR'     : 'SAMMY_runDIR',
+            'keep_runDIR'      : False,
+            'Print'            : False,
 
-            'bayes'         :   False,
-            'iterations'    :   2,
+            'bayes'            : False,
+            'derivatives_only' : False,
+            'iterations'       : 2,
 
-            'energy_window' : None,
-            'get_ECSCM'     : False,
-            'ECSCM_rxn'     : 'total'
+            'energy_window'    : None,
+            'get_ECSCM'        : False,
+            'ECSCM_rxn'        : 'total'
         }
         options = update_dict(default_options, options)
         self.options = options
@@ -69,6 +70,7 @@ class SammyRunTimeOptions:
         self.Print =  options["Print"]
         
         self.bayes = options["bayes"]
+        self.derivatives_only = options["derivatives_only"]
         self.iterations = options["iterations"]
 
         self.energy_window = options["energy_window"]

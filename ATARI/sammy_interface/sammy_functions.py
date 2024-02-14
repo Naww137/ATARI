@@ -669,6 +669,11 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
     if sammyRTO.bayes:
         if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
             raise ValueError("Bayes is set to True but no varied parameters.")
+        if sammyINP.experimental_data is None:
+            if sammyINP.energy_grid is not None: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
+            else: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied")
 
 def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 

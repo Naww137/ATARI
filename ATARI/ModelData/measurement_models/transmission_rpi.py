@@ -490,11 +490,11 @@ class Transmission_RPI:
 
         ### complete raw dataframe with count rates using reductive model parameters
         cr, dcr = cts_to_ctr(raw_data.cts, raw_data.dcts, raw_data.bw, self.model_parameters.trigs[0])
-        raw_data['co']  = cr
-        raw_data['dco'] = dcr
+        raw_data['cs']  = cr
+        raw_data['dcs'] = dcr
         Cr, dCr = cts_to_ctr(self.model_parameters.open_neutron_spectrum.ct, self.model_parameters.open_neutron_spectrum.dct, self.model_parameters.open_neutron_spectrum.bw, self.model_parameters.trigo[0])
-        raw_data['cs']  = Cr
-        raw_data['dcs'] = dCr
+        raw_data['co']  = Cr
+        raw_data['dco'] = dCr
 
         # create transmission object
         trans = pd.DataFrame()

@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.theory.scattering_params import FofE_recursive
 
@@ -29,3 +31,18 @@ def du_dp_n(p_n, E, l, particle_pair:Particle_Pair):
     return 0.5 / np.sqrt(2000 * P * p_n)
 def du_dp_g(p_g):
     return 0.5 / np.sqrt(2000 * p_g)
+
+def convert_deriv_du2dp(df_du: np.ndarray, 
+                        ladder_df: pd.DataFrame,
+                        Ta_pair: Particle_Pair):
+    """
+    Converts derivatives df/du -> df/dp,
+    
+    1. assuming next order of u: 
+        u_e, u_g, u_n -> p_e, p_g, p_n
+
+    2. ladder ordered by E asc with the E, Gg, Gnx inside
+
+    """
+
+    raise NotImplementedError('...')

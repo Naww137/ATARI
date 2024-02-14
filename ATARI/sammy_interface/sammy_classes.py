@@ -114,7 +114,7 @@ class SammyOutputData:
     pw_post: Optional[Union[DataFrame, List[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
     chi2_post: Optional[Union[float, List[float]]] = None
-    chi2n_post : Optional[Union[float, List[float]]] = None
+    chi2n_post: Optional[Union[float, List[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 

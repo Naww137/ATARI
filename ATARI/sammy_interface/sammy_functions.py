@@ -236,13 +236,13 @@ def readpds(pdsfilepath):
 
     # Return the final result
     res_dict = {
-        'NPAR': NPAR,
-        'U': U_values[:NPAR],
-        'DATA': data,
-        'DELD': deld,
-        'THEORY': theory,
+        'NPAR': NPAR, # number of parameters
+        'U': U_values[:NPAR], # u parameter values
+        'DATA': data, # experimental data values
+        'DELD': deld, # uncertainity on data
+        'THEORY': theory, # theoretical values
         'PARTIAL_DERIVATIVES': partial_derivatives, # G with respect to u parameters
-        'PAR_NAMES': par_names
+        'PAR_NAMES': par_names # the names of the u parameters
     }
     return res_dict
 
@@ -372,6 +372,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
 # ################################################ ###############################################
 
 def write_estruct_file(Energies, filename):
+    'Generates a dummy data file for sammy'
     # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
     if np.all([isinstance(E,float) for E in Energies]):
         pass
@@ -517,7 +518,7 @@ def write_saminp(filepath,
     if rto.derivatives_only:
         alphanumeric.insert(2, "GENERATE PARTIAL DERivatives only")
     if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
+        alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -556,18 +557,14 @@ def write_saminp(filepath,
            
 
 def make_runDIR(sammy_runDIR):
-    if os.path.isdir(sammy_runDIR):
-        pass
-    else:
+    if not os.path.isdir(sammy_runDIR):
         os.mkdir(sammy_runDIR)
 
 def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
-
     if os.path.basename(input_template) == input_template:
         template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', input_template)
     else:
         template_path = input_template
-
     shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
 
 
@@ -776,7 +773,7 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
             raise ValueError("Bayes is set to True but no varied parameters.")
 
-def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
+def run_sammy(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions):
 
     sammyINP.resonance_ladder = copy(sammyINP.resonance_ladder)
     check_inputs(sammyINP, sammyRTO)

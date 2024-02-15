@@ -23,7 +23,7 @@ def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, 
 
 
 
-def calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
+def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                         particle_pair, 
                                         resonance_ladder, 
                                         energy_range,
@@ -34,14 +34,20 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
 
     runDIR = generate_sammy_rundir_uniq_name('./')
 
-    sammyRTO = sammy_classes.SammyRunTimeOptions(
-        path_to_SAMMY_exe = sammy_exe,
-        shell = shell,
-        model = 'XCT',
-        sammy_runDIR = runDIR,
-        inptemplate = template,
-        keep_runDIR=False
-        )
+    # sammyRTO = sammy_classes.SammyRunTimeOptions(
+    #     path_to_SAMMY_exe = sammy_exe,
+    #     shell = shell,
+    #     model = 'XCT',
+    #     sammy_runDIR = runDIR,
+    #     inptemplate = template,
+    #     keep_runDIR=False
+    #     )
+    sammyRTO = sammy_classes.SammyRunTimeOptions('/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy',
+                             {"Print"   :   True,
+                              "bayes"   :   False,
+                              "keep_runDIR"     : False,
+                              "sammy_runDIR": runDIR
+                              })
 
     E = fine_egrid(energy_range)
 

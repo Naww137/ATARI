@@ -107,6 +107,25 @@ def sample_true_underlying_parameters(parameter_dict, bool):
 
 
 def neutron_background_function(tof,a,b):
+    """
+    Exponential neutron backgroun function
+
+    .. math:: bkg = a*e^(-b*tof)
+
+    Parameters
+    ----------
+    tof : array-like
+        time-of-flight in micro-seconds (us)
+    a : float
+        parameter
+    b : float
+        parameter
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     return a*np.exp(tof*-b)
 
 
@@ -125,11 +144,11 @@ def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo):
         cts_open_measured = cts_open_approx
     else:
         cts_open_measured = pois_noise(cts_open_approx)
-
+    cts_open_measured[cts_open_measured==0] = 1
     dataframe = pd.DataFrame({'tof'    :   tof,
                                 'bw'    :   bin_width,
-                                'c'     :   cts_open_measured,
-                                'dc'    :   np.sqrt(cts_open_measured)})
+                                'ct'     :   cts_open_measured,
+                                'dct'    :   np.sqrt(cts_open_measured)})
 
     dataframe['E'] = t_to_e((dataframe.tof-t0)*1e-9, FP, True) 
 
@@ -155,8 +174,8 @@ def approximate_neutron_spectrum_Li6det(energy_grid, smooth, FP, t0, trigo):
 
     open_dataframe = pd.DataFrame({'tof'    :   tof,
                                     'bw'    :   bin_width,
-                                    'c'     :   cts_open_measured,
-                                    'dc'    :   np.sqrt(cts_open_measured)})
+                                    'ct'     :   cts_open_measured,
+                                    'dct'    :   np.sqrt(cts_open_measured)})
 
     open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-9, FP, True) 
 
@@ -200,8 +219,8 @@ def sample_true_neutron_spectrum(spectrum_df, cycles=35, mon_unc=0.0160*2):
     for i in range(cycles-1):
         noisy_cycle_data += pois_noise(theo_cycle_data)*monitor_factors[i]
 
-    true_spectrum['c'] = noisy_cycle_data
-    true_spectrum['dc'] = np.sqrt(noisy_cycle_data)
+    true_spectrum['ct'] = noisy_cycle_data
+    true_spectrum['dct'] = np.sqrt(noisy_cycle_data)
 
     return true_spectrum
 

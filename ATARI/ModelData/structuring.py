@@ -31,7 +31,9 @@ class vector_parameter:
 
     def __set__(self, instance, value):
         if isinstance(value, DataFrame):
-            assert all(key in value.keys() for key in ['c','dc'])
+            assert all(key in value.keys() for key in ['E','tof','ct','dct','bw'])
+            value.sort_values("E", ignore_index=True,inplace=True)
+            value.reset_index(drop=True, inplace=True)
         elif value is None:
             pass
         else:

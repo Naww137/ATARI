@@ -5,12 +5,14 @@ Created on Thu Jun 16 12:18:04 2022
 
 @author: noahwalton
 """
-
+from typing import Union
 import numpy as np
 import pandas as pd
-from ATARI.syndat.sample_resparms import sample_resonance_ladder
-from ATARI.theory.resonance_statistics import make_res_par_avg
+from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths
 from ATARI.ModelData.particle import Particle, Ta181, Neutron
+from ATARI.theory.scattering_params import FofE_recursive
+
+
 
 VALID_SAMMY_FORMALISMS = ('REICH-MOORE FORMALIS', 'MORE ACCURATE REICH-', 'XCT',
                           'ORIGINAL REICH-MOORE', 'CRO',
@@ -50,6 +52,40 @@ class Particle_Pair:
     """
     Particle_Pair is a class that stores information regarding the reacting isotopes, the
     resonances, energy range, spingroups, and more.
+
+    Parameters
+    ----------
+    **kwargs : dict, optional
+        Any keyword arguments are used to set attributes on the instance.
+
+    Attributes
+    ----------
+    isotope:
+        The name of the isotope
+    resonance_ladder:
+        The resonance ladder
+    formalism:
+        R-matrix approximation
+    spin_groups:
+        The recorded spingroups
+    ac:
+        Channel radius in √barns or 1e-12 cm
+    target:
+        The target particle
+    projectile:
+        The target particle
+    M:
+        Mass of the target isotope
+    m:
+        Mass of the projectile
+    I:
+        Target isotope intrinsic spin
+    i:
+        Projectile intrinsic spin
+    l_max:
+        Maximum angular momentum
+    energy_range:
+        Modelled energy range
     """
 
     # Class attribute constants:
@@ -61,17 +97,20 @@ class Particle_Pair:
         self.isotope = "Ta181"
         self.resonance_ladder = pd.DataFrame()
         self.formalism = "XCT"
-        self.spin_groups = {}
-        self.total_energy_range = [200,250]
+        self._spin_groups = {}
+        self.energy_range = [200,250]
 
         self.target     = Ta181
         self.projectile = Neutron
-        self.ac = 8.127 # fm
+        self.ac = 0.8127 # √barns or 1e-12 cm
 
-        self.l_max = 2
+        self.l_max = 1
 
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        self.map_quantum_numbers(False)
+
 
     def __repr__(self):
         string = ''
@@ -82,7 +121,6 @@ class Particle_Pair:
 
     @property
     def isotope(self):
-        'The name of the isotope'
         return self._isotope
     @isotope.setter
     def isotope(self, isotope):
@@ -90,7 +128,6 @@ class Particle_Pair:
 
     @property
     def resonance_ladder(self):
-        'The resonance ladder'
         return self._resonance_ladder
     @resonance_ladder.setter
     def resonance_ladder(self, resonance_ladder):
@@ -98,7 +135,6 @@ class Particle_Pair:
 
     @property
     def formalism(self):
-        'R-matrix approximation'
         return self._formalism
     @formalism.setter
     def formalism(self, formalism):
@@ -108,15 +144,14 @@ class Particle_Pair:
 
     @property
     def spin_groups(self):
-        'The recorded spingroups'
         return self._spin_groups
     @spin_groups.setter
     def spin_groups(self, spin_groups):
-        self._spin_groups = spin_groups
+        # self._spin_groups = spin_groups
+        raise AttributeError('Cannot set spin group attribute, it can only be modified through methods.')
 
     @property
     def ac(self):
-        'Channel radius'
         return self._ac
     @ac.setter
     def ac(self, ac):
@@ -124,7 +159,6 @@ class Particle_Pair:
 
     @property
     def target(self):
-        'The target particle'
         raise AttributeError('Cannot access target information. It can only be set.')
     @target.setter
     def target(self, target):
@@ -136,7 +170,6 @@ class Particle_Pair:
 
     @property
     def projectile(self):
-        'The target particle'
         raise AttributeError('Cannot access projectile information. It can only be set.')
     @projectile.setter
     def projectile(self, projectile):
@@ -147,7 +180,6 @@ class Particle_Pair:
 
     @property
     def M(self):
-        'Mass of the target isotope'
         return self._M
     @M.setter
     def M(self, M):
@@ -155,7 +187,6 @@ class Particle_Pair:
 
     @property
     def m(self):
-        'Mass of the projectile'
         return self._m
     @m.setter
     def m(self, m):
@@ -163,7 +194,6 @@ class Particle_Pair:
     
     @property
     def I(self):
-        'Target isotope intrinsic spin'
         return self._I
     @I.setter
     def I(self, I):
@@ -171,7 +201,6 @@ class Particle_Pair:
 
     @property
     def i(self):
-        'Projectile intrinsic spin'
         return self._i
     @i.setter
     def i(self, i):
@@ -179,33 +208,60 @@ class Particle_Pair:
 
     @property
     def l_max(self):
-        'Maximum angular momentum'
         return self._l_max
     @l_max.setter
     def l_max(self, l_max):
         self._l_max = l_max
 
     @property
-    def total_energy_range(self):
-        'Modelled energy range'
-        return self._total_energy_range
-    @total_energy_range.setter
-    def total_energy_range(self, total_energy_range):
-        self._total_energy_range = total_energy_range
+    def energy_range(self):
+        return self._energy_range
+    @energy_range.setter
+    def energy_range(self, energy_range):
+        self._energy_range = energy_range
 
 
+    def clear_spin_groups(self):
+        self._spin_groups = {}
 
+    def add_spin_group(self, 
+                       Jpi: Union[str, float], 
+                       J_ID: int,
+                       D: float, 
+                       gn2_avg: float,
+                       gn2_dof: int, 
+                       gg2_avg: float, 
+                       gg2_dof: int):
+        """
+        Adds a spin group particle pair instance.
 
-    def add_spin_group(self, Jpi, J_ID, D_avg, Gn_avg, Gn_dof, Gg_avg, Gg_dof, print=False):
-        res_par_avg = make_res_par_avg(J_ID,
-                                       D_avg,
-                                       Gn_avg,
-                                       Gn_dof,
-                                       Gg_avg,
-                                       Gg_dof,
-                                       print=False)
-        self.spin_groups[Jpi] = res_par_avg
-
+        Parameters
+        ----------
+        Jpi : str
+            Orbital angular momentum defining the spin group.
+        J_ID : str
+            Numeric ID for spin group, used in sammy.
+        D : float
+            Average level spacing.
+        gn2_avg : float
+            Average reduced neutron width in meV.
+        gn2_dof : int
+            Degrees of freedom in neutron width, corresponds to the contributing channels.
+        gg2_avg : float
+            Average reduced capture width in meV.
+        gg2_dof : int
+            Degrees of freedom in capture width, corresponds to the contributing channels.
+        """
+        Jpi = float(Jpi)
+        res_par_avg_dict = make_res_par_avg(Jpi, J_ID, D, gn2_avg, gn2_dof, gg2_avg, gg2_dof)
+        if Jpi in self.spin_groups.keys():
+            print(f"WARNING: Jpi of {Jpi} already in particle_pair, overwriting")
+        Jpi_map = [each for each in self.J if each[0]==Jpi]
+        if not Jpi_map:
+            raise ValueError("Adding spin group with Jpi that is not possible given particle pair and l-max.")
+        else:
+            Jpi_out, res_par_avg_dict['chs'], res_par_avg_dict['Ls'] = Jpi_map[0]
+        self.spin_groups[Jpi] = res_par_avg_dict
         return
 
 
@@ -219,19 +275,9 @@ class Particle_Pair:
 
         Parameters
         ----------
-        particle_pair : syndat object
-            Particle_pair object containing information about the reaction being studied.
         print_out : bool
             User option to print out quantum spin (J) mapping to console.
 
-        Returns
-        -------
-        Jn : array-like
-            List containing possible J, # of contibuting channels, and contibuting 
-            waveforms for negative parity. Formatted as (J,#chs,[l-wave, l-wave])
-        Jp : array-like
-            List containing possible J, # of contibuting channels, and contibuting 
-            waveforms for positive parity. Formatted as (J,#chs,[l-wave, l-wave])
         Notes
         -----
         
@@ -320,22 +366,20 @@ class Particle_Pair:
 
         return
 
+
+
     def sample_resonance_ladder(self,
                                 ensemble='NNE',
                                 rng=None, seed=None):
         """
-        Samples a full resonance ladder.
+        Generate a resonance ladder sample.
 
-        _extended_summary_
+        The sample uses the energy range, spin groups, and other physical information that has been added to particle_pair.
+        Width sampling is done on the reduced widths (gc2) for which average values were provided.
+        The returned resonance ladder also includes partial widths calculated at P(Eres) in line with the SAMMY format.
 
         Parameters
         ----------
-        Erange : array-like
-            _description_
-        spin_groups : list
-            List of tuples defining the spin groups being considered.
-        average_parameters : DataFrame
-            DataFrame containing the average resonance parameters for each spin group.
         ensemble : "NNE", "GOE", "GUE", "GSE", or "Poisson"
             The level-spacing distribution to sample from:
             NNE : Nearest Neighbor Ensemble
@@ -351,20 +395,50 @@ class Particle_Pair:
         Returns
         -------
         DataFrame
-            Resonance ladder information.
+            ATARI resonance ladder.
         """
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random  # uses np.random.seed
+                rng = np.random # uses np.random.seed
             else:
-                # generates rng from provided seed
-                rng = np.random.default_rng(seed)
+                rng = np.random.default_rng(seed) # generates rng from provided seed
 
-        resonance_ladder = sample_resonance_ladder(
-            self.total_energy_range, self.spin_groups, ensemble=ensemble, rng=rng)
+        resonance_ladders = []
+        for Jpi, Jinfo in self.spin_groups.items():
+
+            # sample resonance levels for each spin group with negative parity
+            [levels, level_spacing] = sample_RRR_levels(self.energy_range, Jinfo["<D>"], ensemble=ensemble, rng=rng)
+            N = len(levels)
+            # if no resonance levels sampled, dont try to sample widths
+            if N == 0:
+                continue
+            # sample reduced widths
+            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], rng=rng)
+            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)
+
+            # convert to partial widths with checks for multiple channels not-implemented error
+            if len(Jinfo["Ls"]) > 1:
+                raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
+            else:
+                L = Jinfo["Ls"][0]
+            _, P_array, _, _ = FofE_recursive(levels, self.ac, self.M, self.m, L)
+            Gg_samples = 2*gg2_samples
+            Gn1_samples = 2*P_array[0]*gn2_samples
+            zeros = np.zeros(len(levels)) #"varyE", "varyGg", "varyGn1", #zeros, zeros, zeros,
+            E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples,  [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],
+                                     index=['E', 'Gg', 'Gn1',  'J_ID', 'gg2', 'gn2', 'Jpi', 'L',])
+            # assert len(np.unique(j[2]))==1, "Code cannot consider different l-waves contributing to a spin group"
+            resonance_ladders.append(E_Gn_gnx2.T)
+
+        resonance_ladder = pd.concat(resonance_ladders)
+        resonance_ladder.reset_index(inplace=True, drop=True)
         self.resonance_ladder = resonance_ladder
+
         return resonance_ladder
+
+
+
 
     def get_sammy_spingroups(self):
         if len(self.spin_groups.keys()) == 2:

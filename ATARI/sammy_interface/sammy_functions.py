@@ -389,26 +389,31 @@ def create_sammyinp(filename='sammy.inp', \
     return
 
 def write_saminp(filepath, 
-                model,
+                particle_pair,
                 experimental_model,
                 rto,
                 alphanumeric = None,
-                use_IDC = False):
+                use_IDC = False,
+                use_ecscm_reaction = False):
     
     if alphanumeric is None:
         alphanumeric = []
+    if use_ecscm_reaction:
+        reaction = rto.ECSCM_rxn
+    else:
+        reaction = experimental_model.reaction
         
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
     
     if rto.bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
-        if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
+    if use_IDC:
+            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     
-    alphanumeric = [model.formalism, bayes_cmd] + alphanumeric
+    alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -424,20 +429,20 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{model.isotope: <9} {model.M: <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,5): <9} {np.round(float(min(experimental_model.energy_range)),3)-0.001: <9} {np.round(float(max(experimental_model.energy_range)),3)+0.001: <9}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(experimental_model.temp[0]):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
+                    f.write(f'  {np.round(float(experimental_model.temp[0]),4):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
                 else:
                     pass
 
-            elif line.startswith('%%%card7%%%'):
-                f.write(f'  {float(model.ac):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
+            elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
+                f.write(f'  {np.round(float(particle_pair.ac)*10, 7):<8}  {np.round(float(experimental_model.n[0]),6):<8}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
-                f.write(f'{experimental_model.reaction}\n')
+                f.write(f'{reaction}\n')
 
             else:
                 f.write(line)
@@ -478,7 +483,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
             if use_RPCM:
                 f.write("SAMMY.COV\n")
             if use_IDC:
-                f.write("sammy.IDC\n")
+                f.write("sammy.idc\n")
             f.write("\n")
 
         # energy windowed solves
@@ -511,17 +516,22 @@ echo "$chi2_string $chi2_stringn"
 
 
 
-def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions):
+def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
     runsammy_process = subprocess.run(
                                 ["sh", "-c", f"./pipe.sh"], 
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*10
                                 )
-    # if sammy_RTO.bayes:
-    chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
-    # else:
-        # chi2=None
-        # chi2n = None
+    if 'STOP' in runsammy_process.stderr:
+        raise ValueError(f"\n\n===========================\nSAMMY Failed with output:\n\n {runsammy_process.stdout}")
+    elif "SAMMY.LPT: No such file or directory" in runsammy_process.stderr:
+        raise ValueError(f"No SAMMY.LPT was generated, check executable path bash scripting.")
+    
+    if getchi2:
+        chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
+    else:
+        chi2=None
+        chi2n = None
 
     return chi2, chi2n
 
@@ -569,7 +579,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     runsammy_process = subprocess.run(
                                     [f"sh", "-c", f"{sammyRTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammyRTO.sammy_runDIR),
-                                    capture_output=True, timeout=60*2
+                                    capture_output=True, timeout=60*10
                                     )
 
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
@@ -610,10 +620,10 @@ def get_ECSCM(sammyRTO, sammyINP):
                  sammyINP.particle_pair, 
                  sammyINP.experiment, 
                  sammyRTO,
-                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"])
-    sammyRTO.bayes = False
+                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
+                 use_ecscm_reaction = True)
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
-    _, _ = runsammy_shellpipe(sammyRTO)
+    _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
 
     df, cov = read_ECSCM(os.path.join(sammyRTO.sammy_runDIR, "SAMCOV.PUB"))
 
@@ -655,11 +665,21 @@ def delta_chi2(lst_df):
     
 #     return recursive_sammy(pw_posterior, par_posterior, sammy_INP, sammy_RTO, itter + 1)
 
-
+def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
+    sammyINP.resonance_ladder = fill_sammy_ladder(sammyINP.resonance_ladder, sammyINP.particle_pair, False)
+    if sammyRTO.bayes:
+        if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
+            raise ValueError("Bayes is set to True but no varied parameters.")
+        if sammyINP.experimental_data is None:
+            if sammyINP.energy_grid is not None: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
+            else: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied")
 
 def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
     sammyINP.resonance_ladder = copy(sammyINP.resonance_ladder)
+    check_inputs(sammyINP, sammyRTO)
 
     #### setup 
     make_runDIR(sammyRTO.sammy_runDIR)
@@ -717,6 +737,8 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         sammy_OUT.par_post = par_df
         sammy_OUT.chi2_post = chi2
         sammy_OUT.chi2n_post = chi2n
+        sammy_OUT.chi2 = None
+        sammy_OUT.chi2n = None
 
         if sammyRTO.get_ECSCM:
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
@@ -828,6 +850,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
                 idc.append(False)
         else:
             write_estruct_file(d, os.path.join(rundir,f"{exp.title}.dat"))
+            idc.append(False)
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 
@@ -937,7 +960,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
-                            capture_output=True, timeout=60*5
+                            capture_output=True, timeout=60*10
                             )
 
     for i in range(1, iterations+1):
@@ -948,7 +971,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
 
         runsammy_bay0 = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*5
+                                    capture_output=True, timeout=60*10
                                     )
 
     # Move par file from final iteration 
@@ -968,6 +991,8 @@ def run_YWY0_and_get_chi2(rundir, step):
     i=i_ndats[0]; ndats=i_ndats[1:]
     i_chi2s = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-3].split()]
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
+    if len(chi2s) != 5:
+        _ =0
     return i, [c for c in chi2s]+[np.sum(chi2s), np.sum(chi2s)/np.sum(ndats)]
 
 
@@ -1005,6 +1030,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
+                        print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
 
                     while True:
                         fudge /= sammyINPyw.LevMarVd
@@ -1056,7 +1082,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
-                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*5
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*10
                         )
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []

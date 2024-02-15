@@ -169,8 +169,8 @@ class SpinSelect:
             # self.fit()
         
     def fit_multiple_models(self,
-                            models,
-                            possible_J_ID,
+                            models: list,
+                            possible_J_ID: list,
                             particle_pair,
                             datasets,
                             experiments,

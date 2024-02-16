@@ -124,32 +124,41 @@ class Syndat_Control:
                                                                      generate_pw_true_with_sammy)
                 pw_true_list.append(pw_true)
 
+            # ### first, approximate unknown data
+            # self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+            # self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+
 
             ### generate raw datasets from samples model parameters
+            gen_raw_data_list = []
             for syn_mod, pw_true in zip(self.syndat_models, pw_true_list):
-                syn_mod.generate_raw_observables(pw_true, true_parameters)
-
+                raw_data = syn_mod.generate_raw_observables(pw_true, 
+                                                            true_parameters)
+                gen_raw_data_list.append(raw_data)
 
             ### reduce raw data with reductive reduction model 
-                ### Perhaps I could sample correlated reductive parameters?
-            for syn_mod in self.syndat_models:
-                syn_mod.reduce_raw_observables()
-
+                # Perhaps I could sample correlated reductive parameters?
+            reduced_data_list, covariance_data_list, raw_data_list = [], [], []
+            for i, syn_mod in enumerate(self.syndat_models):
+                reduced_data, covariance_data, raw_data = syn_mod.reduce_raw_observables(gen_raw_data_list[i])
+                reduced_data_list.append(reduced_data)
+                covariance_data_list.append(covariance_data)
+                raw_data_list.append(raw_data)
 
             ### for each model, append syndat out
             # sample_dict = {}
-            for syn_mod in self.syndat_models:
+            for i, syn_mod in enumerate(self.syndat_models):
 
                 if syn_mod.options.save_raw_data:
                     out = syndatOUT(par_true=par_true,
-                                    pw_reduced=syn_mod.red_data, 
-                                    pw_raw=syn_mod.raw_data)
+                                    pw_reduced=reduced_data_list[i], 
+                                    pw_raw=raw_data_list[i])
                 else:
                     out = syndatOUT(par_true=par_true,
-                                    pw_reduced=syn_mod.red_data)
+                                    pw_reduced=reduced_data_list[i])
 
                 if syn_mod.options.calculate_covariance:
-                    out.covariance_data = syn_mod.covariance_data
+                    out.covariance_data = covariance_data_list[i]
                     
                 syn_mod.samples.append(out)
                 # sample_dict[syn_mod.title] = out

@@ -534,7 +534,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope:<9.8} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {np.round(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope:<9} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {np.round(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
@@ -681,7 +681,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     runsammy_process = subprocess.run(
                                     [f"sh", "-c", f"{sammyRTO.path_to_SAMMY_exe}<pipe.sh"], 
                                     cwd=os.path.realpath(sammyRTO.sammy_runDIR),
-                                    capture_output=True, timeout=60*2
+                                    capture_output=True, timeout=60*10
                                     )
 
     resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
@@ -772,6 +772,11 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
     if sammyRTO.bayes:
         if np.sum(sammyINP.resonance_ladder[["varyE", "varyGg", "varyGn1"]].values) == 0.0:
             raise ValueError("Bayes is set to True but no varied parameters.")
+        if sammyINP.experimental_data is None:
+            if sammyINP.energy_grid is not None: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
+            else: 
+                raise ValueError("Run Bayes is set to True but no experimental data was supplied")
 
 def run_sammy(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions):
 
@@ -834,6 +839,8 @@ def run_sammy(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions):
         sammy_OUT.par_post = par_df
         sammy_OUT.chi2_post = chi2
         sammy_OUT.chi2n_post = chi2n
+        sammy_OUT.chi2 = None
+        sammy_OUT.chi2n = None
 
         if sammyRTO.get_ECSCM:
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
@@ -1055,7 +1062,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
-                            capture_output=True, timeout=60*5
+                            capture_output=True, timeout=60*10
                             )
 
     for i in range(1, iterations+1):
@@ -1066,7 +1073,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
 
         runsammy_bay0 = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*5
+                                    capture_output=True, timeout=60*10
                                     )
 
     # Move par file from final iteration 
@@ -1177,7 +1184,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
-                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*5
+                cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*10
                         )
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []

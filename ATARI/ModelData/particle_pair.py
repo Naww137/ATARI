@@ -161,7 +161,7 @@ class Particle_Pair:
 
     @property
     def target(self):
-        raise AttributeError('Cannot access target information. It can only be set.')
+        return Particle(Z=0, A=int(round(self._M)), I=self._I, mass=self._M, name=self._isotope)
     @target.setter
     def target(self, target):
         if not isinstance(target, Particle):
@@ -172,7 +172,7 @@ class Particle_Pair:
 
     @property
     def projectile(self):
-        raise AttributeError('Cannot access projectile information. It can only be set.')
+        return Particle(Z=0, A=int(round(self._m)), I=self._i, mass=self._m, name='neutron?')
     @projectile.setter
     def projectile(self, projectile):
         if not isinstance(projectile, Particle):

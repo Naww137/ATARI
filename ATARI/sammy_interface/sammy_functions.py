@@ -534,18 +534,18 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {np.round(particle_pair.M,6): <9} {float(min(experimental_model.energy_range)): <9} {float(max(experimental_model.energy_range)): <9}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope:<9.8} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {np.round(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(experimental_model.temp[0]):<8}  {float(experimental_model.FP[0]):<8}  {float(experimental_model.FP[1]):<8}        \n')
+                    f.write(f'  {float(experimental_model.temp[0]):<8.7}  {float(experimental_model.FP[0]):<8.7}  {float(experimental_model.FP[1]):<8.7}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'):
                 ac = float(particle_pair.ac) * 10 #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {round(ac, 7):<8}  {float(experimental_model.n[0]):<8}                       0.00000          \n')
+                f.write(f'  {ac:<8.7}  {float(experimental_model.n[0]):<8.7}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
                 f.write(f'{reaction}\n')

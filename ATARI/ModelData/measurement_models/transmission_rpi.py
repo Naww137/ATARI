@@ -14,7 +14,7 @@ def transmission(cr,Cr, Bi, k,K, b0,B0, alpha):
     return (m1*cr - m2*k*Bi - b0) / (m3*Cr - m4*K*Bi - B0) 
 
 
-def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, calc_cov):
+def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, calc_cov, bkg_func):
         """
         Calculates the output covariance matrix of transmission from input uncertainties.
 
@@ -25,7 +25,7 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, c
         Parameters
         ----------
         tof : array-like
-            Array of time of flight values for each data point - corresponds to energy.
+            Array of time of flight values for each data point in microseconds.
         c : float
             Count rate for sample in.
         C : float
@@ -56,6 +56,8 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, c
             Covariance between a & b background function parameters.
         calc_cov : bool
             Option to calculate covariances, if false, only the diagonal of the covariance matrix will be calculated.
+        bkg_func : str
+            Background function to use, options are 'exp' or 'power'.
         
         Notes
         -----
@@ -79,14 +81,19 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, c
         
         # construct statistical covariance and jacobian
         dTi_dci = alpha[0]/D
-        dTi_dCi = N*alpha[2]/D**2
+        dTi_dCi = -N*alpha[2]/D**2
         diag_stat = (dc**2)*(dTi_dci**2) + (dC**2)*(dTi_dCi**2)
         
-        # systematic derivatives
-        # dTi_da = -1*(k*D+K*N)/(a*D**2)  
-        # dTi_db = (k*D+K*N)*Bi*tof/D**2 
-        dTi_da = -(k*alpha[1]*D+K*alpha[3]*N)*np.exp(-b*tof*1e-3) / (D**2)
-        dTi_db =  (k*alpha[1]*D-N*alpha[3]*K)*Bi*tof*1e-3 / (D**2)
+        # systematic derivatives dependent on background function
+        if bkg_func == 'exp':
+            dTi_da = (-k*alpha[1]*D+K*alpha[3]*N)*np.exp(-b*tof) / (D**2)
+            dTi_db =  (k*alpha[1]*D-N*alpha[3]*K)*Bi*tof / (D**2)
+        elif bkg_func == 'power':
+            dTi_da = (-k*alpha[1]*D + K*alpha[3]*N)*tof**(-b) / (D**2)
+            dTi_db = (k*alpha[1]*D - K*alpha[3]*N)*Bi*np.log(tof) / (D**2) 
+        else:
+            raise ValueError("Background function not regocnized")
+        # more systematic derivatives
         dTi_dk = -alpha[1]*Bi/D       
         dTi_dK = N*alpha[3]*Bi/D**2
         dTi_db0 = -1/D
@@ -118,7 +125,7 @@ def get_covT(tof, c,C, dc,dC, a,b, k,K, Bi, b0,B0, alpha, sys_unc_inp, ab_cov, c
         return [diag_stat, diag_sys, Jac_sys, Cov_sys]
 
     
-def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov):
+def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov, bkg_func):
     """
     Reduces raw count data to transmission data with propagated uncertainty.
 
@@ -130,7 +137,7 @@ def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0,
     Parameters
     ----------
     tof : array-like
-        Array of time of flight values for each data point - corresponds to energy.
+        Array of time of flight values for each data point in microseconds.
     c : float
         Count rate for sample in.
     C : float
@@ -184,8 +191,9 @@ def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0,
 
     # calculate transmission
     Tn = transmission(cr,Cr, Bi, k,K, b0,B0, alpha)
+
     # propagate uncertainty to transmission
-    unc_data = get_covT(tof, cr,Cr, dcr,dCr, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov)
+    unc_data = get_covT(tof, cr,Cr, dcr,dCr, a,b, k,K, Bi, b0,B0, alpha, sys_unc, ab_cov, calc_cov, bkg_func)
     
     return Tn, unc_data, rates
 
@@ -319,12 +327,19 @@ class transmission_rpi_parameters:
         
         self.open_neutron_spectrum = None
 
+        self._bkg_func = 'exp'
+        
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    # @property
-    # def model_parameter_dict(self) -> dict:
-    #     return self.__dict__
+    @property
+    def bkg_func(self) -> str:
+        return self._bkg_func
+    @bkg_func.setter
+    def bkg_func(self, bkg_func):
+        if bkg_func not in ['exp', 'power']:
+            raise ValueError("background function set on bkg_func not recognized")
+        self._bkg_func = bkg_func
 
     def sample_parameters(self, true_model_parameters: dict):
         sampled_params = {}
@@ -387,10 +402,6 @@ class Transmission_RPI:
     def model_parameters(self, model_parameters):
         self._model_parameters = model_parameters
 
-    # @property
-    # def neutron_spectrum_triggers(self) -> int:
-    #     return self.model_parameters.trigo[0]
-
     @property
     def covariance_data(self) -> dict:
         return self._covariance_data
@@ -418,10 +429,6 @@ class Transmission_RPI:
                                                                     self.model_parameters.trigo[0])
             
             self.model_parameters.open_neutron_spectrum = open_neutron_spectrum
-        # else:
-        #     if 'tof' not in self.model_parameters.open_neutron_spectrum:
-        #         self.model_parameters.open_neutron_spectrum["tof"] = e_to_t(self.model_parameters.open_neutron_spectrum.E, exp_model.FP[0], True)*1e9
-        #     # self.model_parameters.open_neutron_spectrum = neutron_spectrum
 
 
         
@@ -439,31 +446,28 @@ class Transmission_RPI:
             raise ValueError(
                 "neutron spectrum and sample data are not of the same length, check energy domain")
         
-        # true_parameter_dict = sample_true_underlying_parameters(vars(self.model_parameters), options.sampleTURP)
-        # true_model_parameters = transmission_rpi_parameters(**true_parameter_dict)
-
+        # gather monitor array
         monitor_array = [true_model_parameters.m1[0], true_model_parameters.m2[0], true_model_parameters.m3[0], true_model_parameters.m4[0]]
-        true_Bi = neutron_background_function(true_model_parameters.open_neutron_spectrum.tof*1e-3, true_model_parameters.a_b[0][0], true_model_parameters.a_b[0][1])
+        
+        # calculate background - uses time-of-flight in microseconds
+        true_Bi = neutron_background_function(true_model_parameters.open_neutron_spectrum.tof*1e-3, 
+                                              true_model_parameters.a_b[0][0], 
+                                              true_model_parameters.a_b[0][1],
+                                              self.model_parameters.bkg_func)
 
         sample_data, open_data = inverse_reduction(copy(pw_true) ,
-                                             true_model_parameters.open_neutron_spectrum ,
-                                             options.sample_counting_noise ,
-                                             options.sampleTMP ,
-                                             true_model_parameters.trigo[0],
-                                             true_model_parameters.trigs[0],
-                                             true_model_parameters.ks[0],
-                                             true_model_parameters.ko[0],
-                                             true_Bi,
-                                             true_model_parameters.b0s[0],
-                                             true_model_parameters.b0o[0],
-                                             monitor_array, true_model_parameters.m1[1])
+                                                    true_model_parameters.open_neutron_spectrum ,
+                                                    options.sample_counting_noise ,
+                                                    options.sampleTMP ,
+                                                    true_model_parameters.trigo[0],
+                                                    true_model_parameters.trigs[0],
+                                                    true_model_parameters.ks[0],
+                                                    true_model_parameters.ko[0],
+                                                    true_Bi,
+                                                    true_model_parameters.b0s[0],
+                                                    true_model_parameters.b0o[0],
+                                                    monitor_array, true_model_parameters.m1[1])
         
-        # open_data.rename(columns={"c":"cto", "dc":"dcto","cps":"c", "dcps":"dc"}, inplace=True)
-        # open_data = open_data.round({'E':6})
-        # sample_data = sample_data.round({'E':6})
-        # pw_raw = open_data.merge(sample_data, how='left', on=['tof','E'])
-        # pw_raw["bkg_true"] = 
-
         raw_data = copy(sample_data)
 
         raw_data['bs_true'] = true_model_parameters.m2[0]*true_Bi*true_model_parameters.ks[0] + true_model_parameters.b0s[0]
@@ -502,18 +506,20 @@ class Transmission_RPI:
         trans['E'] = raw_data.E
         trans['true'] = raw_data.true
 
-        # estimated background function
-        Bi = neutron_background_function(self.model_parameters.open_neutron_spectrum.tof*1e-3, self.model_parameters.a_b[0][0], self.model_parameters.a_b[0][1])
+        # calculate estimated background function - tof in microseconds
+        Bi = neutron_background_function(self.model_parameters.open_neutron_spectrum.tof*1e-3, 
+                                         self.model_parameters.a_b[0][0], 
+                                         self.model_parameters.a_b[0][1], 
+                                         self.model_parameters.bkg_func)
         raw_data['bs'] = self.model_parameters.m2[0]*Bi*self.model_parameters.ks[0] + self.model_parameters.b0s[0]
         raw_data['bo'] = self.model_parameters.m4[0]*Bi*self.model_parameters.ko[0] + self.model_parameters.b0o[0]
 
         # define systematic uncertainties
-        # sys_unc = self.redpar.unc[['a','b','ks','ko','b0s','b0o','m1','m2','m3','m4']].astype(float)
         sys_unc = [getattr(self.model_parameters, attr)[1]for attr in ['ks', 'ko', 'b0s', 'b0o', 'm1', 'm2', 'm3', 'm4']]
 
-        # monitor_array = [self.redpar.val.m1, self.redpar.val.m2, self.redpar.val.m3, self.redpar.val.m4]
+        # gather monitor array and reduce data - again tof should be in microseconds
         monitor_array = [self.model_parameters.m1[0], self.model_parameters.m2[0], self.model_parameters.m3[0], self.model_parameters.m4[0]]
-        trans.loc[:,'exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof.values,
+        trans.loc[:,'exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof.values*1e-3,
                                                               raw_data.cts.values, 
                                                               self.model_parameters.open_neutron_spectrum.ct.values,
                                                               raw_data.dcts.values, 
@@ -531,7 +537,8 @@ class Transmission_RPI:
                                                               monitor_array,
                                                               sys_unc,
                                                               self.model_parameters.a_b[1],
-                                                              options.calculate_covariance)
+                                                              options.calculate_covariance,
+                                                              self.model_parameters.bkg_func)
 
         diag_stat, diag_sys, Jac_sys, Cov_sys = unc_data
 

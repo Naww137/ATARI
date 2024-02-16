@@ -52,7 +52,7 @@ def cts_to_ctr(cts, d_cts, bw, trig):
     d_cts : array-like
         Array of uncertainty on each count data point corresponting to each tof bin.
     bw : array-like
-        Array of tof bin widths.
+        Array of tof bin widths (seconds).
     trig : float or int
         Number of linac pulses.
         
@@ -105,8 +105,15 @@ def sample_true_underlying_parameters(parameter_dict, bool):
 
     return true_parameter_dict
 
+def neutron_background_function(tof,a,b,bkg_func):
+    if bkg_func == "exp":
+        return bkg_func_exp(tof,a,b)
+    elif bkg_func == "power":
+        return bkg_func_power(tof,a,b)
+    else:
+        raise ValueError("bkg_func not regocnized")
 
-def neutron_background_function(tof,a,b):
+def bkg_func_exp(tof,a,b):
     """
     Exponential neutron backgroun function
 
@@ -127,6 +134,28 @@ def neutron_background_function(tof,a,b):
         _description_
     """
     return a*np.exp(tof*-b)
+
+def bkg_func_power(tof,a,b):
+    """
+    Power law neutron background function
+
+    .. math:: bkg = a*tof^(-b)
+
+    Parameters
+    ----------
+    tof : array-like
+        time-of-flight in micro-seconds (us)
+    a : float
+        parameter
+    b : float
+        parameter
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    return a*(tof)**(-b)
 
 
 def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo):

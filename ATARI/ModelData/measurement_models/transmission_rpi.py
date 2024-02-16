@@ -350,7 +350,7 @@ class transmission_rpi_parameters:
             else:
                 if isinstance(param_values, tuple) and len(param_values) == 2:
                     mean, uncertainty = param_values
-                    if uncertainty == 0:
+                    if np.all(np.array(uncertainty) == 0):
                         sample = mean
                     else:
                         if param_name == 'a_b':

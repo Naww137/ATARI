@@ -76,6 +76,7 @@ for case_id in bad_cases_ids:
                         iterations=2,
                         max_steps = 30,
                         LevMarV0=0.05,
+                        batch_fitpar = True,
                         fit_all_spin_groups=False,
                         spin_group_keys = ['3.0'],
                         step_threshold=0.001,
@@ -132,45 +133,45 @@ for case_id in bad_cases_ids:
 
     true_out = sammy_functions.run_sammy_YW(sammyINPyw, sammy_rto_fit)
 
-    # vary1 = np.tile([0,0,1,1], int(len(outs.sammy_outs_fit_2[-1].par_post)/4))
-    # vary2 = np.tile([1,1,0,0], int(len(outs.sammy_outs_fit_2[-1].par_post)/4))
-    pattern1= [0,1]
-    vary1 = np.tile(pattern1, (len(outs.sammy_outs_fit_2[-1].par_post) // len(pattern1)) + 1)[:len(outs.sammy_outs_fit_2[-1].par_post)]
-    pattern2= [1,0]
-    vary2 = np.tile(pattern2, (len(outs.sammy_outs_fit_2[-1].par_post) // len(pattern2)) + 1)[:len(outs.sammy_outs_fit_2[-1].par_post)]
+    # # vary1 = np.tile([0,0,1,1], int(len(outs.sammy_outs_fit_2[-1].par_post)/4))
+    # # vary2 = np.tile([1,1,0,0], int(len(outs.sammy_outs_fit_2[-1].par_post)/4))
+    # pattern1= [0,1]
+    # vary1 = np.tile(pattern1, (len(outs.sammy_outs_fit_2[-1].par_post) // len(pattern1)) + 1)[:len(outs.sammy_outs_fit_2[-1].par_post)]
+    # pattern2= [1,0]
+    # vary2 = np.tile(pattern2, (len(outs.sammy_outs_fit_2[-1].par_post) // len(pattern2)) + 1)[:len(outs.sammy_outs_fit_2[-1].par_post)]
 
-    chi2_per_ndat = np.sum(outs.sammy_outs_fit_2[-1].chi2_post) / np.sum([len(each) for each in outs.sammy_outs_fit_2[-1].pw_post])
-    parameters = deepcopy(outs.sammy_outs_fit_2[-1].par_post)
-    tracker = 1
-    while chi2_per_ndat > np.sum(true_out.chi2_post)/np.sum([len(each) for each in true_out.pw_post]):
+    # chi2_per_ndat = np.sum(outs.sammy_outs_fit_2[-1].chi2_post) / np.sum([len(each) for each in outs.sammy_outs_fit_2[-1].pw_post])
+    # parameters = deepcopy(outs.sammy_outs_fit_2[-1].par_post)
+    # tracker = 1
+    # while chi2_per_ndat > np.sum(true_out.chi2_post)/np.sum([len(each) for each in true_out.pw_post]):
 
-        # if tracker % 2 == 0:
-        parameters['varyE'] = vary1
-        parameters['varyGg'] = vary1
-        parameters['varyGn1'] = vary1
-        print("vary1")
-        # else:
-        sammyINPyw.resonance_ladder = parameters
-        sammyout = sammy_functions.run_sammy_YW(sammyINPyw, sammy_rto_fit)
-        chi2_per_ndat = np.sum(sammyout.chi2_post)/np.sum([len(each) for each in sammyout.pw_post])
-        parameters = sammyout.par_post
+    #     # if tracker % 2 == 0:
+    #     parameters['varyE'] = vary1
+    #     parameters['varyGg'] = vary1
+    #     parameters['varyGn1'] = vary1
+    #     print("vary1")
+    #     # else:
+    #     sammyINPyw.resonance_ladder = parameters
+    #     sammyout = sammy_functions.run_sammy_YW(sammyINPyw, sammy_rto_fit)
+    #     chi2_per_ndat = np.sum(sammyout.chi2_post)/np.sum([len(each) for each in sammyout.pw_post])
+    #     parameters = sammyout.par_post
 
 
-        parameters['varyE'] = vary2
-        parameters['varyGg'] = vary2
-        parameters['varyGn1'] = vary2
-        print("vary2")
-        sammyINPyw.resonance_ladder = parameters
-        sammyout = sammy_functions.run_sammy_YW(sammyINPyw, sammy_rto_fit)
-        chi2_per_ndat = np.sum(sammyout.chi2_post)/np.sum([len(each) for each in sammyout.pw_post])
-        parameters = sammyout.par_post
+    #     parameters['varyE'] = vary2
+    #     parameters['varyGg'] = vary2
+    #     parameters['varyGn1'] = vary2
+    #     print("vary2")
+    #     sammyINPyw.resonance_ladder = parameters
+    #     sammyout = sammy_functions.run_sammy_YW(sammyINPyw, sammy_rto_fit)
+    #     chi2_per_ndat = np.sum(sammyout.chi2_post)/np.sum([len(each) for each in sammyout.pw_post])
+    #     parameters = sammyout.par_post
 
-        tracker += 1
-        if tracker > 10:
-            break
-        if chi2_per_ndat >= chi2_per_ndat_next:
-            break
-        chi2_per_ndat_next = chi2_per_ndat
+    #     tracker += 1
+    #     if tracker > 10:
+    #         break
+    #     if chi2_per_ndat >= chi2_per_ndat_next:
+    #         break
+    #     chi2_per_ndat_next = chi2_per_ndat
         
 
     import pickle
@@ -180,5 +181,9 @@ for case_id in bad_cases_ids:
     # filehandler = open(f"/Users/noahwalton/Documents/GitHub/ATARI/examples/Ta181_Analysis/true_{case_id}.pkl", 'wb')
     # pickle.dump(true_out, filehandler)
     # filehandler.close()
-    filehandler = open(f"/Users/noahwalton/Documents/GitHub/ATARI/examples/Ta181_Analysis/after_01_{case_id}.pkl", 'wb')
-    pickle.dump(sammyout, filehandler)
+    # filehandler = open(f"/Users/noahwalton/Documents/GitHub/ATARI/examples/Ta181_Analysis/after_01_{case_id}.pkl", 'wb')
+    # pickle.dump(sammyout, filehandler)
+    # filehandler.close()
+    filehandler = open(f"/Users/noahwalton/Documents/GitHub/ATARI/examples/Ta181_Analysis/initialFB_{case_id}_50p_inLM.pkl","wb")
+    pickle.dump(outs, filehandler)
+    filehandler.close()

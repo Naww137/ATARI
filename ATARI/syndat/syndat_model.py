@@ -184,7 +184,6 @@ class Syndat_Model:
                 par_true = particle_pair.resonance_ladder
         self.pw_true_list = pw_true
 
-        # samples = []
         for i in range(num_samples):
             
             ### sample resonance ladder

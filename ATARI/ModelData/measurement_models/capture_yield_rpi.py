@@ -61,11 +61,13 @@ def reduce_raw_count_data(raw_data, model_parameters):
                                +np.power(np.multiply(partial_Y_flux   , relative_flux_rate_uncertainty),2)
                                +np.power(partial_Y_fn*model_parameters.fn[1]        ,2))
     
+    # if calc_cov:
+        # do covariance stuff
+    
     # diag_stat = None
     # diag_sys = None
     # data =[diag_stat, diag_sys, Jac_sys, Cov_sys]
-    if np.any(Yield==0):
-        pass
+    
 
     return Yield, Yield_uncertainty
 

@@ -119,10 +119,12 @@ class Syndat_Control:
             ### generate true experimental objects with sammy or just take pw_true arguement
             pw_true_list = []
             for i, syn_mod in enumerate(self.syndat_models):
+                if self.pw_true_list is None: pwtruelist = None
+                else: pwtruelist = self.pw_true_list[i]
                 pw_true = syn_mod.generate_true_experimental_objects(self.particle_pair, 
                                                                      sammyRTO, 
                                                                      generate_pw_true_with_sammy,
-                                                                     self.pw_true_list[i])
+                                                                     pwtruelist)
                 pw_true_list.append(pw_true)
 
 

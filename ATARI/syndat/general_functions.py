@@ -109,35 +109,58 @@ def sample_true_underlying_parameters(parameter_dict, bool):
 def neutron_background_function(tof,a,b):
     return a*np.exp(tof*-b)
 
-def gamma_background_function():
-    return
+
+def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo):
+    # background_spectrum_bg= pd.DataFrame({'c'    :   np.ones(len(exp_model.energy_grid))*25,
+    #                                  'dc'   :   np.ones(len(exp_model.energy_grid))*np.sqrt(25)})
+
+    # calculate a tof count rate spectra, convert to counts 
+    tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
+    cps_open_approx = np.ones(len(energy_grid))*25
+    bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
+    cts_open_approx = cps_open_approx * bin_width * trigo
+
+    # add noise
+    if smooth:
+        cts_open_measured = cts_open_approx
+    else:
+        cts_open_measured = pois_noise(cts_open_approx)
+
+    dataframe = pd.DataFrame({'tof'    :   tof,
+                                'bw'    :   bin_width,
+                                'c'     :   cts_open_measured,
+                                'dc'    :   np.sqrt(cts_open_measured)})
+
+    dataframe['E'] = t_to_e((dataframe.tof-t0)*1e-9, FP, True) 
+
+    return dataframe
 
 
 def approximate_neutron_spectrum_Li6det(energy_grid, smooth, FP, t0, trigo):
 
-        def open_count_rate(tof):
-            return (2212.70180199 * np.exp(-3365.55134779*tof*1e-6) + 23.88486286) 
+    def open_count_rate(tof):
+        return (2212.70180199 * np.exp(-3365.55134779*tof*1e-9) + 23.88486286) 
 
-        # calculate a tof count rate spectra, convert to counts 
-        tof = e_to_t(energy_grid, FP, True)*1e6 + t0 
-        cps_open_approx = open_count_rate(tof)
-        bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-6)
-        cts_open_approx = cps_open_approx * bin_width * trigo
+    # calculate a tof count rate spectra, convert to counts 
+    tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
+    cps_open_approx = open_count_rate(tof)
+    bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
+    cts_open_approx = cps_open_approx * bin_width * trigo
 
-        # add noise
-        if smooth:
-            cts_open_measured = cts_open_approx
-        else:
-            cts_open_measured = pois_noise(cts_open_approx)
+    # add noise
+    if smooth:
+        cts_open_measured = cts_open_approx
+    else:
+        cts_open_measured = pois_noise(cts_open_approx)
 
-        open_dataframe = pd.DataFrame({'tof'    :   tof,
-                                        'bw'    :   bin_width,
-                                        'c'     :   cts_open_measured,
-                                        'dc'    :   np.sqrt(cts_open_measured)})
+    open_dataframe = pd.DataFrame({'tof'    :   tof,
+                                    'bw'    :   bin_width,
+                                    'c'     :   cts_open_measured,
+                                    'dc'    :   np.sqrt(cts_open_measured)})
 
-        open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-6, FP, True) 
+    open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-9, FP, True) 
 
-        return open_dataframe
+    return open_dataframe
 
 
 

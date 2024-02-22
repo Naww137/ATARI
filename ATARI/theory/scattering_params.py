@@ -62,7 +62,7 @@ def k_wavenumber(E, M, m):
     constant = (np.sqrt(2*mn_eV)/c/hbar)*(1e-14) # 0.002197 #sqrt(2Mn)/hbar 
 
     k = (M/(M+m))*constant*np.sqrt(E)
-    return k
+    return k # 1/√barns 
     
 
 def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
@@ -78,7 +78,7 @@ def FofE_recursive(E, ac, M, m, orbital_angular_momentum):
         E : numpy.ndarray
             Energy of the incident neutron.
         ac : float
-            Scattering channel radius in meters.
+            Scattering channel radius in √barns or 1e-12 cm.
         M : float or int
             Mass of the target nucleus.
         m : float or int
@@ -149,7 +149,7 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     E : float or numpy.ndarray
         Energy of the incident neutron.
     ac : float
-        Scattering channel radius in meters.
+        Scattering channel radius in √barns or 1e-12 cm.
     M : float or int
             Mass of the target nucleus.
     m : float or int
@@ -172,7 +172,7 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     
     """
     
-    assert(orbital_angular_momentum == 0, "Phase shift function in syndat.scattering theory needs to be updated for higher-order waveforms")
+    assert(orbital_angular_momentum == 0)# "Phase shift function in syndat.scattering theory needs to be updated for higher-order waveforms"
 
     k = k_wavenumber(E, M, m)
     rho = k*ac
@@ -181,17 +181,17 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     if orbital_angular_momentum == 0:
         P = rho
         S = np.zeros(len(E))
-    if orbital_angular_momentum == 1:
+    elif orbital_angular_momentum == 1:
         P = rho**3/(1+rho**2)
         S = -1/(1+rho**2)
-    if orbital_angular_momentum == 2:
+    elif orbital_angular_momentum == 2:
         P = rho**5/(9+3*rho**2+rho**4)
         S = -(18+3*rho**2)/(9+3*rho**2+rho**4)
-    if orbital_angular_momentum == 3:
+    elif orbital_angular_momentum == 3:
         P = rho**7/(255+45*rho**2+6*rho**4+rho**6)
         S = -(675+90*rho**2+6*rho**4)/(225+45*rho**2+6*rho**4+rho**6)
 
-    if orbital_angular_momentum > 3:
+    else:
         raise ValueError("PS_explicit cannot handle orbital_angular_momenta > 3, use PS_recursive")
         
     return S, P, phi, k

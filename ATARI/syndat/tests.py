@@ -87,7 +87,7 @@ def noise_distribution_test2(syn, df_true, print_out=False, ipert=5000):
     syn.options.explicit_covariance = True
     syn.options.calculate_covariance = True
 
-    syn.sample(pw_true=df_true, num_samples=ipert)
+    syn.sample(pw_true_list=df_true, num_samples=ipert)
     if 'CovT' in syn.samples[0].covariance_data.keys():
         covkey = 'CovT'
     elif 'CovY' in syn.samples[0].covariance_data.keys():

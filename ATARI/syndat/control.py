@@ -44,8 +44,8 @@ class Syndat_Control:
     def __init__(self, 
                  particle_pair: Particle_Pair,
                  syndat_models: list[Syndat_Model],
-                 model_correlations, 
-                 options: syndatOPT
+                 model_correlations: dict = {}, 
+                 options: syndatOPT = syndatOPT()
                  ):
         
         ### user supplied options
@@ -66,6 +66,9 @@ class Syndat_Control:
     # def clear_samples(self):
     #     self.samples = []  
     
+    # def clear_samples(self):
+    #     for syn_mod in self.sy
+    #     return
     
     def get_sample(self,i):
         data = {}

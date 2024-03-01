@@ -121,8 +121,12 @@ def separate_external_resonance_ladder(resonance_ladder, external_resonance_indi
 
 
 def concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder):
-    resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
-    external_resonance_indices = list(range(len(external_resonance_ladder)))
+    if external_resonance_ladder.empty:
+        resonance_ladder = internal_resonance_ladder
+        external_resonance_indices = []
+    else:
+        resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
+        external_resonance_indices = list(range(len(external_resonance_ladder)))
     return resonance_ladder, external_resonance_indices
     
 

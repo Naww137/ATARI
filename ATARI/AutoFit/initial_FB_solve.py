@@ -68,6 +68,7 @@ class InitialFBOPT:
         self._LevMarV = 1.5
         self._LevMarVd = 5
         self._LevMarV0 = 0.05
+        self._batch_fitpar = False
 
         self._fit_Gg = True
         self._fit_all_spin_groups = True
@@ -171,6 +172,13 @@ class InitialFBOPT:
     @LevMarV0.setter
     def LevMarV0(self, LevMarV0):
         self._LevMarV0 = LevMarV0
+
+    @property
+    def batch_fitpar(self):
+        return self._batch_fitpar
+    @batch_fitpar.setter
+    def batch_fitpar(self, batch_fitpar):
+        self._batch_fitpar = batch_fitpar
 
 
     @property
@@ -339,6 +347,7 @@ class InitialFB:
             LevMar = self.options.LevMar,
             LevMarV = self.options.LevMarV,
             LevMarVd = self.options.LevMarVd,
+            batch_fitpar = self.options.batch_fitpar,
             minF = 1e-5,
             maxF = 2.0,
             initial_parameter_uncertainty = self.options.LevMarV0,

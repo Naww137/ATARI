@@ -1,5 +1,5 @@
 ENDF
-ENDF      180.948030  0.00001 3997.0000     0    0 0  0 0  0         0
+ENDF      180.948434  0.00001 2400.0000     0    0 0  0 0  0         0
 PRINT ALL INPUT PARAMETERS
 DO NOT SOLVE BAYES EQUATIONS
 DEBUG
@@ -9,7 +9,7 @@ MLBW FORMALISM IS WANTED
 PUT QUANTUM NUMBERS INTO PARAMETER FILE
  
 000.                                        0.0000                    
-  7.650000  0.000000                       0.00000          
+  7.800000  0.000000                       0.00000          
 REACTION                                                                      
   1      1    0  3.0       1.0  3.5
     1    1    0    0       3.0

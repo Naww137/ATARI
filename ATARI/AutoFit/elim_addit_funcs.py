@@ -1582,15 +1582,21 @@ def calc_all_SSE_gen_XS_plot(
         #ioff()
         figure = plt.figure(figsize = fig_size)
         
-        # # Total
-        plt.plot(df_est.E, df_est.xs_transmission, label=f'Fit result (N={len(est_ladder)})', color = 'b', alpha=1.0, linewidth=1.0)
-        plt.plot(df_theo.E, df_theo. xs_transmission, label=f'Theo (N={len(theo_ladder)})', color = 'r', alpha=1.0, linewidth=1.0)
+        # # # Total
+        plt.plot(df_est.E, df_est.xs_transmission, label=f'Fit (N={len(est_ladder)})', color = 'b', alpha=1.0, linewidth=1.0)
+        plt.plot(df_theo.E, df_theo. xs_transmission, label=f'"True" (N={len(theo_ladder)})', color = 'r', alpha=1.0, linewidth=1.0)
+        # plt.plot(df_est.E, df_est.xs_transmission, label=f'Fit', color = 'b', alpha=1.0, linewidth=1.0)
+        # plt.plot(df_theo.E, df_theo. xs_transmission, label=f'"True"', color = 'r', alpha=1.0, linewidth=1.0)
         
         # just fill in area between two xs
         plt.fill_between(df_est.E, df_est.xs_transmission, df_theo.xs_transmission, 
                     color='darkorange', alpha=0.5, 
                     label=' $SSE_{W}$ = '+ str(np.round(SSE_dict['SSE_sum_normalized_casewise'][0], 2))
                     )
+        
+        # plt.fill_between(df_est.E, df_est.xs_transmission, df_theo.xs_transmission, 
+        #             color='darkorange', alpha=0.5, 
+        #             label='Error')
         
         # Add vertical dashed lines for each E value in ladder_df
         for energy in est_ladder.E:

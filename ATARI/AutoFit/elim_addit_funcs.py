@@ -315,7 +315,6 @@ def calc_LL_by_ladder(ladder_df: pd.DataFrame,
 
 
 # calculation of AIC & all parameters of current solution
-
 def characterize_sol(Ta_pair: Particle_Pair,
                      datasets: list,
                      experiments: list,
@@ -440,6 +439,197 @@ def characterize_sol(Ta_pair: Particle_Pair,
     output_dict['N_res_joint_LL'] = joint_LL
 
     return output_dict
+
+
+
+# function to calc chi2 - using ladder
+
+from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOptions, SammyOutputData
+from ATARI.sammy_interface import sammy_functions
+def run_sammy_wo_Bayes(rto, 
+                       ladder_df,
+                       Ta_pair,
+                       
+                       datasets,
+                       experiments,
+                       exp_covariance
+                       ):
+
+    #print(ladder_df) 
+
+    eval_sammyINPyw = SammyInputDataYW(
+        particle_pair = Ta_pair,
+        resonance_ladder = ladder_df,
+        datasets = datasets,
+        experiments = experiments,
+        experimental_covariance = exp_covariance,
+        
+        max_steps = 30,
+        iterations = 2,
+        step_threshold = 0.01,
+        autoelim_threshold = None,
+
+        LS = False,
+        LevMar = True,
+        LevMarV = 2,
+        LevMarVd= 5,
+        initial_parameter_uncertainty = 0.1
+    )
+
+    sammy_OUT = sammy_functions.run_sammy_YW(sammyINPyw = eval_sammyINPyw, 
+                                                sammyRTO = rto)
+    
+    return sammy_OUT
+
+
+def characterize_ladder(
+        Ta_pair: Particle_Pair,
+        datasets: list,
+        experiments: list,
+        covariance_data: list,
+        
+        sol_ladder: pd.DataFrame, #SammyOutputData, # ! chi2 is calculated inside?
+
+        energy_grid_2_compare_on: np.array = np.array([]),
+        printout: bool  = True,
+        settings: dict = {}
+        ):
+    
+    output_dict = {}
+
+    eval_rto = SammyRunTimeOptions(
+        sammyexe = settings['path_to_SAMMY_exe'],
+        options = {"Print"   :   True,
+                    "bayes"   :   False,
+                    "keep_runDIR"     : False,
+                    "sammy_runDIR": generate_sammy_rundir_uniq_name(path_to_sammy_temps = settings['path_to_SAMMY_temps'])
+                    }
+    )
+
+    ladder_SO = run_sammy_wo_Bayes(rto = eval_rto,
+                       ladder_df = sol_ladder,
+                       Ta_pair = Ta_pair,
+                       
+                       datasets = datasets,
+                       experiments = experiments,
+                       exp_covariance = covariance_data
+                       )
+    
+    if (printout):
+        print(ladder_SO.chi2)
+        print(ladder_SO.chi2_post)
+
+    # for each datasets if they are separate
+    aic = []
+    aicc = []
+    all_chi2 = []
+
+    bic = []
+    bicc = []
+
+
+    # for e-range and characterization
+    e_range = [np.inf, 0]
+    e_range[0] = np.min(energy_grid_2_compare_on)
+    e_range[1] = np.max(energy_grid_2_compare_on)
+
+    if (printout):
+        print(f'Energy grid for analysis: {e_range}')
+
+
+    # evaluating solution to get chi2 value using sammy run - to get fits also for given experiments
+        
+
+    # # chi2 & AIC calculation based on the datasets & fits
+    # for index, ds in enumerate(datasets):
+    #     #check data type
+    #     exp = experiments[index]
+
+    #     if exp.reaction == "transmission":
+    #         model_key = "theo_trans"
+    #     elif exp.reaction == "capture":
+    #         model_key = "theo_xs"
+    #     else:
+    #         raise ValueError()
+
+    #     aic_wls, aicc_wls, bic_wls, bicc_wls, chi2, chi2_n = calc_AIC_AICc_BIC_BICc_by_fit(
+    #         data = ds.exp, 
+    #         data_unc = ds.exp_unc,
+    #         fit = sol.pw_post[index][model_key],
+    #         ladder_df = sol.par_post,
+    #         precalc_chi2 = sol.chi2_post[index])
+        
+    #     # note, if the data about cov is present - take chi2 values from sol (SammyOutputData) object
+    #     if (len(covariance_data)>0):
+    #         print('Using cov data for chi2 calc')
+    #         chi2 = sol.chi2_post[index]
+    #         chi2_n = sol.chi2n_post[index]
+
+    #     else:
+    #         print('for chi2 calc using diag unc only')
+        
+    #     # Aggregate data for each dataset
+    #     aggregated_exp_data.extend(ds.exp)
+    #     aggregated_exp_unc.extend(ds.exp_unc)
+        
+
+    #     aic.append(aic_wls)
+    #     aicc.append(aicc_wls)
+        
+    #     all_chi2.append(chi2)
+
+    #     bic.append(bic_wls)
+    #     bicc.append(bicc_wls)
+
+    # # for each dataset - separately - wrong!
+    # output_dict['aic'] = aic
+    # output_dict['aicc'] = aicc
+    # output_dict['bic'] = bic
+    # output_dict['bicc'] = bicc
+    # output_dict['chi2'] = all_chi2
+
+    # output_dict['chi2_stat'] = np.sum(all_chi2) / ( len(aggregated_exp_data) - len(sol.par_post) * 3)
+    # output_dict['chi2_stat_ndat'] = np.sum(all_chi2) / ( len(aggregated_exp_data))
+    
+
+    # # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
+    # if(len(covariance_data)>0 and (len(sol.chi2_post)>0)):
+
+    #     #chi2 for all datasets
+    #     precalc_chi2_sum = np.sum(sol.chi2_post)
+
+    #     k = sol.par_post.shape[0] * 3  #+ 1 # estimating the variance
+
+    #     n = len(aggregated_exp_data)
+
+    #     AICc_entire_ds = 2*k + precalc_chi2_sum + 2*k*(k+1)/(n-k-1)
+    #     BIC_entire_ds = k*np.log(n) + precalc_chi2_sum
+
+    #     output_dict['aicc_entire_ds'] = AICc_entire_ds
+    #     output_dict['bic_entire_ds'] = BIC_entire_ds
+
+    # # Wigner - by spingroups
+    # LL_dict = calc_LL_by_ladder(ladder_df = sol.par_post,
+    #                          Ta_pair = Ta_pair,
+    #                          energy_grid=energy_grid_2_compare_on)
+
+    # output_dict['NLLW'] = LL_dict['by_groups_NLLW']
+    # output_dict['NLL_PT_Gn1'] = LL_dict['by_groups_NLL_PT_Gn']
+    # output_dict['NLL_PT_Gg'] = LL_dict['by_groups_NLL_PT_Gg']
+
+    # output_dict['NLL_gn_normal_all_energy'] = LL_dict['by_groups_NLL_gn_normal_on_reduced_width_amp']
+    # output_dict['NLL_W_all_energy'] = LL_dict['by_groups_NLLW_all_energy']
+
+    # joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
+    #                                                          e_range = e_range,
+    #                                                          ladder_df=sol.par_post)
+    
+    # output_dict['N_res_prob_by_spingr'] = prob_by_spin_groups
+    # output_dict['N_res_joint_prob'] = joint_prob
+    # output_dict['N_res_joint_LL'] = joint_LL
+
+    return output_dict
+
 
 
 def calc_N_res_probability(Ta_pair: Particle_Pair,
@@ -1630,6 +1820,35 @@ def calc_all_SSE_gen_XS_plot(
     return df_est, df_theo, resid_matrix, SSE_dict, figure
 
 
+def calc_SSE_one_case(
+        est_ladder: pd.DataFrame,
+        theo_ladder: pd.DataFrame,
+        Ta_pair: Particle_Pair,
+        settings: dict,
+        energy_grid: np.array,
+        reactions_SSE : list = ['capture', 'elastic'],
+):
+    
+    resid_matrix = build_residual_matrix_dict(
+        est_par_list = [est_ladder], 
+        true_par_list = [theo_ladder],
+        Ta_pair = Ta_pair, 
+        settings = settings,
+        energy_grid = energy_grid,
+        reactions = reactions_SSE, 
+        print_bool = False
+        )
+    
+    SSE_dict = calculate_SSE_by_cases(ResidualMatrixDict = resid_matrix)
+    
+    SSE_val = SSE_dict['SSE_sum_normalized_casewise'][0]
+
+    # clean all
+    del SSE_dict
+    del resid_matrix
+    #gc.collect()
+
+    return SSE_val 
 
 def calc_strength_functions(
         theoretical_df, 

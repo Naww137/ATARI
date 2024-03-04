@@ -146,6 +146,8 @@ def no_sampling_returns_true_test(generative_model, reductive_model):
     energy_grid = np.sort(np.random.default_rng().uniform(10,5000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
     df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1,10)})
     exp_model = Experimental_Model(energy_grid=energy_grid, energy_range=[10,5000])
+    for measurement_model in [generative_model, reductive_model]:
+        measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=False)
     synT = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
 
     exp = np.zeros([10,len(energy_grid)])

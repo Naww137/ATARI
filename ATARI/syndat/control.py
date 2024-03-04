@@ -117,7 +117,7 @@ class Syndat_Control:
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
-            true_parameters = self.sample_model_correlations()
+            sampled_parameter_correlations = self.sample_model_correlations()
 
             ### generate true experimental objects with sammy or just take pw_true arguement
             pw_true_list = []
@@ -133,8 +133,22 @@ class Syndat_Control:
 
             ### generate raw datasets from samples model parameters
             gen_raw_data_list = []
-            for syn_mod, pw_true in zip(self.syndat_models, pw_true_list):
-                raw_data = syn_mod.generate_raw_observables(pw_true, 
+            for i, syn_mod in enumerate(self.syndat_models):
+                true_parameters = {}
+                for each in sampled_parameter_correlations:
+                        for key,val in each.items():
+                            if key == "models":
+                                if val[i] == 0: # skip if not flagged as correlated
+                                    update = False
+                                elif val[i] == 1: # skip if not flagged as correlated
+                                    update = True
+                            else:
+                                if update:
+                                    true_parameters.update({key:val})
+                                else:
+                                    pass
+                        
+                raw_data = syn_mod.generate_raw_observables(pw_true_list[i], 
                                                             true_parameters)
                 gen_raw_data_list.append(raw_data)
 
@@ -171,7 +185,64 @@ class Syndat_Control:
         return
     
 
+
     def sample_model_correlations(self):
-        true_parameters = {}
-        return true_parameters
+
+        sampled_model_correlations = []
+
+        for each in self.model_correlations:
+
+            sampled = False
+            sampled_dict = {'models':each['models']}
+            for corr_bool, syn_mod in zip(each['models'], self.syndat_models):
+        
+                # do nothing if not flagged as correlated model
+                if corr_bool == 0:
+                    pass
+
+                # if flagged, do stuff
+                else:
+                    # if a sample has already been taken, check to make sure the flagged model has the appropriate parameters
+                    if sampled:
+                        if isinstance(syn_mod.generative_measurement_model,instance_check):
+                            pass
+                        else:
+                            raise ValueError("You have flagged correlations between two different measurement model types, this capability has not yet been implemented")
+                        
+                        for key,val in sampled_dict.items():
+                            if key == 'models':
+                                pass
+                            else:
+                                if key not in syn_mod.generative_measurement_model.model_parameters.__dict__.keys():
+                                    raise ValueError(f"Assigned a correlated parameter to a syndat model {syn_mod.title} that does not have that parameter")
+
+                    # if a sample has not yet been taken, draw a sample
+                    else:
+                        instance_check = type(syn_mod.generative_measurement_model)
+                        sampled = True
+                        # sampled_parameters = syn_mod.generative_measurement_model.model_parameters.sample_parameters({})
+                        for param_name, param_values in each.items():
+                            if param_name == 'models':
+                                pass
+                            else: 
+                                if isinstance(param_values, tuple) and len(param_values) == 2:
+                                    mean, uncertainty = param_values
+                                    if np.all(np.array(uncertainty) == 0):
+                                        sample = mean
+                                    else:
+                                        if param_name == 'a_b':
+                                            sample = np.random.multivariate_normal(mean, uncertainty)
+                                        else:
+                                            sample = np.random.normal(loc=mean, scale=uncertainty)
+                                    sampled_dict[param_name] = (sample, 0.0)
+                                if isinstance(param_values, pd.DataFrame):
+                                    new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
+                                    df = deepcopy(param_values)
+                                    df.loc[:,'ct'] = new_c
+                                    df.loc[:,'dct'] = np.sqrt(new_c)
+                                    sampled_dict[param_name] = df
+
+            sampled_model_correlations.append(sampled_dict)
+        
+        return sampled_model_correlations
 

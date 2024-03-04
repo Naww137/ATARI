@@ -215,6 +215,10 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
 
     return df
 
+def check_sampar_inputs(df):
+    # check for same energy and same spin group
+    return 
+
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
     """
@@ -1133,12 +1137,15 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     if len(np.unique(dataset_titles)) != len(dataset_titles):
         raise ValueError("Redundant experiment model titles")
-    return
+    if np.any([exp.template is None for exp in sammyINPyw.experiments]):
+        raise ValueError(f"One or more experiments do not have template files.")
+    return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
     # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)

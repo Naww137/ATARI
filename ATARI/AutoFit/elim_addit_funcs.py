@@ -488,7 +488,7 @@ def characterize_ladder(
         experiments: list,
         covariance_data: list,
         
-        sol_ladder: pd.DataFrame, #SammyOutputData, # ! chi2 is calculated inside?
+        sol_ladder: pd.DataFrame,
 
         energy_grid_2_compare_on: np.array = np.array([]),
         printout: bool  = True,
@@ -519,13 +519,12 @@ def characterize_ladder(
         print(ladder_SO.chi2)
         print(ladder_SO.chi2_post)
 
-    # for each datasets if they are separate
-    aic = []
-    aicc = []
+
     all_chi2 = []
 
-    bic = []
-    bicc = []
+    # Variables for aggregated data
+    aggregated_exp_data = []
+    aggregated_exp_unc = []
 
 
     # for e-range and characterization
@@ -536,79 +535,49 @@ def characterize_ladder(
     if (printout):
         print(f'Energy grid for analysis: {e_range}')
 
-
-    # evaluating solution to get chi2 value using sammy run - to get fits also for given experiments
+    # chi2 & AIC calculation based on the datasets & fits
+    for index, ds in enumerate(datasets):
         
+        chi2 = ladder_SO.chi2[index]
 
-    # # chi2 & AIC calculation based on the datasets & fits
-    # for index, ds in enumerate(datasets):
-    #     #check data type
-    #     exp = experiments[index]
-
-    #     if exp.reaction == "transmission":
-    #         model_key = "theo_trans"
-    #     elif exp.reaction == "capture":
-    #         model_key = "theo_xs"
-    #     else:
-    #         raise ValueError()
-
-    #     aic_wls, aicc_wls, bic_wls, bicc_wls, chi2, chi2_n = calc_AIC_AICc_BIC_BICc_by_fit(
-    #         data = ds.exp, 
-    #         data_unc = ds.exp_unc,
-    #         fit = sol.pw_post[index][model_key],
-    #         ladder_df = sol.par_post,
-    #         precalc_chi2 = sol.chi2_post[index])
+        # Aggregate data for each dataset
+        aggregated_exp_data.extend(ds.exp)
+        aggregated_exp_unc.extend(ds.exp_unc)
         
-    #     # note, if the data about cov is present - take chi2 values from sol (SammyOutputData) object
-    #     if (len(covariance_data)>0):
-    #         print('Using cov data for chi2 calc')
-    #         chi2 = sol.chi2_post[index]
-    #         chi2_n = sol.chi2n_post[index]
+        all_chi2.append(chi2)
+    
+    sum_chi2 = np.sum(all_chi2)
 
-    #     else:
-    #         print('for chi2 calc using diag unc only')
-        
-    #     # Aggregate data for each dataset
-    #     aggregated_exp_data.extend(ds.exp)
-    #     aggregated_exp_unc.extend(ds.exp_unc)
-        
-
-    #     aic.append(aic_wls)
-    #     aicc.append(aicc_wls)
-        
-    #     all_chi2.append(chi2)
-
-    #     bic.append(bic_wls)
-    #     bicc.append(bicc_wls)
-
-    # # for each dataset - separately - wrong!
-    # output_dict['aic'] = aic
-    # output_dict['aicc'] = aicc
-    # output_dict['bic'] = bic
-    # output_dict['bicc'] = bicc
-    # output_dict['chi2'] = all_chi2
-
-    # output_dict['chi2_stat'] = np.sum(all_chi2) / ( len(aggregated_exp_data) - len(sol.par_post) * 3)
-    # output_dict['chi2_stat_ndat'] = np.sum(all_chi2) / ( len(aggregated_exp_data))
+    output_dict['sum_chi2'] = sum_chi2
+    output_dict['chi2_stat'] = sum_chi2 / ( len(aggregated_exp_data) - len(ladder_SO.par) * 3)
+    output_dict['chi2_stat_ndat'] = sum_chi2 / ( len(aggregated_exp_data))
     
 
-    # # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
-    # if(len(covariance_data)>0 and (len(sol.chi2_post)>0)):
+    # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
 
-    #     #chi2 for all datasets
-    #     precalc_chi2_sum = np.sum(sol.chi2_post)
+    k = ladder_SO.par.shape[0] * 3  #+ 1 # estimating the variance
 
-    #     k = sol.par_post.shape[0] * 3  #+ 1 # estimating the variance
+    n = len(aggregated_exp_data)
 
-    #     n = len(aggregated_exp_data)
+    AICc_entire_ds = 2 * k + sum_chi2 + 2*k*(k+1)/(n-k-1)
+    BIC_entire_ds = k * np.log(n) + sum_chi2
 
-    #     AICc_entire_ds = 2*k + precalc_chi2_sum + 2*k*(k+1)/(n-k-1)
-    #     BIC_entire_ds = k*np.log(n) + precalc_chi2_sum
+    output_dict['aicc_entire_ds'] = AICc_entire_ds
+    output_dict['bic_entire_ds'] = BIC_entire_ds
 
-    #     output_dict['aicc_entire_ds'] = AICc_entire_ds
-    #     output_dict['bic_entire_ds'] = BIC_entire_ds
+    # Wigner - by spingroups
+    LL_bypar, LL_bypar_bysg = get_LL_by_parameter(ladder = sol_ladder, 
+                        spin_groups =  Ta_pair.spin_groups)
+    
+    # output_dict['LL_W'] = LL_bypar[0]
+    # output_dict['LL_gg2'] = LL_bypar[1]
+    # output_dict['LL_gn2'] = LL_bypar[2]
 
-    # # Wigner - by spingroups
+    output_dict['LL_bypar'] = LL_bypar
+    output_dict['LL_by_sg'] = LL_bypar_bysg
+
+    output_dict['OF2'] = sum_chi2 - 2 * np.sum(LL_bypar)
+
     # LL_dict = calc_LL_by_ladder(ladder_df = sol.par_post,
     #                          Ta_pair = Ta_pair,
     #                          energy_grid=energy_grid_2_compare_on)
@@ -629,6 +598,71 @@ def characterize_ladder(
     # output_dict['N_res_joint_LL'] = joint_LL
 
     return output_dict
+
+from typing import Union
+from ATARI.theory.resonance_statistics import wigner_PDF, chisquare_PDF
+
+def wigner_LL(resonance_levels  : Union[np.ndarray, list], 
+              average_spacing   : float                    ) -> float:
+    """Calculating LL for ladder utilizing Wigner distr. """
+    resonance_levels = np.sort(list(resonance_levels))
+    Di = np.diff(resonance_levels)
+    probs = wigner_PDF(Di, average_spacing)
+    return np.sum(np.log(probs))
+
+
+def width_LL_by_gn2(resonance_widths:   np.array,# given in gn2
+                  average_width_gn2 : float) -> float:
+    """Calculating LL for ladder utilizing normal distr. of gn (not squarred!) """
+    # for gn <- gn2 value as a normal distr... and given <gn2> as a basis for calculation
+    # assuming gn2 has DOF = 1
+    # and for DOF =1 - variance is the same as mean value of chi2 distributed 
+
+                        #gn, , mu , sigma
+    probs = norm.pdf(np.sqrt(resonance_widths), 0, average_width_gn2)
+
+    return np.sum(np.log(probs))
+
+
+def width_LL_by_gg2(resonance_widths:   np.array,
+                  average_width_gg2 : float, 
+                  dof: int
+                  ) -> float:
+    
+    probs = chisquare_PDF(resonance_widths, dof, average_width_gg2)
+
+    # to prevent log zero
+    epsilon = 1e-323
+    
+    return np.sum(np.log(probs+epsilon))
+
+
+
+def get_LL_by_parameter(ladder, 
+                        spin_groups 
+                        ):
+    if 'gg2' not in ladder:
+        raise ValueError("Reduced widths not in ladder, please convert from sammy to atari ladder first")
+    
+    LL_bypar_bysg = []
+    for sg in ladder.groupby("J_ID"):
+
+        for key, val in spin_groups.items():
+            if float(val['J_ID']) == sg[0]:
+                sg_key = key
+
+        LLw = wigner_LL(sg[1].E, spin_groups[sg_key]['<D>'])
+
+        LL_Gg = width_LL_by_gg2(sg[1].gg2, spin_groups[sg_key]['<gg2>'], spin_groups[sg_key]['g_dof'])
+
+        LL_Gn = width_LL_by_gn2(sg[1].gn2, spin_groups[sg_key]['<gn2>'])
+
+        LL_bypar_bysg.append([LLw, LL_Gg, LL_Gn])
+    
+    LL_bypar_bysg = np.array(LL_bypar_bysg)
+    LL_bypar = np.sum(LL_bypar_bysg, axis=0)
+
+    return LL_bypar, LL_bypar_bysg
 
 
 

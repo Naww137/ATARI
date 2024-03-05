@@ -12,7 +12,9 @@ from ATARI.utils.misc import fine_egrid
 from ATARI.theory.resonance_statistics import sample_RRR_levels
 
 from ATARI.theory.scattering_params import FofE_recursive
-from ATARI.utils.atario import fill_resonance_ladder
+#from ATARI.utils.atario import fill_resonance_ladder
+from ATARI.utils.atario import add_Gw_from_gw
+from ATARI.utils.atario import expand_sammy_ladder_2_atari
 
 from ATARI.sammy_interface.sammy_classes import SammyInputDataYW, SammyRunTimeOptions, SammyOutputData, SammyInputData
 from ATARI.sammy_interface.sammy_functions import run_sammy
@@ -489,8 +491,11 @@ def characterize_ladder(
         covariance_data: list,
         
         sol_ladder: pd.DataFrame,
-
+        
+        true_ladder: pd.DataFrame = pd.DataFrame(),
+        reactions_SSE: list = ['capture', 'elastic'],
         energy_grid_2_compare_on: np.array = np.array([]),
+
         printout: bool  = True,
         settings: dict = {}
         ):
@@ -569,22 +574,11 @@ def characterize_ladder(
     LL_bypar, LL_bypar_bysg = get_LL_by_parameter(ladder = sol_ladder, 
                         spin_groups =  Ta_pair.spin_groups)
     
-    # output_dict['LL_W'] = LL_bypar[0]
-    # output_dict['LL_gg2'] = LL_bypar[1]
-    # output_dict['LL_gn2'] = LL_bypar[2]
 
     output_dict['LL_bypar'] = LL_bypar
     output_dict['LL_by_sg'] = LL_bypar_bysg
 
     output_dict['OF2'] = sum_chi2 - 2 * np.sum(LL_bypar)
-
-    # LL_dict = calc_LL_by_ladder(ladder_df = sol.par_post,
-    #                          Ta_pair = Ta_pair,
-    #                          energy_grid=energy_grid_2_compare_on)
-
-    # output_dict['NLLW'] = LL_dict['by_groups_NLLW']
-    # output_dict['NLL_PT_Gn1'] = LL_dict['by_groups_NLL_PT_Gn']
-    # output_dict['NLL_PT_Gg'] = LL_dict['by_groups_NLL_PT_Gg']
 
     # output_dict['NLL_gn_normal_all_energy'] = LL_dict['by_groups_NLL_gn_normal_on_reduced_width_amp']
     # output_dict['NLL_W_all_energy'] = LL_dict['by_groups_NLLW_all_energy']
@@ -596,6 +590,18 @@ def characterize_ladder(
     # output_dict['N_res_prob_by_spingr'] = prob_by_spin_groups
     # output_dict['N_res_joint_prob'] = joint_prob
     # output_dict['N_res_joint_LL'] = joint_LL
+
+    # SSE inside 
+    if (len(true_ladder)>0 and len(energy_grid_2_compare_on)>0):
+        SSE_val = calc_SSE_one_case(
+            est_ladder = sol_ladder,
+            theo_ladder = true_ladder,
+            Ta_pair = Ta_pair,
+            settings = settings,
+            energy_grid = energy_grid_2_compare_on,
+            reactions_SSE  = reactions_SSE,
+        )
+        output_dict['SSE'] = SSE_val
 
     return output_dict
 
@@ -641,6 +647,7 @@ def width_LL_by_gg2(resonance_widths:   np.array,
 def get_LL_by_parameter(ladder, 
                         spin_groups 
                         ):
+    
     if 'gg2' not in ladder:
         raise ValueError("Reduced widths not in ladder, please convert from sammy to atari ladder first")
     
@@ -2804,7 +2811,79 @@ def check_and_change_template_paths(experiments,
     return all_success
 
 
-        # checkif file exists
+def printout_comparison_chars_dict(
+        sol_chars_dict1: dict, name1: str,
+        sol_chars_dict2: dict, name2: str,
+        ):
 
-    
-    return 
+    print('Comparison of 2 ladders given the data and avg. parameters:')
+    print()
+    print(f'Sol.: \t{name1} \t {name2}')
+
+    print(f'sum(LL):\t{np.round(np.sum(sol_chars_dict1["LL_bypar"]),2)}\t{np.round(np.sum(sol_chars_dict2["LL_bypar"]),2)} ')
+    print(f'{sol_chars_dict1["LL_bypar"]} \t {sol_chars_dict2["LL_bypar"]}')
+    print()
+    print(f'chi2:\t{sol_chars_dict1["sum_chi2"]}\t{sol_chars_dict2["sum_chi2"]} ')
+    print()
+    print(f'OF:\t{sol_chars_dict1["OF2"]}\t{sol_chars_dict2["OF2"]} ')
+    print(f'SSE:\t{sol_chars_dict1["SSE"]}\t{sol_chars_dict2["SSE"]} ')
+
+
+def make_base_ladder_with_extra_from_given(ladder_df: pd.DataFrame,
+                                          particle_pair: Particle_Pair,
+                                          energy_region: list):
+    """Puts additional resonances (artificial ones) right to the last closest existing real resonances
+    with small gn2, and all the parameters fixed (!) not to fit them.
+    """
+    spin_groups = particle_pair.spin_groups
+
+    res_ladder = ladder_df.copy()
+    # if we have no values or columns at varyE, varyGg, varyGn1 - set them to 1
+    res_ladder = set_varying_fixed_params(ladder_df = res_ladder, vary_list = [1,1,1])
+
+    artif_resonances = pd.DataFrame(columns=ladder_df.columns)  # Assuming ladder_df has the necessary columns
+
+    for spin, data in spin_groups.items():
+        curr_J_ID = data['J_ID']
+        curr_avg_D = data['<D>']
+        curr_gg2 = data['<gg2>']
+        current_Jpi = data['Jpi']
+        curr_gg01 = data['quantiles']['gg01']
+        curr_gn01 = data['quantiles']['gn01']/10
+
+        # Find the row with the same J_ID and max E value
+        max_e_row = ladder_df[ladder_df['J_ID'] == curr_J_ID].nlargest(1, 'E')
+
+        if not max_e_row.empty:
+            new_E = max_e_row['E'].values[0] + np.sqrt(2/np.pi) * curr_avg_D
+        else:
+            new_E = np.min(energy_region)
+
+        # Create a new artificial resonance DataFrame
+        artif_resonance = pd.DataFrame({
+            'E': [new_E],
+            'gn2': [curr_gn01],
+            'gg2': [curr_gg2],
+            'varyE': [0],
+            'varyGg': [0],
+            'varyGn1': [0],
+            'Jpi': [current_Jpi],
+            'L': [0],
+            'J_ID': [curr_J_ID]
+        })
+        artif_resonance['J_ID'] = artif_resonance['J_ID'].astype(float)
+        artif_resonance['L'] = artif_resonance['L'].astype(float)
+
+        artif_resonance = add_Gw_from_gw(particle_pair = particle_pair, resonance_ladder = artif_resonance)
+
+        artif_resonances = pd.concat([artif_resonances, artif_resonance], ignore_index=True)
+
+
+    res_ladder = pd.concat([res_ladder, artif_resonances], ignore_index=True)
+    res_ladder = res_ladder.sort_values(by='E').reset_index(drop=True) # include deleting of an index
+
+    # add output the indexes of real resonances and artificial ones
+    real_res_indexes = res_ladder[(res_ladder['varyE'] == 1) & (res_ladder['varyGg'] == 1) & (res_ladder['varyGn1'] == 1)].index.tolist()
+    art_res_indexes = res_ladder[(res_ladder['varyE'] == 0) & (res_ladder['varyGg'] == 0) & (res_ladder['varyGn1'] == 0)].index.tolist()
+
+    return res_ladder, real_res_indexes, art_res_indexes

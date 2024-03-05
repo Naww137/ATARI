@@ -520,9 +520,9 @@ def characterize_ladder(
                        exp_covariance = covariance_data
                        )
     
-    if (printout):
-        print(ladder_SO.chi2)
-        print(ladder_SO.chi2_post)
+    # if (printout):
+    #     print(ladder_SO.chi2)
+    #     print(ladder_SO.chi2_post)
 
 
     all_chi2 = []
@@ -551,6 +551,8 @@ def characterize_ladder(
         
         all_chi2.append(chi2)
     
+    output_dict['chi2'] = all_chi2
+
     sum_chi2 = np.sum(all_chi2)
 
     output_dict['sum_chi2'] = sum_chi2
@@ -576,6 +578,7 @@ def characterize_ladder(
     
 
     output_dict['LL_bypar'] = LL_bypar
+    output_dict['sum_LL_bypar'] = np.sum(LL_bypar)
     output_dict['LL_by_sg'] = LL_bypar_bysg
 
     output_dict['OF2'] = sum_chi2 - 2 * np.sum(LL_bypar)
@@ -617,7 +620,7 @@ def wigner_LL(resonance_levels  : Union[np.ndarray, list],
     return np.sum(np.log(probs))
 
 
-def width_LL_by_gn2(resonance_widths:   np.array,# given in gn2
+def width_LL_by_gn2(resonance_widths:   np.array, # given in gn2
                   average_width_gn2 : float) -> float:
     """Calculating LL for ladder utilizing normal distr. of gn (not squarred!) """
     # for gn <- gn2 value as a normal distr... and given <gn2> as a basis for calculation
@@ -625,6 +628,22 @@ def width_LL_by_gn2(resonance_widths:   np.array,# given in gn2
     # and for DOF =1 - variance is the same as mean value of chi2 distributed 
 
                         #gn, , mu , sigma
+    
+    # force all res. widths to be positive to prevent nans
+    negative_values = resonance_widths[resonance_widths < 0]
+    if not negative_values.empty:
+        print("Negative resonance widths found:")
+        print(negative_values)
+
+        # Force all values to be positive
+        resonance_widths = resonance_widths.abs()
+        print("\nResonance widths are forced to be positive, applying abs():")
+        # print(resonance_widths)
+    else:
+        pass
+        
+    resonance_widths = np.abs(resonance_widths)
+
     probs = norm.pdf(np.sqrt(resonance_widths), 0, average_width_gn2)
 
     return np.sum(np.log(probs))
@@ -635,6 +654,20 @@ def width_LL_by_gg2(resonance_widths:   np.array,
                   dof: int
                   ) -> float:
     
+    # make sure all of them are positive
+    negative_values = resonance_widths[resonance_widths < 0]
+    if not negative_values.empty:
+        print("Negative resonance widths found:")
+        print(negative_values)
+
+        # Force all values to be positive
+        resonance_widths = resonance_widths.abs()
+        print("\nResonance widths after applying abs():")
+        # print(resonance_widths)
+    else:
+        pass
+
+
     probs = chisquare_PDF(resonance_widths, dof, average_width_gg2)
 
     # to prevent log zero
@@ -645,8 +678,7 @@ def width_LL_by_gg2(resonance_widths:   np.array,
 
 
 def get_LL_by_parameter(ladder, 
-                        spin_groups 
-                        ):
+                        spin_groups):
     
     if 'gg2' not in ladder:
         raise ValueError("Reduced widths not in ladder, please convert from sammy to atari ladder first")
@@ -2887,3 +2919,104 @@ def make_base_ladder_with_extra_from_given(ladder_df: pd.DataFrame,
     art_res_indexes = res_ladder[(res_ladder['varyE'] == 0) & (res_ladder['varyGg'] == 0) & (res_ladder['varyGn1'] == 0)].index.tolist()
 
     return res_ladder, real_res_indexes, art_res_indexes
+
+
+def create_doubled_deleted_ladders(base_ladder: pd.DataFrame,
+                                   base_ladder_art_res_indexes: list,
+                                   res_index: int,
+                                   particle_pair: Particle_Pair):
+    
+    """Produces modified ladders based on the base ladder and index of the resonance to modify,
+        
+    """
+
+    ladder_with_moved_res = base_ladder.copy() 
+    ladder_with_doubled_res = base_ladder.copy()
+
+    # print(ladder_with_moved_res)
+
+    # Resonance to double or move
+    cand_res_df = base_ladder.loc[[res_index]].copy()
+
+    # Get spin group ID for the given resonance
+    cand_res_Jpi = cand_res_df['Jpi'].values[0]
+
+    # Extract parameters from the particle pair spin groups
+    avg_D = particle_pair.spin_groups[cand_res_Jpi]['<D>']
+    avg_gn2 = particle_pair.spin_groups[cand_res_Jpi]['<gn2>']
+    avg_gg2 = particle_pair.spin_groups[cand_res_Jpi]['<gg2>']
+
+    gn2_q01 = particle_pair.spin_groups[cand_res_Jpi]['quantiles']['gn01']
+
+
+    ### Move the resonance to the rightmost position within the same spin group, excluding the current resonance
+    max_e_row = ladder_with_moved_res.drop(index=res_index)[ladder_with_moved_res['Jpi'] == cand_res_Jpi].nlargest(1, 'E')
+    
+    if not max_e_row.empty:
+        new_E_val = max_e_row['E'].values[0] + np.sqrt(2/np.pi) * avg_D
+        
+        print(f"Found res. # {max_e_row.index[0]} with energy {max_e_row['E'].values[0]}, avg_D = {avg_D}")
+        print(f" {max_e_row['E'].values[0]} + {np.sqrt(2/np.pi) * avg_D} = {new_E_val}")
+
+    else:
+        new_E_val = cand_res_df['E'].values[0]
+
+    ladder_with_moved_res.loc[res_index, 'E'] = new_E_val
+    ladder_with_moved_res.loc[res_index, 'gn2'] = gn2_q01 / 10
+    ladder_with_moved_res.loc[res_index, 'gg2'] = avg_gg2
+
+    # set not to vary this res.
+    ladder_with_moved_res.loc[res_index, 'varyGg'] = 0
+    ladder_with_moved_res.loc[res_index, 'varyE'] = 0
+    ladder_with_moved_res.loc[res_index, 'varyGn1'] = 0
+
+    # Update other parameters (assuming add_Gw_from_gw function exists)
+    ladder_with_moved_res = add_Gw_from_gw(particle_pair=particle_pair, resonance_ladder=ladder_with_moved_res)
+    
+    # resort all the ladders by energy for convenience
+    ladder_with_moved_res = ladder_with_moved_res.sort_values(by='E')
+
+    # print("Deleted/Moved:")
+    # print(ladder_with_moved_res)
+
+    ### Double the resonance
+    # given the res_index - find the fake res. with the same spin group id cand_res_Jpi
+    # in ladder_with_doubled_res , s.t. varyGg = 0, varyGn1=0, varyE=0 
+    # and it's index is in base_ladder_art_res_indexes ?
+
+    # # just the same Jpi
+    # fake_res_same_Jpi = ladder_with_doubled_res[(ladder_with_doubled_res['Jpi'] == cand_res_Jpi) & 
+    #                                   (ladder_with_doubled_res['varyE'] == 0) & 
+    #                                   (ladder_with_doubled_res['varyGg'] == 0) & 
+    #                                   (ladder_with_doubled_res['varyGn1'] == 0)]
+    
+    # same Jpi and index in base_ladder_art_res_indexes
+    fake_res_same_Jpi = ladder_with_doubled_res[
+        (ladder_with_doubled_res['Jpi'] == cand_res_Jpi) &
+        ladder_with_doubled_res.index.isin(base_ladder_art_res_indexes)
+    ]
+    
+    # take res with the max energy
+    if not fake_res_same_Jpi.empty:
+        fake_res_index = fake_res_same_Jpi['E'].idxmax()
+
+        # Redefine parameters for the artificial resonance
+        ladder_with_doubled_res.loc[fake_res_index, ['E', 'gg2', 'gn2']] = [
+            cand_res_df['E'].values[0] + 1e-5, 
+            cand_res_df['gg2'].values[0], 
+            cand_res_df['gn2'].values[0]
+        ]
+
+    ladder_with_doubled_res = add_Gw_from_gw(particle_pair=particle_pair, 
+    resonance_ladder=ladder_with_doubled_res)
+
+    #allow to vary
+    ladder_with_doubled_res.loc[fake_res_index, ['varyGg', 'varyE', 'varyGn1']] = [1,1,1]
+    
+    ladder_with_doubled_res = ladder_with_doubled_res.sort_values(by='E')
+
+    # print('Doubled:')
+    # print(ladder_with_doubled_res)
+
+    return ladder_with_moved_res, ladder_with_doubled_res
+

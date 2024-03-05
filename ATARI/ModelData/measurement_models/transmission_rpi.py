@@ -276,6 +276,11 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
         for i in range(cycles-1):
             c += c_cycle*monitor_factors[i]
 
+    # if options.force_zero_to_1:
+    #             c[c==0] = 1
+    #         else:
+    #             if np.any(c==0):
+    #                 raise ValueError("Syndat Option force_zero_to_1 is set to false and you have bins with 0 counts")
     assert(c.all() >= 0)
     dc = np.sqrt(c)
     
@@ -346,7 +351,8 @@ class transmission_rpi_parameters:
 
         for param_name, param_values in self.__dict__.items():
             if param_name in true_model_parameters:
-                sampled_params[param_name] = (true_model_parameters[param_name], 0.0)
+                assert true_model_parameters[param_name][1] == 0.0, "provided true model parameter with non-zero uncertainty"
+                sampled_params[param_name] = true_model_parameters[param_name]
             else:
                 if isinstance(param_values, tuple) and len(param_values) == 2:
                     mean, uncertainty = param_values
@@ -419,6 +425,15 @@ class Transmission_RPI:
     def sample_true_model_parameters(self, true_model_parameters: dict):
         return self.model_parameters.sample_parameters(true_model_parameters)
     
+    
+    def truncate_energy_range(self, new_energy_range):
+        if min(new_energy_range) < min(self.model_parameters.open_neutron_spectrum.E):
+            raise ValueError("new energy range is less than existing transmission_rpi.open_netron_spectrum energy")
+        if max(new_energy_range) > max(self.model_parameters.open_neutron_spectrum.E):
+            raise ValueError("new energy range is more than existing transmission_rpi.open_netron_spectrum energy")
+        self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[(self.model_parameters.open_neutron_spectrum.E.values < max(new_energy_range)) & (self.model_parameters.open_neutron_spectrum.E.values > min(new_energy_range))].copy()
+        return
+    
 
     def approximate_unknown_data(self, exp_model, smooth, check_trig = False):
         if self.model_parameters.open_neutron_spectrum is None:
@@ -429,9 +444,7 @@ class Transmission_RPI:
                                                                     self.model_parameters.trigo[0])
             
             self.model_parameters.open_neutron_spectrum = open_neutron_spectrum
-
-
-        
+  
 
     def generate_raw_data(self,
                           pw_true,
@@ -443,8 +456,7 @@ class Transmission_RPI:
         """
         assert true_model_parameters.open_neutron_spectrum is not None
         if len(true_model_parameters.open_neutron_spectrum) != len(pw_true):
-            raise ValueError(
-                "neutron spectrum and sample data are not of the same length, check energy domain")
+            raise ValueError("neutron spectrum and sample data are not of the same length, check energy domain")
         
         # gather monitor array
         monitor_array = [true_model_parameters.m1[0], true_model_parameters.m2[0], true_model_parameters.m3[0], true_model_parameters.m4[0]]
@@ -489,6 +501,8 @@ class Transmission_RPI:
         Reduces the raw count data (sample in/out) to Transmission data and propagates uncertainty.
 
         """
+        if self.model_parameters.open_neutron_spectrum is None:
+            raise ValueError("background neutron flux spectrum is None, please provide this data or approximate it using the method in this class")
         assert isinstance(self.model_parameters.open_neutron_spectrum, pd.DataFrame)
         assert(np.isclose(max(abs(self.model_parameters.open_neutron_spectrum.tof.values - raw_data.tof.values)/raw_data.tof.values), 0,atol=1e-7))
 

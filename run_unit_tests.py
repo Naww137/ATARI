@@ -1,5 +1,5 @@
 import unittest
-from tests import test_resonance_distributions, test_sammy_interface, test_syndat, test_res_generator
+from tests import test_resonance_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality
 
 
 
@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parameter_distribution_test_suite = loader.loadTestsFromModule(test_resonance_distributions)
     resonance_generator_test_suite = loader.loadTestsFromModule(test_res_generator)
     # TODO: add theory_module_test_suite
-    syndat_test_suite = loader.loadTestsFromModule(test_syndat)
+    syndat_test_suite = loader.loadTestsFromModule(test_syndat_functionality)
 
     ### those that require sammy
     sammy_test_suite = loader.loadTestsFromModule(test_sammy_interface)

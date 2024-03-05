@@ -70,6 +70,13 @@ class syndatOPT:
         Option to use a smoothed function for the true neutron count spectrum for data generation.
     save_raw_data : bool = False
         Option to save raw count data, if False, only the reduced transmission data will be saved.
+    force_zero_to_1 : bool = True
+        Option to force sampled 0-counts to counts of 1. 
+        This option is true by default as an artifact of the synthetic data methodology. 
+        In actuallity, un-grouped time bins (on the order of ns widths) may have 0-counts, but the experimentalist will determine a grouping structure that avoids this.
+        Because they synthetic data methodology samples counting statistics on the grouped bin structure, 0-counts are unrealistic.
+        The combination of settings, particularly energy grid and linac triggers, can cause 0-counts.
+        This is an indication that your settings are likely not realistic, however, you should still be able to generate usable data and 0-counts will cause downstream issues.
     """
     def __init__(self, **kwargs):
         self._sampleRES = True
@@ -81,6 +88,8 @@ class syndatOPT:
         self._sampleTNCS = True
         self._smoothTNCS = False
         self._save_raw_data = False
+
+        self._force_zero_to_1 = True
 
 
         for key, value in kwargs.items():
@@ -155,5 +164,12 @@ class syndatOPT:
     @save_raw_data.setter
     def save_raw_data(self, save_raw_data):
         self._save_raw_data = save_raw_data
+
+    @property
+    def force_zero_to_1(self):
+        return self._force_zero_to_1
+    @force_zero_to_1.setter
+    def force_zero_to_1(self, force_zero_to_1):
+        self._force_zero_to_1 = force_zero_to_1
 
 

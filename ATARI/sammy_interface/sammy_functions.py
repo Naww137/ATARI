@@ -215,6 +215,10 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
 
     return df
 
+def check_sampar_inputs(df):
+    # check for same energy and same spin group
+    return 
+
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
     """
@@ -1004,7 +1008,33 @@ mv "results/temp" "results/step{step}.par" """],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
 
+def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
+    # if True:# sammyINPyw.batch_reduce_width:
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    proportion = 0.
+    factor = np.random.rand(len(df))
+    factor[factor <= proportion] = 0.75
+    factor[factor != 1] = 1
+    # df['Gg'] = df['Gg']*factor
+    df['Gn1'] = df['Gn1']*factor
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
 
+def batch_fitpar(rundir, istep, sammyINPyw, fudge):
+    # if sammyINPyw.batch_fitpar:
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    varyE = np.any(df['varyE']==1)
+    varyGg = np.any(df['varyGg']==1)
+    varyGn1 = np.any(df['varyGn1']==1)
+    proportion_ones = 0.5
+    vary = np.random.rand(len(df))
+    vary[vary <= proportion_ones] = 1
+    vary[vary != 1] = 0
+    df['varyE'] = vary*varyE
+    df['varyGg'] = vary*varyGg
+    df['varyGn1'] = vary*varyGn1
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)    
 
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
@@ -1016,33 +1046,10 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
-        
+            
         if sammyINPyw.batch_fitpar:
-            parfile = os.path.join(rundir,'results',f'step{istep}.par')
-            df = readpar(parfile)
-            varyE = np.any(df['varyE']==1)
-            varyGg = np.any(df['varyGg']==1)
-            varyGn1 = np.any(df['varyGn1']==1)
-
-            # if istep % 2 == 0:
-            #     # vary = np.tile([0,0,1,1], int(len(df)/4))
-            #     pattern = np.array([0,0,1,1])
-            # else:
-            #     # vary =  np.tile([1,1,0,0], int(len(df)/4))
-            #     pattern = np.array([1,1,0,0])
-            # Set the proportion of ones
-            proportion_ones = 0.5
-            vary = np.random.rand(len(df))
-            vary[vary <= proportion_ones] = 1
-            vary[vary != 1] = 0
-            
-            # vary = np.tile(pattern, (len(df) // len(pattern)) + 1)[:len(df)]
-            df['varyE'] = vary*varyE
-            df['varyGg'] = vary*varyGg
-            df['varyGn1'] = vary*varyGn1
-            write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
-            
-
+            batch_fitpar(rundir, istep, sammyINPyw, fudge)
+    
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
 
@@ -1062,6 +1069,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge)
+                        # if True: reduce_width_randomly(rundir, istep-1, sammyINPyw, fudge)
+                        # if sammyINPyw.batch_fitpar:
+                        #     batch_fitpar(rundir, istep, sammyINPyw, fudge)
                         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
@@ -1097,6 +1107,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         update_fudge_in_parfile(rundir, istep, fudge)
+        # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
+
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
 
         istep += 1
@@ -1121,11 +1133,19 @@ def plot_YW(sammyRTO, dataset_titles, i):
     return par, lsts, chi2s, chi2ns
 
 
+def check_inputs_YW(sammyINPyw, sammyRTO):
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    if len(np.unique(dataset_titles)) != len(dataset_titles):
+        raise ValueError("Redundant experiment model titles")
+    if np.any([exp.template is None for exp in sammyINPyw.experiments]):
+        raise ValueError(f"One or more experiments do not have template files.")
+    return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
     # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)

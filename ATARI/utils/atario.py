@@ -4,6 +4,7 @@ from ATARI.theory.scattering_params import FofE_recursive
 from copy import deepcopy, copy
 import pickle
 import os
+from typing import Union
 from ATARI.syndat.control import Syndat_Control
 from ATARI.syndat.syndat_model import Syndat_Model
 
@@ -42,11 +43,11 @@ def save_syndat_control(syndat_control: Syndat_Control,
     pickle.dump(syndat_control, file)
     file.close()
 
-def load_syndat_model(filepath: str) -> Syndat_Model:
+def load_syndat(filepath: str) -> Union[Syndat_Model, Syndat_Control]:
     file = open(filepath, "rb")
-    syndat_model = pickle.load(file)
+    syndat = pickle.load(file)
     file.close()
-    return syndat_model
+    return syndat
 
 # ----------------------------------------------------------------------------------
 # User interface functions

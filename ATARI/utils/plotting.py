@@ -282,8 +282,8 @@ def plot_reduced_data_Y(datasets,
 
 
 
-def plot_reduced_data_TY(datasets, 
-                      experiments,
+def plot_reduced_data_TY(datasets   :  list, 
+                      experiments   :  list,
                       fits=[], fits_chi2=[], f_model_name='fit',
                       priors=[], priors_chi2=[], pr_model_name='prior',
                       true=[], true_chi2=[], t_model_name ='true',
@@ -292,6 +292,7 @@ def plot_reduced_data_TY(datasets,
                       fit_pars = pd.DataFrame(),
                       title: str = '',
                       show_spingroups: bool = True,
+                      plot_datasets_true: bool = False,
                       xlim : tuple = (0.15e3, 200e3), 
                       fig_size : tuple = (6,4)
                       ):
@@ -334,6 +335,9 @@ def plot_reduced_data_TY(datasets,
                 true_label = f'{t_model_name} {exp.title}'
                 
             axes[iax].plot(true[i].E, true[i][model_key], '-', color='green', zorder=1, alpha=0.5, lw=1.5, label=true_label)
+        
+        if plot_datasets_true:
+            axes[iax].plot(datasets[i].E, datasets[i]['true'], '-', color='green', zorder=1, alpha=0.5, lw=1.5, label="True")
 
 
     # Set the y-axis limits with additional space for text and capture ymax before changing

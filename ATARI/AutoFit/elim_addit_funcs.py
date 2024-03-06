@@ -346,8 +346,8 @@ def characterize_sol(Ta_pair: Particle_Pair,
     e_range[0] = np.min(energy_grid_2_compare_on)
     e_range[1] = np.max(energy_grid_2_compare_on)
 
-    if (printout):
-        print(f'Energy grid for analysis: {e_range}')
+    # if (printout):
+    #     print(f'Energy grid for analysis: {e_range}')
 
         
 
@@ -537,8 +537,8 @@ def characterize_ladder(
     e_range[0] = np.min(energy_grid_2_compare_on)
     e_range[1] = np.max(energy_grid_2_compare_on)
 
-    if (printout):
-        print(f'Energy grid for analysis: {e_range}')
+    # if (printout):
+    #     print(f'Energy grid for analysis: {e_range}')
 
     # chi2 & AIC calculation based on the datasets & fits
     for index, ds in enumerate(datasets):
@@ -608,6 +608,8 @@ def characterize_ladder(
 
     return output_dict
 
+
+
 from typing import Union
 from ATARI.theory.resonance_statistics import wigner_PDF, chisquare_PDF
 
@@ -617,6 +619,10 @@ def wigner_LL(resonance_levels  : Union[np.ndarray, list],
     resonance_levels = np.sort(list(resonance_levels))
     Di = np.diff(resonance_levels)
     probs = wigner_PDF(Di, average_spacing)
+
+    # to avoid inf values of log
+    probs = probs + 1e-323
+
     return np.sum(np.log(probs))
 
 
@@ -631,6 +637,7 @@ def width_LL_by_gn2(resonance_widths:   np.array, # given in gn2
     
     # force all res. widths to be positive to prevent nans
     negative_values = resonance_widths[resonance_widths < 0]
+
     if not negative_values.empty:
         print("Negative resonance widths found:")
         print(negative_values)
@@ -646,7 +653,12 @@ def width_LL_by_gn2(resonance_widths:   np.array, # given in gn2
 
     probs = norm.pdf(np.sqrt(resonance_widths), 0, average_width_gn2)
 
-    return np.sum(np.log(probs))
+    # check if the probs have zero valuse or negative
+
+    # to prevent log zero
+    epsilon = 1e-323
+
+    return np.sum(np.log(probs+epsilon))
 
 
 def width_LL_by_gg2(resonance_widths:   np.array,
@@ -662,8 +674,9 @@ def width_LL_by_gg2(resonance_widths:   np.array,
 
         # Force all values to be positive
         resonance_widths = resonance_widths.abs()
-        print("\nResonance widths after applying abs():")
-        # print(resonance_widths)
+        print("Resonance widths after applying abs():")
+        print(resonance_widths)
+
     else:
         pass
 
@@ -677,23 +690,18 @@ def width_LL_by_gg2(resonance_widths:   np.array,
 
 
 
-def get_LL_by_parameter(ladder, 
-                        spin_groups):
-    
+def get_LL_by_parameter(ladder, spin_groups):
     if 'gg2' not in ladder:
         raise ValueError("Reduced widths not in ladder, please convert from sammy to atari ladder first")
     
     LL_bypar_bysg = []
     for sg in ladder.groupby("J_ID"):
-
         for key, val in spin_groups.items():
             if float(val['J_ID']) == sg[0]:
                 sg_key = key
 
         LLw = wigner_LL(sg[1].E, spin_groups[sg_key]['<D>'])
-
         LL_Gg = width_LL_by_gg2(sg[1].gg2, spin_groups[sg_key]['<gg2>'], spin_groups[sg_key]['g_dof'])
-
         LL_Gn = width_LL_by_gn2(sg[1].gn2, spin_groups[sg_key]['<gn2>'])
 
         LL_bypar_bysg.append([LLw, LL_Gg, LL_Gn])
@@ -701,8 +709,16 @@ def get_LL_by_parameter(ladder,
     LL_bypar_bysg = np.array(LL_bypar_bysg)
     LL_bypar = np.sum(LL_bypar_bysg, axis=0)
 
-    return LL_bypar, LL_bypar_bysg
+    # Check if any of the elements is NaN, Inf, or -Inf
+    if np.isnan(LL_bypar_bysg).any() or np.isinf(LL_bypar_bysg).any():
 
+        print("Warning: NaN, Inf, or -Inf values detected in LL calculations.")
+        print("LL_bypar_bysg with problematic values:")
+        print(LL_bypar_bysg)
+        print("Corresponding ladder data:")
+        print(ladder)
+
+    return LL_bypar, LL_bypar_bysg
 
 
 def calc_N_res_probability(Ta_pair: Particle_Pair,
@@ -2950,7 +2966,11 @@ def create_doubled_deleted_ladders(base_ladder: pd.DataFrame,
 
 
     ### Move the resonance to the rightmost position within the same spin group, excluding the current resonance
-    max_e_row = ladder_with_moved_res.drop(index=res_index)[ladder_with_moved_res['Jpi'] == cand_res_Jpi].nlargest(1, 'E')
+    #max_e_row = ladder_with_moved_res.drop(index=res_index)[ladder_with_moved_res['Jpi'] == cand_res_Jpi].nlargest(1, 'E')
+    
+    temp_ladder = ladder_with_moved_res.drop(index=res_index)
+    # Then, apply the boolean condition directly on the modified DataFrame
+    max_e_row = temp_ladder[temp_ladder['Jpi'] == cand_res_Jpi].nlargest(1, 'E')
     
     if not max_e_row.empty:
         new_E_val = max_e_row['E'].values[0] + np.sqrt(2/np.pi) * avg_D

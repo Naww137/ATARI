@@ -49,6 +49,23 @@ def load_syndat(filepath: str) -> Union[Syndat_Model, Syndat_Control]:
     file.close()
     return syndat
 
+
+def save_general_object(object, 
+                        path: str,
+                        ):
+    try:
+        file = open(path, "wb")
+        pickle.dump(object, file)
+        file.close()
+    except:
+        raise ValueError("Pickling syndat model failed, cause is unknown")
+    
+def load_general_object(filepath: str):
+    file = open(filepath, "rb")
+    obj = pickle.load(file)
+    file.close()
+    return obj
+
 # ----------------------------------------------------------------------------------
 # User interface functions
 # ----------------------------------------------------------------------------------

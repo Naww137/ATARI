@@ -40,7 +40,7 @@ class TestRunSammy(unittest.TestCase):
             cls.resonance_ladder,
             os.path.realpath('samtemplate.inp'),
             cls.exp_model,
-            energy_grid=cls.exp_model.energy_grid
+            energy_grid=cls.exp_model.energy_grid,
         )
 
         cls.samout = sammy_functions.run_sammy(cls.sammyINP, cls.rto)
@@ -69,6 +69,9 @@ class TestRunSammy(unittest.TestCase):
         
         self.sammyINP.resonance_ladder = resonance_ladder_fit
         self.rto.bayes=True
+        self.assertRaises(ValueError, sammy_functions.run_sammy, self.sammyINP, self.rto)
+
+        self.sammyINP.experimental_data = np.ones(len(self.sammyINP.energy_grid))
         sammyOUT_fit = sammy_functions.run_sammy(self.sammyINP, self.rto)
         self.assertIsNotNone(sammyOUT_fit.par_post)
         self.assertIsNotNone(sammyOUT_fit.chi2_post)
@@ -84,6 +87,20 @@ class TestRunSammy(unittest.TestCase):
 
         self.assertTrue(np.all([each in atari_par_post.keys() for each in ["gg2", "gn2", "Jpi", "L"]]))
 
+
+class TestMisc(unittest.TestCase):
+    
+    def test_batch_vector(self):
+        steps_per_batch = 2
+        save = []
+        for i in range(20):
+            if i%steps_per_batch == 0:
+                save.append(sammy_functions.get_batch_vector(10, 1, int(i/steps_per_batch)))
+        np.array(save)
+
+        self.assertTrue(np.all(np.diag(save)==1))
+        self.assertTrue(np.all(np.diag(save, k=1)==0))
+        self.assertTrue(np.all(np.diag(save, k=2)==0))
 
 
 

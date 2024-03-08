@@ -351,7 +351,8 @@ class InitialFB:
             experiments,
             covariance_data,
             sammyRTO,
-            external_resonance_ladder = pd.DataFrame()
+            external_resonance_ladder = pd.DataFrame()#,
+            # internal_resonance_ladder = None,
             ):
         
         rto = copy(sammyRTO)
@@ -366,8 +367,8 @@ class InitialFB:
         
         ### generate intial_feature bank
         initial_resonance_ladder = get_starting_feature_bank(energy_range,
-                                                             particle_pair,
-                                                             spin_groups,
+                                                            particle_pair,
+                                                            spin_groups,
                                                             num_Elam= self.options.num_Elam,
                                                             starting_Gg_multiplier = self.options.starting_Gg_multiplier,
                                                             starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
@@ -407,6 +408,8 @@ class InitialFB:
             batch_fitpar_ifit = self.options.batch_fitpar_ifit,
             steps_per_batch = self.options.steps_per_batch,
             batch_fitpar_random = self.options.batch_fitpar_random,
+
+            external_resonance_indices = external_resonance_indices,
 
             minF = 1e-5,
             maxF = 2.0,

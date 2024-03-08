@@ -1035,15 +1035,32 @@ def get_batch_vector(vector_length, num_ones, ibatch):
         return np.roll(vector, ibatch)
     
 
+### temporary functions here
+def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
+    if external_resonance_indices is None: external_resonance_indices = []
+    external_resonance_ladder = resonance_ladder.iloc[external_resonance_indices, :]
+    internal_resonance_ladder = copy(resonance_ladder)
+    internal_resonance_ladder.drop(index=external_resonance_indices, inplace=True)
+    return internal_resonance_ladder, external_resonance_ladder
+def concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder):
+    if external_resonance_ladder.empty:
+        resonance_ladder = internal_resonance_ladder
+        external_resonance_indices = []
+    else:
+        resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
+        external_resonance_indices = list(range(len(external_resonance_ladder)))
+    return resonance_ladder, external_resonance_indices
+    
 def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
     df = readpar(parfile)
-    varyE = np.any(df['varyE']==1)
-    varyGg = np.any(df['varyGg']==1)
-    varyGn1 = np.any(df['varyGn1']==1)
+    df_internal, df_external = separate_external_resonance_ladder(df, sammyINPyw.external_resonance_indices)
+    varyE = np.any(df_internal['varyE']==1)
+    varyGg = np.any(df_internal['varyGg']==1)
+    varyGn1 = np.any(df_internal['varyGn1']==1)
 
-    numpar = len(df)
+    numpar = len(df_internal)
     if sammyINPyw.batch_fitpar_random:
         proportion_ones = sammyINPyw.batch_fitpar_ifit/numpar
         vary = np.random.rand(numpar)
@@ -1052,14 +1069,16 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
     else:
         vary = get_batch_vector(numpar, sammyINPyw.batch_fitpar_ifit, int(istep/sammyINPyw.steps_per_batch))
 
-    df['varyE'] = vary*varyE
-    df['varyGg'] = vary*varyGg
-    df['varyGn1'] = vary*varyGn1
+    df_internal['varyE'] = vary*varyE
+    df_internal['varyGg'] = vary*varyGg
+    df_internal['varyGn1'] = vary*varyGn1
+    df, _ = concat_external_resonance_ladder(df_internal, df_external)
     write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)    
 
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     istep = 0
+    no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)

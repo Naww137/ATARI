@@ -167,6 +167,8 @@ class SammyInputDataYW:
     steps_per_batch: int = 1
     batch_fitpar_random: bool = False
 
+    external_resonance_indices: Optional[list] = None
+
     LevMar: bool = True
     LevMarV: float = 1.5
     LevMarVd: float = 5.0

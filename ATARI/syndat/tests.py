@@ -6,7 +6,7 @@ from ATARI.syndat.control import syndatOPT, Syndat_Model
 from ATARI.ModelData.experimental_model import Experimental_Model
 
 
-def noise_distribution_test(syn, print_out=False, ipert=5000, energy_range = [10,3000]):
+def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000]):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
@@ -21,8 +21,12 @@ def noise_distribution_test(syn, print_out=False, ipert=5000, energy_range = [10
     syn.clear_samples()
     syn.generative_experimental_model.energy_grid = energy_grid
     syn.generative_experimental_model.energy_range = energy_range
-    syn.generative_measurement_model.model_parameters.open_neutron_spectrum = None
-    syn.reductive_measurement_model.model_parameters.open_neutron_spectrum = None
+    # syn.generative_measurement_model.model_parameters.open_neutron_spectrum = None
+    # syn.reductive_measurement_model.model_parameters.open_neutron_spectrum = None
+    ## approximate unknown data (spectra with defaults)
+    for measurement_model in [syn.generative_measurement_model, syn.reductive_measurement_model]:
+        measurement_model.approximate_unknown_data(exp_model=syn.generative_experimental_model, smooth=True, check_trig=True, overwrite=True)
+
     
     # set options for test
     syn.options.sampleRES = False
@@ -75,7 +79,7 @@ def noise_distribution_test(syn, print_out=False, ipert=5000, energy_range = [10
 
 
 
-def noise_distribution_test2(syn, df_true, print_out=False, ipert=5000):
+def noise_distribution_test2(syn:Syndat_Model, df_true, print_out=False, ipert=5000):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
@@ -87,7 +91,7 @@ def noise_distribution_test2(syn, df_true, print_out=False, ipert=5000):
     syn.options.explicit_covariance = True
     syn.options.calculate_covariance = True
 
-    syn.sample(pw_true_list=df_true, num_samples=ipert)
+    syn.sample(pw_true=df_true, num_samples=ipert)
     if 'CovT' in syn.samples[0].covariance_data.keys():
         covkey = 'CovT'
     elif 'CovY' in syn.samples[0].covariance_data.keys():

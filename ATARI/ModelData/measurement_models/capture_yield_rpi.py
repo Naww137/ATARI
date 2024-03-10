@@ -227,14 +227,14 @@ class Capture_Yield_RPI:
         return
 
 
-    def approximate_unknown_data(self, exp_model, smooth, check_trig=False):
+    def approximate_unknown_data(self, exp_model, smooth, check_trig=False, overwrite=False):
         
         if check_trig:
             for each in [self.model_parameters.trig_g, self.model_parameters.trig_bg, self.model_parameters.trig_f, self.model_parameters.trig_bf]:
                 if exp_model.channel_widths['chw'][0]*1e-9 * each[0] < 1:
                     print("WARNING: the linac trigers in you generative measurement model are not large enough for the channel bin width. This will result in many bins with 0 counts")
 
-        if self.model_parameters.background_spectrum_bg is None:
+        if self.model_parameters.background_spectrum_bg is None or overwrite:
             background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
                                                                            smooth, 
                                                                            exp_model.FP[0], 
@@ -242,7 +242,7 @@ class Capture_Yield_RPI:
                                                                            self.model_parameters.trig_bg[0])
             self.model_parameters.background_spectrum_bg = background_spectrum_bg
 
-        if self.model_parameters.incident_neutron_spectrum_f is None:
+        if self.model_parameters.incident_neutron_spectrum_f is None or overwrite:
             incident_neutron_spectrum_f = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
                                                                             smooth, #self.options.smoothTNCS, 
                                                                             exp_model.FP[0],
@@ -252,7 +252,7 @@ class Capture_Yield_RPI:
             self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
             # self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
 
-        if self.model_parameters.background_spectrum_bf is None:
+        if self.model_parameters.background_spectrum_bf is None or overwrite:
             background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 
                                                                            smooth, 
                                                                            exp_model.FP[0], 

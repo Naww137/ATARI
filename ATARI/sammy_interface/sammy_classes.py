@@ -157,16 +157,26 @@ class SammyInputDataYW:
     max_steps: int = 1
     iterations: int = 2
     step_threshold: float = 0.01
+    step_threshold_lag: int = 1
     autoelim_threshold: Optional[float] = None
 
     LS: bool = False
+
+    batch_fitpar :  bool = False
+    batch_fitpar_ifit: int = 10
+    steps_per_batch: int = 1
+    batch_fitpar_random: bool = False
+
+    external_resonance_indices: Optional[list] = None
+
     LevMar: bool = True
     LevMarV: float = 1.5
     LevMarVd: float = 5.0
     minF:   float = 1e-5
     maxF:   float = 10
-    batch_fitpar :  bool = False
+    
     initial_parameter_uncertainty: float = 1.0
+
 
 
 

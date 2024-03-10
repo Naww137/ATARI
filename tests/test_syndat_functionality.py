@@ -12,6 +12,9 @@ from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.tests import noise_distribution_test2, noise_distribution_test, no_sampling_returns_true_test
 # from ATARI.syndat.general_functions import approximate_neutron_spectrum_Li6det
 import unittest
+import os
+import ATARI.utils.hdf5 as h5io
+from copy import deepcopy
 
 
 __doc__ == """
@@ -19,7 +22,7 @@ This file tests various syndat functionality, including pre-loaded measurment mo
 The noise distribution test can be used outside of the unit testing framework to verify that normality assumptions hold for any given syndat model.
 """
 
-
+os.chdir(os.path.dirname(__file__))
         
 
 class TestTransmissionRPIModel(unittest.TestCase):
@@ -320,6 +323,64 @@ class TestSyndatControl(unittest.TestCase):
         self.assertTrue(np.all(b0o1[0] == b0o2[0]))
 
         return
+    
+
+    def test_save_samples_to_hdf5(self):
+
+        options = syndatOPT(sampleRES=False)
+                
+        df_true_1 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
+        df_true_2 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
+        df_true_3 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
+
+        save_file = os.path.realpath("./test.hdf5")
+        if os.path.isfile(save_file):
+            os.remove(save_file)
+        
+        # test raises error if all syndat models have the same name
+        syndat = Syndat_Control(self.pair, syndat_models = self.syndat_models, model_correlations=[], options=options)
+        self.assertRaises(ValueError, syndat.sample, num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
+        
+        # test no error when writing fresh samples without explicit covariance
+        updated_syndat_models =[]; title = 1
+        for mod in  self.syndat_models:
+            new_mod = deepcopy(mod)
+            new_mod.title = str(title)
+            title+=1
+            updated_syndat_models.append(new_mod)
+
+        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], options=options)
+        syndat.sample(num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
+        for isample in range(3):
+            read_par = h5io.read_par(save_file, isample, 'true')
+            pw_reduced_df, cov_data = h5io.read_pw_reduced(save_file, isample, "1")
+            self.assertIsInstance(read_par, pd.DataFrame)
+            self.assertIsInstance(pw_reduced_df, pd.DataFrame)
+            self.assertIsInstance(cov_data['Cov_sys'], np.ndarray)
+            self.assertIsInstance(cov_data['Jac_sys'], pd.DataFrame)
+            self.assertIsInstance(cov_data['diag_stat'], pd.DataFrame)
+
+        # test no error when writing samples with explicit covariance
+        if os.path.isfile(save_file):
+            os.remove(save_file)
+        for mod in updated_syndat_models:
+            mod.options.explicit_covariance = True
+        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], options=options)
+        syndat.sample(num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
+        for isample in range(3):
+            read_par = h5io.read_par(save_file, isample, 'true')
+            pw_reduced_df, cov_data = h5io.read_pw_reduced(save_file, isample, "1")
+            self.assertIsInstance(read_par, pd.DataFrame)
+            self.assertIsInstance(pw_reduced_df, pd.DataFrame)
+            self.assertIsInstance(cov_data['Cov_sys'], np.ndarray)
+            self.assertIsInstance(cov_data['Jac_sys'], pd.DataFrame)
+            self.assertIsInstance(cov_data['diag_stat'], pd.DataFrame)
+            self.assertIsInstance(cov_data['CovT'], pd.DataFrame)
+
+        if os.path.isfile(save_file):
+            os.remove(save_file)
+
+
 
 # # class TestSyndatWithSammy(unittest.TestCase):
 

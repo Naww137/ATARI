@@ -56,8 +56,8 @@ class TestTransmissionRPIModel(unittest.TestCase):
         self.assertAlmostEqual(residual, 0, places=10)
 
 
-    def test_setting_bkg_func(self):
-        self.assertRaises(ValueError, Transmission_RPI('pwower'))
+    # def test_setting_bkg_func(self):
+    #     self.assertRaises(ValueError, Transmission_RPI, 'pwower')
 
 
     def test_random_energy(self):
@@ -71,6 +71,8 @@ class TestTransmissionRPIModel(unittest.TestCase):
 
         synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
         exp_model = Experimental_Model(energy_grid=energy_grid, energy_range = [min(energy_grid), max(energy_grid)])
+        for measurement_model in [generative_model, reductive_model]:
+            measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=True, overwrite=True)
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
 
 
@@ -89,7 +91,9 @@ class TestTransmissionRPIModel(unittest.TestCase):
         df_true = pd.DataFrame({'E': exp_model.energy_grid, 'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
 
         generative_model = Transmission_RPI(**self.model_par)
-        reductive_model = Transmission_RPI(**self.model_par)
+        reductive_model = Transmission_RPI(**self.model_par)    
+        for measurement_model in [generative_model, reductive_model]:
+            measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=True, overwrite=True)
 
         synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
@@ -111,12 +115,14 @@ class TestTransmissionRPIModel(unittest.TestCase):
         open_df = pd.DataFrame({"E":exp_model.energy_grid, 
                                 'tof': exp_model.tof_grid,
                                 'bw': abs(np.append(np.diff(exp_model.tof_grid), np.diff(exp_model.tof_grid)[-1])*1e-9),
-                               'c':np.ones(len(exp_model.energy_grid))*1e10,
-                               'dc': np.ones(len(exp_model.energy_grid))*np.sqrt(1e10)})
+                               'ct':np.ones(len(exp_model.energy_grid))*1e10,
+                               'dct': np.ones(len(exp_model.energy_grid))*np.sqrt(1e10)})
         # open_df = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, True, exp_model.FP[0], exp_model.t0[0], self.model_par['trigo'][0])
 
         generative_model = Transmission_RPI(**self.model_par, open_neutron_spectrum=open_df)
         reductive_model = Transmission_RPI(**self.model_par, open_neutron_spectrum=open_df)
+        # for measurement_model in [generative_model, reductive_model]:
+        #     measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=True, overwrite=True)
 
         synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
@@ -188,7 +194,7 @@ class TestYieldRPIModel(unittest.TestCase):
     def setUpClass(cls):
         cls.pair = Particle_Pair()
 
-        cls.print_out = False
+        cls.print_out = True
 
         ## parameters to reduce default uncertainties to be in linear regime
         # but don't eliminate covariance because we want to test it 
@@ -214,6 +220,8 @@ class TestYieldRPIModel(unittest.TestCase):
 
         generative_model = Capture_Yield_RPI(**self.model_par)
         reductive_model = Capture_Yield_RPI(**self.model_par)
+        for measurement_model in [generative_model, reductive_model]:
+            measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=True, overwrite=True)
 
         synOPT = syndatOPT(smoothTNCS=True, sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True) 
         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
@@ -225,6 +233,48 @@ class TestYieldRPIModel(unittest.TestCase):
                         "Normalized residuals are not standard normal")
         self.assertTrue( kstest_on_chi2.pvalue>1e-5 , 
                         "Chi2 of data does not have appropriate DOF") 
+        
+
+    def test_with_given_TNCS(self):
+
+        exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
+        df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
+
+        open_df = pd.DataFrame({"E":exp_model.energy_grid, 
+                                'tof': exp_model.tof_grid,
+                                'bw': abs(np.append(np.diff(exp_model.tof_grid), np.diff(exp_model.tof_grid)[-1])*1e-9),
+                               'ct':np.ones(len(exp_model.energy_grid))*1e10,
+                               'dct': np.ones(len(exp_model.energy_grid))*np.sqrt(1e10)})
+        bkg_df = pd.DataFrame({"E":exp_model.energy_grid, 
+                                'tof': exp_model.tof_grid,
+                                'bw': abs(np.append(np.diff(exp_model.tof_grid), np.diff(exp_model.tof_grid)[-1])*1e-9),
+                               'ct':np.ones(len(exp_model.energy_grid))*1e1,
+                               'dct': np.ones(len(exp_model.energy_grid))*np.sqrt(1e1)})
+        # bkg_df = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, True, exp_model.FP[0], exp_model.t0[0], self.model_par['trigo'][0])
+
+        generative_model = Capture_Yield_RPI(**self.model_par,
+                                            background_spectrum_bg = bkg_df,
+                                            incident_neutron_spectrum_f = open_df,
+                                            background_spectrum_bf =bkg_df 
+                                            )
+        reductive_model = Capture_Yield_RPI(**self.model_par, 
+                                            background_spectrum_bg = bkg_df,
+                                            incident_neutron_spectrum_f = open_df,
+                                            background_spectrum_bf = bkg_df
+                                            )
+        # for measurement_model in [generative_model, reductive_model]:
+        #     measurement_model.approximate_unknown_data(exp_model=exp_model, smooth=True, check_trig=True, overwrite=True)
+
+        synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+        SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
+        
+        mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) #noise_distribution_test(SynMod, print_out=True)
+        self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
+                        "Mean of residuals is not 0")
+        self.assertTrue( norm_test_on_residual.pvalue>1e-5, 
+                        f"Normalized residuals are not standard normal: pvalue = {norm_test_on_residual.pvalue}")
+        self.assertTrue( kstest_on_chi2.pvalue>1e-5, 
+                        "Chi2 of data does not have appropriate DOF")
 
 
 

@@ -221,11 +221,13 @@ class Syndat_Model:
             reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
 
             if self.options.save_raw_data:
-                out = syndatOUT(par_true=par_true,
+                out = syndatOUT(title = self.title,
+                                par_true=par_true,
                                 pw_reduced=reduced_data, 
                                 pw_raw=raw_data)
             else:
-                out = syndatOUT(par_true=par_true,
+                out = syndatOUT(title = self.title,
+                                par_true=par_true,
                                 pw_reduced=reduced_data)
             if self.options.calculate_covariance:
                 out.covariance_data = covariance_data

@@ -44,7 +44,7 @@ class Syndat_Control:
     def __init__(self, 
                  particle_pair: Particle_Pair,
                  syndat_models: list[Syndat_Model],
-                 model_correlations: dict = {}, 
+                 model_correlations: list = [], 
                  options: syndatOPT = syndatOPT()
                  ):
         
@@ -91,7 +91,9 @@ class Syndat_Control:
     def sample(self, 
                sammyRTO=None,
                num_samples=1,
-               pw_true_list: Optional[list[pd.DataFrame]] = None
+               pw_true_list: Optional[list[pd.DataFrame]] = None,
+               save_samples_to_hdf5 = False,
+               hdf5_file = None
                ):
 
         generate_pw_true_with_sammy = False
@@ -105,11 +107,11 @@ class Syndat_Control:
             generate_pw_true_with_sammy = True
             if sammyRTO is None:
                 raise ValueError("User did not supply a sammyRTO or a pw_true, one of these is needed")
-            par_true = self.particle_pair.resonance_ladder
+        par_true = self.particle_pair.resonance_ladder
         self.pw_true_list = deepcopy(pw_true_list)
 
 
-        for i in range(num_samples):
+        for isample in range(num_samples):
             
             ### sample resonance ladder
             if self.options.sampleRES:
@@ -167,20 +169,24 @@ class Syndat_Control:
             for i, syn_mod in enumerate(self.syndat_models):
 
                 if syn_mod.options.save_raw_data:
-                    out = syndatOUT(par_true=par_true,
+                    out = syndatOUT(title = syn_mod.title,
+                                    par_true=par_true,
                                     pw_reduced=reduced_data_list[i], 
                                     pw_raw=raw_data_list[i])
                 else:
-                    out = syndatOUT(par_true=par_true,
+                    out = syndatOUT(title = syn_mod.title,
+                                    par_true=par_true,
                                     pw_reduced=reduced_data_list[i])
 
                 if syn_mod.options.calculate_covariance:
                     out.covariance_data = covariance_data_list[i]
-                    
-                syn_mod.samples.append(out)
-                # sample_dict[syn_mod.title] = out
-            
-            # self.samples.append(sample_dict)
+                
+                if save_samples_to_hdf5:
+                    if hdf5_file is None:
+                        raise ValueError("If save_samples_to_hdf5, please provide an hdf5 file.")
+                    out.to_hdf5(hdf5_file, isample)
+                else:
+                    syn_mod.samples.append(out)
 
         return
     

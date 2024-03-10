@@ -435,8 +435,8 @@ class Transmission_RPI:
         return
     
 
-    def approximate_unknown_data(self, exp_model, smooth, check_trig = False):
-        if self.model_parameters.open_neutron_spectrum is None:
+    def approximate_unknown_data(self, exp_model, smooth, check_trig = False, overwrite = False):
+        if self.model_parameters.open_neutron_spectrum is None or overwrite:
             open_neutron_spectrum = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
                                                                     smooth, #self.options.smoothTNCS, 
                                                                     exp_model.FP[0],

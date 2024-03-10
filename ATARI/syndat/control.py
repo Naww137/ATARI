@@ -38,6 +38,14 @@ class Syndat_Control:
     options: syndatOPT
         Syndat Options object, only option that will be used is SampleRES.
         Otherwise, individual syndat_models have their own options.
+
+    sampleRES: bool = True
+        Option to sample a new resonance ladder with each sample
+    save_covariance: bool = True
+        Option to save covariance data to SyndatOut, this option WILL NOT alter the covariance settings for individual syndat models.
+        If a syndat model has calculate_covariance=False, save_covariance=True will result in saving and empty dict to SyndatOUT
+    save_raw_data: bool = False
+        Option to save raw data to SyndatOut
     """
     
 
@@ -45,14 +53,18 @@ class Syndat_Control:
                  particle_pair: Particle_Pair,
                  syndat_models: list[Syndat_Model],
                  model_correlations: list = [], 
-                 options: syndatOPT = syndatOPT()
+                 sampleRES = True,
+                 save_covariance = True,
+                 save_raw_data = False
                  ):
         
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
         self.model_correlations = model_correlations
-        self.options = deepcopy(options)
+        self.sampleRES = sampleRES
+        self.save_covariance = save_covariance
+        self.save_raw_data = save_raw_data
 
         # self.clear_samples()
 
@@ -99,7 +111,7 @@ class Syndat_Control:
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true_list is not None:
-            if self.options.sampleRES:
+            if self.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")
             if len(pw_true_list) != len(self.syndat_models):
                 raise ValueError("User provided a pw_true list not of the same length as syndat_models")
@@ -114,7 +126,7 @@ class Syndat_Control:
         for isample in range(num_samples):
             
             ### sample resonance ladder
-            if self.options.sampleRES:
+            if self.sampleRES:
                 self.particle_pair.sample_resonance_ladder()
                 par_true = self.particle_pair.resonance_ladder
             
@@ -168,7 +180,7 @@ class Syndat_Control:
             # sample_dict = {}
             for i, syn_mod in enumerate(self.syndat_models):
 
-                if syn_mod.options.save_raw_data:
+                if self.save_raw_data:
                     out = syndatOUT(title = syn_mod.title,
                                     par_true=par_true,
                                     pw_reduced=reduced_data_list[i], 
@@ -178,7 +190,7 @@ class Syndat_Control:
                                     par_true=par_true,
                                     pw_reduced=reduced_data_list[i])
 
-                if syn_mod.options.calculate_covariance:
+                if self.save_covariance:
                     out.covariance_data = covariance_data_list[i]
                 
                 if save_samples_to_hdf5:

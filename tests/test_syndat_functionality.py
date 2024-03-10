@@ -272,11 +272,10 @@ class TestSyndatControl(unittest.TestCase):
 
     def test_sampling(self):
         
-        options = syndatOPT(sampleRES=False)
         syndat = Syndat_Control(self.pair,
                         syndat_models = self.syndat_models,
                         model_correlations={},
-                        options=options)
+                        sampleRES=False)
         
         df_true_1 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
         df_true_2 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
@@ -298,11 +297,10 @@ class TestSyndatControl(unittest.TestCase):
 
                                 ]
           
-        options = syndatOPT(sampleRES=False)
         syndat = Syndat_Control(self.pair,
                         syndat_models = self.syndat_models,
                         model_correlations=model_correlations,
-                        options=options)
+                        sampleRES=False)
         
         df_true_1 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
         df_true_2 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
@@ -326,8 +324,6 @@ class TestSyndatControl(unittest.TestCase):
     
 
     def test_save_samples_to_hdf5(self):
-
-        options = syndatOPT(sampleRES=False)
                 
         df_true_1 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
         df_true_2 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
@@ -338,7 +334,7 @@ class TestSyndatControl(unittest.TestCase):
             os.remove(save_file)
         
         # test raises error if all syndat models have the same name
-        syndat = Syndat_Control(self.pair, syndat_models = self.syndat_models, model_correlations=[], options=options)
+        syndat = Syndat_Control(self.pair, syndat_models = self.syndat_models, model_correlations=[], sampleRES=False)
         self.assertRaises(ValueError, syndat.sample, num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
         
         # test no error when writing fresh samples without explicit covariance
@@ -349,7 +345,7 @@ class TestSyndatControl(unittest.TestCase):
             title+=1
             updated_syndat_models.append(new_mod)
 
-        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], options=options)
+        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], sampleRES=False)
         syndat.sample(num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
         for isample in range(3):
             read_par = h5io.read_par(save_file, isample, 'true')
@@ -365,7 +361,7 @@ class TestSyndatControl(unittest.TestCase):
             os.remove(save_file)
         for mod in updated_syndat_models:
             mod.options.explicit_covariance = True
-        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], options=options)
+        syndat = Syndat_Control(self.pair, syndat_models = updated_syndat_models, model_correlations=[], sampleRES=False)
         syndat.sample(num_samples=3, pw_true_list=[df_true_1, df_true_2, df_true_3],  save_samples_to_hdf5=True, hdf5_file=save_file)
         for isample in range(3):
             read_par = h5io.read_par(save_file, isample, 'true')
@@ -379,7 +375,6 @@ class TestSyndatControl(unittest.TestCase):
 
         if os.path.isfile(save_file):
             os.remove(save_file)
-
 
 
 # # class TestSyndatWithSammy(unittest.TestCase):

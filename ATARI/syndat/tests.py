@@ -6,7 +6,7 @@ from ATARI.syndat.control import syndatOPT, Syndat_Model
 from ATARI.ModelData.experimental_model import Experimental_Model
 
 
-def noise_distribution_test(syn, print_out=False, ipert=5000, energy_range = [10,3000]):
+def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000]):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
@@ -79,7 +79,7 @@ def noise_distribution_test(syn, print_out=False, ipert=5000, energy_range = [10
 
 
 
-def noise_distribution_test2(syn, df_true, print_out=False, ipert=5000):
+def noise_distribution_test2(syn:Syndat_Model, df_true, print_out=False, ipert=5000):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value

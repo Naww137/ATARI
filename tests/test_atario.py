@@ -20,7 +20,7 @@ class TestSyndatSaveLoad(unittest.TestCase):
         cls.synmod = Syndat_Model(options=syndatOPT(sampleRES=False))
         cls.syncon = Syndat_Control(Particle_Pair(), 
                                     [cls.synmod], 
-                                    options= syndatOPT(sampleRES=False))
+                                    sampleRES=False)
         
         
         energy_grid = cls.synmod.generative_experimental_model.energy_grid

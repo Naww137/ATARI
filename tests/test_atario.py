@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import pandas as pd
 import os
-from ATARI.utils.atario import save_syndat_model, save_syndat_control, load_syndat_model
+from ATARI.utils.atario import save_syndat_model, save_syndat_control, load_general_object
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.control import Syndat_Control, syndatOPT
 from ATARI.ModelData.particle_pair import Particle_Pair
@@ -52,7 +52,7 @@ class TestSyndatSaveLoad(unittest.TestCase):
         self.syncon.sample(pw_true_list=[self.df_true])
         save_syndat_model(self.synmod, self.pickle_file_path, clear_samples=True)
         self.assertTrue(os.path.exists(self.pickle_file_path))
-        syndat_loaded = load_syndat_model(self.pickle_file_path)
+        syndat_loaded = load_general_object(self.pickle_file_path)
         os.remove(self.pickle_file_path)
         self.assertIsInstance(syndat_loaded, Syndat_Model)
 

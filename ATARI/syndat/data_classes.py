@@ -73,22 +73,6 @@ class syndatOUT:
         h5io.write_pw_reduced(filepath, isample, self.title, self.pw_reduced, cov_data=self.covariance_data)
         h5io.write_par(filepath, isample, self.par_true, "true")
 
-            # h5io.write_pw_exp(filepath, isample, pw_exp_df, CovT=CovT, CovXS=None)
-            # h5io.write_par(filepath, isample, resonance_ladder, 'true')
-        #     ) and ('par_true' in h5f[sample_group]):
-        #         if overwrite:
-        #             h5f.close()
-        #             sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
-        #         else:
-        #             h5f.close()
-        #             samples_not_being_generated.append(i)
-        #     else:
-        #         h5f.close()
-        #         sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
-        # else:
-        #     h5f.close()
-        #     sample_and_write_syndat(case_file, i, particle_pair, experiment, solver, open_data, fixed_resonance_ladder, vary_Erange, use_hdf5, sammy_RTO, sammy_INP)
-
 
 
 

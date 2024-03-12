@@ -35,15 +35,15 @@ class TestRunSammy(unittest.TestCase):
         cls.pair = Ta_pair
         cls.resonance_ladder = Ta_pair.sample_resonance_ladder()
         
-        cls.sammyINP = sammy_classes.SammyInputData(
+        sammyINP = sammy_classes.SammyInputData(
             cls.pair,
             cls.resonance_ladder,
-            os.path.realpath('samtemplate.inp'),
+            cls.exp_model.template,
             cls.exp_model,
             energy_grid=cls.exp_model.energy_grid,
         )
 
-        cls.samout = sammy_functions.run_sammy(cls.sammyINP, cls.rto)
+        cls.samout = sammy_functions.run_sammy(sammyINP, cls.rto)
 
         data_unc = np.sqrt(cls.samout.pw['theo_trans'])/10
         data = np.random.default_rng().normal(cls.samout.pw['theo_trans'], data_unc)
@@ -57,7 +57,14 @@ class TestRunSammy(unittest.TestCase):
     def test_novaried_parameters_error_catch(self):
         # print("test error catching for bayes w/o varied parameter")
         self.rto.bayes=True
-        self.assertRaises(ValueError, sammy_functions.run_sammy, self.sammyINP, self.rto)
+        sammyINP = sammy_classes.SammyInputData(
+            self.pair,
+            self.resonance_ladder,
+            self.exp_model.template,
+            self.exp_model,
+            energy_grid=self.exp_model.energy_grid,
+        )
+        self.assertRaises(ValueError, sammy_functions.run_sammy, sammyINP, self.rto)
 
 
     def test_varied_parameters(self):
@@ -67,22 +74,56 @@ class TestRunSammy(unittest.TestCase):
         resonance_ladder_fit["varyGg"] = np.ones(len(resonance_ladder_fit))
         resonance_ladder_fit["varyGn1"] = np.ones(len(resonance_ladder_fit))
         
-        self.sammyINP.resonance_ladder = resonance_ladder_fit
         self.rto.bayes=True
-        self.assertRaises(ValueError, sammy_functions.run_sammy, self.sammyINP, self.rto)
+        self.rto.get_ECSCM = False
+        sammyINP = sammy_classes.SammyInputData(
+            self.pair,
+            resonance_ladder_fit,
+            self.exp_model.template,
+            self.exp_model,
+            energy_grid=self.exp_model.energy_grid,
+        )
+        self.assertRaises(ValueError, sammy_functions.run_sammy, sammyINP, self.rto)
 
-        self.sammyINP.experimental_data = np.ones(len(self.sammyINP.energy_grid))
-        sammyOUT_fit = sammy_functions.run_sammy(self.sammyINP, self.rto)
+        sammyINP.experimental_data = self.data_df
+        sammyOUT_fit = sammy_functions.run_sammy(sammyINP, self.rto)
         self.assertIsNotNone(sammyOUT_fit.par_post)
         self.assertIsNotNone(sammyOUT_fit.chi2_post)
         self.assertIsNotNone(sammyOUT_fit.pw_post)
+        self.assertIsNone(sammyOUT_fit.est_df)
+    
+    def test_get_ECSCM(self):
+        # print("test bayes solve")
+        resonance_ladder_fit = copy(self.resonance_ladder)
+        resonance_ladder_fit["varyE"] = np.ones(len(resonance_ladder_fit))
+        resonance_ladder_fit["varyGg"] = np.ones(len(resonance_ladder_fit))
+        resonance_ladder_fit["varyGn1"] = np.ones(len(resonance_ladder_fit))
+        
+        self.rto.bayes=True
+        self.rto.get_ECSCM = True
+        sammyINP = sammy_classes.SammyInputData(
+            self.pair,
+            resonance_ladder_fit,
+            self.exp_model.template,
+            self.exp_model,
+            experimental_data = self.data_df
+        )
+        
+        sammyOUT_fit = sammy_functions.run_sammy(sammyINP, self.rto)
+        self.assertIsNotNone(sammyOUT_fit.est_df)
     
 
     def test_expand_sammy_ladder_2_atari(self):
         # print("test ladder to atari function")
-        self.sammyINP.resonance_ladder = self.resonance_ladder
         self.rto.bayes=False
-        sammyOUT = sammy_functions.run_sammy(self.sammyINP, self.rto)
+        sammyINP = sammy_classes.SammyInputData(
+            self.pair,
+            self.resonance_ladder,
+            self.exp_model.template,
+            self.exp_model,
+            energy_grid= self.exp_model.energy_grid
+        )
+        sammyOUT = sammy_functions.run_sammy(sammyINP, self.rto)
         atari_par_post = expand_sammy_ladder_2_atari(self.pair, sammyOUT.par)
 
         self.assertTrue(np.all([each in atari_par_post.keys() for each in ["gg2", "gn2", "Jpi", "L"]]))

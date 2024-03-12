@@ -5,7 +5,7 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
 from pandas import DataFrame, Series
 from numpy import ndarray
-
+import os
 
 # from ATARI.utils.stats import chi2_val
 
@@ -45,38 +45,71 @@ from numpy import ndarray
 
 class SammyRunTimeOptions:
 
-    def __init__(self, sammyexe: str, options={}):
-        default_options = {
-            # 'sh'            :   'zsh',
-            'sammy_runDIR'  :   'SAMMY_runDIR',
-            'keep_runDIR'   :   False,
-            'Print'         :   False,
-
-            'bayes'         :   False,
-            'iterations'    :   2,
-
-            'energy_window' : None,
-            'get_ECSCM'     : False,
-            'ECSCM_rxn'     : 'total'
-        }
-        options = update_dict(default_options, options)
-        self.options = options
-
-        self.path_to_SAMMY_exe = sammyexe
-        # self.shell =  options["sh"]
-        self.sammy_runDIR =  options["sammy_runDIR"]
-        self.keep_runDIR = options["keep_runDIR"]
-        self.Print =  options["Print"]
+    def __init__(self, 
+                 sammyexe: str, 
+                 **kwargs
+                 ):
+        """
+        Sammy run time option class that holds information about how you would like to run SAMMY.
+        The only require arguement is sammyexe.
         
-        self.bayes = options["bayes"]
-        self.iterations = options["iterations"]
 
-        self.energy_window = options["energy_window"]
-        self.get_ECSCM = options["get_ECSCM"]
-        self.ECSCM_rxn = options["ECSCM_rxn"]
+        Parameters
+        ----------
+        sammyexe : str
+            Full path to the local sammy executable.
+        **kwargs : dict, optional
+            Any keyword arguments are used to set attributes on the instance.
+
+        Attributes
+        ----------
+        path_to_SAMMY_exe   :   str
+            Full path to the local sammy executable.
+        sammy_runDIR    :   str, 'sammy_runDIR'
+            Directory in which to run sammy.
+        keep_runDIR :   bool, False
+            Option to keep sammy_runDIR after running sammy.
+        Print   :   bool, False
+            Option to print out status while running sammy.
+        bayes   :   bool, False
+            Option to solve bayes while running sammy.
+        iterations  :   int, 2
+            Number of internal iterations for non-linearities
+        energy_window   :   None or float, None
+            Energy window size for windowed sammy runs between Emin and Emax
+        get_ECSCM   :   bool, False
+            Option to run an additional sammy run to calculate ECSCM from RPCM.
+            Bayes must be True.
+        ECSCM_rxn   :   str, 'total'
+            Reaction on which to calculate the ECSCM, default is total.
+        ECSCM_template  :   str or None, None
+            Optional input to change the sammy template for ECSCM calculation.
+            Default behavior (None) will use the template used for the basic sammy run with Bayes.
+        """
+
+        ### set defaults
+        self.path_to_SAMMY_exe = sammyexe
+        self.sammy_runDIR =  "sammy_runDIR"
+        self.keep_runDIR = False
+        self.Print =  False
+        
+        self.bayes = False
+        self.iterations = 2
+
+        self.energy_window = None
+        self.get_ECSCM = False
+        self.ECSCM_rxn = 'total'
+        self.ECSCM_template = None #os.path.realpath(os.path.join(os.path.dirname(__file__), "sammy_templates/dop_2sg.inp"))
+
+        ### update attributes to **kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
 
     def __repr__(self):
         return str(self.options)
+
+
 
 
 arraytype_id = Union[Series, ndarray, list]

@@ -10,12 +10,9 @@ from typing import Optional
 
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
+import os
 
 
-class Model_Correlations:
-
-    def __init__(self):
-        pass
 
 
 
@@ -98,6 +95,16 @@ class Syndat_Control:
     def titles(self) -> list:
         return [syn_mod.title for syn_mod in self.syndat_models]
 
+
+    def redefine_exp_template_directory(self, new_directory):
+        for syn_mod in self.syndat_models:
+            exp = syn_mod.generative_experimental_model
+            basename = os.path.basename(exp.template)
+            filepath = os.path.join(new_directory, basename)
+            if os.path.isfile(filepath):
+                exp.template = os.path.realpath(filepath)
+            else: 
+                raise ValueError(f"New template file {filepath} does not exist")
 
 
     def sample(self, 

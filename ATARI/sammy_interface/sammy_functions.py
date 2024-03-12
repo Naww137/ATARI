@@ -365,8 +365,8 @@ def write_idc(filepath, J, C, stat):
         f.write("\n\n")
         
         f.write("CORRELATIOns for data-reduction parameters")
-        D = 1 / np.sqrt(np.diag(C)) # takes the inverse of sqrt of diag.
-        Corr = D @ C @ D
+        D = 1 / np.sqrt(np.diag(C))
+        Corr = D * C * D
         for i, row in enumerate(Corr):
             for corr in row[0:i]:
                 formatted_correlation = format_float(corr, width, sep=' ')

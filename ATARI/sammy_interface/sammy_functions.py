@@ -702,9 +702,11 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                   sammyINP.experimental_covariance['Jac_sys'],
                   sammyINP.experimental_covariance['Cov_sys'],
                   sammyINP.experimental_covariance['diag_stat'])
+        #TODO: Filter idc dataframe
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
+        #TODO: Filter idc dataframe
         idc = True
     else:
         idc = False
@@ -749,6 +751,7 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         sammy_OUT.chi2n = None
 
         if sammyRTO.get_ECSCM:
+            #TODO: update get_ECSCM to calculate with a different sammy template
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
             sammy_OUT.ECSCM = ecscm
             sammy_OUT.est_df = est_df
@@ -849,6 +852,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
             if isinstance(cov, dict) and len(cov)>0:
                 write_idc(os.path.join(rundir, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
+                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
@@ -1196,6 +1200,8 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
         raise ValueError(f"One or more experiments do not have template files.")
     if sammyINPyw.step_threshold_lag > 1 and sammyINPyw.batch_fitpar is False:
         print("WARNING: you have set a step threshold lag but are not batching fit parameters, this is an odd setting.")
+    # if sammyRTO.bayes:
+    #     if sammyINPyw.resonance_ladder
     return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):

@@ -38,6 +38,38 @@ model_correlations = {
                         }
 
 
+import os
+
+sammyexe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
+
+exp_model = Experimental_Model(channel_widths={"maxE": [250],"chw": [100.0],"dchw": [0.8]})
+# template_creator.make_input_template('samtemplate.inp', Ta_pair, exp_model, rto)
+exp_model.template = os.path.realpath('samtemplate.inp')
+
+rto = sammy_classes.SammyRunTimeOptions(sammyexe)
+
+Ta_pair = Particle_Pair()
+Ta_pair.add_spin_group(Jpi='3.0', J_ID=1, D=8.79, gn2_avg=46.5, gn2_dof=1, gg2_avg=64.0, gg2_dof=1000)
+pair = Ta_pair
+resonance_ladder = Ta_pair.sample_resonance_ladder()
+
+sammyINP = sammy_classes.SammyInputData(
+        pair,
+        resonance_ladder,
+        os.path.realpath('samtemplate.inp'),
+        exp_model,
+        energy_grid=exp_model.energy_grid,
+)
+
+samout = sammy_functions.run_sammy(sammyINP, rto)
+
+data_unc = np.sqrt(samout.pw['theo_trans'])/10
+data = np.random.default_rng().normal(samout.pw['theo_trans'], data_unc)
+
+data_df = pd.DataFrame({'E':samout.pw['E'],
+                        'exp': data,
+                        'exp_unc': data_unc})
+
 #%%
 
 # energy_grid = np.sort(np.random.default_rng().uniform(10,3000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum

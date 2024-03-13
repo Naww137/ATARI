@@ -1,5 +1,5 @@
 import unittest
-from tests import test_resonance_distributions, test_sammy_interface, test_syndat, test_res_generator
+from tests import test_resonance_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario
 
 
 
@@ -12,8 +12,12 @@ if __name__ == '__main__':
     ### general ATARI test suites
     parameter_distribution_test_suite = loader.loadTestsFromModule(test_resonance_distributions)
     resonance_generator_test_suite = loader.loadTestsFromModule(test_res_generator)
+    
     # TODO: add theory_module_test_suite
-    syndat_test_suite = loader.loadTestsFromModule(test_syndat)
+    syndat_test_suite = loader.loadTestsFromModule(test_syndat_functionality)
+    measurement_test_suite = loader.loadTestsFromModule(test_measurement_covariance)
+
+    atario_test_suite = loader.loadTestsFromModule(test_atario)
 
     ### those that require sammy
     sammy_test_suite = loader.loadTestsFromModule(test_sammy_interface)
@@ -29,6 +33,12 @@ if __name__ == '__main__':
 
     print("Running Syndat test suite")
     result = runner.run(syndat_test_suite)
+
+    print("Running measurement covariance test suite")
+    result = runner.run(measurement_test_suite)
+
+    print("Running atario test suite")
+    result = runner.run(atario_test_suite)
 
     print("Now running tests that require SAMMY")
     print("Running sammy_interface test suite")

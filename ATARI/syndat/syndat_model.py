@@ -70,11 +70,13 @@ class Syndat_Model:
             self.generative_measurement_model = generative_measurement_model
         else:
             self.generative_measurement_model = Transmission_RPI()  # Generative_Reduction_Model()
+            self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, smooth=False)
 
         if reductive_measurement_model is not None:
             self.reductive_measurement_model = reductive_measurement_model
         else:
             self.reductive_measurement_model = Transmission_RPI()
+            self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, smooth=False)
 
         if options is not None:
             self.options = deepcopy(options)
@@ -87,11 +89,8 @@ class Syndat_Model:
         self.pw_true = pd.DataFrame()
         self.clear_samples()
         
-        ### first, approximate unknown data
-        self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS, check_trig=True)
-        self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
-
+        
     @property
     def samples(self) -> list:
         return self._samples
@@ -123,10 +122,33 @@ class Syndat_Model:
         self._reductive_measurement_model = reductive_measurement_model
 
 
-    # def recalculate_unknown_data(self):
-    #     self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
-    #     self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
+    def truncate_energy_range(self,
+                              new_energy_range, 
+                              return_copy : bool = True
+                              ):
+        """
+        Truncates the energy range for all constituent measurement/experimental models. 
+        The new energy range must be within the bounds of the existing energy range due to the required spectra held in each model.
 
+        Parameters
+        ----------
+        new_energy_range : _type_
+            _description_
+        return_copy : bool, optional
+            Will return a copy of the syndat model with a truncated energy range rather than truncating its own range, by default True
+        """
+        if return_copy:
+            model = deepcopy(self)
+            model.generative_experimental_model.truncate_energy_range(new_energy_range)
+            model.generative_measurement_model.truncate_energy_range(new_energy_range)
+            model.reductive_measurement_model.truncate_energy_range(new_energy_range)
+            return model
+        else:
+            self.generative_experimental_model.truncate_energy_range(new_energy_range)
+            self.generative_measurement_model.truncate_energy_range(new_energy_range)
+            self.reductive_measurement_model.truncate_energy_range(new_energy_range)
+
+            
 
     def sample(self,
                particle_pair: Optional[Particle_Pair] = None,
@@ -163,11 +185,8 @@ class Syndat_Model:
         ValueError
             _description_
         """
-        # ### first, approximate unknown data
-        # self.generative_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
-        # self.reductive_measurement_model.approximate_unknown_data(self.generative_experimental_model, self.options.smoothTNCS)
 
-        ### Then, generate pw true
+        ### Generate pw true
         generate_pw_true_with_sammy = False
         par_true = None
         if pw_true is not None:
@@ -202,11 +221,13 @@ class Syndat_Model:
             reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
 
             if self.options.save_raw_data:
-                out = syndatOUT(par_true=par_true,
+                out = syndatOUT(title = self.title,
+                                par_true=par_true,
                                 pw_reduced=reduced_data, 
                                 pw_raw=raw_data)
             else:
-                out = syndatOUT(par_true=par_true,
+                out = syndatOUT(title = self.title,
+                                par_true=par_true,
                                 pw_reduced=reduced_data)
             if self.options.calculate_covariance:
                 out.covariance_data = covariance_data
@@ -296,6 +317,8 @@ class Syndat_Model:
 
         else:
             assert pw_true is not None
+            if np.any(pw_true.true.values == np.nan):
+                raise ValueError("'true' in supplied pw true contains a Nan, please make sure you are supplying the correct pw_true")
 
             pw_true = pw_true
         

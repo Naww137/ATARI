@@ -334,9 +334,26 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 ########################################################## ###############################################
 # run sammy with the YW scheme
 ########################################################## ###############################################
+def remove_resolution_function_from_template(template_filepath):
+    file = open(template_filepath, 'r')
+    readlines = file.readlines()
+    file.close()
+    file = open(template_filepath, 'w')
+    sg_started = False
+    end = False
+    for line in readlines:
+        if sg_started:
+            if line == '\n':
+                end = True
+        if line.startswith("%%%card8%%%"):
+            sg_started = True
+        if not end:
+            file.write(line)
+    file.close()
+
 
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions, idc_list: list):
-    temp_RTO = copy(sammyRTO)
+
     #### make files for each dataset YW generation
     exp, idc_bool = sammyINPYW.experiments[0], idc_list
     for exp, idc_bool in zip(sammyINPYW.experiments, idc_list):  # fix this !!
@@ -344,13 +361,12 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
             idc_flag = ["USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX"]
         else:
             idc_flag = []
-
-        temp_RTO.bayes = True
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", temp_RTO.sammy_runDIR)
+        ### make YWY initial
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_initial.inp"),
-                    bayes       =   temp_RTO.bayes,
-                    iterations  =   temp_RTO.iterations,
+                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
+                    bayes       =   True,
+                    iterations  =   sammyRTO.iterations,
                     formalism   =   sammyINPYW.particle_pair.formalism,
                     isotope     =   sammyINPYW.particle_pair.isotope,
                     M           =   sammyINPYW.particle_pair.M,
@@ -363,12 +379,12 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
                     # use_IDC=idc,
                     alphanumeric=["yw"]+idc_flag
                                     )
-
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", temp_RTO.sammy_runDIR)
+        ### make YWY for iterations
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_iter.inp"),
-                bayes       =   temp_RTO.bayes,
-                iterations  =   temp_RTO.iterations,
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
+                bayes       =   True,
+                iterations  =   sammyRTO.iterations,
                 formalism   =   sammyINPYW.particle_pair.formalism,
                 isotope     =   sammyINPYW.particle_pair.isotope,
                 M           =   sammyINPYW.particle_pair.M,
@@ -381,13 +397,12 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
                 # use_IDC=idc,
                 alphanumeric=["yw","Use remembered original parameter values"]+idc_flag
                 )
-
-        temp_RTO.bayes = False
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", temp_RTO.sammy_runDIR)
+        ### make plotting
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"),
-                    bayes       =   temp_RTO.bayes,
-                    iterations  =   temp_RTO.iterations,
+                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
+                    bayes       =   False,
+                    iterations  =   sammyRTO.iterations,
                     formalism   =   sammyINPYW.particle_pair.formalism,
                     isotope     =   sammyINPYW.particle_pair.isotope,
                     M           =   sammyINPYW.particle_pair.M,
@@ -407,39 +422,40 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     else:
         alphanumeric_LS_opts = []
 
-    #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
-    fill_runDIR_with_templates(exp.template, "solvebayes_initial.inp", temp_RTO.sammy_runDIR)
-    temp_RTO.bayes = True
+    ### solve bayes with YWY matrices initial - don't need experimental description
+    fill_runDIR_with_templates(exp.template, "solvebayes_initial.inp", sammyRTO.sammy_runDIR) # need to remove resolutin function from template
+    remove_resolution_function_from_template(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"))
     write_saminp(
-                filepath   =    os.path.join(temp_RTO.sammy_runDIR,"solvebayes_initial.inp"),
-                bayes       =   temp_RTO.bayes,
-                iterations  =   temp_RTO.iterations,
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"),
+                bayes       =   True,
+                iterations  =   0,
                 formalism   =   sammyINPYW.particle_pair.formalism,
                 isotope     =   sammyINPYW.particle_pair.isotope,
                 M           =   sammyINPYW.particle_pair.M,
-                ac          =   sammyINPYW.particle_pair.ac*10,
-                reaction    =   exp.reaction,
-                energy_range=   exp.energy_range,
-                temp        =   exp.temp,
-                FP          =   exp.FP,
-                n           =   exp.n,
+                ac          =   0.0,
+                reaction    =   'REACTION',
+                energy_range=   (0.0, 0.0),
+                temp        =   (0.0, 0.0),
+                FP          =   (0.0, 0.0),
+                n           =   (0.0, 0.0),
                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts
                 )
-
-    fill_runDIR_with_templates(exp.template, "solvebayes_iter.inp" , temp_RTO.sammy_runDIR)
+    ### solve bayes with YWY matrices iterations - don't need experimental description
+    fill_runDIR_with_templates(exp.template, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
+    remove_resolution_function_from_template(os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"))
     write_saminp(
-                filepath   =    os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"),
-                bayes       =   temp_RTO.bayes,
-                iterations  =   temp_RTO.iterations,
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"),
+                bayes       =   True,
+                iterations  =   0,
                 formalism   =   sammyINPYW.particle_pair.formalism,
                 isotope     =   sammyINPYW.particle_pair.isotope,
                 M           =   sammyINPYW.particle_pair.M,
-                ac          =   sammyINPYW.particle_pair.ac*10,
-                reaction    =   exp.reaction,
-                energy_range=   exp.energy_range,
-                temp        =   exp.temp,
-                FP          =   exp.FP,
-                n           =   exp.n,          
+                ac          =   0.0,
+                reaction    =   'REACTION',
+                energy_range=   (0.0, 0.0),
+                temp        =   (0.0, 0.0),
+                FP          =   (0.0, 0.0),
+                n           =   (0.0, 0.0),       
                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts
                 )
 

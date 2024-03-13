@@ -413,7 +413,7 @@ def write_saminp(filepath   :   str,
 
                 alphanumeric:   bool    = None,
                 use_IDC     :   bool    = False,
-                # use_ecscm_reaction = False
+                # resolution_function = True,
                 ):
     
     if alphanumeric is None:

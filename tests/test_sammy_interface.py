@@ -162,7 +162,7 @@ class TestRunSammyYW(unittest.TestCase):
         # template_creator.make_input_template('samtemplate.inp', Ta_pair, cls.exp_model, rto)
         cls.exp_model.template = os.path.realpath('samtemplate.inp')
 
-        cls.rto = sammy_classes.SammyRunTimeOptions(sammyexe, Print=False)
+        cls.rto = sammy_classes.SammyRunTimeOptions(sammyexe, Print=False, keep_runDIR=True)
 
         Ta_pair = Particle_Pair()
         Ta_pair.add_spin_group(Jpi='3.0', J_ID=1, D=8.79, gn2_avg=46.5, gn2_dof=1, gg2_avg=64.0, gg2_dof=1000)

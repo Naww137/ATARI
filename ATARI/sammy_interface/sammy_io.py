@@ -486,7 +486,27 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 
 
 
+# ################################################ ###############################################
+# MISC
+# ################################################ ###############################################
 
 
+
+def remove_resolution_function_from_template(template_filepath):
+    file = open(template_filepath, 'r')
+    readlines = file.readlines()
+    file.close()
+    file = open(template_filepath, 'w')
+    sg_started = False
+    end = False
+    for line in readlines:
+        if sg_started:
+            if line == '\n':
+                end = True
+        if line.startswith("%%%card8%%%"):
+            sg_started = True
+        if not end:
+            file.write(line)
+    file.close()
 
 

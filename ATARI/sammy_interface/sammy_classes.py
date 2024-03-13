@@ -63,8 +63,8 @@ class SammyRunTimeOptions:
 
         self.energy_window = None
         self.get_ECSCM = False
-        self.ECSCM_rxn = 'total'
-        self.ECSCM_template = None #os.path.realpath(os.path.join(os.path.dirname(__file__), "sammy_templates/dop_2sg.inp"))
+        # self.ECSCM_rxn = 'total'
+        # self.ECSCM_template = None #os.path.realpath(os.path.join(os.path.dirname(__file__), "sammy_templates/dop_2sg.inp"))
 
         ### update attributes to **kwargs
         for key, value in kwargs.items():
@@ -95,12 +95,16 @@ class SammyInputData:
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
     template: str
+
     experiment: Experimental_Model
     experimental_data: Optional[Union[DataFrame,ndarray]] = None
     experimental_covariance: Optional[dict] = None
     energy_grid: Optional[arraytype_id] = None
 
     initial_parameter_uncertainty: Optional[float] = 1.0
+
+    ECSCM_experiment: Optional[Experimental_Model] = None
+
     
 
 

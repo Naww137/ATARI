@@ -111,6 +111,14 @@ class TestRunSammy(unittest.TestCase):
         
         sammyOUT_fit = sammy_functions.run_sammy(sammyINP, self.rto)
         self.assertIsNotNone(sammyOUT_fit.est_df)
+
+        # test with separate exp definition
+        ECSCM_experiment = Experimental_Model(title = "theo",reaction='total',temp = (300,0))
+        ECSCM_experiment.template = self.exp_model.template
+        sammyINP.ECSCM_experiment = ECSCM_experiment
+        sammyOUT_fit2 = sammy_functions.run_sammy(sammyINP, self.rto)
+        self.assertIsNotNone(sammyOUT_fit2.est_df)
+        self.assertFalse(np.all(sammyOUT_fit.est_df== sammyOUT_fit2.est_df))
     
 
     def test_expand_sammy_ladder_2_atari(self):

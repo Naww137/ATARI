@@ -160,9 +160,14 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 
 
 def get_ECSCM(sammyRTO, sammyINP):
+    if sammyINP.ECSCM_experiment is None:
+        print("No specific ECSCM experiment class was given, using the same experiment model as used to fit")
+        exp = sammyINP.experiment
+    else:
+        exp = sammyINP.ECSCM_experiment 
 
     # update_input_files(sammy_INP, sammy_RTO)
-    fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    fill_runDIR_with_templates(exp.template, "sammy.inp", sammyRTO.sammy_runDIR)
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(
@@ -173,11 +178,11 @@ def get_ECSCM(sammyRTO, sammyINP):
                 isotope     =   sammyINP.particle_pair.isotope,
                 M           =   sammyINP.particle_pair.M,
                 ac          =   sammyINP.particle_pair.ac*10,
-                reaction    =   sammyINP.experiment.reaction,
-                energy_range=   sammyINP.experiment.energy_range,
-                temp        =   sammyINP.experiment.temp,
-                FP          =   sammyINP.experiment.FP,
-                n           =   sammyINP.experiment.n,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,
                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
                 )
     
@@ -234,9 +239,13 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
             else: 
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied")
+    if sammyRTO.get_ECSCM:
+        if not sammyRTO.bayes:
+            raise ValueError("get_ECSCM is set to True but bayes is False")
     if sammyINP.experimental_data is None:
         if sammyINP.energy_grid is None: 
             raise ValueError("No energy grid was provided")
+
 
 def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
@@ -317,7 +326,6 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         sammy_OUT.chi2n = None
 
         if sammyRTO.get_ECSCM:
-            #TODO: update get_ECSCM to calculate with a different sammy template
             est_df, ecscm = get_ECSCM(sammyRTO, sammyINP)
             sammy_OUT.ECSCM = ecscm
             sammy_OUT.est_df = est_df
@@ -334,22 +342,6 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 ########################################################## ###############################################
 # run sammy with the YW scheme
 ########################################################## ###############################################
-def remove_resolution_function_from_template(template_filepath):
-    file = open(template_filepath, 'r')
-    readlines = file.readlines()
-    file.close()
-    file = open(template_filepath, 'w')
-    sg_started = False
-    end = False
-    for line in readlines:
-        if sg_started:
-            if line == '\n':
-                end = True
-        if line.startswith("%%%card8%%%"):
-            sg_started = True
-        if not end:
-            file.write(line)
-    file.close()
 
 
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions, idc_list: list):

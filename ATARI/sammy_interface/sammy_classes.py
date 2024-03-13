@@ -68,6 +68,9 @@ class SammyRunTimeOptions:
 
         ### update attributes to **kwargs
         for key, value in kwargs.items():
+            if key == 'options': # catch legacy implementation
+                for key1, val1 in value.items():
+                    setattr(self, key1, val1)
             setattr(self, key, value)
 
 
@@ -121,19 +124,6 @@ class SammyOutputData:
 
 
 ### New scheme
-
-
-def update_dict(old, additional):
-    new = old
-    for key in old:
-        if key in additional:
-            new.update({key:additional[key]})
-    return new
-
-
-
-
-
 
 
 @dataclass

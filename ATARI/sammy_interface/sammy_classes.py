@@ -7,41 +7,6 @@ from pandas import DataFrame, Series
 from numpy import ndarray
 import os
 
-# from ATARI.utils.stats import chi2_val
-
-# @dataclass
-# class SammyRunTimeOptions:
-#     """
-#     Runtime options for sammy. 
-
-#     This object holds many options for how sammy should be used.
-#     Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
-#     The options here fall into two primary categories:
-#     1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
-#     2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
-
-#     There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
-#     """
-#     path_to_SAMMY_exe: str
-#     shell: str = 'zsh'
-#     sammy_runDIR: str = 'SAMMY_runDIR'
-#     keep_runDIR: bool = False
-#     Print: bool = False
-
-#     model: str = 'XCT'
-#     reaction: str = 'total'
-#     solve_bayes: bool = False
-#     inptemplate: str = "noexp_1sg.inp"
-#     inpname: str = "sammy.inp"
-#     title: str = "default title"
-#     get_ECSCM: bool = False
-
-#     alphanumeric: list = field(default_factory=lambda: [])
-#     energy_window: Optional[float] = None
-#     recursive: bool = False
-#     recursive_opt: dict = field(default_factory=lambda: {"threshold":0.01,
-#                                                         "iterations": 5,
-#                                                         "print":False}      )
 
 class SammyRunTimeOptions:
 
@@ -184,8 +149,8 @@ class SammyInputDataYW:
     resonance_ladder: DataFrame
 
     datasets : list[DataFrame]
-    experimental_covariance: Optional[list[Union[dict, str]]]
     experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
+    experimental_covariance: Optional[list[Union[dict, str]]] #= None
 
     max_steps: int = 1
     iterations: int = 2

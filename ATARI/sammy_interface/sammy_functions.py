@@ -165,12 +165,22 @@ def get_ECSCM(sammyRTO, sammyINP):
     fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
-                 sammyINP.particle_pair, 
-                 sammyINP.experiment, 
-                 sammyRTO,
-                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
-                 use_ecscm_reaction = True)
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes       =   sammyRTO.bayes,
+                iterations  =   sammyRTO.iterations,
+                formalism   =   sammyINP.particle_pair.formalism,
+                isotope     =   sammyINP.particle_pair.isotope,
+                M           =   sammyINP.particle_pair.M,
+                ac          =   sammyINP.particle_pair.ac*10,
+                reaction    =   sammyINP.experiment.reaction,
+                energy_range=   sammyINP.experiment.energy_range,
+                temp        =   sammyINP.experiment.temp,
+                FP          =   sammyINP.experiment.FP,
+                n           =   sammyINP.experiment.n,
+                alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
+                )
+    
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
     _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
 
@@ -262,10 +272,22 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
     fill_runDIR_with_templates(sammyINP.template, 
                                "sammy.inp", 
                                sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
-                 sammyINP.particle_pair, 
-                 sammyINP.experiment, 
-                 sammyRTO,use_IDC=idc)
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes       =   sammyRTO.bayes,
+                iterations  =   sammyRTO.iterations,
+                formalism   =   sammyINP.particle_pair.formalism,
+                isotope     =   sammyINP.particle_pair.isotope,
+                M           =   sammyINP.particle_pair.M,
+                ac          =   sammyINP.particle_pair.ac*10,
+                reaction    =   sammyINP.experiment.reaction,
+                energy_range=   sammyINP.experiment.energy_range,
+                temp        =   sammyINP.experiment.temp,
+                FP          =   sammyINP.experiment.FP,
+                n           =   sammyINP.experiment.n,
+                use_IDC=idc
+                )
+                
     write_shell_script(sammyINP, 
                        sammyRTO, 
                        use_RPCM=False, 
@@ -324,20 +346,60 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
             idc_flag = []
 
         temp_RTO.bayes = True
-        temp_RTO.bayes = True
         fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=["yw"]+idc_flag)
+        write_saminp(
+                    filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_initial.inp"),
+                    bayes       =   temp_RTO.bayes,
+                    iterations  =   temp_RTO.iterations,
+                    formalism   =   sammyINPYW.particle_pair.formalism,
+                    isotope     =   sammyINPYW.particle_pair.isotope,
+                    M           =   sammyINPYW.particle_pair.M,
+                    ac          =   sammyINPYW.particle_pair.ac*10,
+                    reaction    =   exp.reaction,
+                    energy_range=   exp.energy_range,
+                    temp        =   exp.temp,
+                    FP          =   exp.FP,
+                    n           =   exp.n,
+                    # use_IDC=idc,
+                    alphanumeric=["yw"]+idc_flag
+                                    )
 
         fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=["yw","Use remembered original parameter values"]+idc_flag)
+        write_saminp(
+                filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_iter.inp"),
+                bayes       =   temp_RTO.bayes,
+                iterations  =   temp_RTO.iterations,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   sammyINPYW.particle_pair.ac*10,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,
+                # use_IDC=idc,
+                alphanumeric=["yw","Use remembered original parameter values"]+idc_flag
+                )
 
         temp_RTO.bayes = False
-        temp_RTO.bayes = False
         fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=[]+idc_flag)
+        write_saminp(
+                    filepath   =    os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"),
+                    bayes       =   temp_RTO.bayes,
+                    iterations  =   temp_RTO.iterations,
+                    formalism   =   sammyINPYW.particle_pair.formalism,
+                    isotope     =   sammyINPYW.particle_pair.isotope,
+                    M           =   sammyINPYW.particle_pair.M,
+                    ac          =   sammyINPYW.particle_pair.ac*10,
+                    reaction    =   exp.reaction,
+                    energy_range=   exp.energy_range,
+                    temp        =   exp.temp,
+                    FP          =   exp.FP,
+                    n           =   exp.n,
+                    # use_IDC=idc,
+                    alphanumeric=[]+idc_flag
+                    )
     
     ### options for least squares
     if sammyINPYW.LS:
@@ -348,13 +410,38 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
     fill_runDIR_with_templates(exp.template, "solvebayes_initial.inp", temp_RTO.sammy_runDIR)
     temp_RTO.bayes = True
-    temp_RTO.bayes = True
-    write_saminp(os.path.join(temp_RTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,   
-                                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
+    write_saminp(
+                filepath   =    os.path.join(temp_RTO.sammy_runDIR,"solvebayes_initial.inp"),
+                bayes       =   temp_RTO.bayes,
+                iterations  =   temp_RTO.iterations,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   sammyINPYW.particle_pair.ac*10,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,
+                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts
+                )
 
     fill_runDIR_with_templates(exp.template, "solvebayes_iter.inp" , temp_RTO.sammy_runDIR)
-    write_saminp(os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
+    write_saminp(
+                filepath   =    os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"),
+                bayes       =   temp_RTO.bayes,
+                iterations  =   temp_RTO.iterations,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   sammyINPYW.particle_pair.ac*10,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,          
+                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts
+                )
 
 def filter_idc(filepath, pw_df):
     minE = np.min(pw_df.E)

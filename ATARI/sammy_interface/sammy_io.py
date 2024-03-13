@@ -395,32 +395,44 @@ def create_sammyinp(filename='sammy.inp', \
         
     return
 
-def write_saminp(filepath, 
-                particle_pair,
-                experimental_model,
-                rto,
-                alphanumeric = None,
-                use_IDC = False,
-                use_ecscm_reaction = False):
+def write_saminp(filepath   :   str, 
+
+                bayes       :   bool,
+                iterations  :   int,
+
+                formalism   :   str,
+                isotope     :   str,
+                M           :   float,
+                ac          :   float,
+
+                reaction    :   str,
+                energy_range,
+                temp        :   tuple,
+                FP          :   tuple,
+                n           :   tuple,
+
+                alphanumeric:   bool    = None,
+                use_IDC     :   bool    = False,
+                # use_ecscm_reaction = False
+                ):
     
     if alphanumeric is None:
         alphanumeric = []
-    if use_ecscm_reaction:
-        reaction = rto.ECSCM_rxn
-    else:
-        reaction = experimental_model.reaction
-        
+    # if use_ecscm_reaction:
+    #     reaction = rto.ECSCM_rxn
+    # else:
+    #     reaction = experimental_model.reaction
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
     
-    if rto.bayes:
+    if bayes:
         bayes_cmd = "SOLVE BAYES EQUATIONS"
     else:
         bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
     if use_IDC:
             alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
     
-    alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
+    alphanumeric = [formalism, bayes_cmd] + alphanumeric
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -436,17 +448,17 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {float(max(experimental_model.energy_range)):<9.8}      {rto.iterations: <5} \n")
+                f.write(f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(experimental_model.temp[0]):<8.7}  {float(experimental_model.FP[0]):<8.7}  {float(experimental_model.FP[1]):<8.7}        \n')
+                    f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n')
                 else:
                     pass
 
             elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {float(particle_pair.ac)*10:<8.7}  {float(experimental_model.n[0]):<8.7}                       0.00000          \n')
+                f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
 
             elif line.startswith('%%%card8%%%'):
                 f.write(f'{reaction}\n')

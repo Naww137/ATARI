@@ -180,7 +180,7 @@ class elim_OPTs:
         self._interm_fit_step_thr = interm_fit_step_thr
 
 
-    # if solution passed the prior it's recommended to start from small value of V-coeff. for LM alg. to save time
+    # if solution passed the prior it's recommended to start from small value of V-coeff. for LM alg.
     @property
     def LevMarV0_priorpassed(self):
         return self._LevMarV0_priorpassed

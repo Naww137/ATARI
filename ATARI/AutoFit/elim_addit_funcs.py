@@ -2758,9 +2758,12 @@ def plot_multiple_hist(values_list: list,
                         colors: list, 
                         captions: list, 
                         title: str = '',
+                        x_label: str = '',
                         show_kde: bool = True,
                         stacked: bool = False,
-                        show_numbers: bool = False):
+                        show_numbers: bool = False,
+                        zorders: list = [],
+                        x_lim = None):
     
     # create a new figure and axis
     fig_new, ax_new = plt.subplots()
@@ -2794,7 +2797,15 @@ def plot_multiple_hist(values_list: list,
     # set the title and legend
     if(len(title)>0):
         ax_new.set_title(title)
+
+    if len(x_label)>0:
+        ax_new.set_xlabel(x_label)
+    
     ax_new.legend()
+
+    if (x_lim is not None):
+        ax_new.set_xlim(x_lim)
+
 
     return fig_new
 
@@ -2951,7 +2962,7 @@ def create_doubled_deleted_ladders(base_ladder: pd.DataFrame,
 
     # print(ladder_with_moved_res)
 
-    # Resonance to double or move
+    # Resonance to work with
     cand_res_df = base_ladder.loc[[res_index]].copy()
 
     # Get spin group ID for the given resonance

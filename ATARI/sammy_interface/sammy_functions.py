@@ -41,13 +41,13 @@ def readlst(filepath):
         DataFrame with headers.
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
         if df.index.equals(pd.RangeIndex(len(df))):
             pass
         else:
-            df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
+            df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
     else:
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):
@@ -130,12 +130,12 @@ def read_ECSCM(file_path):
         _description_
     """
 
-    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
+    data = pd.read_csv(file_path, sep = '\s+', skiprows=3, header=None)
     df_tdte = data.iloc[:,0:3]
     df_tdte.columns = ["theo", "theo_unc", "E"]
 
     # assert top rows == left columns
-    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
+    dftest = pd.read_csv(file_path, sep = '\s+', nrows=3, header=None)
     dftest=dftest.T
     dftest.columns = ["theo", "theo_unc", "E"]
     assert(np.all(dftest == df_tdte))

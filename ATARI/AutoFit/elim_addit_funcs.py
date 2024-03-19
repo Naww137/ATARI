@@ -1767,7 +1767,8 @@ def plot_xs_differences(cand_sol : list,
 
                         addit_str : str = '',
                         fig_size : tuple = (10,5),
-                        y_scale: str = 'linear'
+                        y_scale: str = 'linear',
+                        show_spin_groups: bool = False,
                         ):
     """
     given a true solution and a list of candidate solutions - output each type of cs 
@@ -1801,6 +1802,7 @@ def plot_xs_differences(cand_sol : list,
 
     if num_xs_columns == 1:
         axs = [axs]
+
 
     # Looping through each column to plot
     for idx, column in enumerate(xs_columns):
@@ -1836,6 +1838,45 @@ def plot_xs_differences(cand_sol : list,
         if (y_scale!='linear'):
             axs[idx].set_yscale(y_scale)
     
+    ### plotting spin groups if plotting
+    
+
+    for idx, column in enumerate(xs_columns):
+
+        for index_sol, sol in enumerate(cs_calc_res_dfs_list):
+
+            # vertical lines where we assume res.
+            for index_res, res in cand_sol[index_sol].iterrows():
+                axs[idx].axvline(x=res.E, linestyle='--', linewidth=0.5, alpha=0.5, color = cand_sol_colors[index_sol])
+
+                if (show_spin_groups):
+
+                     # Set the y-axis limits with additional space for text and capture ymax before changing
+                    y_top_padding = 0.1 
+                    x_offset = 0.05
+
+                    ymax_values = [ax.get_ylim()[1] for ax in axs]  # Store original ymax values for each axis
+                
+                    for ax in axs:
+                        ymin, ymax = ax.get_ylim()
+                        ax.set_ylim(ymin, ymax + y_top_padding)
+
+                    font_size = 8
+                    y_text_shift = 0.01  # Adjust as needed, related to font size
+                    y_text_positions = [ymax_values[0], ymax_values[1]]
+
+                    #add txt with
+                    sp_gr_txt = np.round(int(res.J_ID),0)
+            
+                    # Show the text to the right of the line
+                    for i, ax in enumerate(axs):
+                        y_text_position = ymax_values[i]  # Use original ymax for text position
+
+                        ax.text(res.E, y_text_positions[i], str(sp_gr_txt), color=cand_sol_colors[index_sol], verticalalignment='bottom', fontsize=font_size)
+                        y_text_positions[i] -= y_text_shift
+
+
+
     
     # Adding a title for the entire figure
     #fig_all_reacts.suptitle(f"Cross-section Comparison. {addit_str}", fontsize=14)
@@ -2162,17 +2203,11 @@ def calc_SSE_one_case(
 
 from ATARI.theory.scattering_params import gstat
 
-def calc_SF_Gn1(Ta_pair, ladder_df, energy_range, lwave=0):
+def calc_SF_Gn1(Ta_pair, ladder_df, energy_grid, lwave=0):
     """Calculated SF value for a given ladder and region for Ta_pair parameters
     for lwave l  -> 1 / ((2*lwave + 1) * delta_E) * np.sum(gj * Gn_vals_l)
     """
     result_dict = {}
-
-    # Create a fine energy grid for calculation
-    combined_energy = create_E_grid_steps(ladder_df = ladder_df,
-                                           e_range = energy_range,
-                                           e_offset=1e-3)
-    #combined_energy = fine_egrid(energy_range)
 
     # for each spin group present in Ta_pair.
     for Jpi in Ta_pair.spin_groups.keys():
@@ -2180,20 +2215,20 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_range, lwave=0):
         gj = gstat(J=Jpi, I=Ta_pair.I, i=Ta_pair.i)
 
         # Filter DataFrame based on the energy range + Jpi value == Jpi
-        ladder_subset = ladder_df[(ladder_df['E'] >= energy_range[0]) & (ladder_df['E'] <= energy_range[1])]
+        ladder_subset = ladder_df[(ladder_df['E'] >= energy_grid[0]) & (ladder_df['E'] <= energy_grid[-1])]
         ladder_subset = ladder_subset[(ladder_subset['L'] == lwave) & (ladder_subset['Jpi'] == Jpi)]
 
         N_res_Jpi = len(ladder_subset)
 
-        SF_Gn1_l = np.zeros_like(combined_energy)
+        SF_Gn1_l = np.zeros_like(energy_grid)
 
         # Manually set the first element to 0
         SF_Gn1_l[0] = 0
 
-        delta_E = combined_energy[-1] - combined_energy[0]
+        delta_E = energy_grid[-1] - energy_grid[0]
 
-        for i in range(1, len(combined_energy)):  # Start loop from 1
-            e = combined_energy[i]
+        for i in range(1, len(energy_grid)):  # Start loop from 1
+            e = energy_grid[i]
             sum_gn1 = ladder_subset[ladder_subset['E'] <= e]['Gn1'].sum()
             #delta_E = e - combined_energy[0]
             
@@ -2201,7 +2236,7 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_range, lwave=0):
 
         # Create a DataFrame
         resulting_df = pd.DataFrame.from_dict({
-            'E': combined_energy,
+            'E': energy_grid,
             'SF_Gn1': SF_Gn1_l
         })
 
@@ -2212,25 +2247,98 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_range, lwave=0):
     return result_dict
 
 
-def create_E_grid_steps(ladder_df, e_range, e_offset=1e-3):
+def calc_sum_sf_using(input_SF_dict:dict) -> float:
+    """calc sum of separate SF for each Jpi"""
+
+    sf_sum = 0
+
+    n_res_sum = 0
+
+    for key in input_SF_dict:
+        sf_sum += input_SF_dict[key]['lastval']
+        n_res_sum += input_SF_dict[key]['N_res']
+
+    return sf_sum, n_res_sum
+
+
+
+def calc_SF_error_by_Jpi(SF_dict_true: dict,
+                        SF_dict_sol: dict):
     
+    result_dict = {'all_Jpi': {},
+                    'by_Jpi': {},
+                    'squareed_error_sum_separate_Jpi': 0
+                    }
+
+    sum_SF_true = 0
+    sum_SF_sol = 0
+    sum_SF_error = 0
+
+    for key in SF_dict_true:
+        
+        sum_SF_true += SF_dict_true[key]['lastval']
+        sum_SF_sol += SF_dict_sol[key]['lastval']
+
+        # per spin group
+
+        # error
+        result_dict['by_Jpi'][key] = {}
+        
+        SF_sg_error = SF_dict_sol[key]['lastval'] - SF_dict_true[key]['lastval']
+
+
+        result_dict['by_Jpi'][key]['error']  = SF_sg_error
+        result_dict['by_Jpi'][key]['abs_error']  = np.abs(SF_sg_error)
+        result_dict['by_Jpi'][key]['sq_error']  = np.power(SF_sg_error,2)
+
+        result_dict['by_Jpi'][key]['rel_error']  = SF_sg_error / SF_dict_true[key]['lastval'] * 100
+        result_dict['by_Jpi'][key]['abs_rel_error']  = np.abs(SF_sg_error) / SF_dict_true[key]['lastval'] * 100
+
+        result_dict['squareed_error_sum_separate_Jpi'] += result_dict['by_Jpi'][key]['sq_error']
+    
+
+
+    sum_SF_error = sum_SF_sol - sum_SF_true
+    # absolute value of error
+    sum_SF_abs_error = np.abs(sum_SF_error)
+    # squarred error val
+    sum_SF_sq_error = sum_SF_error**2
+
+    # relative error, %
+    sum_SF_rel_error = sum_SF_error / sum_SF_true * 100
+
+    result_dict['all_Jpi']['error'] = sum_SF_error
+    result_dict['all_Jpi']['abs_error'] = sum_SF_abs_error
+    result_dict['all_Jpi']['sq_error'] = sum_SF_sq_error
+    result_dict['all_Jpi']['rel_error'] = sum_SF_rel_error
+    result_dict['all_Jpi']['abs_rel_error'] = np.abs(sum_SF_rel_error)
+
+    return result_dict
+
+
+def create_E_grid_steps(ladders_dfs: list, e_range: list, e_offset=1e-3):
+    """Create a combined energy grid based on the energy_range and values of energy from a list of ladders."""
     E_min, E_max = e_range
-    E_values = sorted(ladder_df['E'].unique())  # Get unique, sorted E values from the dataframe
-    E_res = [E_min]  # Start with the minimum value
+    all_E_values = set()
 
-    for E in E_values:
-        if E_min < E < E_max:
-            # Add value slightly less than E, if it's within range and not a duplicate
-            if E - e_offset > E_res[-1]:
-                E_res.append(E - e_offset)
-            # Add the E value
-            E_res.append(E)
+    # Collect and filter unique E values from all DataFrames
+    for ladder_df in ladders_dfs:
+        E_values = ladder_df['E'].unique()
+        filtered_E_values = [E for E in E_values if E_min < E < E_max]
+        all_E_values.update(filtered_E_values)
 
-    # Add value slightly less than E_max, if it's greater than the last value added
+    # Sort the combined E values
+    all_E_values = sorted(all_E_values)
+
+    # Create the energy grid with offsets
+    E_res = [E_min]
+    for E in all_E_values:
+        if E - e_offset > E_res[-1]:
+            E_res.append(E - e_offset)
+        E_res.append(E)
+
     if E_max - e_offset > E_res[-1]:
         E_res.append(E_max - e_offset)
-    
-    # Finally, add the maximum value
     E_res.append(E_max)
 
     return E_res

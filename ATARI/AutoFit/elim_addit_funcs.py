@@ -10,6 +10,7 @@ from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.theory import resonance_statistics
 from ATARI.utils.misc import fine_egrid
 from ATARI.theory.resonance_statistics import sample_RRR_levels
+from ATARI.theory.distributions import wigner_dist
 
 from ATARI.theory.scattering_params import FofE_recursive
 #from ATARI.utils.atario import fill_resonance_ladder
@@ -596,7 +597,7 @@ def characterize_ladder(
 
     # SSE inside 
     if (len(true_ladder)>0 and len(energy_grid_2_compare_on)>0):
-        SSE_val = calc_SSE_one_case(
+        SSE_val, SSE_dict = calc_SSE_one_case(
             est_ladder = sol_ladder,
             theo_ladder = true_ladder,
             Ta_pair = Ta_pair,
@@ -605,6 +606,7 @@ def characterize_ladder(
             reactions_SSE  = reactions_SSE,
         )
         output_dict['SSE'] = SSE_val
+        output_dict['SSE_dict'] = SSE_dict
 
     return output_dict
 
@@ -797,6 +799,24 @@ def calculate_probability_N_res(avg_distance, N_res, num_samples, e_range):
     return probability
 
 
+
+def estimate_feasible_nres(particle_pair, window_size, probability_cutoff = 1e-5):
+
+    min_res = 0; max_res = 0
+    for key, sg in particle_pair.spin_groups.items():
+        wigdist = wigner_dist(beta=1, scale=sg['<D>'])
+
+        feasible_resonance_numbers = []
+        for ires in np.arange(start=1, stop=window_size, step=1):
+            spacing = window_size/ires
+            probability = np.power(wigdist.cdf(spacing), ires)
+            if probability >= probability_cutoff:
+                feasible_resonance_numbers.append(ires)
+
+        min_res += min(feasible_resonance_numbers)
+        max_res += max(feasible_resonance_numbers)
+
+    return (min_res, max_res)
 
 
 def save_obj_as_pkl(folder_name:str,
@@ -1609,6 +1629,7 @@ def build_residual_matrix_dict(
         reactions: list = ['capture', 'elastic'],
         print_bool=False
         ):
+    
     """Calculating the residuals disctionaries on the fine grid for provided reactions"""
 
     energy_grid_fine = fine_egrid(energy=energy_grid)
@@ -1692,12 +1713,13 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
     for rxn in ResidualMatrixDict.keys():
 
         R = ResidualMatrixDict[rxn]
+
         SSE['SSE'][rxn] = {}
         SSE['SSE_normalized'][rxn] = {}
 
         SSE['SSE'][rxn]['casewise'] = [np.sum(R[i]**2) for i in range(R.shape[0])] # for each case by react type
 
-        SSE['SSE_normalized'][rxn]['casewise'] = [np.sum(R[i]**2)/R[i].size for i in range(R.shape[0])] # for each case by react type
+        SSE['SSE_normalized'][rxn]['casewise'] = [np.sum(R[i]**2)/R[i].size for i in range(R.shape[0])] 
         
         SSE['SSE'][rxn]['for_all_cases'] = np.sum(R**2)  # for all cases by react type
 
@@ -1712,8 +1734,8 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
     SSE['SSE_normalized']['size'] = overall_size
 
     # calculating for all reactions but per case!
-    
-    for i in range(R.shape[0]):
+
+    for i in range(R.shape[0]): # for each case
 
         total_case_SSE, total_case_SSE_normalized  = 0, 0
         size_to_norm = 0
@@ -1732,7 +1754,6 @@ def calculate_SSE_by_cases(ResidualMatrixDict):
 
 
 # PLOTTING ALL cs calculated data and comparing it to some assumed true sol?
-
 def plot_xs_differences(cand_sol : list,
                         cand_sol_names : list,
                         cand_sol_colors : list,
@@ -1741,10 +1762,15 @@ def plot_xs_differences(cand_sol : list,
                         settings : dict,
                         reactions : list = ['transmission', 'capture', 'elastic'],
 
-                        addit_str : str = ''
+                        title_list: list = [],
+                        sse_values : list = [],
+
+                        addit_str : str = '',
+                        fig_size : tuple = (10,5),
+                        y_scale: str = 'linear'
                         ):
     """
-    given a true solution and a list of candidate solutions - output each type of cs or transmission 
+    given a true solution and a list of candidate solutions - output each type of cs 
     for a specific reaction to compare on corresponding plots
 
     """
@@ -1771,7 +1797,7 @@ def plot_xs_differences(cand_sol : list,
     num_xs_columns = len(xs_columns)
 
     # Creating subplots
-    fig_all_reacts, axs = subplots(num_xs_columns, 1, figsize=(8, 3 * num_xs_columns))
+    fig_all_reacts, axs = subplots(num_xs_columns, 1, figsize=fig_size, sharex=True)
 
     if num_xs_columns == 1:
         axs = [axs]
@@ -1781,7 +1807,7 @@ def plot_xs_differences(cand_sol : list,
 
         for index_sol, sol in enumerate(cs_calc_res_dfs_list):
             
-            axs[idx].plot(sol["E"], sol[column], label=f'{column} {cand_sol_names[index_sol]}')
+            axs[idx].plot(sol["E"], sol[column], label=f'{cand_sol_names[index_sol]}')
 
             # vertical lines where we assume res.
             for index_res, res in cand_sol[index_sol].iterrows():
@@ -1794,21 +1820,217 @@ def plot_xs_differences(cand_sol : list,
                                   cs_calc_res_dfs_list[1][column], 
                                   color='red', 
                                   alpha=0.5,
-                                  label = 'diff')
+                                  label = r'E = ' + str(np.round(sse_values[idx],2)))
         # end fill between two lines
 
-        axs[idx].set_title(column)
-        axs[idx].set_xlabel("E")
-        axs[idx].set_ylabel(column)
+        #axs[idx].set_title(title_list[idx]+' = '+str(np.round(sse_values[idx],2)))
+        if (idx== len(xs_columns)-1):
+            axs[idx].set_xlabel("E, eV")
+
+        if (len(title_list)==0):
+            axs[idx].set_ylabel(column)
+        else:
+            axs[idx].set_ylabel(title_list[idx])
         axs[idx].legend(loc='right')
+
+        if (y_scale!='linear'):
+            axs[idx].set_yscale(y_scale)
     
     
     # Adding a title for the entire figure
-    fig_all_reacts.suptitle(f"Cross-section & Transm. Comparison {addit_str}", fontsize=14)
+    #fig_all_reacts.suptitle(f"Cross-section Comparison. {addit_str}", fontsize=14)
+    fig_all_reacts.suptitle(f"{addit_str}", fontsize=14)
 
     tight_layout()
 
     return fig_all_reacts
+
+
+
+def plot_xs_differences_calc_avg_error(
+    cand_ladder_df  : pd.DataFrame,
+    cand_sol_name   : str,
+
+    true_ladder_df  : pd.DataFrame,
+    true_sol_name   : str,
+
+    colors          : list,
+    Ta_pair         : Particle_Pair,
+    energy_grid     : np.array,
+    settings        : dict,
+    reactions       : list = ['capture', 'elastic'],
+
+    addit_str       : str = '',
+
+    show_fig        : bool = True,
+
+    fig_size        : tuple = (10,5),
+    y_scale         : str = 'linear'
+    ):
+    
+    # calc resids matrix
+    resid_matrix = build_residual_matrix_dict(
+        est_par_list = [cand_ladder_df], 
+        true_par_list = [true_ladder_df], # [jeff_parameters], 
+        Ta_pair = Ta_pair, 
+        settings = settings,
+        energy_grid = energy_grid,
+        reactions = reactions, 
+        print_bool = False
+    )
+    
+    SSE_dict = calculate_SSE_by_cases(ResidualMatrixDict = resid_matrix)
+    print(SSE_dict)
+
+    # for each react type
+    all_xs_true = []
+    all_xs_est = []
+    all_xs_errors = []
+    
+    # Counting the number of xs_ columns to create subplots
+    num_xs_columns = len(reactions)
+
+    # Creating subplots
+    fig_all_reacts, axs = subplots(num_xs_columns, 1, figsize=fig_size, sharex=True)
+
+    if num_xs_columns == 1:
+        axs = [axs]
+
+    for idx, rxn  in enumerate(reactions):
+        
+        cur_rxn_cs_est_df = calc_theo_broadened_xs_for_reactions(
+            resonance_ladder = cand_ladder_df,
+            Ta_pair = Ta_pair,
+            energy_grid = energy_grid,
+            settings = settings,
+            reactions = [rxn],
+        )
+        
+        # print(cur_rxn_cs_est_df.columns)
+
+        cur_rxn_cs_theo_df = calc_theo_broadened_xs_for_reactions(
+            resonance_ladder = true_ladder_df,
+            Ta_pair = Ta_pair,
+            energy_grid = energy_grid,
+            settings = settings,
+            reactions = reactions,
+        )
+
+        all_xs_est.append(cur_rxn_cs_est_df)
+        all_xs_true.append(cur_rxn_cs_theo_df)
+
+        # calc error
+        E = cur_rxn_cs_est_df.E
+
+        assert(np.all(E == cur_rxn_cs_theo_df.E))
+        
+        residuals = cur_rxn_cs_est_df-cur_rxn_cs_theo_df
+
+        residuals["E"] = E
+
+
+        # plot a histogram of residuals[f'xs_{rxn}'] with name rxn
+
+        # calc avg error        
+        mean_abs_error = np.mean(np.abs(residuals[f'xs_{rxn}']))
+
+        sq_resids = np.power(residuals[f'xs_{rxn}'], 2)
+
+        mean_sq_error = np.mean(sq_resids)
+
+        # calc avg error / avg xs for this reaction type * 100 %
+        mean_xs_val = np.mean(cur_rxn_cs_theo_df[f'xs_{rxn}'])
+
+        mean_sq_xs_val = np.mean(cur_rxn_cs_theo_df[f'xs_{rxn}']**2)
+
+        MAE_error_perc = mean_abs_error / mean_xs_val * 100
+
+        # what if divide values of residuals on the value of cs
+        rel_resids = np.abs(residuals[f'xs_{rxn}']) / cur_rxn_cs_theo_df[f'xs_{rxn}'] * 100
+        mean_rel_resid = np.mean(rel_resids)
+
+        MSE_error_perc = np.sqrt(mean_sq_error) / mean_xs_val  * 100
+        
+        print()
+        print(rxn)
+        print(f'\ttrue_avg_xs = {mean_xs_val}, true_avg_qs_val = {mean_sq_xs_val}')
+        print(f'\tMAE = {mean_abs_error},  rel. to avg_xs = {MAE_error_perc} %')
+        print(f'\tMSE = {mean_sq_error},   rel. to avg_xs = {MSE_error_perc} %')
+
+        print()
+        print(f'\tSSE_normalized -> ', SSE_dict['SSE_normalized'][rxn]['casewise'][0])
+
+        #print(rel_resids)
+
+        print(f'\tMean relative residual, %: {mean_rel_resid}')
+        print()
+
+        plot_multiple_hist(values_list = [resid_matrix[rxn][0]], 
+                    bins = 100, 
+                    cumulative = False, 
+                    colors = ['r', 'b' ], 
+                    captions = [f'{rxn},' +r'<$\sigma$>'+ f' {np.round(mean_xs_val,1)}  MAE(R) = {np.round(mean_abs_error,1)}'],
+                    title = f'Residuals distribution',
+                    show_kde = False,
+                    stacked = False,
+                    show_numbers = False)
+
+
+        ### plotting
+
+        # plot sol            
+        axs[idx].plot(all_xs_est[idx]["E"], all_xs_est[idx][f"xs_{rxn}"], label=f'{cand_sol_name}', color = colors[0])
+
+        # vertical lines where we assume res.
+        for index_res, res in cand_ladder_df.iterrows():
+            axs[idx].axvline(x=res.E, linestyle='--', linewidth=0.5, alpha=0.5, color = colors[0])
+
+
+        # plot true
+        label_true = f'{true_sol_name} '+r'$<\sigma_{\text{'+str(rxn)+'}}>$ = '+ f'{np.round(mean_xs_val)}'+r'$<\sigma_{\text{'+str(rxn)+'}}^2>$ = '+f'{np.round(mean_sq_xs_val,1)}'
+
+        axs[idx].plot(all_xs_true[idx]["E"], all_xs_true[idx][f"xs_{rxn}"], label=label_true, color = colors[1])
+
+        # vertical lines where we assume res.
+        for index_res, res in true_ladder_df.iterrows():
+            axs[idx].axvline(x=res.E, linestyle='--', linewidth=0.5, alpha=0.5, color = colors[1])
+
+        
+        # fill between if we have 2 sol in a list
+        label_error = f'Error: MAE = {np.round(mean_abs_error,1)} ({np.round(MAE_error_perc,1)} %), MSE = {np.round(mean_sq_error,1)} ' \
+            r' ($\sqrt{MSE}$ / $<\sigma_{\text{'+str(rxn)+'}}>$ ' \
+        f' = {np.round(MSE_error_perc,1)} %)'
+
+        axs[idx].fill_between(all_xs_true[idx]["E"], 
+                                all_xs_true[idx][f"xs_{rxn}"], 
+                                all_xs_est[idx][f"xs_{rxn}"], 
+                                color='orange', 
+                                alpha=0.5,
+                                label =label_error
+        )
+
+        # end fill between two lines
+
+        axs[idx].set_title(rxn)
+        
+        if (idx == len(reactions)-1):
+            axs[idx].set_xlabel("E, eV")
+
+        axs[idx].set_ylabel('$\sigma_{'+str(rxn)+'}$')
+        
+        axs[idx].legend(loc='right')
+
+        if (y_scale!='linear'):
+            axs[idx].set_yscale(y_scale)
+    
+    fig_all_reacts.suptitle(f"{addit_str}", fontsize=14)
+
+    tight_layout()
+
+    return fig_all_reacts, resid_matrix, SSE_dict
+
+
+
 
 
 def calc_all_SSE_gen_XS_plot(
@@ -1822,9 +2044,6 @@ def calc_all_SSE_gen_XS_plot(
         calc_fig: bool = False,
         fig_yscale: str = 'log'
 ):
-    # print('Input Energy grid')
-    # print(len(energy_grid))
-    # print(energy_grid)
     
     resid_matrix = build_residual_matrix_dict(
         est_par_list = [est_ladder], 
@@ -1933,11 +2152,90 @@ def calc_SSE_one_case(
     SSE_val = SSE_dict['SSE_sum_normalized_casewise'][0]
 
     # clean all
-    del SSE_dict
+    # del SSE_dict
     del resid_matrix
     #gc.collect()
 
-    return SSE_val 
+    return SSE_val, SSE_dict
+
+
+
+from ATARI.theory.scattering_params import gstat
+
+def calc_SF_Gn1(Ta_pair, ladder_df, energy_range, lwave=0):
+    """Calculated SF value for a given ladder and region for Ta_pair parameters
+    for lwave l  -> 1 / ((2*lwave + 1) * delta_E) * np.sum(gj * Gn_vals_l)
+    """
+    result_dict = {}
+
+    # Create a fine energy grid for calculation
+    combined_energy = create_E_grid_steps(ladder_df = ladder_df,
+                                           e_range = energy_range,
+                                           e_offset=1e-3)
+    #combined_energy = fine_egrid(energy_range)
+
+    # for each spin group present in Ta_pair.
+    for Jpi in Ta_pair.spin_groups.keys():
+
+        gj = gstat(J=Jpi, I=Ta_pair.I, i=Ta_pair.i)
+
+        # Filter DataFrame based on the energy range + Jpi value == Jpi
+        ladder_subset = ladder_df[(ladder_df['E'] >= energy_range[0]) & (ladder_df['E'] <= energy_range[1])]
+        ladder_subset = ladder_subset[(ladder_subset['L'] == lwave) & (ladder_subset['Jpi'] == Jpi)]
+
+        N_res_Jpi = len(ladder_subset)
+
+        SF_Gn1_l = np.zeros_like(combined_energy)
+
+        # Manually set the first element to 0
+        SF_Gn1_l[0] = 0
+
+        delta_E = combined_energy[-1] - combined_energy[0]
+
+        for i in range(1, len(combined_energy)):  # Start loop from 1
+            e = combined_energy[i]
+            sum_gn1 = ladder_subset[ladder_subset['E'] <= e]['Gn1'].sum()
+            #delta_E = e - combined_energy[0]
+            
+            SF_Gn1_l[i] = 1 / ((2 * lwave + 1) * delta_E) * gj * sum_gn1
+
+        # Create a DataFrame
+        resulting_df = pd.DataFrame.from_dict({
+            'E': combined_energy,
+            'SF_Gn1': SF_Gn1_l
+        })
+
+        result_dict[Jpi] = {'df': resulting_df,
+                            'N_res': N_res_Jpi, 
+                            'lastval': SF_Gn1_l[-1]}
+
+    return result_dict
+
+
+def create_E_grid_steps(ladder_df, e_range, e_offset=1e-3):
+    
+    E_min, E_max = e_range
+    E_values = sorted(ladder_df['E'].unique())  # Get unique, sorted E values from the dataframe
+    E_res = [E_min]  # Start with the minimum value
+
+    for E in E_values:
+        if E_min < E < E_max:
+            # Add value slightly less than E, if it's within range and not a duplicate
+            if E - e_offset > E_res[-1]:
+                E_res.append(E - e_offset)
+            # Add the E value
+            E_res.append(E)
+
+    # Add value slightly less than E_max, if it's greater than the last value added
+    if E_max - e_offset > E_res[-1]:
+        E_res.append(E_max - e_offset)
+    
+    # Finally, add the maximum value
+    E_res.append(E_max)
+
+    return E_res
+
+
 
 def calc_strength_functions(
         theoretical_df, 
@@ -2750,6 +3048,212 @@ def analyze_max_min(result_diff_df, col_name):
         'q_95': np.quantile(a = result_diff_df[col_name], q=0.95)
     }
     return res 
+
+
+
+## plotting several scatters or lineplots on one plot
+def plot_simple_xy(x_s: list, 
+                   y_s: list, 
+                   types: list, 
+                   labels: list,
+                   show_labels: bool, 
+                   colors: list, 
+                   sizes: list,
+                   alphas: list,
+                   zorders: list,
+                   x_axis_label: str, 
+                   y_axis_label: str, 
+                   title: str,
+                   errorbars: list = None,
+                   yscale: str = None,
+                   xscale: str = None,
+                   xlim: tuple = None,
+                   ylim: tuple = None,
+                   quiet: bool = False,
+                   linewidths: list = None,
+                   figsize: tuple = None,
+                   ): # Add this line
+
+    # If linewidths is not provided, default to 1 for each dataset
+    if linewidths is None:
+        linewidths = [1 for _ in x_s]
+
+    if (figsize is not None):
+        fig, axs = plt.subplots(figsize = figsize)
+    else: 
+        fig, axs = plt.subplots()
+    fig.suptitle(title)
+
+    for i in range(len(x_s)):
+        common_args = {
+            "label": labels[i] if show_labels else None,
+            "alpha": alphas[i],
+            "zorder": zorders[i],
+            "color": colors[i],
+            "linewidth": linewidths[i]  # Use the linewidth here
+        }
+
+        if types[i] == 'l':
+            axs.plot(x_s[i], y_s[i], marker="o", markersize=sizes[i], **common_args)
+        
+        if types[i] == 'dl':
+            axs.plot(x_s[i], y_s[i], linestyle='--', **common_args)
+
+        elif types[i] == 's':
+            axs.scatter(x_s[i], y_s[i], marker="o", s=sizes[i], **common_args)
+        
+        elif types[i] == 'vl':
+            for y_value in y_s[i]:
+                axs.axvline(x=y_value, linestyle='dashed', **common_args)
+
+        elif (types[i]=='hl'):
+            for j in range(0, len(x_s[i])):
+                axs.axhline(y = y_s[i], 
+                            color = colors[i], 
+                            linestyle = 'dashed', 
+                            linewidth = sizes[i], 
+                            alpha=alphas[i],
+                            label = labels[i] if (show_labels) else None, 
+                            zorder = zorders[i]) 
+        
+        elif types[i] == 'errorbar':
+            axs.errorbar(x=x_s[i], y=y_s[i], yerr=errorbars[i], 
+                         fmt='.', markersize=sizes[i], 
+                         capsize=2, **common_args)
+
+    axs.grid(color='grey', linestyle='--', linewidth=0.2)
+    axs.legend()
+    axs.set_xlabel(x_axis_label)
+    axs.set_ylabel(y_axis_label)
+
+    if yscale:
+        axs.set_yscale(yscale)
+    if xscale:
+        axs.set_xscale(xscale)
+    if xlim:
+        axs.set_xlim(xlim)
+    if ylim:
+        axs.set_ylim(ylim)
+
+    if not quiet:
+        plt.show()
+        return None
+    else:
+        plt.close(fig)
+        return fig
+
+
+def plot_simple_xy_stacked(x_s: list, 
+                   y_s: list, 
+                   stack_s: list, # num of plot
+                   stacks_h_ratios: list,
+                   types: list, # type of plot (line/scatter)
+                   labels: list,
+                   show_labels: bool, 
+                   colors: list, 
+                   sizes: list,
+                   alphas: list,
+                   zorders: list,
+                   x_axis_label: str, 
+                   y_axis_label: str, 
+                   title: str,
+                   errorbars: list = None,
+                   xlim: list = None,
+                   ylim: list = None,
+                   quiet: bool = False,
+                   fig_size: tuple = (8,4),
+                   linewidths: list = None):
+
+    fig = plt.figure(figsize=fig_size)
+
+    # how many subplots
+    sp_num = len(np.unique(stack_s))
+
+    gs = fig.add_gridspec(sp_num, hspace=0.2, height_ratios=stacks_h_ratios)
+    axs = gs.subplots(sharex=True)
+
+    fig.suptitle(title, fontsize=10)
+
+    if linewidths is None:
+        linewidths = sizes.copy()
+
+    for i in range(0, len(x_s)):
+
+        if (types[i]=='l'):
+            axs[stack_s[i]].plot(x_s[i], 
+                    y_s[i], 
+                    marker = "o", 
+                    markersize = sizes[i], 
+                    linewidth = linewidths[i], 
+                    alpha=alphas[i], 
+                    color = colors[i], 
+                    label = labels[i] if (show_labels) else None, 
+                    zorder=zorders[i])
+            
+        elif (types[i]=='s'):             axs[stack_s[i]].scatter(x_s[i], 
+                    y_s[i], 
+                    marker = "o", 
+                    s = sizes[i], #markersize = 1, 
+                    linewidths = 1.0, 
+                    alpha=alphas[i], 
+                    c = colors[i], 
+                    label = labels[i] if (show_labels) else None, 
+                    zorder=zorders[i])
+        
+        elif (types[i]=='vl'):
+            for j in range(0, len(x_s[i])):
+                axs[stack_s[i]].axvline(x = y_s[i][j], 
+                            color = colors[i], 
+                            linestyle = 'dashed', 
+                            linewidth = linewidths[i], 
+                            alpha=alphas[i],
+                            zorder = zorders[i]) 
+        
+        elif (types[i]=='hl'):
+            for j in range(0, len(x_s[i])):
+                axs[stack_s[i]].axhline(y = y_s[i][j], 
+                            color = colors[i], 
+                            linestyle = 'dashed', 
+                            linewidth =  linewidths[i], 
+                            alpha=alphas[i],
+                            label = labels[i] if (show_labels) else None, 
+                            zorder = zorders[i]) 
+        
+        elif (types[i]=='errorbar'):
+            axs[stack_s[i]].errorbar(
+                x = x_s[i], 
+                y = y_s[i], 
+                yerr=errorbars[i], 
+                zorder=0, 
+                fmt='.', 
+                color=colors[i], 
+                linewidth = 0.2, 
+                markersize=sizes[i], 
+                capsize=2, 
+                label = labels[i] if (show_labels) else None, 
+                alpha = alphas[i])
+    
+    for j in range(0, sp_num):
+        axs[j].grid(color = 'grey', linestyle = '--', linewidth = 0.2)
+       
+        axs[j].legend(loc='upper right')
+
+        axs[j].set_xlabel(x_axis_label[j])
+        axs[j].set_ylabel(y_axis_label[j])
+
+        if (xlim is not None):
+            axs[j].set_xlim(xlim[j])
+
+        if (ylim is not None):
+            if (ylim[j] is not None):
+                axs[j].set_ylim(ylim[j])
+
+    if not quiet:
+        plt.show()
+        return fig
+    else:
+        plt.close(fig)
+        return fig
 
 
 def plot_multiple_hist(values_list: list, 

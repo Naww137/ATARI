@@ -127,11 +127,11 @@ def Bayes(sammy_out:SammyOutputData,
     Gu = sammy_out.derivatives
     # Vary conditions:
     indices_e = 3*par.index[par['varyE'] == 0].to_numpy()
-    indices_n = 3*par.index[par['varyGn1'] == 0].to_numpy() + 1
-    indices_g = 3*par.index[par['varyGg'] == 0].to_numpy()  + 2
-    Gu[indices_e,:] = 0.0
-    Gu[indices_n,:] = 0.0
-    Gu[indices_g,:] = 0.0
+    indices_g = 3*par.index[par['varyGg'] == 0].to_numpy() + 1
+    indices_n = 3*par.index[par['varyGn1'] == 0].to_numpy()  + 2
+    Gu[:,indices_e] = 0.0
+    Gu[:,indices_g] = 0.0
+    Gu[:,indices_n] = 0.0
     
     # Pointwise Data:
     pw  = sammy_out.pw

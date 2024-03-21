@@ -16,6 +16,23 @@ def t_to_e(t, d, rel:bool):
 
 
 def e_to_t(E, d, rel:bool):
+    """
+    Converts energy (eV) to time-of-flight (s)
+
+    Parameters
+    ----------
+    E : ndarray
+        Energy in eV
+    d : float
+        flight-path distance in m
+    rel : bool
+        Option to use relative calculation
+
+    Returns
+    -------
+    ndarray
+        time-of-flight vector corresponding to energies passed in
+    """
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s

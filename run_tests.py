@@ -1,5 +1,5 @@
 import unittest
-from tests import test_sammy_interface, test_syndat, test_distributions, test_res_generator
+from tests import test_resonance_distributions, test_sammy_interface, test_syndat, test_res_generator
 
 __doc__ = """
 This file runs all of the unit tests from the "tests" directory.
@@ -14,7 +14,7 @@ if __name__ == '__main__':
     loader = unittest.TestLoader()
 
     ### general ATARI test suites
-    parameter_distribution_test_suite = loader.loadTestsFromModule(test_distributions)
+    parameter_distribution_test_suite = loader.loadTestsFromModule(test_resonance_distributions)
     resonance_generator_test_suite = loader.loadTestsFromModule(test_res_generator)
     # TODO: add theory_module_test_suite
     syndat_test_suite = loader.loadTestsFromModule(test_syndat)

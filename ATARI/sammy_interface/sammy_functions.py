@@ -1142,6 +1142,33 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
+        
+        if sammyINPyw.batch_fitpar:
+            parfile = os.path.join(rundir,'results',f'step{istep}.par')
+            df = readpar(parfile)
+            varyE = np.any(df['varyE']==1)
+            varyGg = np.any(df['varyGg']==1)
+            varyGn1 = np.any(df['varyGn1']==1)
+
+            # if istep % 2 == 0:
+            #     # vary = np.tile([0,0,1,1], int(len(df)/4))
+            #     pattern = np.array([0,0,1,1])
+            # else:
+            #     # vary =  np.tile([1,1,0,0], int(len(df)/4))
+            #     pattern = np.array([1,1,0,0])
+            # Set the proportion of ones
+            proportion_ones = 0.5
+            vary = np.random.rand(len(df))
+            vary[vary <= proportion_ones] = 1
+            vary[vary != 1] = 0
+            
+            # vary = np.tile(pattern, (len(df) // len(pattern)) + 1)[:len(df)]
+            df['varyE'] = vary*varyE
+            df['varyGg'] = vary*varyGg
+            df['varyGn1'] = vary*varyGn1
+            write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
+            
+
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
 

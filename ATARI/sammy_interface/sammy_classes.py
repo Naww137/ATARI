@@ -180,6 +180,7 @@ class SammyInputDataYW:
     LevMarVd: float = 5.0
     minF:   float = 1e-5
     maxF:   float = 10
+    batch_fitpar :  bool = False
     initial_parameter_uncertainty: float = 1.0
 
 

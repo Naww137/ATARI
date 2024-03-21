@@ -1,109 +1,99 @@
-# #%%
-# import numpy as np
-# import pandas as pd
-# from scipy.stats import normaltest
-# from ATARI.ModelData.experimental_model import Experimental_Model
-# from ATARI.ModelData.particle_pair import Particle_Pair
-# from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
-# from ATARI.ModelData.measurement_models.capture_yield_rpi import Capture_Yield_RPI
+#%%
+import numpy as np
+import pandas as pd
+from scipy.stats import normaltest, chi2, ks_1samp, norm
+from ATARI.ModelData.experimental_model import Experimental_Model
+from ATARI.ModelData.particle_pair import Particle_Pair
+from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
+from ATARI.ModelData.measurement_models.capture_yield_rpi import Capture_Yield_RPI
 
-# from ATARI.syndat.control import syndatOPT, Syndat_Model
-# from matplotlib.pyplot import *
-# #%%
-# pair = Particle_Pair()
-# energy_grid = np.linspace(10,3000,10) 
-# exp_model = Experimental_Model(energy_grid = energy_grid,
-#                                     energy_range =[0, 3000])#,
-#                                 #    channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
+from ATARI.syndat.control import syndatOPT, Syndat_Model
+from matplotlib.pyplot import *
+from ATARI.syndat.tests import noise_distribution_test, noise_distribution_test2
 
-# ipert = 5000
-# df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1,10)})
-# true = np.array(df_true.sort_values('E', ascending=True)["true"])
+#%%
+pair = Particle_Pair()
 
 
-# # def test_sampling_distribution_transmissionRPI(self):
-# # """
-# # Tests the data sampling distribution for RPI transmission measurement model. 
-# # Over 5000 samples, test:
-# #     1. the mean of all data samples converges to the true value
-# #     2. the normalized residuals (data-true)/(data_uncertainty) fall on a standard normal distribution
-# # """
-# open_neutron_spectrum = pd.DataFrame({"E":energy_grid, 
-#                                       "c":np.ones(len(energy_grid))*1000, 
-#                                       "dc":np.ones(len(energy_grid))*np.sqrt(1000)})
-# # open_neutron_spectrum = None
+par = {'bkg_func': 'exp'
+#         'trigs' :   (1e10,  0),
+#         'trigo' :   (1e10,  0),
+#         'm1'    :   (1,     0.016) ,#0.016
+#         'm2'    :   (1,     0.008) ,#0.008
+#         'm3'    :   (1,     0.018) ,#0.018
+#         'm4'    :   (1,     0.005) ,#0.005
+#         'ks'    :   (0.563, 0.0240), #0.02402339737495515
+#         'ko'    :   (1.471, 0.0557), #0.05576763648617445
+#         'b0s'   :   (9.9,   0.1) ,#0.1
+#         'b0o'   :   (13.4,  0.7) ,#0.7
+        }
+
+generative_measurement_model = Transmission_RPI(**par)
+reductive_measurement_model = Transmission_RPI(**par)
+
+# return [{true_parameters}, {true_parameters}]
+model_correlations = {  
+                        'b0o' : (13.4, 0.7),
+                        
+                        }
+
+
+#%%
+
+# energy_grid = np.sort(np.random.default_rng().uniform(10,3000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
+# df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1.0,10)})
+# df_true.sort_values('E', ascending=True, inplace=True)
+
+# energy_grid = np.array([20,30,40])
+# df_true = pd.DataFrame({'E':energy_grid, 'true':np.array([0.6,0.6,0.6])})
+# df_true.sort_values('E', ascending=True, inplace=True)
+# options = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+
+# for i in range(1):
+     
+#     # raw_data = self.generate_raw_observables(pw_true, true_model_parameters={})
+#     # def generate_raw_observables(self, pw_true, true_model_parameters: dict):
+#     if options.sampleTMP:
+#         true_model_parameters = generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+#     else:
+#         true_model_parameters = generative_measurement_model.model_parameters
+
+#     generative_measurement_model.true_model_parameters = true_model_parameters
+
+#     ### generate raw count data from generative reduction model
+#     raw_data = generative_measurement_model.generate_raw_data(df_true, 
+#                                                                 true_model_parameters, 
+#                                                                 options)
+
+    
+#     # reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
+#     # def reduce_raw_observables(self, raw_data):
+#     red_data, covariance_data, raw_data = reductive_measurement_model.reduce_raw_data(raw_data, options)
+#     # self.covariance_data = self.reductive_measurement_model.covariance_data
+
+
+
+#%%
 
 # generative_model = Transmission_RPI()
-#     # trigs=(1e10,0),
-#     #                             trigo=(1e10,0),
-
-#     #                             a_b    = ([582.7768594580712, 0.05149689096209191],
-#     #                                         [[1.14395753e+03,  0],
-#     #                                         [0,   2.19135003e-05]]) )
 # reductive_model = Transmission_RPI()
-# # trigs=(1e10,0),
-# #                                 trigo=(1e10,0),
 
-# #                                 a_b    = ([582.7768594580712, 0.05149689096209191],
-# #                                             [[1.14395753e+03,  0],
-# #                                             [0,   2.19135003e-05]] ))
-
-# # synOPT = syndatOPT(sampleRES=False, calculate_covariance=False)
-# # synT = Syndat_Model(exp_model, generative, reductive, synOPT)
-
-# # exp_trans = np.zeros([ipert,10])
-# # exp_trans_unc = np.zeros([ipert,10])
-# # synT.sample(pw_true=df_true, num_samples=ipert)
-
-# # for i in range(ipert):
-# #     data = synT.samples[i].pw_reduced
-# #     exp_trans[i,:] = np.array(data.exp)
-# #     exp_trans_unc[i,:] = np.array(data.exp_unc)
-
-# # print( np.all(np.isclose(np.mean(exp_trans, axis=0), true, rtol=1e-2)))
-# # print( np.all(normaltest((exp_trans-true)/exp_trans_unc).pvalue>0.001))
-
-# # figure()
-# # hist((exp_trans-true)/exp_trans_unc)
-# # show()
+# synOPT = syndatOPT(sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
+# exp_model = Experimental_Model(energy_grid=energy_grid, energy_range = [min(energy_grid), max(energy_grid)])
+# SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
 
 
-# synOPT = syndatOPT(sampleRES=False, 
-#                    sample_counting_noise= False, 
-#                    calculate_covariance=False, 
-#                    sampleTMP=False, 
-#                    smoothTNCS =True)
-# synT = Syndat_Model(exp_model, generative_model, reductive_model, synOPT)
+# mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=True) #noise_distribution_test(SynMod, print_out=True)
+# print("Mean of residuals is not 0",  np.isclose(mean_of_residual, 0, atol=1e-1))
+# print("Normalized residuals are standard normal", norm_test_on_residual.pvalue>1e-5)
+# print()
+# print("Chi2 of data", kstest_on_chi2.pvalue>1e-5, )
 
-# exp_trans = np.zeros([10,len(energy_grid)])
-# exp_trans_unc = np.zeros([10,len(energy_grid)])
-# synT.sample(pw_true=df_true, num_samples=10)
+# #%%
 
-# for i in range(10):
-#     data = synT.samples[i].pw_reduced
-#     exp_trans[i,:] = np.array(data.exp)
-#     exp_trans_unc[i,:] = np.array(data.exp_unc)
+# generative_model = Capture_Yield_RPI()
+# reductive_model = Capture_Yield_RPI()
 
-# np.isclose(np.sum(abs(exp_trans-true)), 0, atol=1e-10)
-
-
-
-import unittest
-
-class TestCalculator(unittest.TestCase):
-    def helper_method(self, a, b):
-        # Helper method to perform some calculation
-        return a * b
-
-    def test_add(self):
-        # Test case for the add method
-        result = self.helper_method(2, 3)
-        self.assertEqual(result, 6, "Multiplication result is incorrect")
-
-    def test_subtract(self):
-        # Test case for the subtract method
-        result = self.helper_method(5, 2)
-        self.assertEqual(result, 10, "Multiplication result is incorrect")
-
-if __name__ == '__main__':
-    unittest.main()
+# synOPT = syndatOPT(smoothTNCS = True) 
+# SynY = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
+# mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynY, df_true=df_true, ipert=250, print_out=True)

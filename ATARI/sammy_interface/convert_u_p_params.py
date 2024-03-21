@@ -13,32 +13,46 @@ def u2p_E(u_E):
 def p2u_E(p_E):
     return np.sign(p_E)*np.sqrt(abs(p_E))
 def u2p_n(u_n, E, l, particle_pair:Particle_Pair):
-    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, l)
-    return 2000*P[-1,:]*u_n*abs(u_n)
+    if isinstance(l, int):      lmax = l
+    else:                       lmax = max(l)
+    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lmax)
+    return 2e3*P[l,range(len(E))]*u_n*abs(u_n)
+    # gn2 = 1e3 * u_n*abs(u_n)
+    # return particle_pair.gn2_to_Gn(gn2, E, l)
 def p2u_n(p_n, E, l, particle_pair:Particle_Pair):
-    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, l)
-    return np.sign(p_n)*np.sqrt(abs(p_n)/(2000 * P[-1,:]))
+    if isinstance(l, int):      lmax = l
+    else:                       lmax = max(l)
+    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lmax)
+    return np.sign(p_n)*np.sqrt(abs(p_n) / (2e3 * P[l,range(len(E))]))
+    # gn2 = particle_pair.Gn_to_gn2(p_n, E, l)
+    # return np.sign(gn2)*np.sqrt(abs(gn2) / 1e3)
 def u2p_g(u_g):
-    return 2000*u_g*abs(u_g)
+    return 2e3*u_g*abs(u_g)
+    # gg2 = 1e3 * u_g*abs(u_g)
+    # return particle_pair.gg2_to_Gg(gg2)
 def p2u_g(p_g):
-    return np.sign(p_g)*np.sqrt(abs(p_g)/2000)
+    return np.sign(p_g) * np.sqrt(abs(p_g) / 2e3)
+    # gg2 = particle_pair.Gg_to_gg2(p_g)
+    # return np.sign(gg2) * np.sqrt(abs(gg2) / 1e3)
 
 # Derivatives:
 def du_dp_E(p_E):
-    return 0.5 / np.sqrt(p_E)
+    return 0.5 / np.sqrt(abs(p_E))
 def du_dp_n(p_n, E, l, particle_pair:Particle_Pair):
-    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, l)
-    return np.sign(p_n) * 0.5 / np.sqrt(2000 * P[-1,:] * abs(p_n))
+    if isinstance(l, int):      lmax = l
+    else:                       lmax = max(l)
+    _, P, _, _ = FofE_recursive(E, particle_pair.ac, particle_pair.M, particle_pair.m, lmax)
+    return 0.5 / np.sqrt(2e3 * P[l,range(len(E))] * abs(p_n))
 def du_dp_g(p_g):
-    return np.sign(p_g) * 0.5 / np.sqrt(2000 * abs(p_g))
+    return 0.5 / np.sqrt(2e3 * abs(p_g))
 
 # Conversions with respect to gn2 and gg2:
 def u2g2(u):
-    return 1000*u*abs(u)
+    return 1e3*u*abs(u)
 def g22u(g2):
-    return np.sign(g2) * np.sqrt(1e-3 * abs(g2))
+    return np.sign(g2) * np.sqrt(abs(g2) / 1e3)
 def du_dg2(g2):
-    return np.sign(g2) * 0.5/np.sqrt(1000 * abs(g2))
+    return 0.5 / np.sqrt(1e3 * abs(g2))
 
 def convert_deriv_du2dp(df_du: np.array, 
                         ladder_df: pd.DataFrame):
@@ -77,7 +91,6 @@ def convert_deriv_du2dp(df_du: np.array,
         dp_names.append(f'df/dE_{res_idx}')
 
         # du_g/dGg
-        # du_dp[i+1, i+1] = 0.5 / np.sqrt(2 * row['Gg'] * 1e-3)
         du_dp[par_idx+1] = du_dg2(row['gg2'])
         dp_names.append(f'df/dGg_{res_idx}')
 

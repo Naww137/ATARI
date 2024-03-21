@@ -274,6 +274,8 @@ class Syndat_Model:
 
             rto = deepcopy(sammyRTO)
             rto.bayes = False
+            rto.derivatives = False
+            rto.theoretical = True
             template = self.generative_experimental_model.template
 
             if template is None: raise ValueError("Experimental model sammy template has not been assigned")

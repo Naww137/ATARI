@@ -510,13 +510,36 @@ def write_saminp(filepath,
     # ac = sammy_INP.particle_pair.ac*10  
     broadening = True
     
+    
     alphanumeric.insert(0, particle_pair.formalism)
+
+    # Running Bayes or not:
     if rto.bayes:
         alphanumeric.insert(1, "SOLVE BAYES EQUATIONS")
     else:
         alphanumeric.insert(1, "DO NOT SOLVE BAYES EQUATIONS")
-    if rto.derivatives_only:
+
+    # Getting Derivatives:
+    if rto.derivatives:
         alphanumeric.insert(2, "GENERATE PARTIAL DERivatives only")
+
+    # What Scheme to use:
+    if   rto.bayes_scheme == 'IQ':
+        alphanumeric.append('USE (I+Q) INVERSION scheme')
+    elif rto.bayes_scheme == 'MW':
+        alphanumeric.append('USE (M+W) INVERSION scheme')
+    elif rto.bayes_scheme == 'NV':
+        alphanumeric.append('USE (N+V) INVERSION scheme')
+    elif rto.bayes_scheme is None:
+        pass
+    else:
+        raise ValueError(f'The provided bayes_scheme, {rto.bayes_scheme} does not exist.')
+    
+    # Least Squares:
+    if rto.use_least_squares:
+        alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
+        alphanumeric.append('REMEMBER ORIGINAL PArameter values')
+
     if use_IDC:
         alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
 
@@ -534,7 +557,7 @@ def write_saminp(filepath,
                     f.write(f'{cmd}\n')
             
             elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope:<9} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {np.round(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
+                f.write(f"{particle_pair.isotope:<9} {float(particle_pair.M):<9.8} {float(min(experimental_model.energy_range)):<9.8} {float(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
 
 
             elif line.startswith('%%%card5/6%%%'):

@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Any
 from dataclasses import dataclass, field
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
@@ -43,22 +43,28 @@ from numpy import ndarray
 #                                                         "iterations": 5,
 #                                                         "print":False}      )
 
+
 class SammyRunTimeOptions:
 
-    def __init__(self, sammyexe: str, options={}):
+    def __init__(self, sammyexe: str, options={}, alphanumeric=None):
         default_options = {
             # 'sh'               : 'zsh',
-            'sammy_runDIR'     : 'SAMMY_runDIR',
-            'keep_runDIR'      : False,
-            'Print'            : False,
+            'sammy_runDIR'      : 'SAMMY_runDIR', # the run directory for SAMMY input and output files
+            'keep_runDIR'       : False,
+            'Print'             : False,
 
-            'bayes'            : False,
-            'derivatives_only' : False,
-            'iterations'       : 2,
+            # What to calculate:
+            'derivatives'       : False, # calculate the derivatives
+            'bayes'             : False, # calculate Bayesian posteriors
 
-            'energy_window'    : None,
-            'get_ECSCM'        : False,
-            'ECSCM_rxn'        : 'total'
+            # What to use when calculating:
+            'iterations'        : 2,     # the number of iterations of bayes
+            'bayes_scheme'      : None,  # the scheme for bayes (MW, IQ, or NV)
+            'use_least_squares' : False, # uses least squares if true
+
+            'energy_window'     : None, 
+            'get_ECSCM'         : False,
+            'ECSCM_rxn'         : 'total'
         }
         options = update_dict(default_options, options)
         self.options = options
@@ -69,13 +75,20 @@ class SammyRunTimeOptions:
         self.keep_runDIR = options["keep_runDIR"]
         self.Print =  options["Print"]
         
+        self.derivatives = options["derivatives"]
         self.bayes = options["bayes"]
-        self.derivatives_only = options["derivatives_only"]
+
         self.iterations = options["iterations"]
+        self.bayes_scheme = options["bayes_scheme"]
+        self.use_least_squares = options["use_least_squares"]
 
         self.energy_window = options["energy_window"]
         self.get_ECSCM = options["get_ECSCM"]
         self.ECSCM_rxn = options["ECSCM_rxn"]
+
+        if alphanumeric is None:
+            alphanumeric = []
+        self.alphanumeric = alphanumeric
 
     def __repr__(self):
         return str(self.options)

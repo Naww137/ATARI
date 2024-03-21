@@ -2218,6 +2218,9 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_grid, lwave=0):
         ladder_subset = ladder_df[(ladder_df['E'] >= energy_grid[0]) & (ladder_df['E'] <= energy_grid[-1])]
         ladder_subset = ladder_subset[(ladder_subset['L'] == lwave) & (ladder_subset['Jpi'] == Jpi)]
 
+        # add a new column with Gn1_in_eV
+        ladder_subset['Gn1_in_eV'] = ladder_subset['Gn1']/1000 
+
         N_res_Jpi = len(ladder_subset)
 
         SF_Gn1_l = np.zeros_like(energy_grid)
@@ -2229,7 +2232,8 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_grid, lwave=0):
 
         for i in range(1, len(energy_grid)):  # Start loop from 1
             e = energy_grid[i]
-            sum_gn1 = ladder_subset[ladder_subset['E'] <= e]['Gn1'].sum()
+
+            sum_gn1 = ladder_subset[ladder_subset['E'] <= e]['Gn1_in_eV'].sum()
             #delta_E = e - combined_energy[0]
             
             SF_Gn1_l[i] = 1 / ((2 * lwave + 1) * delta_E) * gj * sum_gn1

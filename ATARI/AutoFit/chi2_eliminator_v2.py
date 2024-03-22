@@ -69,6 +69,11 @@ class elim_OPTs:
     start_deep_fit_from: int
         determines the number of resonances on a current level on a path from N->N-1 where deep fit start from (see default value)
 
+    # TODO: 
+    final_stage_vary_pars: list
+        which parameters are fitted on the final stage.
+        by default - the same values as for initial ladder feeded into eliminator.
+
     TODO:
     path_selection_mode: string
         TBD: determines how on each elimination level the candidate solution will be selected
@@ -124,7 +129,15 @@ class elim_OPTs:
     def stop_at_chi2_thr(self, stop_at_chi2_thr):
         self._stop_at_chi2_thr = stop_at_chi2_thr
 
-     # stop or not if we found a solution inside a subset that passed the test (greedy in time)
+    # allow to fit gg on the final stage of each level
+    @property
+    def fit_gg_on_final_stage_of_level(self):
+        return self._fit_gg_on_final_stage_of_level
+    @fit_gg_on_final_stage_of_level.setter
+    def fit_gg_on_final_stage_of_level(self, fit_gg_on_final_stage_of_level):
+        self._fit_gg_on_final_stage_of_level = fit_gg_on_final_stage_of_level
+
+    # stop or not if we found a solution inside a subset that passed the test (greedy in time)
     @property
     def greedy_mode(self):
         return self._greedy_mode

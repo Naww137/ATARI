@@ -6,7 +6,7 @@ from ATARI.theory.experimental import e_to_t
 import ATARI.utils.hdf5 as h5io
 
 from ATARI.ModelData.particle_pair import Particle_Pair
-from typing import Optional
+from typing import Optional, List
 
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT

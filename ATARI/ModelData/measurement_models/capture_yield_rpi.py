@@ -227,7 +227,7 @@ class Capture_Yield_RPI:
         return
 
 
-    def approximate_unknown_data(self, exp_model, smooth, check_trig=False, overwrite=False):
+    def approximate_unknown_data(self, exp_model, smooth, check_trig=False, overwrite=False, nominal=25):
         
         if check_trig:
             for each in [self.model_parameters.trig_g, self.model_parameters.trig_bg, self.model_parameters.trig_f, self.model_parameters.trig_bf]:
@@ -239,7 +239,8 @@ class Capture_Yield_RPI:
                                                                            smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
-                                                                           self.model_parameters.trig_bg[0])
+                                                                           self.model_parameters.trig_bg[0],
+                                                                           nominal)
             self.model_parameters.background_spectrum_bg = background_spectrum_bg
 
         if self.model_parameters.incident_neutron_spectrum_f is None or overwrite:
@@ -257,7 +258,8 @@ class Capture_Yield_RPI:
                                                                            smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
-                                                                           self.model_parameters.trig_bf[0])
+                                                                           self.model_parameters.trig_bf[0],
+                                                                           nominal)
             self.model_parameters.background_spectrum_bf = background_spectrum_bf
 
 

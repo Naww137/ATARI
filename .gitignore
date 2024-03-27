@@ -7,7 +7,7 @@ workspace/
 *.asv
 *.bar*
 */.bar*
-*.dat
+# *.dat
 fort*
 *SAMMY_runDIR*
 *.gif

@@ -14,7 +14,7 @@ from ATARI.theory.scattering_params import FofE_recursive
 # from ATARI.utils.stats import chi2_val
 
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData, SammyInputDataYW
-
+import fortranformat as ff
 from typing import Optional, Union
 from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
 
@@ -145,6 +145,111 @@ def read_ECSCM(file_path):
     dfcov = data.iloc[:, 3:]
 
     return df_tdte, dfcov
+
+
+
+
+def readpds(pdsfilepath):
+    """
+    Reads a Sammy .pds derivative file.
+
+    Parameters
+    ----------
+    filepath : str
+        Full path to the .pds file you want to read
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with appropriately names columns
+    """
+    with open(pdsfilepath, 'r') as file:
+        lines = file.readlines()
+    
+    num_lines = len(lines)
+    NPAR = int(lines[0].strip())
+
+    # parameter names
+    par_names = []
+    for par_num in range(0, int(NPAR // 3)):
+        par_names.append(f'df/d_ue_{par_num}')
+        par_names.append(f'df/d_ug_{par_num}')
+        par_names.append(f'df/d_un_{par_num}')
+
+
+    # calculating number of datapoints using line reading
+    lines_for_u = NPAR // 6 + (1 if NPAR % 6 != 0 else 0) # lines for U parameters
+    
+    # Subtract the number of lines used for NPAR and U values
+    remaining_lines = num_lines - (1 + lines_for_u) 
+    
+    # Use fortranformat to extract U values
+    line_reader = ff.FortranRecordReader('6G13.6')
+    U_values = []
+    for line_index in range(1, 1+lines_for_u): # Extracting U values over the needed number of lines
+        values = line_reader.read(lines[line_index])
+        U_values.extend(values)
+
+      # Calculate number of lines needed to represent a single data point
+    if NPAR <= 3:
+        lines_per_data_point = 1
+    else:
+        lines_per_data_point = 1 + (NPAR - 3) // 6 + (1 if (NPAR - 3) % 6 != 0 else 0)
+    
+    num_data_points = remaining_lines // lines_per_data_point
+
+    # Start processing from the line after U values
+    data_start_line = 1 + lines_for_u
+
+    # Parsing line with DATA, DELD, THEORY, and partial derivatives using columns
+    line_values = []; data = []; deld = []; theory = []
+    partial_derivatives = np.zeros((num_data_points, NPAR))
+
+    for i in range(num_data_points):
+        # Extract values from the first line for each data point
+        line_values = []
+        for col_start in range(0, 13*6, 13):  # Each field is 13 columns wide, 6 fields in the first line for current point
+            segment = lines[data_start_line][col_start:col_start+13].strip()
+            data_reader = ff.FortranRecordReader('F13.6')
+            value = data_reader.read(segment)[0]
+            line_values.append(value)
+
+        # Assign values to respective categories
+        data.append(line_values[0])
+        deld.append(line_values[1])
+        theory.append(line_values[2])
+        partial_derivatives[i, :3] = line_values[3:6]  # First 3 partial derivatives
+        data_start_line += 1  # Move to the next line
+
+        # If NPAR > 3, read subsequent lines for additional partial derivatives
+        if NPAR > 3:
+            remaining_derivatives = NPAR - 3
+            while remaining_derivatives > 0:
+                line_values = []
+                for col_start in range(0, min(13*remaining_derivatives, 13*6), 13):
+                    segment = lines[data_start_line][col_start:col_start+13].strip()
+                    value = data_reader.read(segment)[0]
+                    line_values.append(value)
+
+                start_col = NPAR - remaining_derivatives
+                end_col = start_col + len(line_values)
+                partial_derivatives[i, start_col:end_col] = line_values
+
+                remaining_derivatives -= len(line_values)
+                data_start_line += 1
+
+    # Return the final result
+    res_dict = {
+        'NPAR': NPAR, # number of parameters
+        'U': U_values[:NPAR], # u parameter values
+        'DATA': data, # experimental data values
+        'DELD': deld, # uncertainity on data
+        'THEORY': theory, # theoretical values
+        'PARTIAL_DERIVATIVES': partial_derivatives, # G with respect to u parameters
+        'PAR_NAMES': par_names # the names of the u parameters
+    }
+    return res_dict
+
 
 # =============================================================================
 # Sammy Parameter File
@@ -376,7 +481,6 @@ def write_idc(filepath, J, C, stat):
             f.write("\n")
             
 
-
 # ################################################ ###############################################
 # Sammy Input file
 # ################################################ ###############################################
@@ -413,26 +517,49 @@ def write_saminp(filepath   :   str,
 
                 alphanumeric:   bool    = None,
                 use_IDC     :   bool    = False,
-                # resolution_function = True,
+                use_least_squares: bool = False,
+                derivatives : bool = False,
+                bayes_scheme  : bool = None
+
                 ):
     
     if alphanumeric is None:
         alphanumeric = []
-    # if use_ecscm_reaction:
-    #     reaction = rto.ECSCM_rxn
-    # else:
-    #     reaction = experimental_model.reaction
-    # ac = sammy_INP.particle_pair.ac*10  
+
     broadening = True
-    
+    alphanumeric.insert(0, formalism)
+
+    # Running Bayes or not:
     if bayes:
-        bayes_cmd = "SOLVE BAYES EQUATIONS"
+        alphanumeric.insert(1, "SOLVE BAYES EQUATIONS")
     else:
-        bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
-    if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
+        alphanumeric.insert(1, "DO NOT SOLVE BAYES EQUATIONS")
+
+    # Getting Derivatives:
+    if derivatives:
+        alphanumeric.insert(2, "GENERATE PARTIAL DERivatives only")
+
+    # What Scheme to use:
+    if   bayes_scheme == 'IQ':
+        alphanumeric.append('USE (I+Q) INVERSION scheme')
+    elif bayes_scheme == 'MW':
+        alphanumeric.append('USE (M+W) INVERSION scheme')
+    elif bayes_scheme == 'NV':
+        alphanumeric.append('USE (N+V) INVERSION scheme')
+    elif bayes_scheme is None:
+        pass
+    else:
+        raise ValueError(f'The provided bayes_scheme, {bayes_scheme} does not exist.')
     
-    alphanumeric = [formalism, bayes_cmd] + alphanumeric
+    # Least Squares:
+    if use_least_squares:
+        alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
+        alphanumeric.append('REMEMBER ORIGINAL PArameter values')
+
+    if use_IDC:
+        alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
+
+
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
@@ -465,6 +592,7 @@ def write_saminp(filepath   :   str,
 
             else:
                 f.write(line)
+
 
 
            

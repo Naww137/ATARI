@@ -1,11 +1,12 @@
 
-from typing import Optional, Union
+from typing import Optional, Union, List, Any
 from dataclasses import dataclass, field
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
 from pandas import DataFrame, Series
 from numpy import ndarray
 import os
+
 
 
 class SammyRunTimeOptions:
@@ -15,9 +16,15 @@ class SammyRunTimeOptions:
                  **kwargs
                  ):
         """
-        Sammy run time option class that holds information about how you would like to run SAMMY.
-        The only require arguement is sammyexe.
-        
+        Runtime options for sammy. 
+
+        This object holds many options for how sammy should be used.
+        Running sammy with this interface is dependent on the supply of a template input file that is used to handle the extensive list of options when running sammy (i.e., spin group definitions, experimental corrections). 
+        The options here fall into two primary categories:
+        1) simple options that can be toggled on/off without significant change to the input (i.e., reaction model, run bayes).
+        2) automated approaches such as recursion, least squares, simultaneous or sequential fitting, etc.
+
+        There are several input templates preloaded with the ATARI package, but the user can supply one as well. 
 
         Parameters
         ----------
@@ -36,10 +43,16 @@ class SammyRunTimeOptions:
             Option to keep sammy_runDIR after running sammy.
         Print   :   bool, False
             Option to print out status while running sammy.
+        derivatives : bool, False
+            Option to use sammy to get derivatives.
         bayes   :   bool, False
             Option to solve bayes while running sammy.
         iterations  :   int, 2
             Number of internal iterations for non-linearities
+        bayes_scheme : str, None
+            Solution scheme to bayes equations (IV, NQ, MW)
+        use_least_squares : bool, None
+            Option to use least squares fitting rather than Bayes.
         energy_window   :   None or float, None
             Energy window size for windowed sammy runs between Emin and Emax
         get_ECSCM   :   bool, False
@@ -52,26 +65,35 @@ class SammyRunTimeOptions:
             Default behavior (None) will use the template used for the basic sammy run with Bayes.
         """
 
+
         ### set defaults
         self.path_to_SAMMY_exe = sammyexe
         self.sammy_runDIR =  "sammy_runDIR"
         self.keep_runDIR = False
         self.Print =  False
         
+        self.derivatives = False
         self.bayes = False
+
+        # What to use when calculating:
         self.iterations = 2
+        self.bayes_scheme = None
+        self.use_least_squares = False
 
         self.energy_window = None
         self.get_ECSCM = False
-        # self.ECSCM_rxn = 'total'
-        # self.ECSCM_template = None #os.path.realpath(os.path.join(os.path.dirname(__file__), "sammy_templates/dop_2sg.inp"))
-
+        self.alphanumeric = None
+       
         ### update attributes to **kwargs
         for key, value in kwargs.items():
             if key == 'options': # catch legacy implementation
                 for key1, val1 in value.items():
                     setattr(self, key1, val1)
             setattr(self, key, value)
+
+
+        if self.alphanumeric is None:
+            self.alphanumeric = []
 
 
     def __repr__(self):
@@ -110,14 +132,14 @@ class SammyInputData:
 
 @dataclass
 class SammyOutputData:
-    pw: Union[DataFrame, list[DataFrame]]
+    pw: Union[DataFrame, List[DataFrame]]
     par: DataFrame
-    chi2: Union[float, list[float]]
-    chi2n: Union[float, list[float]]
-    pw_post: Optional[Union[DataFrame, list[DataFrame]]] = None
+    chi2: Union[float, List[float]]
+    chi2n: Union[float, List[float]]
+    pw_post: Optional[Union[DataFrame, List[DataFrame]]] = None
     par_post: Optional[DataFrame] = None
-    chi2_post: Optional[Union[float, list[float]]] = None
-    chi2n_post : Optional[Union[float, list[float]]] = None
+    chi2_post: Optional[Union[float, List[float]]] = None
+    chi2n_post: Optional[Union[float, List[float]]] = None
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 

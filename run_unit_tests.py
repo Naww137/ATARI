@@ -1,6 +1,10 @@
 import unittest
 from tests import test_resonance_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario
 
+__doc__ = """
+This file runs all of the unit tests from the "tests" directory.
+"""
+
 
 
 
@@ -45,4 +49,15 @@ if __name__ == '__main__':
     result = runner.run(sammy_test_suite)
 
 
-    
+
+# # The following code will run all tests that fit the pattern. This may be convenient when we get
+# # all of the tests in order.
+# import unittest
+# def run_tests():
+#     test_loader = unittest.TestLoader()
+#     test_suite = test_loader.discover('tests', pattern='tests_*.py')
+#     runner = unittest.TextTestRunner()
+#     runner.run(test_suite)
+
+# if __name__ == "__main__":
+#     run_tests()

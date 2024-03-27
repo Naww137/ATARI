@@ -512,8 +512,8 @@ def characterize_ladder(
     else:
         print('Expanding ladder...')
         sol_ladder = expand_sammy_ladder_2_atari(particle_pair = Ta_pair,
-                                                      ladder = sol_ladder) 
-        print(sol_ladder)
+                                                 ladder = sol_ladder) 
+        # print(sol_ladder)
 
     eval_rto = SammyRunTimeOptions(
         sammyexe = settings['path_to_SAMMY_exe'],
@@ -623,7 +623,7 @@ def characterize_ladder(
             print('Expanding true ladder...')
             true_ladder = expand_sammy_ladder_2_atari(particle_pair = Ta_pair,
                                                       ladder = true_ladder) 
-            print(true_ladder)
+            # print(true_ladder)
         
         SSE_val, SSE_dict = calc_SSE_one_case(
             est_ladder = sol_ladder,
@@ -1821,7 +1821,7 @@ def plot_xs_differences(cand_sol : list,
                         addit_str : str = '',
                         fig_size : tuple = (10,5),
                         y_scale: str = 'linear',
-                        show_spin_groups: bool = False,
+                        show_spin_groups: bool = False
                         ):
     """
     given a true solution and a list of candidate solutions - output each type of cs 
@@ -1862,7 +1862,7 @@ def plot_xs_differences(cand_sol : list,
 
         for index_sol, sol in enumerate(cs_calc_res_dfs_list):
             
-            axs[idx].plot(sol["E"], sol[column], label=f'{cand_sol_names[index_sol]}')
+            axs[idx].plot(sol["E"], sol[column], label=f'{cand_sol_names[index_sol]}', color = cand_sol_colors[index_sol])
 
             # vertical lines where we assume res.
             for index_res, res in cand_sol[index_sol].iterrows():
@@ -3033,6 +3033,7 @@ def create_solutions_comparison_table_from_hist(
         covariance_data: list = [],
 
         true_ladder: pd.DataFrame = pd.DataFrame(),
+        sft_ladder: pd.DataFrame = pd.DataFrame(),
 
         settings: dict = {},
         energy_grid_2_compare_on: np.array = np.array([]),
@@ -3140,9 +3141,7 @@ def create_solutions_comparison_table_from_hist(
         previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
 
         numres = current_ladder.shape[0]
-
         time_elaps = hist.elimination_history[level]['total_time']
-
         pass_test = hist.elimination_history[level]['final_model_passed_test']
 
         sol_chars = characterize_ladder(
@@ -3166,7 +3165,6 @@ def create_solutions_comparison_table_from_hist(
         SF_Gn1.append(sol_chars['SF_Gn1_sum_all_Jpi']) # SF value
         E_SF.append(sol_chars['E_SF_squared'])
         E_PSF.append(sol_chars['E_SFP_squared'])
-
         
         # end strength funcs calculation & fig production
         N_res_s.append(numres)
@@ -3211,8 +3209,6 @@ def create_solutions_comparison_table_from_hist(
 
         'OF_alt1': OF_alt1,
        
-        # for function that contain NLLW - with all resonances (artificial = remaining + art deleted)
-       
         'SF_Gn1': SF_Gn1,
         'E_SF': E_SF,
         'E_PSF': E_PSF,
@@ -3237,6 +3233,7 @@ def create_solutions_comparison_table_from_hist(
 
     if (len(true_ladder) >0):
 
+        # chars for true ladder
         true_sol_chars = characterize_ladder(
                     Ta_pair = Ta_pair,
                     datasets = datasets,
@@ -3279,19 +3276,82 @@ def create_solutions_comparison_table_from_hist(
             'ET': [0],
         })
 
-    true_sol_table['delta_AICc_best'] = true_sol_table['AICc'] - table_df['AICc'].min()
-    true_sol_table['delta_BIC_best'] = true_sol_table['BIC'] - table_df['BIC'].min()
+        true_sol_table['delta_AICc_best'] = true_sol_table['AICc'] - table_df['AICc'].min()
+        true_sol_table['delta_BIC_best'] = true_sol_table['BIC'] - table_df['BIC'].min()
 
-    #deltas with best solution
-    true_sol_table['delta_chi2_prev'] = 0
-    true_sol_table['delta_chi2_best'] = true_sol_table['sum_chi2'] - table_df['sum_chi2'].min()
+        #deltas with best solution
+        true_sol_table['delta_chi2_prev'] = 0
+        true_sol_table['delta_chi2_best'] = true_sol_table['sum_chi2'] - table_df['sum_chi2'].min()
 
-    # end add info about true sol to a new DF
+        # end add info about true sol to a new DF
 
-    table_df = pd.concat([table_df, true_sol_table], ignore_index=True)
+    else:
+        true_sol_table = pd.DataFrame()
+
+    # incorp. start from true solution
+        
     #  end incorporate true sol
+        
+    if (len(sft_ladder)>0):
+        # incorporate data about solution SFT
     
+        # chars for true ladder
+        sft_sol_chars = characterize_ladder(
+                    Ta_pair = Ta_pair,
+                    datasets = datasets,
+                    experiments = experiments,
+                    covariance_data = covariance_data,
+                    
+                    sol_ladder = sft_ladder,
+                    true_ladder = true_ladder,
 
+                    reactions_SSE = reactions_to_compare,
+                    energy_grid_2_compare_on = energy_grid_2_compare_on,
+
+                    printout = False,
+                    settings = settings
+                    )
+
+        # add info about true solution to a new DF
+        sft_sol_table = pd.DataFrame.from_dict({
+            'AT': [False],
+            'class': ['sft'],
+            'N_res': len(sft_ladder),
+        
+            'passed': [True],
+            'sum_chi2': [sft_sol_chars['sum_chi2']],
+            'chi2_s': [sft_sol_chars['chi2_stat']],
+            'chi2_s_ndat': [sft_sol_chars['chi2_stat_ndat']],
+            'SSE': [sft_sol_chars['SSE']],
+            'sum_LLW': [sft_sol_chars['LL_bypar'][0]],
+            'sum_LL_gn2': [sft_sol_chars['LL_bypar'][2]],
+            'sum_LL_gg2': [sft_sol_chars['LL_bypar'][1]],
+
+            'OF_alt1': [sft_sol_chars['OF2']],
+       
+            'SF_Gn1': [sft_sol_chars['SF_Gn1_sum_all_Jpi']],
+            'E_SF': [sft_sol_chars['E_SF_squared']],
+            'E_PSF': [sft_sol_chars['E_SFP_squared']],
+
+            'AICc': [sft_sol_chars['aicc_entire_ds']],
+            'BIC': [sft_sol_chars['bic_entire_ds']],
+            'ET': [0],
+        })
+
+        sft_sol_table['delta_AICc_best'] = sft_sol_table['AICc'] - table_df['AICc'].min()
+        sft_sol_table['delta_BIC_best'] = sft_sol_table['BIC'] - table_df['BIC'].min()
+
+        #deltas with best solution
+        sft_sol_table['delta_chi2_prev'] = 0
+        sft_sol_table['delta_chi2_best'] = sft_sol_table['sum_chi2'] - table_df['sum_chi2'].min()
+
+        # end add info about true sol to a new DF
+    else: 
+        sft_sol_table = pd.DataFrame()
+
+    table_df = pd.concat([table_df, true_sol_table, sft_sol_table], ignore_index=True)
+    # end incorporate data about SFT solution
+    
     return table_df
 
 

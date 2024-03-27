@@ -435,6 +435,8 @@ class InitialFB:
 
         ### Fit 1 on Gn only
         print("========================================\n\tFIT 1\n========================================")
+        print(f"Options to vary: {self.options.fitpar1}")
+
         outs_fit_1 = self.fit_and_eliminate(rto, sammyINPyw, external_resonance_indices)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
@@ -443,6 +445,8 @@ class InitialFB:
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
+        print(f"Options to vary: {self.options.fitpar2}")
+
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
         internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, 
                                                                  varyE = self.options.fitpar2[0],

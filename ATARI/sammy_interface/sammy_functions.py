@@ -42,13 +42,13 @@ def readlst(filepath):
         DataFrame with headers.
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
         if df.index.equals(pd.RangeIndex(len(df))):
             pass
         else:
-            df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
+            df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
     else:
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):
@@ -131,12 +131,12 @@ def read_ECSCM(file_path):
         _description_
     """
 
-    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
+    data = pd.read_csv(file_path, sep = '\s+', skiprows=3, header=None)
     df_tdte = data.iloc[:,0:3]
     df_tdte.columns = ["theo", "theo_unc", "E"]
 
     # assert top rows == left columns
-    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
+    dftest = pd.read_csv(file_path, sep = '\s+', nrows=3, header=None)
     dftest=dftest.T
     dftest.columns = ["theo", "theo_unc", "E"]
     assert(np.all(dftest == df_tdte))
@@ -318,6 +318,10 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
             df["J_ID"] = J_ID
 
     return df
+
+def check_sampar_inputs(df):
+    # check for same energy and same spin group
+    return 
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -800,6 +804,9 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
             else: 
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied")
+    if sammyINP.experimental_data is None:
+        if sammyINP.energy_grid is None: 
+            raise ValueError("No energy grid was provided")
 
 def run_sammy(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions):
 
@@ -1130,11 +1137,74 @@ mv "results/temp" "results/step{step}.par" """],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
 
+def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
+    # if True:# sammyINPyw.batch_reduce_width:
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    proportion = 0.
+    factor = np.random.rand(len(df))
+    factor[factor <= proportion] = 0.75
+    factor[factor != 1] = 1
+    # df['Gg'] = df['Gg']*factor
+    df['Gn1'] = df['Gn1']*factor
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
 
+
+def get_batch_vector(vector_length, num_ones, ibatch):
+    vector = np.zeros(vector_length)
+    indices = np.arange(0, vector_length, int(vector_length/num_ones))
+    vector[indices] = 1
+
+    if ibatch%vector_length == 0:
+        return vector
+    else:
+        return np.roll(vector, ibatch)
+    
+
+### temporary functions here
+def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
+    if external_resonance_indices is None: external_resonance_indices = []
+    external_resonance_ladder = resonance_ladder.iloc[external_resonance_indices, :]
+    internal_resonance_ladder = copy(resonance_ladder)
+    internal_resonance_ladder.drop(index=external_resonance_indices, inplace=True)
+    return internal_resonance_ladder, external_resonance_ladder
+def concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder):
+    if external_resonance_ladder.empty:
+        resonance_ladder = internal_resonance_ladder
+        external_resonance_indices = []
+    else:
+        resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
+        external_resonance_indices = list(range(len(external_resonance_ladder)))
+    return resonance_ladder, external_resonance_indices
+    
+def batch_fitpar(rundir, istep, sammyINPyw, fudge):
+
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    df_internal, df_external = separate_external_resonance_ladder(df, sammyINPyw.external_resonance_indices)
+    varyE = np.any(df_internal['varyE']==1)
+    varyGg = np.any(df_internal['varyGg']==1)
+    varyGn1 = np.any(df_internal['varyGn1']==1)
+
+    numpar = len(df_internal)
+    if sammyINPyw.batch_fitpar_random:
+        proportion_ones = sammyINPyw.batch_fitpar_ifit/numpar
+        vary = np.random.rand(numpar)
+        vary[vary <= proportion_ones] = 1
+        vary[vary != 1] = 0
+    else:
+        vary = get_batch_vector(numpar, sammyINPyw.batch_fitpar_ifit, int(istep/sammyINPyw.steps_per_batch))
+
+    df_internal['varyE'] = vary*varyE
+    df_internal['varyGg'] = vary*varyGg
+    df_internal['varyGn1'] = vary*varyGn1
+    df, _ = concat_external_resonance_ladder(df_internal, df_external)
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)    
 
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     istep = 0
+    no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
@@ -1142,37 +1212,17 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
-        
+            
         if sammyINPyw.batch_fitpar:
-            parfile = os.path.join(rundir,'results',f'step{istep}.par')
-            df = readpar(parfile)
-            varyE = np.any(df['varyE']==1)
-            varyGg = np.any(df['varyGg']==1)
-            varyGn1 = np.any(df['varyGn1']==1)
-
-            # if istep % 2 == 0:
-            #     # vary = np.tile([0,0,1,1], int(len(df)/4))
-            #     pattern = np.array([0,0,1,1])
-            # else:
-            #     # vary =  np.tile([1,1,0,0], int(len(df)/4))
-            #     pattern = np.array([1,1,0,0])
-            # Set the proportion of ones
-            proportion_ones = 0.5
-            vary = np.random.rand(len(df))
-            vary[vary <= proportion_ones] = 1
-            vary[vary != 1] = 0
-            
-            # vary = np.tile(pattern, (len(df) // len(pattern)) + 1)[:len(df)]
-            df['varyE'] = vary*varyE
-            df['varyGg'] = vary*varyGg
-            df['varyGn1'] = vary*varyGn1
-            write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
-            
-
+            if istep%sammyINPyw.steps_per_batch == 0:
+                batch_fitpar(rundir, istep, sammyINPyw, fudge)
+            else:
+                pass
+    
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
 
-            # Levenberg-Marquardt algorithm
+            ### Levenberg-Marquardt algorithm
             if sammyINPyw.LevMar:
                 assert(sammyINPyw.LevMarV>1)
 
@@ -1188,6 +1238,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge)
+                        # if True: reduce_width_randomly(rundir, istep-1, sammyINPyw, fudge)
+                        # if sammyINPyw.batch_fitpar:
+                        #     batch_fitpar(rundir, istep, sammyINPyw, fudge)
                         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
@@ -1199,30 +1252,42 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         else:
                             pass
             
-            # convergence check
+            ### convergence check
             Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
             if Dchi2 < sammyINPyw.step_threshold:
-                if Dchi2 < 0:
-                    criteria = f"Chi2 increased, taking solution {istep-1}"
-                    if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
-                        criteria = f"Fudge below minimum value, taking solution {istep-1}"
+
+                no_improvement_tracker += 1
+                if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                    
+                    if Dchi2 < 0:
+                        criteria = f"Chi2 increased, taking solution {istep-1}"
+                        if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                            criteria = f"Fudge below minimum value, taking solution {istep-1}"
+                        if sammyRTO.Print:
+                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                            print(criteria)
+                        return max(istep-1, 0)
+                    else:
+                        criteria = "Chi2 improvement below threshold"
                     if sammyRTO.Print:
                         print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                         print(criteria)
-                    return max(istep-1, 0)
-                else:
-                    criteria = "Chi2 improvement below threshold"
-                if sammyRTO.Print:
-                    print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
-                    print(criteria)
-                return istep
+                    return istep
                 
+                else:
+                    pass
+            
+            else:   
+                no_improvement_tracker = 0
+            
         
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         update_fudge_in_parfile(rundir, istep, fudge)
+        # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
+
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
 
         istep += 1
@@ -1247,11 +1312,21 @@ def plot_YW(sammyRTO, dataset_titles, i):
     return par, lsts, chi2s, chi2ns
 
 
+def check_inputs_YW(sammyINPyw, sammyRTO):
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    if len(np.unique(dataset_titles)) != len(dataset_titles):
+        raise ValueError("Redundant experiment model titles")
+    if np.any([exp.template is None for exp in sammyINPyw.experiments]):
+        raise ValueError(f"One or more experiments do not have template files.")
+    if sammyINPyw.step_threshold_lag > 1 and sammyINPyw.batch_fitpar is False:
+        print("WARNING: you have set a step threshold lag but are not batching fit parameters, this is an odd setting.")
+    return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
     # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)

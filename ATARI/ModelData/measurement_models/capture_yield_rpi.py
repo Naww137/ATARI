@@ -134,10 +134,10 @@ class capture_yield_rpi_parameters:
 
     def __init__(self, **kwargs):
 
-        self.trig_g     =  (12000000,   0)
-        self.trig_bg    =  (10000000,  0)
-        self.trig_f     =  (12000000,   0)
-        self.trig_bf    =  (10000000,  0)
+        self.trig_g     =  (1.2e7,   0)
+        self.trig_bg    =  (0.8e7,  0)
+        self.trig_f     =  (1e7,   0)
+        self.trig_bf    =  (0.8e7,  0)
         self.fn         =  (1,          0)
     
         self.background_spectrum_bg = None
@@ -190,10 +190,6 @@ class Capture_Yield_RPI:
     def model_parameters(self, model_parameters):
         self._model_parameters = model_parameters
 
-    # @property
-    # def neutron_spectrum_triggers(self) -> int:
-    #     return self.model_parameters.trigo[0]
-
     @property
     def covariance_data(self) -> dict:
         return self._covariance_data
@@ -210,24 +206,44 @@ class Capture_Yield_RPI:
 
     def sample_true_model_parameters(self, true_model_parameters: dict):
         return self.model_parameters.sample_parameters(true_model_parameters)
+    
+
+    def truncate_energy_range(self, new_energy_range):
+        if min(new_energy_range) < min(self.model_parameters.background_spectrum_bg.E):
+            raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bg energy")
+        if max(new_energy_range) > max(self.model_parameters.background_spectrum_bg.E):
+            raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bg energy")
+        if min(new_energy_range) < min(self.model_parameters.incident_neutron_spectrum_f.E):
+            raise ValueError("new energy range is less than existing transmission_rpi.incident_neutron_spectrum_f energy")
+        if max(new_energy_range) > max(self.model_parameters.incident_neutron_spectrum_f.E):
+            raise ValueError("new energy range is more than existing transmission_rpi.incident_neutron_spectrum_f energy")
+        if min(new_energy_range) < min(self.model_parameters.background_spectrum_bf.E):
+            raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bf energy")
+        if max(new_energy_range) > max(self.model_parameters.background_spectrum_bf.E):
+            raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bf energy")
+        self.model_parameters.background_spectrum_bg =      self.model_parameters.background_spectrum_bg.loc[(self.model_parameters.background_spectrum_bg.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bg.E.values > min(new_energy_range))].copy()
+        self.model_parameters.incident_neutron_spectrum_f = self.model_parameters.incident_neutron_spectrum_f.loc[(self.model_parameters.incident_neutron_spectrum_f.E.values < max(new_energy_range)) & (self.model_parameters.incident_neutron_spectrum_f.E.values > min(new_energy_range))].copy()
+        self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[(self.model_parameters.background_spectrum_bf.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bf.E.values > min(new_energy_range))].copy()
+        return
 
 
-    def approximate_unknown_data(self, exp_model, smooth, check_trig=False):
+    def approximate_unknown_data(self, exp_model, smooth, check_trig=False, overwrite=False, nominal=25):
         
         if check_trig:
             for each in [self.model_parameters.trig_g, self.model_parameters.trig_bg, self.model_parameters.trig_f, self.model_parameters.trig_bf]:
                 if exp_model.channel_widths['chw'][0]*1e-9 * each[0] < 1:
                     print("WARNING: the linac trigers in you generative measurement model are not large enough for the channel bin width. This will result in many bins with 0 counts")
 
-        if self.model_parameters.background_spectrum_bg is None:
+        if self.model_parameters.background_spectrum_bg is None or overwrite:
             background_spectrum_bg = approximate_gamma_background_spectrum(exp_model.energy_grid, 
                                                                            smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
-                                                                           self.model_parameters.trig_bg[0])
+                                                                           self.model_parameters.trig_bg[0],
+                                                                           nominal)
             self.model_parameters.background_spectrum_bg = background_spectrum_bg
 
-        if self.model_parameters.incident_neutron_spectrum_f is None:
+        if self.model_parameters.incident_neutron_spectrum_f is None or overwrite:
             incident_neutron_spectrum_f = approximate_neutron_spectrum_Li6det(exp_model.energy_grid, 
                                                                             smooth, #self.options.smoothTNCS, 
                                                                             exp_model.FP[0],
@@ -237,12 +253,13 @@ class Capture_Yield_RPI:
             self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
             # self.model_parameters.incident_neutron_spectrum_f = incident_neutron_spectrum_f
 
-        if self.model_parameters.background_spectrum_bf is None:
+        if self.model_parameters.background_spectrum_bf is None or overwrite:
             background_spectrum_bf = approximate_gamma_background_spectrum(exp_model.energy_grid, 
                                                                            smooth, 
                                                                            exp_model.FP[0], 
                                                                            exp_model.t0[0], 
-                                                                           self.model_parameters.trig_bf[0])
+                                                                           self.model_parameters.trig_bf[0],
+                                                                           nominal)
             self.model_parameters.background_spectrum_bf = background_spectrum_bf
 
 
@@ -277,34 +294,19 @@ class Capture_Yield_RPI:
             _description_
         """
 
-        assert true_model_parameters.incident_neutron_spectrum_f is not None
+        if true_model_parameters.incident_neutron_spectrum_f is None:
+            raise ValueError("incident neutron flux spectrum is None, please provide this data or approximate it using the method in this class")
         if len(true_model_parameters.incident_neutron_spectrum_f) != len(pw_true):
             raise ValueError("neutron flux spectrum and sample data are not of the same length, check energy domain")
-        assert true_model_parameters.background_spectrum_bg is not None
+        if true_model_parameters.background_spectrum_bg is None:
+            raise ValueError("background gamma spectrum is None, please provide this data or approximate it using the method in this class")
         if len(true_model_parameters.background_spectrum_bg) != len(pw_true):
             raise ValueError("gamma background spectrum for target capture measurement and sample data are not of the same length, check energy domain")
-        assert true_model_parameters.background_spectrum_bf is not None
+        if true_model_parameters.background_spectrum_bf is None:
+            raise ValueError("background neutron flux spectrum is None, please provide this data or approximate it using the method in this class")
         if len(true_model_parameters.background_spectrum_bf) != len(pw_true):
             raise ValueError("gamma background spectrum for flux yield measurement and sample data are not of the same length, check energy domain")
-        
-        # ====================
-        #### Noah's Changes: True reduction parameters (including neutron spectrum and background) are now sampled using the sample_true_model_parameters
-        # ====================
 
-        # # true_reduction_parameters = sample_true_underlying_parameters(self.reduction_parameters, options["Sample TURP"])
-
-        #true_Bi = gamma_background_function()
-        #We use a linear aproximation for the background function for now.
-        # background=pd.DataFrame({'c'    :   np.ones(len(pw_true.E))*25,
-        #                          'dc'   :   np.ones(len(pw_true.E))*0})
-        
-        #If we are sampling TURP, we also should sample background. Might it be better to have a distinct setting for this?
-        # if(options.sampleTURP):
-        #     background.c=pois_noise(background.c)
-        #     background.dc=np.sqrt(background.c)
-        # ====================
-        #### 
-        # ====================
 
         raw_data = deepcopy(pw_true)
         true_gamma_counts = inverse_reduction(pw_true, true_model_parameters)
@@ -313,30 +315,20 @@ class Capture_Yield_RPI:
             c = pois_noise(true_gamma_counts)
         else:
             c = true_gamma_counts
-        c[c==0] = 1
-        # assert(all(c> 0))
+
+        if options.force_zero_to_1:
+            c[c==0] = 1
+        else:
+            if np.any(c==0):
+                raise ValueError("Syndat Option force_zero_to_1 is set to false and you have bins with 0 counts")
+
         dc = np.sqrt(c)
 
         raw_data.loc[:, 'ctg_true'] = true_gamma_counts
         raw_data.loc[:, 'ctg'] = c
         raw_data.loc[:, 'dctg'] = dc
         
-        # count_rate=pd.DataFrame({'c'    :   count_rate,
-        #                          'dc'   :   count_rate_uncertainty})
-        
-        #We sample countrate here instead of in the reduction function.
-        # if(options.sample_counting_noise):
-        #     count_rate.c=pois_noise(count_rate.c)
-        
-        #Uncertainty from this operation still needs to be nailed down.
 
-        # raw_data = pd.DataFrame({'E':pw_true.E, 
-        #                          'tof':pw_true.tof, 
-        #                          'true':pw_true.true, 
-        #                          'cg':count_rate.c,
-        #                          'dcg':count_rate.dc, 
-        #                          'cb':true_model_parameters.gamma_background_spectrum.c, 
-        #                          'dcb':true_model_parameters.gamma_background_spectrum.dc})
 
         return raw_data
         

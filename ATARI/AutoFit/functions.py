@@ -68,13 +68,6 @@ def get_starting_feature_bank(energy_range,
     elif num_Elam/(np.max(energy_range)-np.min(energy_range)) < 1.25:
         print("WARNING: User supplied a feature bank energy grid of <1 per eV, problem may not be convex")
 
-    # # setup spin groups
-    # if options.fit_all_spin_groups:
-    #     spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
-    # else:
-    #     assert len(options.spin_group_keys)>0
-    #     spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in options.spin_group_keys]
-        
     Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
     for sg in spin_groups:
         Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier)

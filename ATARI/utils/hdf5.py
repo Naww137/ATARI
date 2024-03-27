@@ -1,8 +1,27 @@
 import pandas as pd
 import numpy as np
+import h5py
 
 
 ### Read data
+
+def read_pw_reduced(case_file, isample, dataset_title):
+    pw_reduced_df = pd.read_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/pw_reduced")
+    existing_cov_fields = []
+    with h5py.File(case_file, 'r') as f:
+        if "cov_data" in f[f"sample_{isample}/exp_dat_{dataset_title}"].keys():
+            [existing_cov_fields.append(cov_field) for cov_field in f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data"].keys()]
+    cov_data = {}
+    for cov_field in existing_cov_fields:
+        if cov_field == 'Cov_sys':
+            with h5py.File(case_file, 'r') as f:
+                cov_data[cov_field] = f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{cov_field}"][:]
+        else:
+            cov_data[cov_field] = pd.read_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{cov_field}")
+    return pw_reduced_df, cov_data
+
+    
+        
 
 def read_pw_exp(case_file, isample, title="exp"):
     pw_exp = pd.read_hdf(case_file, f'/sample_{isample}/pw_{title}')
@@ -27,6 +46,31 @@ def read_par(case_file:str, isample:int, title:str) -> pd.DataFrame:
 
 
 ### Write data
+import os
+def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=None):
+    ### check for existing dataset in isample
+    if os.path.isfile(case_file):
+        h5f = h5py.File(case_file, 'r')
+        if f"sample_{isample}" in h5f.keys():
+            if f"exp_dat_{dataset_title}" in h5f[f"sample_{isample}"].keys():
+                h5f.close()
+                raise ValueError(f"Dataset with title {dataset_title} already exists for sample_{isample}")
+        h5f.close()
+
+    ### write data
+    pw_reduced_df.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/pw_reduced")
+    if cov_data is not None:
+        for key, val in cov_data.items():
+            if isinstance(val, np.ndarray):
+                h5f = h5py.File(case_file, 'a')
+                # h5f.create_dataset(f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}", data=val)
+                h5f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}"]=val
+                h5f.close()
+            elif isinstance(val, pd.DataFrame):
+                val.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}")
+            else:
+                raise ValueError(f"Unrecognized type {type(val)} in cov_data")
+        
 
 def write_pw_exp(case_file, isample, pw_exp_df, title="exp", CovT=None, CovXS=None):
     pw_exp_df.to_hdf(case_file, f"sample_{isample}/pw_{title}")

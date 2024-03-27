@@ -71,8 +71,8 @@ class elim_OPTs:
 
     # TODO: 
     final_stage_vary_pars: list
-        which parameters are fitted on the final stage.
-        by default - the same values as for initial ladder feeded into eliminator.
+        which parameters are fitted on the final stage - list of 0/1, - [E, Gg, Gn1]
+        by default - [1,0,1]
 
     TODO:
     path_selection_mode: string
@@ -108,6 +108,8 @@ class elim_OPTs:
 
         self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 10)
 
+        self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) #by default vary this vars on the final stage of the elim for current level
+
         # all that passed through
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -129,13 +131,13 @@ class elim_OPTs:
     def stop_at_chi2_thr(self, stop_at_chi2_thr):
         self._stop_at_chi2_thr = stop_at_chi2_thr
 
-    # allow to fit gg on the final stage of each level
+    # allow to fit listed perameters on the final stage of each level
     @property
-    def fit_gg_on_final_stage_of_level(self):
-        return self._fit_gg_on_final_stage_of_level
-    @fit_gg_on_final_stage_of_level.setter
-    def fit_gg_on_final_stage_of_level(self, fit_gg_on_final_stage_of_level):
-        self._fit_gg_on_final_stage_of_level = fit_gg_on_final_stage_of_level
+    def final_stage_vary_pars (self):
+        return self._final_stage_vary_pars 
+    @final_stage_vary_pars .setter
+    def final_stage_vary_pars (self, final_stage_vary_pars ):
+        self._final_stage_vary_pars = final_stage_vary_pars 
 
     # stop or not if we found a solution inside a subset that passed the test (greedy in time)
     @property

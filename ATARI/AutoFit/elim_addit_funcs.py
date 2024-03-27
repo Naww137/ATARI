@@ -503,6 +503,18 @@ def characterize_ladder(
     
     output_dict = {}
 
+    # check if we have all required columns if not - expand to atari format
+    # gg2, gn2, L, Jpi - check if we have such columns in a df
+    exp_ladder_req_cols = ['gg2', 'gn2', 'L', 'Jpi']
+    
+    if all(col in sol_ladder.columns for col in exp_ladder_req_cols):
+        pass
+    else:
+        print('Expanding ladder...')
+        sol_ladder = expand_sammy_ladder_2_atari(particle_pair = Ta_pair,
+                                                      ladder = sol_ladder) 
+        print(sol_ladder)
+
     eval_rto = SammyRunTimeOptions(
         sammyexe = settings['path_to_SAMMY_exe'],
         options = {"Print"   :   True,
@@ -520,11 +532,6 @@ def characterize_ladder(
                        experiments = experiments,
                        exp_covariance = covariance_data
                        )
-    
-    # if (printout):
-    #     print(ladder_SO.chi2)
-    #     print(ladder_SO.chi2_post)
-
 
     all_chi2 = []
 
@@ -563,7 +570,7 @@ def characterize_ladder(
 
     # recalc entire dataset & calc AICc and BICc values for all datasets as one (!)
 
-    k = ladder_SO.par.shape[0] * 3  #+ 1 # estimating the variance
+    k = ladder_SO.par.shape[0] * 3  #+ or 4 - spin group?
 
     n = len(aggregated_exp_data)
 
@@ -584,9 +591,6 @@ def characterize_ladder(
 
     output_dict['OF2'] = sum_chi2 - 2 * np.sum(LL_bypar)
 
-    # output_dict['NLL_gn_normal_all_energy'] = LL_dict['by_groups_NLL_gn_normal_on_reduced_width_amp']
-    # output_dict['NLL_W_all_energy'] = LL_dict['by_groups_NLLW_all_energy']
-
     # joint_prob, prob_by_spin_groups, joint_LL = calc_N_res_probability(Ta_pair=Ta_pair,
     #                                                          e_range = e_range,
     #                                                          ladder_df=sol.par_post)
@@ -595,8 +599,32 @@ def characterize_ladder(
     # output_dict['N_res_joint_prob'] = joint_prob
     # output_dict['N_res_joint_LL'] = joint_LL
 
-    # SSE inside 
+    # just SF for ladder
+    SF_sol_dict = calc_SF_Gn1(
+        Ta_pair = Ta_pair,
+        ladder_df = sol_ladder,
+        energy_grid = energy_grid_2_compare_on,
+        lwave = 0
+        )
+    
+    # calculating sum for all sg
+    SF_sol_sum_all_Jpi, N_res_sol_all_Jpi = calc_sum_sf_using(input_SF_dict = SF_sol_dict)
+
+    output_dict['SF_Gn1_sum_all_Jpi'] = SF_sol_sum_all_Jpi
+
+    # end SF calculation
+
+    # SSE & SF
     if (len(true_ladder)>0 and len(energy_grid_2_compare_on)>0):
+        
+        if all(col in true_ladder.columns for col in exp_ladder_req_cols):
+            pass
+        else:
+            print('Expanding true ladder...')
+            true_ladder = expand_sammy_ladder_2_atari(particle_pair = Ta_pair,
+                                                      ladder = true_ladder) 
+            print(true_ladder)
+        
         SSE_val, SSE_dict = calc_SSE_one_case(
             est_ladder = sol_ladder,
             theo_ladder = true_ladder,
@@ -605,8 +633,32 @@ def characterize_ladder(
             energy_grid = energy_grid_2_compare_on,
             reactions_SSE  = reactions_SSE,
         )
+
         output_dict['SSE'] = SSE_val
         output_dict['SSE_dict'] = SSE_dict
+
+        #SF for true
+        SF_true_dict = calc_SF_Gn1(
+            Ta_pair = Ta_pair,
+            ladder_df = true_ladder,
+            energy_grid = energy_grid_2_compare_on,
+            lwave = 0)
+    
+        ##  calculating sum for all sg
+        # SF_true_sum_all_Jpi, N_res_true_all_Jpi = calc_sum_sf_using(input_SF_dict = SF_true_dict)
+
+        SF_diff_dict = calc_SF_error_by_Jpi(SF_dict_true = SF_true_dict,
+                         SF_dict_sol = SF_sol_dict)
+        
+        E_SFP_squared = SF_diff_dict["squared_error_sum_separate_Jpi"]
+        E_SF_squared = SF_diff_dict["all_Jpi"]['sq_error']
+
+        output_dict['SF_diff_dict'] = SF_diff_dict
+        output_dict['E_SF_squared'] = E_SF_squared
+        output_dict['E_SFP_squared'] = E_SFP_squared
+
+    # mirroring the ladder
+    output_dict['ladder_df'] = sol_ladder
 
     return output_dict
 
@@ -697,6 +749,7 @@ def get_LL_by_parameter(ladder, spin_groups):
         raise ValueError("Reduced widths not in ladder, please convert from sammy to atari ladder first")
     
     LL_bypar_bysg = []
+    
     for sg in ladder.groupby("J_ID"):
         for key, val in spin_groups.items():
             if float(val['J_ID']) == sg[0]:
@@ -2271,7 +2324,7 @@ def calc_SF_error_by_Jpi(SF_dict_true: dict,
     
     result_dict = {'all_Jpi': {},
                     'by_Jpi': {},
-                    'squareed_error_sum_separate_Jpi': 0
+                    'squared_error_sum_separate_Jpi': 0
                     }
 
     sum_SF_true = 0
@@ -2298,7 +2351,7 @@ def calc_SF_error_by_Jpi(SF_dict_true: dict,
         result_dict['by_Jpi'][key]['rel_error']  = SF_sg_error / SF_dict_true[key]['lastval'] * 100
         result_dict['by_Jpi'][key]['abs_rel_error']  = np.abs(SF_sg_error) / SF_dict_true[key]['lastval'] * 100
 
-        result_dict['squareed_error_sum_separate_Jpi'] += result_dict['by_Jpi'][key]['sq_error']
+        result_dict['squared_error_sum_separate_Jpi'] += result_dict['by_Jpi'][key]['sq_error']
     
 
 
@@ -2433,6 +2486,11 @@ def calc_strength_functions(
 
 
 
+def format_scientific_notation(num):
+    """Custom formatter to convert a number to scientific notation."""
+    num_str = f"{num:.2e}"
+    base, exponent = num_str.split('e')
+    return f'{base} \\times 10^{{{int(exponent)}}}'
 
 
 
@@ -2622,13 +2680,13 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
     """Produces ladder based on Ta_pair and average parameters and given ladder with """
 
     art_res = input_ladder.copy()
+
     # emptying this dataframe but keeping the structure & columns
     art_res = art_res.iloc[0:0]
-    #print(art_res)
-
+    
     varyE, varyGg, varyGn1 = 0, 0, 0
 
-    # shift in energy
+    # shift in energy - where to put the resonances
     delta_E = np.max(energy_range) + 5
 
     for j_id, count in res_to_add.items():
@@ -2641,19 +2699,23 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
 
         spin_group_key, current_spin_group_info = find_spin_group_info(Ta_Pair = Ta_Pair,
                          j_id = j_id)
-        #current_spin_group_info = Ta_Pair.spin_groups[spin_group_key]
+        
+        current_spin_group_info = Ta_Pair.spin_groups[spin_group_key]
 
         # print(current_spin_group_info)
         
-        Gg = np.repeat(current_spin_group_info["<Gg>"], count)
+        avg_gg2 = np.repeat(current_spin_group_info["<gg2>"], count)
 
-        current_Gn = current_spin_group_info["<Gn>"]
+        avg_gn2 = current_spin_group_info["<gn2>"]
 
-        Gn = np.repeat(current_Gn, count)
+        Gn = np.repeat(avg_gn2, count)
+
         Er = np.linspace(start = delta_E, 
                          stop = delta_E + (count - 1) * np.sqrt(2/np.pi) * current_spin_group_info['<D>'],
                          num = count)
+        
         J_ID = np.repeat(current_spin_group_info["J_ID"], count)
+        
         # combine it into a dataframe
 
         sg_dataframe = pd.DataFrame(
@@ -2684,15 +2746,305 @@ def produce_art_ladder(input_ladder: pd.DataFrame,
 
 
 
-def create_solutions_comparison_table_from_hist(hist,
-                                                Ta_pair: Particle_Pair,
-                     datasets: list,
-                     experiments: list,
-                     covariance_data: list =[],
-                     true_chars: SammyOutputData = None,
-                     settings: dict = {},
-                     energy_grid_2_compare_on: np.array = np.array([])
-                    ):
+# def create_solutions_comparison_table_from_hist(hist,
+#                                                 Ta_pair: Particle_Pair,
+#                      datasets: list,
+#                      experiments: list,
+#                      covariance_data: list =[],
+#                      true_chars: SammyOutputData = None,
+#                      settings: dict = {},
+#                      energy_grid_2_compare_on: np.array = np.array([])
+#                     ):
+
+#     # table for analysis of the models - produce chi2
+#     hist = copy.deepcopy(hist)
+
+#     # sums - for all datasets
+#     is_true = []
+#     elaps_time = []
+
+#     SSE_s = []
+#     NLLW_s = []
+#     NLL_Gn1 = []
+#     NLL_Gg = []
+
+#     chi2_s = []
+#     chi2_stat_s_npar = []
+#     chi2_stat_s_ndat = []
+
+#     OF_alt1 = []
+#     OF_alt2 = []
+#     OF_alt3 = []
+
+#     OF_alt4 = [] # function values that are calculated by artificial ladder (remaining resonances + added ones to keep cardinality)
+
+#     sum_NLLW_al = []
+#     sum_NLL_gn_normal = []
+
+#     # SF
+#     SF_Gn1 = []
+#     SF_Gg = []
+#     # end SF
+
+
+#     aicc_s = []
+#     bicc_s = []
+#     N_res_s = []
+#     N_res_art_s = []
+
+#     test_pass = []
+
+#     N_res_joint_LL = []
+
+#     # # incorporate true sol
+#     true_sol_key = 0
+
+#     if ((true_sol_key not in hist.elimination_history.keys()) and true_chars is not None):
+#         hist.elimination_history[true_sol_key] = {
+
+#                 'input_ladder' : true_chars.par_post, #? questionable
+#                 'selected_ladder_chars': true_chars, # solution with min chi2 on this level
+#                 'any_model_passed_test': True, # any model on this level of N-1 res..
+#                 'final_model_passed_test': True,
+#                 'level_time': np.inf,
+#                 'total_time': np.inf,
+#                 # adding a mark that this is a true solution
+#                 'assumed_true': True
+#             }
+
+#     # # end incorporate true sol
+        
+#     max_level = np.max(list(hist.elimination_history.keys()))
+#     previous_ladder = hist.elimination_history[max_level ]['selected_ladder_chars'].par_post
+#     combined_ladder = previous_ladder
+
+#     for level in hist.elimination_history.keys():
+        
+#         # # adding a mark that this is a true solution
+#         if (level != true_sol_key):
+#             # adding a mark that this is a true solution
+#             hist.elimination_history[level]['assumed_true'] = False
+
+#         if (level == max_level or level == true_sol_key):
+#             """This is the initial number of resonances"""
+#             N_res_initial = hist.elimination_history[level]['selected_ladder_chars'].par.shape[0]
+#             # empty dataframe
+#             arificial_res = pd.DataFrame()
+#         else:
+#             # produce artificial resonances
+
+#             # get the difference with previous remaining resonances - which spin group res. was deleted?
+#             # compare current ladder vs. previous
+
+#             # remaining resonances
+#             current_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+
+#             # we got count of deleted resonances by each J_ID
+#             deleted_res = find_deleted_res_spingroup_J_ID(ladder1 = previous_ladder, ladder2 = current_ladder)
+            
+#             # print('Deleted count resonances by each group:')
+#             # print(deleted_res)
+
+#             # for j_id, count in deleted_res.items():
+#             #     print(f"J_ID {j_id} was deleted {count} times")
+
+#             art_ladder = produce_art_ladder(input_ladder = current_ladder,
+#                                             res_to_add = deleted_res,
+#                                             energy_range = energy_grid_2_compare_on,
+#                                             Ta_Pair = Ta_pair)
+            
+#             print()
+#             print('Artificial ladder:')
+#             print(art_ladder)
+#             print()
+
+#             # adding artificial resonance 
+#             print()
+#             combined_ladder = pd.concat([current_ladder, art_ladder], ignore_index=True)
+#             print('Combined ladder:')
+#             print(combined_ladder)
+#             print()
+
+
+#         # # update prev. ladder - to track changes in spin groups
+#         # previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+
+#         numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
+
+#         numres_combined = combined_ladder.shape[0]
+
+#         time_elaps = hist.elimination_history[level]['total_time']
+
+#         pass_test = hist.elimination_history[level]['final_model_passed_test']
+
+#         is_true.append(hist.elimination_history[level]['assumed_true'])
+
+#         elaps_time.append(time_elaps)
+
+#         # SSE & strength funcs?
+#         if (true_chars is not None):
+            
+#             df_est, df_theo, resid_matrix, SSE_dict, xs_figure = calc_all_SSE_gen_XS_plot(
+#                         est_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post,
+#                         theo_ladder = true_chars.par_post,
+#                         Ta_pair = Ta_pair,
+#                         settings = settings,
+#                         energy_grid = energy_grid_2_compare_on,
+#                         reactions_SSE = ['capture', 'elastic'],
+#                         fig_size = (13,8),
+#                         calc_fig = False,
+#                         fig_yscale='linear'
+#                 )
+            
+#             SSE_s.append(SSE_dict['SSE_sum_normalized_casewise'][0])
+
+#             # TODO: strength funcs calculation & fig production
+#             SSE_Gg, SSE_Gn1, SSE_sf_fig = calc_strength_functions(theoretical_df = true_chars.par_post, 
+#                                     estimated_df = hist.elimination_history[level]['selected_ladder_chars'].par_post, 
+#                                     energy_range = [np.min(energy_grid_2_compare_on), np.max(energy_grid_2_compare_on)],
+#                                     fig_size=(8, 6), 
+#                                     create_fig=False
+#                                     )
+            
+#             SF_Gn1.append(SSE_Gn1)
+#             SF_Gg.append(SSE_Gg)
+#             # end strength funcs calculation & fig production
+
+#         else:
+#             SSE_s.append(None)
+#             SF_Gg.append(None)
+#             SF_Gn1.append(None)
+
+#             # print(SSE_dict)
+
+#         # print(level)
+#         # print(f'N_res = {numres}')
+
+#         # print(f'level {level}, # of resonances: {numres},  passed the test: {pass_test}')
+#         cur_ch_dict = characterize_sol(Ta_pair=Ta_pair,
+#                         datasets = datasets,
+#                         experiments = experiments,
+#                         sol = hist.elimination_history[level]['selected_ladder_chars'],
+#                         covariance_data = covariance_data,
+#                         energy_grid_2_compare_on = energy_grid_2_compare_on
+#                         )
+        
+#         # characterizing the combined ladder with side resonances - using Likellihoods
+
+#         LL_dict_combined = calc_LL_by_ladder(ladder_df = combined_ladder,
+#                                              Ta_pair = Ta_pair,
+#                                              energy_grid = energy_grid_2_compare_on)
+        
+#         sum_NLLW_al.append(LL_dict_combined['total_NLLW_all_energy'])
+
+#         sum_NLL_gn_normal.append(LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'])
+        
+#         combined_NLL = LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'] + LL_dict_combined['total_NLLW_all_energy']
+
+#         OF_alt4.append( sum(cur_ch_dict['chi2']) + 2 * combined_NLL    )
+
+#         # 
+
+        
+#         N_res_s.append(numres)
+#         test_pass.append(pass_test)
+#         chi2_s.append(sum(cur_ch_dict['chi2']))
+
+#         chi2_stat_s_npar.append(cur_ch_dict['chi2_stat'])
+
+#         chi2_stat_s_ndat.append(cur_ch_dict['chi2_stat_ndat'])
+        
+#         # aicc_s.append(sum(cur_ch_dict['aicc']))
+#         # bicc_s.append(sum(cur_ch_dict['bicc']))
+
+#         aicc_s.append(cur_ch_dict['aicc_entire_ds'])
+#         bicc_s.append(cur_ch_dict['bic_entire_ds'])
+
+#         NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
+
+#         NLL_Gn1.append(sum(cur_ch_dict['NLL_PT_Gn1'].values()))
+#         NLL_Gg.append(sum(cur_ch_dict['NLL_PT_Gg'].values()))
+
+
+
+#         N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
+
+#         OF_alt1.append(sum(cur_ch_dict['chi2'])+2 * sum(cur_ch_dict['NLLW'].values()))
+#         #OF_alt2.append(cur_ch_dict['aicc_entire_ds'] + sum(cur_ch_dict['NLLW'].values()) )
+#         OF_alt3.append(
+#             sum(cur_ch_dict['chi2']) + 
+#             2 * (
+#                 sum(cur_ch_dict['NLLW'].values()) +
+#                 sum(cur_ch_dict['NLL_PT_Gn1'].values())
+#                 # sum(cur_ch_dict['NLL_PT_Gg'].values())
+#             )
+#         )
+
+#         # levels.append(level)
+#         # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
+#         # N_ress.append(numres)
+#         # print(cur_ch_dict )
+
+#     # combine to one DataFrame
+#     table_df = pd.DataFrame.from_dict({
+#         'AT': is_true,
+#         'N_res': N_res_s,
+#         'N_res_joint_LL': N_res_joint_LL,
+#         'passed': test_pass,
+#         'sum_chi2': chi2_s,
+#         'chi2_s': chi2_stat_s_npar,
+#         'chi2_s_ndat': chi2_stat_s_ndat,
+#         'SSE': SSE_s,
+#         'sum_NLLW': NLLW_s,
+#         'sum_NLL_Gn1': NLL_Gn1,
+#         'sum_NLL_Gg': NLL_Gg,
+
+#         'OF_alt1': OF_alt1,
+#         'OF_alt3': OF_alt3,
+
+#         # for function that contain NLLW - with all resonances (artificial = remaining + art deleted)
+#         'sum_NLLW_al': sum_NLLW_al,
+#         'sum_NLL_gn_normal': sum_NLL_gn_normal,
+#         'OF_alt4': OF_alt4,
+
+
+#         'SF_Gn1': SF_Gn1,
+#         'SF_Gg': SF_Gg,
+#         'AICc': aicc_s,
+#         'BIC': bicc_s,
+#         'ET': elaps_time, # time
+#     })
+
+#     # calculating deltas in BIC and AICc
+#     table_df['delta_AICc_best'] = table_df['AICc'] - table_df['AICc'].min()
+#     table_df['delta_BIC_best'] = table_df['BIC'] - table_df['BIC'].min()
+#     table_df['delta_chi2_prev'] = table_df['sum_chi2'].diff().fillna(0)
+#     table_df['delta_chi2_best'] = table_df['sum_chi2'] - table_df['sum_chi2'].min()
+
+#     return table_df
+
+
+
+def create_solutions_comparison_table_from_hist(
+        hist,
+        Ta_pair: Particle_Pair,
+        datasets: list,
+        experiments: list,
+        covariance_data: list = [],
+
+        true_ladder: pd.DataFrame = pd.DataFrame(),
+
+        settings: dict = {},
+        energy_grid_2_compare_on: np.array = np.array([]),
+        reactions_to_compare: list = ['capture', 'elastic'],
+    ):
+
+    """
+    Updated func. to create a table for solution comparison
+
+    note - the difference! in history the sammy_output_object is stored. - par_post!
+    while during characterization - no Bayes is used.
+    """
 
     # table for analysis of the models - produce chi2
     hist = copy.deepcopy(hist)
@@ -2701,262 +3053,244 @@ def create_solutions_comparison_table_from_hist(hist,
     is_true = []
     elaps_time = []
 
+    # class of solution to distinguish it from all others
+    sol_class = [] # elim_result / spin_select_result / true
+
     SSE_s = []
-    NLLW_s = []
-    NLL_Gn1 = []
-    NLL_Gg = []
+
+    LLW_s = []
+    LL_gn2 = []
+    LL_gg2 = []
 
     chi2_s = []
     chi2_stat_s_npar = []
     chi2_stat_s_ndat = []
 
-    OF_alt1 = []
-    OF_alt2 = []
-    OF_alt3 = []
-
-    OF_alt4 = [] # function values that are calculated by artificial ladder (remaining resonances + added ones)
-    sum_NLLW_al = []
-    sum_NLL_gn_normal = []
-
-    # SF
+    OF_alt1 = [] # chi2 + 2 * NLL
+    
+    # SF value
     SF_Gn1 = []
-    SF_Gg = []
-    # end SF
 
+    # SF-differences with true
+    E_SF = []
+    E_PSF = []
+    # end SF
 
     aicc_s = []
     bicc_s = []
     N_res_s = []
-    N_res_art_s = []
 
-    test_pass = []
+    test_pass = [] # by delta_chi2 threshold
 
-    N_res_joint_LL = []
-
-    # # incorporate true sol
-    true_sol_key = 0
-
-    if ((true_sol_key not in hist.elimination_history.keys()) and true_chars is not None):
-        hist.elimination_history[true_sol_key] = {
-
-                'input_ladder' : true_chars.par_post, #? questionable
-                'selected_ladder_chars': true_chars, # solution with min chi2 on this level
-                'any_model_passed_test': True, # any model on this level of N-1 res..
-                'final_model_passed_test': True,
-                'level_time': np.inf,
-                'total_time': np.inf,
-                # adding a mark that this is a true solution
-                'assumed_true': True
-            }
-
-    # # end incorporate true sol
-        
+    
     max_level = np.max(list(hist.elimination_history.keys()))
+    current_ladder = hist.elimination_history[max_level]['selected_ladder_chars'].par_post
     previous_ladder = hist.elimination_history[max_level ]['selected_ladder_chars'].par_post
     combined_ladder = previous_ladder
 
+    true_sol_key = 0
+
     for level in hist.elimination_history.keys():
         
-        # # adding a mark that this is a true solution
-        if (level != true_sol_key):
-            # adding a mark that this is a true solution
-            hist.elimination_history[level]['assumed_true'] = False
+        current_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
 
         if (level == max_level or level == true_sol_key):
             """This is the initial number of resonances"""
             N_res_initial = hist.elimination_history[level]['selected_ladder_chars'].par.shape[0]
+            
             # empty dataframe
             arificial_res = pd.DataFrame()
+
         else:
             # produce artificial resonances
 
             # get the difference with previous remaining resonances - which spin group res. was deleted?
             # compare current ladder vs. previous
 
-            # remaining resonances
-            current_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+            # # remaining resonances
 
             # we got count of deleted resonances by each J_ID
             deleted_res = find_deleted_res_spingroup_J_ID(ladder1 = previous_ladder, ladder2 = current_ladder)
             
-            # print('Deleted count resonances by each group:')
-            # print(deleted_res)
+            print('Deleted count resonances by each group:')
+            print(deleted_res)
 
-            # for j_id, count in deleted_res.items():
-            #     print(f"J_ID {j_id} was deleted {count} times")
+            # # for j_id, count in deleted_res.items():
+            # #     print(f"J_ID {j_id} was deleted {count} times")
 
-            art_ladder = produce_art_ladder(input_ladder = current_ladder,
-                                            res_to_add = deleted_res,
-                                            energy_range = energy_grid_2_compare_on,
-                                            Ta_Pair = Ta_pair)
+            # art_ladder = produce_art_ladder(input_ladder = current_ladder,
+            #                                 res_to_add = deleted_res,
+            #                                 energy_range = energy_grid_2_compare_on,
+            #                                 Ta_Pair = Ta_pair)
             
-            print()
-            print('Artificial ladder:')
-            print(art_ladder)
-            print()
+            # print()
+            # print('Artificial ladder:')
+            # print(art_ladder)
+            # print()
 
-            # adding artificial resonance 
-            print()
-            combined_ladder = pd.concat([current_ladder, art_ladder], ignore_index=True)
-            print('Combined ladder:')
-            print(combined_ladder)
-            print()
+            # # adding artificial resonance 
+            # print()
+            # combined_ladder = pd.concat([current_ladder, art_ladder], ignore_index=True)
+            # print('Combined ladder:')
+            # print(combined_ladder)
+            # print()
 
 
-        # # update prev. ladder - to track changes in spin groups
-        # previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
+        # update prev. ladder - to track changes in spin groups
+        previous_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post
 
-        numres = hist.elimination_history[level]['selected_ladder_chars'].par_post.shape[0]
-
-        numres_combined = combined_ladder.shape[0]
+        numres = current_ladder.shape[0]
 
         time_elaps = hist.elimination_history[level]['total_time']
 
         pass_test = hist.elimination_history[level]['final_model_passed_test']
 
-        is_true.append(hist.elimination_history[level]['assumed_true'])
+        sol_chars = characterize_ladder(
+                Ta_pair = Ta_pair,
+                datasets = datasets,
+                experiments = experiments,
+                covariance_data = covariance_data,
+                
+                sol_ladder = current_ladder,
+                true_ladder = true_ladder,
 
-        elaps_time.append(time_elaps)
+                reactions_SSE = reactions_to_compare,
+                energy_grid_2_compare_on = energy_grid_2_compare_on,
 
-        # SSE & strength funcs?
-        if (true_chars is not None):
-            
-            df_est, df_theo, resid_matrix, SSE_dict, xs_figure = calc_all_SSE_gen_XS_plot(
-                        est_ladder = hist.elimination_history[level]['selected_ladder_chars'].par_post,
-                        theo_ladder = true_chars.par_post,
-                        Ta_pair = Ta_pair,
-                        settings = settings,
-                        energy_grid = energy_grid_2_compare_on,
-                        reactions_SSE = ['capture', 'elastic'],
-                        fig_size = (13,8),
-                        calc_fig = False,
-                        fig_yscale='linear'
-                )
-            
-            SSE_s.append(SSE_dict['SSE_sum_normalized_casewise'][0])
-
-            # TODO: strength funcs calculation & fig production
-            SSE_Gg, SSE_Gn1, SSE_sf_fig = calc_strength_functions(theoretical_df = true_chars.par_post, 
-                                    estimated_df = hist.elimination_history[level]['selected_ladder_chars'].par_post, 
-                                    energy_range = [np.min(energy_grid_2_compare_on), np.max(energy_grid_2_compare_on)],
-                                    fig_size=(8, 6), 
-                                    create_fig=False
-                                    )
-            
-            SF_Gn1.append(SSE_Gn1)
-            SF_Gg.append(SSE_Gg)
-            # end strength funcs calculation & fig production
-
-        else:
-            SSE_s.append(None)
-            SF_Gg.append(None)
-            SF_Gn1.append(None)
-
-            # print(SSE_dict)
-
-        # print(level)
-        # print(f'N_res = {numres}')
-
-        # print(f'level {level}, # of resonances: {numres},  passed the test: {pass_test}')
-        cur_ch_dict = characterize_sol(Ta_pair=Ta_pair,
-                        datasets = datasets,
-                        experiments = experiments,
-                        sol = hist.elimination_history[level]['selected_ladder_chars'],
-                        covariance_data = covariance_data,
-                        energy_grid_2_compare_on = energy_grid_2_compare_on
-                        )
+                printout = False,
+                settings = settings
+        )
         
-        # characterizing the combined ladder with side resonances - using Likellihoods
+        SSE_s.append(sol_chars['SSE'])
 
-        LL_dict_combined = calc_LL_by_ladder(ladder_df = combined_ladder,
-                                             Ta_pair = Ta_pair,
-                                             energy_grid = energy_grid_2_compare_on)
-        
-        sum_NLLW_al.append(LL_dict_combined['total_NLLW_all_energy'])
-
-        sum_NLL_gn_normal.append(LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'])
-        
-        combined_NLL = LL_dict_combined['total_NLL_gn_normal_on_reduced_width_amp'] + LL_dict_combined['total_NLLW_all_energy']
-
-        OF_alt4.append( sum(cur_ch_dict['chi2']) + 2 * combined_NLL    )
-
-        # 
+        SF_Gn1.append(sol_chars['SF_Gn1_sum_all_Jpi']) # SF value
+        E_SF.append(sol_chars['E_SF_squared'])
+        E_PSF.append(sol_chars['E_SFP_squared'])
 
         
+        # end strength funcs calculation & fig production
         N_res_s.append(numres)
         test_pass.append(pass_test)
-        chi2_s.append(sum(cur_ch_dict['chi2']))
 
-        chi2_stat_s_npar.append(cur_ch_dict['chi2_stat'])
+        chi2_s.append(sol_chars['sum_chi2'])
 
-        chi2_stat_s_ndat.append(cur_ch_dict['chi2_stat_ndat'])
+        chi2_stat_s_npar.append(sol_chars['chi2_stat'])
+
+        chi2_stat_s_ndat.append(sol_chars['chi2_stat_ndat'])
         
-        # aicc_s.append(sum(cur_ch_dict['aicc']))
-        # bicc_s.append(sum(cur_ch_dict['bicc']))
+        aicc_s.append(sol_chars['aicc_entire_ds'])
+        bicc_s.append(sol_chars['bic_entire_ds'])
 
-        aicc_s.append(cur_ch_dict['aicc_entire_ds'])
-        bicc_s.append(cur_ch_dict['bic_entire_ds'])
+        LLW_s.append(sol_chars['LL_bypar'][0])
+        LL_gg2.append(sol_chars['LL_bypar'][1])
+        LL_gn2.append(sol_chars['LL_bypar'][2])
+    
+        # N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
 
-        NLLW_s.append(sum(cur_ch_dict['NLLW'].values()))
+        OF_alt1.append(sol_chars['OF2'])
 
-        NLL_Gn1.append(sum(cur_ch_dict['NLL_PT_Gn1'].values()))
-        NLL_Gg.append(sum(cur_ch_dict['NLL_PT_Gg'].values()))
+        is_true.append(False)
+        sol_class.append('elim_result')
+        elaps_time.append(time_elaps)
 
-
-
-        N_res_joint_LL.append(cur_ch_dict['N_res_joint_LL'])
-
-        OF_alt1.append(sum(cur_ch_dict['chi2'])+2 * sum(cur_ch_dict['NLLW'].values()))
-        #OF_alt2.append(cur_ch_dict['aicc_entire_ds'] + sum(cur_ch_dict['NLLW'].values()) )
-        OF_alt3.append(
-            sum(cur_ch_dict['chi2']) + 
-            2 * (
-                sum(cur_ch_dict['NLLW'].values()) +
-                sum(cur_ch_dict['NLL_PT_Gn1'].values())
-                # sum(cur_ch_dict['NLL_PT_Gg'].values())
-            )
-        )
-
-        # levels.append(level)
-        # chi2_s.append(np.sum(hist.elimination_history[level]['selected_ladder_chars'].chi2_post))
-        # N_ress.append(numres)
-        # print(cur_ch_dict )
 
     # combine to one DataFrame
     table_df = pd.DataFrame.from_dict({
         'AT': is_true,
+        'class': sol_class,
         'N_res': N_res_s,
-        'N_res_joint_LL': N_res_joint_LL,
+        # 'N_res_joint_LL': N_res_joint_LL,
         'passed': test_pass,
         'sum_chi2': chi2_s,
         'chi2_s': chi2_stat_s_npar,
         'chi2_s_ndat': chi2_stat_s_ndat,
         'SSE': SSE_s,
-        'sum_NLLW': NLLW_s,
-        'sum_NLL_Gn1': NLL_Gn1,
-        'sum_NLL_Gg': NLL_Gg,
+        'sum_LLW': LLW_s,
+        'sum_LL_gn2': LL_gn2,
+        'sum_LL_gg2': LL_gg2,
 
         'OF_alt1': OF_alt1,
-        'OF_alt3': OF_alt3,
-
+       
         # for function that contain NLLW - with all resonances (artificial = remaining + art deleted)
-        'sum_NLLW_al': sum_NLLW_al,
-        'sum_NLL_gn_normal': sum_NLL_gn_normal,
-        'OF_alt4': OF_alt4,
-
-
+       
         'SF_Gn1': SF_Gn1,
-        'SF_Gg': SF_Gg,
+        'E_SF': E_SF,
+        'E_PSF': E_PSF,
+
         'AICc': aicc_s,
         'BIC': bicc_s,
         'ET': elaps_time, # time
     })
 
-    # calculating deltas in BIC and AICc
+    # calculating deltas in BIC and AICc for all ladders except true if it's inside
+    
     table_df['delta_AICc_best'] = table_df['AICc'] - table_df['AICc'].min()
     table_df['delta_BIC_best'] = table_df['BIC'] - table_df['BIC'].min()
+
+    #deltas with best solution
     table_df['delta_chi2_prev'] = table_df['sum_chi2'].diff().fillna(0)
     table_df['delta_chi2_best'] = table_df['sum_chi2'] - table_df['sum_chi2'].min()
+
+    # creating table for true solution
+
+    # # incorporate true sol if it's provided
+
+    if (len(true_ladder) >0):
+
+        true_sol_chars = characterize_ladder(
+                    Ta_pair = Ta_pair,
+                    datasets = datasets,
+                    experiments = experiments,
+                    covariance_data = covariance_data,
+                    
+                    sol_ladder = true_ladder,
+                    true_ladder = true_ladder,
+
+                    reactions_SSE = reactions_to_compare,
+                    energy_grid_2_compare_on = energy_grid_2_compare_on,
+
+                    printout = False,
+                    settings = settings
+                    )
+
+        # add info about true solution to a new DF
+        true_sol_table = pd.DataFrame.from_dict({
+            'AT': [True],
+            'class': ['true'],
+            'N_res': len(true_ladder),
+        
+            'passed': [True],
+            'sum_chi2': [true_sol_chars['sum_chi2']],
+            'chi2_s': [true_sol_chars['chi2_stat']],
+            'chi2_s_ndat': [true_sol_chars['chi2_stat_ndat']],
+            'SSE': [true_sol_chars['SSE']],
+            'sum_LLW': [true_sol_chars['LL_bypar'][0]],
+            'sum_LL_gn2': [true_sol_chars['LL_bypar'][2]],
+            'sum_LL_gg2': [true_sol_chars['LL_bypar'][1]],
+
+            'OF_alt1': [true_sol_chars['OF2']],
+       
+            'SF_Gn1': [true_sol_chars['SF_Gn1_sum_all_Jpi']],
+            'E_SF': [true_sol_chars['E_SF_squared']],
+            'E_PSF': [true_sol_chars['E_SFP_squared']],
+
+            'AICc': [true_sol_chars['aicc_entire_ds']],
+            'BIC': [true_sol_chars['bic_entire_ds']],
+            'ET': [0],
+        })
+
+    true_sol_table['delta_AICc_best'] = true_sol_table['AICc'] - table_df['AICc'].min()
+    true_sol_table['delta_BIC_best'] = true_sol_table['BIC'] - table_df['BIC'].min()
+
+    #deltas with best solution
+    true_sol_table['delta_chi2_prev'] = 0
+    true_sol_table['delta_chi2_best'] = true_sol_table['sum_chi2'] - table_df['sum_chi2'].min()
+
+    # end add info about true sol to a new DF
+
+    table_df = pd.concat([table_df, true_sol_table], ignore_index=True)
+    #  end incorporate true sol
+    
 
     return table_df
 

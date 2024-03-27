@@ -196,7 +196,7 @@ def Bayes(sammy_out:SammyOutputData,
     par_post['varyE']   = par['varyE']
     par_post['varyGn1'] = par['varyGn1']
     par_post['varyGg']  = par['varyGg']
-    par_post = particle_pair.expand_ladder(par_post)
+    # par_post = particle_pair.expand_ladder(par_post)
     return par_post, Mpu
 
 # =================================================================================================

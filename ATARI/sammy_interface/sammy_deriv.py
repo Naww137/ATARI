@@ -8,7 +8,7 @@ from scipy.interpolate import interpn
 
 from ATARI.theory.scattering_params import FofE_recursive
 
-from ATARI.sammy_interface import sammy_functions
+from ATARI.sammy_interface import sammy_functions, sammy_io
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData
 from ATARI.sammy_interface.convert_u_p_params import convert_deriv_du2dp
 
@@ -33,38 +33,45 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
         The SAMMY output data object.
     """
 
-    sammy_functions.make_runDIR(sammyRTO.sammy_runDIR)
+    sammy_io.make_runDIR(sammyRTO.sammy_runDIR)
     # Setting up sammy input file:
     if isinstance(sammyINP.experimental_data, pd.DataFrame):
-        sammy_functions.write_samdat(sammyINP.experimental_data, sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
+        sammy_io.write_samdat(sammyINP.experimental_data, sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     else:
-        sammy_functions.write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
-    sammyRTO_alt = deepcopy(sammyRTO)
-    sammyRTO_alt.derivatives = True
-    sammyRTO_alt.bayes = False
-    sammy_functions.write_sampar(sammyINP.resonance_ladder, 
+        sammy_io.write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
+    sammy_io.write_sampar(sammyINP.resonance_ladder, 
                  sammyINP.particle_pair, 
                  sammyINP.initial_parameter_uncertainty,
-                 os.path.join(sammyRTO_alt.sammy_runDIR, 'SAMMY.PAR'))
+                 os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
     # making templates:
-    sammy_functions.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO_alt.sammy_runDIR)
+    sammy_io.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
     # making sammy input file:
-    sammy_functions.write_saminp(os.path.join(sammyRTO_alt.sammy_runDIR,"sammy.inp"), 
-                                 particle_pair=sammyINP.particle_pair, 
-                                 experimental_model=sammyINP.experiment, 
-                                 rto=sammyRTO_alt,
-                                 use_IDC=False,
-                                 use_ecscm_reaction=False)
+    sammy_io.write_saminp(
+                        filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                        bayes       =   False,
+                        iterations  =   sammyRTO.iterations,
+                        formalism   =   sammyINP.particle_pair.formalism,
+                        isotope     =   sammyINP.particle_pair.isotope,
+                        M           =   sammyINP.particle_pair.M,
+                        ac          =   sammyINP.particle_pair.ac*10,
+                        reaction    =   sammyINP.experiment.reaction,
+                        energy_range=   sammyINP.experiment.energy_range,
+                        temp        =   sammyINP.experiment.temp,
+                        FP          =   sammyINP.experiment.FP,
+                        n           =   sammyINP.experiment.n,
+                        use_IDC=False,
+                        derivatives = True
+                                 )
     # creating shell script:
     sammy_functions.write_shell_script(sammyINP, 
-                                       sammyRTO_alt, 
+                                       sammyRTO, 
                                        use_RPCM=False, 
                                        use_IDC=False)
     # Executing sammy and reading outputs:
     # if sammyRTO.recursive == True:
     #     raise NotImplementedError('Recursive SAMMY has not been implemented.')
-    lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO_alt)
-    derivs_dict = sammy_functions.readpds(os.path.join(sammyRTO_alt.sammy_runDIR, 'SAMMY.PDS'))
+    lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO)
+    derivs_dict = sammy_functions.readpds(os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PDS'))
     if   u_or_p == 'p':
         derivs_dict['PARTIAL_DERIVATIVES'] = convert_deriv_du2dp(derivs_dict['PARTIAL_DERIVATIVES'], sammyINP.resonance_ladder)[0]
     elif u_or_p == 'u':
@@ -73,21 +80,28 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
         raise ValueError('"u_or_p" can only be "u" or "p".')
     
     if find_theo_trans: # if we also need the theoretical value, run sammy again and get theoretical value
-        sammyRTO_alt = deepcopy(sammyRTO_alt)
-        sammyRTO_alt.derivatives = False
-        sammyRTO_alt.bayes = False
-        sammy_functions.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO_alt.sammy_runDIR)
-        sammy_functions.write_saminp(os.path.join(sammyRTO_alt.sammy_runDIR,"sammy.inp"), 
-                                 particle_pair=sammyINP.particle_pair, 
-                                 experimental_model=sammyINP.experiment, 
-                                 rto=sammyRTO_alt,
-                                 use_IDC=False,
-                                 use_ecscm_reaction=False)
+        sammy_functions.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+        sammy_functions.write_saminp(
+                                    filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                                    bayes       =   False,
+                                    iterations  =   sammyRTO.iterations,
+                                    formalism   =   sammyINP.particle_pair.formalism,
+                                    isotope     =   sammyINP.particle_pair.isotope,
+                                    M           =   sammyINP.particle_pair.M,
+                                    ac          =   sammyINP.particle_pair.ac*10,
+                                    reaction    =   sammyINP.experiment.reaction,
+                                    energy_range=   sammyINP.experiment.energy_range,
+                                    temp        =   sammyINP.experiment.temp,
+                                    FP          =   sammyINP.experiment.FP,
+                                    n           =   sammyINP.experiment.n,
+                                    use_IDC=False,
+                                    derivatives=False,
+                                    )
         sammy_functions.write_shell_script(sammyINP, 
-                                        sammyRTO_alt, 
+                                        sammyRTO, 
                                         use_RPCM=False, 
                                         use_IDC=False)
-        lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO_alt)
+        lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO)
     sammy_OUT = SammyOutputData(pw=lst_df, 
                                 par=par_df,
                                 chi2=[chi2],

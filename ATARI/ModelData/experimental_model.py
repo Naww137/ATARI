@@ -91,7 +91,7 @@ class Experimental_Model:
             self.sammy_inputs = {
                 'alphanumeric':   ["BROADENING IS WANTED"],
 
-                'ResFunc':   ""
+                'ResFunc':   None
             }        
         
         # update kwargs again if user supplied sammy inputs

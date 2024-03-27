@@ -197,11 +197,49 @@ def FofE_explicit(E, ac, M, m, orbital_angular_momentum):
     return S, P, phi, k
 
 
+def G_to_g2(G, penetrability):
+    """
+    Converts partial widths to reduced widths.
+
+    Parameters
+    ----------
+    G : float, array-like
+        The partial width.
+    penetrability : float, array-like
+        The penetration factor.
+
+    Returns
+    -------
+    g2 : float, array-like
+        The reduced width.
+    """
+
+    g2 = G / (2 * penetrability)
+    return g2
+
+def g2_to_G(g2, penetrability):
+    """
+    Converts reduced widths to partial widths.
+
+    Parameters
+    ----------
+    g2 : float, array-like
+        The reduced width.
+    penetrability : float, array-like
+        The penetration factor.
+
+    Returns
+    -------
+    G : float, array-like
+        The partial width.
+    """
+
+    G = 2 * penetrability * g2
+    return G
 
 
+# NOTE: Duplicate, unused:
 def reduced_width_square_2_partial_width(E, ac, M, m, reduced_widths_square, orbital_angular_momentum):
     S, P, psi, k = FofE_recursive(np.array(E), ac, M, m, orbital_angular_momentum)
     partial_widths = 2*P*reduced_widths_square 
     return partial_widths
-
-

@@ -11,7 +11,8 @@ debugpy==1.6.7
 decorator==5.1.1
 ecos==2.0.12
 executing==1.2.0
-fonttools==4.39.4
+fonttools==4.43.0
+fortranformat=2.0.0
 h5py==3.8.0
 importlib-metadata==6.6.0
 importlib-resources==5.12.0

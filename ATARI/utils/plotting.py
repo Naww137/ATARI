@@ -472,7 +472,7 @@ def plot_datafits(datasets, experiments,
             raise ValueError()
 
         axes[iax].errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
-                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+                                                fmt='.', color=f'{colors[i]}', alpha=1.0, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
         
         if len(fits) != 0:
             if (len(fits_chi2) != 0):

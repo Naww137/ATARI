@@ -1,7 +1,8 @@
 import numpy as np
 from ATARI.theory.xs import SLBW
 from ATARI.utils.atario import fill_resonance_ladder
-
+import os
+from datetime import datetime
 
 
 def fine_egrid(energy, ppeV=100):
@@ -26,6 +27,20 @@ def fine_egrid(energy, ppeV=100):
     new_egrid = np.linspace(minE, maxE, n)
     return new_egrid
 
+
+
+def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, addit_str: str = ''):
+
+    if not os.path.exists(path_to_sammy_temps):
+        os.mkdir(path_to_sammy_temps)
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    # Combine timestamp and random characters
+    unique_string = timestamp
+
+    sammy_rundirname = path_to_sammy_temps+'SAMMY_runDIR_'+addit_str+'_'+str(case_id)+'_'+unique_string+'/'
+
+    return sammy_rundirname
 
 
 def calc_xs_on_fine_egrid(E, ppeV, particle_pair, resonance_ladder):

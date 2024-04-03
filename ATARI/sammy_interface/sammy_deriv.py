@@ -12,7 +12,7 @@ from ATARI.sammy_interface import sammy_functions, sammy_io
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData
 from ATARI.sammy_interface.convert_u_p_params import convert_deriv_du2dp
 
-def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_theo_trans:bool=False, u_or_p='u'):
+def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_theo:bool=False, u_or_p='u'):
     """
     Gets derivatives from SAMMY.
 
@@ -22,8 +22,8 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
         The SAMMY input data object.
     sammyRTO : SammyRunTimeOptions
         The SAMMY runtime options object.
-    find_theo_trans : bool
-        If true, SAMMY finds the theoretical transmission and uncertainty. Default is False.
+    get_theo : bool
+        If true, SAMMY finds the theory value and uncertainty with an additional sammy call. Default is False.
     u_or_p : 'u' or 'p'
         Decides between using SAMMY defined u-parameters or p-parameters.
 
@@ -44,7 +44,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
                  sammyINP.initial_parameter_uncertainty,
                  os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
     # making templates:
-    sammy_io.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    sammy_io.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
     # making sammy input file:
     sammy_io.write_saminp(
                         filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
@@ -79,8 +79,8 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
     else:
         raise ValueError('"u_or_p" can only be "u" or "p".')
     
-    if find_theo_trans: # if we also need the theoretical value, run sammy again and get theoretical value
-        sammy_functions.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    if get_theo: # if we also need the theoretical value, run sammy again and get theoretical value
+        sammy_functions.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
         sammy_functions.write_saminp(
                                     filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
                                     bayes       =   False,
@@ -147,7 +147,8 @@ def find_interpolation_array(particle_pair, exp_model_T, sammyRTO:SammyRunTimeOp
                     exp_model_T.energy_grid = E_grid
                     sammyINP = SammyInputData(particle_pair,
                                               particle_pair.resonance_ladder,
-                                              os.path.realpath('template_T.inp'),
+                                            #   os.path.realpath('template_T.inp'),
+                                                exp_model_T.template,
                                               exp_model_T,
                                               energy_grid=exp_model_T.energy_grid)
                     sammy_out = get_derivatives(sammyINP, sammyRTO, find_theo_trans=True, u_or_p=u_or_p)

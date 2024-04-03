@@ -503,7 +503,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 
-def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list):
+def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False):
     par = 'results/step$1.par'
     inp_ext = 'initial'
     with open(os.path.join(rundir, "YWY0.sh") , 'w') as f:
@@ -515,6 +515,8 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list):
             title = f"{ds}_iter0"
             f.write(f"##################################\n# Generate YW for {ds}\n")
             f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
+            if save_lsts:
+                f.write(f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n""")
             f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
         f.write("################# read chi2 #######################\n#\n")
         for ds in dataset_titles:
@@ -599,7 +601,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 
     make_inputs_for_YW(sammyINPyw, sammyRTO, idc_list)
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
-    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
+    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps)
     make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     
@@ -654,6 +656,11 @@ mv "results/temp" "results/step{step}.par" """],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
 
+
+
+
+### additional functions withing step until convergence
+    
 def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
     # if True:# sammyINPyw.batch_reduce_width:
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
@@ -693,7 +700,8 @@ def concat_external_resonance_ladder(internal_resonance_ladder, external_resonan
         resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
         external_resonance_indices = list(range(len(external_resonance_ladder)))
     return resonance_ladder, external_resonance_indices
-    
+
+
 def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
@@ -720,44 +728,50 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
+    ### some convenient definitions
     istep = 0
     no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
+    par_df_current = sammyINPyw.resonance_ladder
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
+    ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
-            
+        
+        ### options to batch parameters being fit
         if sammyINPyw.batch_fitpar:
             if istep%sammyINPyw.steps_per_batch == 0:
                 batch_fitpar(rundir, istep, sammyINPyw, fudge)
             else:
                 pass
-    
+        
+        ### get initial YW matrices for iteration and chi2 for current parameters
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
-        if istep>=1:
 
-            ### Levenberg-Marquardt algorithm
+        ### after step 1, do convergence checking
+        if istep>=1:
+            par_df_current = par_df_next
+
+            ### Levenberg-Marquardt algorithm to update fudge for upcoming step based on chi2 of current parameters
             if sammyINPyw.LevMar:
                 assert(sammyINPyw.LevMarV>1)
 
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
                     fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge,sammyINPyw.maxF)
+                    update_fudge_in_parfile(rundir, istep, fudge)
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
                         print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
 
-                    while True:
+                    while True:  
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
-                        update_fudge_in_parfile(rundir, istep-1, fudge)
-                        # if True: reduce_width_randomly(rundir, istep-1, sammyINPyw, fudge)
-                        # if sammyINPyw.batch_fitpar:
-                        #     batch_fitpar(rundir, istep, sammyINPyw, fudge)
+                        update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
                         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
@@ -793,20 +807,47 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 
                 else:
                     pass
-            
+
             else:   
                 no_improvement_tracker = 0
             
-        
+
+        ### Log chi2
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
-        update_fudge_in_parfile(rundir, istep, fudge)
+        ### Solve Bayes for this step
+        # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
-
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
 
+
+        ### 2 step Lasso if on
+        Lasso = True
+        lambda_lasso = 0.0005
+        gamma_lasso = 2
+        if Lasso:
+        # def Lasso_from_previous_step(rundir, istep, sammyINPyw, fudge):
+            parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
+            par_df_next = readpar(parfile_next)
+            df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
+            df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
+            fit_mask = df_internal_current.varyGn1 == 1
+            # fit_mask_next = df_internal_next.varyGn1 == 1
+
+            alpha = fudge*df_internal_current['Gn1'][fit_mask].values/10
+            # weight = could be model evaluated at par_df_current['Gn1'].values and Elam
+            # more traditional weight is OLS estimate of par_df_current['Gn1'].values but we don't have that
+            weight = 1/(df_internal_current['Gn1'][fit_mask].values**gamma_lasso * 2*np.sqrt(abs(df_internal_current['Gn1'][fit_mask].values)))
+            dL_dP = lambda_lasso*weight*np.sign(df_internal_current['Gn1'][fit_mask].values)
+
+            df_internal_next['Gn1'][fit_mask] = df_internal_next['Gn1'][fit_mask].values - alpha*dL_dP
+            par_df_next, _ = concat_external_resonance_ladder(df_internal_next, df_external_next)
+            write_sampar(par_df_next, sammyINPyw.particle_pair, fudge, parfile_next)
+
+
+        ### update step
         istep += 1
 
     print("Maximum steps reached")
@@ -870,3 +911,111 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
         shutil.rmtree(sammyRTO.sammy_runDIR)
 
     return sammy_OUT
+
+
+
+
+
+
+
+
+
+
+
+
+
+def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
+    ### some convenient definitions
+    istep = 0
+    no_improvement_tracker = 0
+    lambda_lasso = 1e-4
+    chi2_log = []
+    fudge = sammyINPyw.initial_parameter_uncertainty
+    par_df_current = sammyINPyw.resonance_ladder
+    rundir = os.path.realpath(sammyRTO.sammy_runDIR)
+    criteria="max steps"
+    ### start loop
+    if sammyRTO.Print:
+        print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
+    while istep<sammyINPyw.max_steps:
+        
+        ### options to batch parameters being fit
+        if sammyINPyw.batch_fitpar:
+            if istep%sammyINPyw.steps_per_batch == 0:
+                batch_fitpar(rundir, istep, sammyINPyw, fudge)
+            else:
+                pass
+        
+        ### get initial YW matrices for iteration and chi2 for current parameters
+        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+
+        ### after step 1, do convergence checking
+        if istep>=1:
+            par_df_current = par_df_next
+            
+            ### convergence check
+            Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+            if Dchi2 < sammyINPyw.step_threshold:
+
+                no_improvement_tracker += 1
+                if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                    
+                    if Dchi2 < 0:
+                        criteria = f"Chi2 increased, taking solution {istep-1}"
+                        if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                            criteria = f"Fudge below minimum value, taking solution {istep-1}"
+                        if sammyRTO.Print:
+                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                            print(criteria)
+                        return max(istep-no_improvement_tracker, 0)
+                    else:
+                        criteria = "Chi2 improvement below threshold"
+                    if sammyRTO.Print:
+                        print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                        print(criteria)
+                    return istep
+                
+                else:
+                    pass
+
+            else:   
+                no_improvement_tracker = 0
+            
+
+        ### Log chi2
+        chi2_log.append(chi2_list)
+        if sammyRTO.Print:
+            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+        
+        ### Solve Bayes for this step
+        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+
+
+        ### 2 step Lasso if on
+        Lasso = True
+        gamma_lasso = 2
+        if Lasso:
+        # def Lasso_from_previous_step(rundir, istep, sammyINPyw, fudge):
+            parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
+            par_df_next = readpar(parfile_next)
+            df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
+            df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
+            fit_mask = df_internal_current.varyGn1 == 1
+            # fit_mask_next = df_internal_next.varyGn1 == 1
+
+            alpha = fudge*df_internal_current['Gn1'][fit_mask].values
+            # weight = could be model evaluated at par_df_current['Gn1'].values and Elam
+            # more traditional weight is OLS estimate of par_df_current['Gn1'].values but we don't have that
+            weight = 1/(df_internal_current['Gn1'][fit_mask].values**gamma_lasso * 2*np.sqrt(abs(df_internal_current['Gn1'][fit_mask].values)))
+            dL_dP = lambda_lasso*weight*np.sign(df_internal_current['Gn1'][fit_mask].values)
+
+            df_internal_next['Gn1'][fit_mask] = df_internal_next['Gn1'][fit_mask].values - alpha*dL_dP
+            par_df_next, _ = concat_external_resonance_ladder(df_internal_next, df_external_next)
+            write_sampar(par_df_next, sammyINPyw.particle_pair, fudge, parfile_next)
+
+
+        ### update step
+        istep += 1
+
+    print("Maximum steps reached")
+    return max(istep-1, 0)

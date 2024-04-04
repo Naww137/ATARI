@@ -22,12 +22,81 @@ def gammayield():
     pass
 
 
-def get_covT():
-    #We need to come back to this later
-    pass
+def get_covT(crg,dcrg,brg,dbrg,cr_flux,dcr_flux,br_flux,dbr_flux,Y_flux,dY_flux,fn,dfn,Yield,covariance_data,calc_cov):
+    """Calculates the uncertainty on Yield with or without covariance.
+
+    Args:
+        crg (Array-Like): _description_
+        dcrg (Array-Like): _description_
+        brg (Array-Like): _description_
+        dbrg (Array-Like): _description_
+        cr_flux (Array-Like): _description_
+        dcr_flux (Array-Like): _description_
+        br_flux (Array-Like): _description_
+        dbr_flux (Array-Like): _description_
+        Y_flux (Array-Like): _description_
+        dY_flux (Array-Like): _description_
+        fn (Float): _description_
+        dfn (Float): _description_
+        Yield (Array-Like): The calculated gamma yield
+        cr_flux_cov (Float): General covariance between each flux gross count rate
+        br_flux_cov (Float): General covariance between each flux background count rate
+        calc_cov (Boolean): If true, the function will calculate full covariance
+    """
+    #Defining derivatives that are used in either method
+    cr_flux_der=-Yield/(cr_flux-br_flux)
+    br_flux_der=-cr_flux_der
+    
+    
+    if(calc_cov):
+        #Calculates uncertainty for elements without covariance treating it as one combined element, Q
+        crg_Q_der=fn*Y_flux
+        brg_Q_der=-crg_Q_der
+        Y_flux_Q_der=fn*(crg-brg)
+        fn_Q_der=(crg-brg)*Y_flux
+        
+        dQ=np.sqrt(np.power(crg_Q_der*dcrg,2)+
+                   np.power(brg_Q_der*dbrg,2)+
+                   np.power(Y_flux_Q_der*dY_flux,2)+
+                   np.power(fn_Q_der*dfn,2))
+        
+        Q_der=1/(cr_flux-br_flux)
+        
+        Jacobian=np.concatenate((np.diag(cr_flux_der),np.diag(br_flux_der),np.diag(Q_der)),1)
+        
+        #Fills out the Covariance blocks for the flux count rates
+        dcr_flux_jac=np.ones((len(dcr_flux),len(dcr_flux)))*covariance_data["cr_flux_cov"]
+        np.fill_diagonal(dcr_flux_jac,dcr_flux**2)
+        
+        dbr_flux_jac=np.ones((len(dbr_flux),len(dbr_flux)))*covariance_data["br_flux_cov"]
+        np.fill_diagonal(dbr_flux_jac,dbr_flux**2)
+        
+        
+        Covariance_matrix=np.block([[dcr_flux_jac,                            np.zeros((len(dcr_flux),len(dbr_flux))),np.zeros((len(dcr_flux),len(dQ)))],
+                                  [np.zeros((len(dbr_flux),len(dcr_flux))), dbr_flux_jac,                           np.zeros((len(dbr_flux),len(dQ)))],
+                                  [np.zeros((len(dQ),len(dcr_flux))),       np.zeros((len(dQ),len(dbr_flux))),      np.diag(dQ**2)]])
+        
+        Yield_Covariance=Jacobian@Covariance_matrix@Jacobian.T
+        Yield_Uncertainty=np.sqrt(np.diag(Yield_Covariance))
+        return(Yield_Uncertainty,Yield_Covariance)
+        
+    
+    else:
+        #Defining non-covariance derivatives
+        crg_der=fn*(Y_flux/(cr_flux-br_flux))
+        brg_der=-crg_der
+        Y_flux_der=fn*((crg-brg)/(cr_flux-br_flux))
+        fn_der=Yield/fn
+        Yield_Uncertainty=np.sqrt(np.power(crg_der*dcrg,2)+
+                                  np.power(brg_der*dbrg,2)+
+                                  np.power(Y_flux_der*dY_flux,2)+
+                                  np.power(cr_flux_der*dcr_flux,2)+
+                                  np.power(br_flux_der*dbr_flux,2)+
+                                  np.power(fn_der*dfn,2))
+        return(Yield_Uncertainty,None)
 
     
-def reduce_raw_count_data(raw_data, model_parameters):
+def reduce_raw_count_data(raw_data, model_parameters, covariance_data, calc_cov):
 
     ### counts to count rates for target gamma and background measurements
     crg, dcrg = cts_to_ctr(raw_data.ctg, raw_data.dctg, model_parameters.incident_neutron_spectrum_f.bw, model_parameters.trig_g[0])
@@ -50,26 +119,14 @@ def reduce_raw_count_data(raw_data, model_parameters):
     relative_flux_rate_uncertainty = np.sqrt(np.power(dcr_flux,2) + np.power(dbr_flux,2))
     Yield             = model_parameters.fn[0] * np.divide(crg - brg, relative_flux_rate)
     
-    #Uncertainty Calculations:
-    partial_Y_Cc      = model_parameters.fn[0]/relative_flux_rate
-    partial_Y_Cb      =-model_parameters.fn[0]/relative_flux_rate
-    partial_Y_flux    =-model_parameters.fn[0]*np.divide(crg - brg, np.power(relative_flux_rate,2))
-    partial_Y_fn      = np.divide(crg - brg, relative_flux_rate)
-    
-    Yield_uncertainty = np.sqrt(np.power(np.multiply(partial_Y_Cc     , dcrg)       ,2)
-                               +np.power(np.multiply(partial_Y_Cb     , dbrg)      ,2)
-                               +np.power(np.multiply(partial_Y_flux   , relative_flux_rate_uncertainty),2)
-                               +np.power(partial_Y_fn*model_parameters.fn[1]        ,2))
-    
-    # if calc_cov:
-        # do covariance stuff
+    Yield_uncertainty, CovY=get_covT(crg,dcrg,brg,dbrg,cr_flux,dcr_flux,br_flux,dbr_flux,relative_flux_rate,relative_flux_rate_uncertainty,model_parameters.fn[0],model_parameters.fn[1],Yield,covariance_data,calc_cov)
     
     # diag_stat = None
     # diag_sys = None
     # data =[diag_stat, diag_sys, Jac_sys, Cov_sys]
     
 
-    return Yield, Yield_uncertainty
+    return Yield, Yield_uncertainty, CovY
 
 
 def inverse_reduction(pw_true, true_model_parameters):
@@ -387,25 +444,10 @@ class Capture_Yield_RPI:
 
         # define systematic uncertainties
         #I will implement covariance later once we get to defining that.
-        Yg.loc[:,'exp'], unc_data = reduce_raw_count_data(raw_data, self.model_parameters)
-
-        diag_tot = unc_data**2
-        if options.calculate_covariance:
-            CovY = np.diag(diag_tot)
-            CovY = pd.DataFrame(CovY, columns=Yg.E, index=Yg.E)
-            CovY.index.name = None
-            Yg['exp_unc'] = np.sqrt(np.diag(CovY))
-            covariance_data = {}
-            if options.explicit_covariance:
-                covariance_data['CovY'] = CovY
-            else:
-                raise ValueError("not implemented")
-
-        else:
-            diag_tot = unc_data
-            Yg.loc[:,'exp_unc'] = diag_tot
-            covariance_data = {}
-
+        Yg.loc[:,'exp'], Yg.loc[:,'exp_unc'], CovY = reduce_raw_count_data(raw_data, self.model_parameters, self.covariance_data, options.calculate_covariance)
+        covariance_data={}
+        if not(CovY is None):
+           covariance_data['CovY']=CovY 
         ## fix for zero gamma counts
         # Yg = Yg.loc[Yg.exp!=0]
         # assert(np.all(Yg.exp!=0))

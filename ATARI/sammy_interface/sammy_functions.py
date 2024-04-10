@@ -278,7 +278,7 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                  sammyINP.particle_pair, 
                  sammyINP.initial_parameter_uncertainty,
                  os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
-    fill_runDIR_with_templates(sammyINP.template, 
+    fill_runDIR_with_templates(sammyINP.experiment.template, 
                                "sammy.inp", 
                                sammyRTO.sammy_runDIR)
     write_saminp(
@@ -554,6 +554,21 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
             f.write(f"##################################\n# Generate YW for {ds}\n")
             f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n")
             f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
+        f.write("################# read chi2 #######################\n#\n")
+        for ds in dataset_titles:
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
+            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $chi2_string_{ds}")
+        f.write(""""\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $ndat_string_{ds}")
+        f.write(""""\n""")
+
     with open(os.path.join(rundir,"BAYiter.sh"), 'w') as f:
         dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
         title = f"bayes_iter$plus_one"
@@ -608,27 +623,38 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 
 
 
-def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
+def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
                             capture_output=True, timeout=60*10
                             )
-
+    chi2_old = np.inf
     for i in range(1, iterations+1):
-        runsammy_ywy0 = subprocess.run(
+        runsammy_ywyiter = subprocess.run(
                                     ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*10
+                                    capture_output=True, text=True, timeout=60*10
                                     )
 
-        runsammy_bay0 = subprocess.run(
+        runsammy_bayiter = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
                                     capture_output=True, timeout=60*10
                                     )
+        
+        i_chi2s = [float(s) for s in runsammy_ywyiter.stdout.split('\n')[-3].split()]
+        chi2 = np.sum(i_chi2s[1:])
+        if np.isclose(chi2, chi2_old):
+            print(f"{lead}\tConverged step at {i} iterations")
+            break   
+        else:
+            chi2_old = chi2
+
+    if i == iterations:
+        print(f"\t{lead}Step did not converge {i} iterations")
 
     # Move par file from final iteration 
     out = subprocess.run(
         ["sh", "-c", 
-        f"""head -$(($(wc -l < iterate/bayes_iter{iterations+1}.par) - 1)) iterate/bayes_iter{iterations+1}.par > results/step{step+1}.par"""],
+        f"""head -$(($(wc -l < iterate/bayes_iter{i+1}.par) - 1)) iterate/bayes_iter{i+1}.par > results/step{step+1}.par"""],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
     
 
@@ -740,6 +766,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
+            # par_df_current = par_df_next
 
             ### Levenberg-Marquardt algorithm
             if sammyINPyw.LevMar:
@@ -756,11 +783,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     while True:
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
-                        update_fudge_in_parfile(rundir, istep-1, fudge)
-                        # if True: reduce_width_randomly(rundir, istep-1, sammyINPyw, fudge)
-                        # if sammyINPyw.batch_fitpar:
-                        #     batch_fitpar(rundir, istep, sammyINPyw, fudge)
-                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
+                        update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
+                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
@@ -812,7 +836,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         istep += 1
 
     print("Maximum steps reached")
-    return max(istep-1, 0)
+    return max(istep, 0)
 
 
 
@@ -839,8 +863,12 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
         raise ValueError(f"One or more experiments do not have template files.")
     if sammyINPyw.step_threshold_lag > 1 and sammyINPyw.batch_fitpar is False:
         print("WARNING: you have set a step threshold lag but are not batching fit parameters, this is an odd setting.")
-    # if sammyRTO.bayes:
-    #     if sammyINPyw.resonance_ladder
+    if sammyRTO.bayes:
+        if not np.any([each in sammyINPyw.resonance_ladder for each in ["varyE", "varyGg", "varyGn1"]]):
+            raise ValueError("No vary flag columns in resonance ladder")
+        if np.sum([sammyINPyw.resonance_ladder["varyE"], sammyINPyw.resonance_ladder["varyGg"], sammyINPyw.resonance_ladder["varyGn1"]]) == 0:
+            raise ValueError("Bayes set to true but no varied parameters")
+
     return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):

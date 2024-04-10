@@ -49,8 +49,8 @@ exp_model = Experimental_Model(channel_widths={"maxE": [250],"chw": [100.0],"dch
 exp_model.template = os.path.realpath('samtemplate.inp')
 
 rto = sammy_classes.SammyRunTimeOptions(sammyexe,
-                                        bayes = True,
-                                        get_ECSCM=True,
+                                        bayes = False,
+                                        get_ECSCM=False,
                                         )
 
 Ta_pair = Particle_Pair()
@@ -67,7 +67,7 @@ sammyINP = sammy_classes.SammyInputData(
         pair,
         # resonance_ladder,
         resonance_ladder_fit,
-        os.path.realpath('samtemplate.inp'),
+        # os.path.realpath('samtemplate.inp'),
         exp_model,
         energy_grid=exp_model.energy_grid,
 )
@@ -84,7 +84,40 @@ data_df = pd.DataFrame({'E':samout.pw['E'],
 print(data_df)
 print(samout.est_df)
 
-#%%
+# ###
+# resonance_ladder_fit["varyE"] = np.ones(len(resonance_ladder_fit))
+# resonance_ladder_fit["varyGg"] = np.ones(len(resonance_ladder_fit))
+# resonance_ladder_fit["varyGn1"] = np.ones(len(resonance_ladder_fit))
+resonance_ladder_fit["E"] = resonance_ladder_fit["E"]+3
+rto.bayes=True
+rto.get_ECSCM = False
+rto.Print = True
+sammyINPyw = sammy_classes.SammyInputDataYW(
+        particle_pair = pair,
+        resonance_ladder = resonance_ladder_fit,
+        
+        datasets= [data_df],
+        experiments = [exp_model],
+        experimental_covariance= [{}], 
+        
+        max_steps = 4,
+        iterations = 10,
+
+        LevMar = True,
+        initial_parameter_uncertainty = 100
+)
+# # self.assertRaises(ValueError, sammy_functions.run_sammy_YW, sammyINPyw, self.rto)
+
+# sammyINPyw.resonance_ladder = resonance_ladder_fit
+sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
+print(sammyOUT_fit.chi2)
+print(sammyOUT_fit.chi2_post)
+# self.assertIsNotNone(sammyOUT_fit.par_post)
+# self.assertIsNotNone(sammyOUT_fit.chi2_post)
+# self.assertIsNotNone(sammyOUT_fit.pw_post)
+# self.assertIsNone(sammyOUT_fit.est_df)
+
+# rto.get_ECSCM = False#%%
 
 # energy_grid = np.sort(np.random.default_rng().uniform(10,3000,10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
 # df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1.0,10)})

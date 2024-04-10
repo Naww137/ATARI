@@ -1,0 +1,405 @@
+from ATARI.sammy_interface.sammy_io import *
+from ATARI.sammy_interface.sammy_functions import *
+from ATARI.sammy_interface.sammy_deriv import get_derivatives
+from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   du_dp_E, du_dp_g, du_dp_n
+import numpy as np
+import pandas as pd
+from ATARI.sammy_interface import sammy_classes
+
+
+def get_Gs_Ts(resonance_ladder, 
+              particle_pair,
+              experiments,
+              datasets, 
+              covariance_data,
+              rto):
+    
+    Gs = []; Ts = []; pw_list = []
+    for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
+        sammyINP = sammy_classes.SammyInputData(particle_pair, resonance_ladder, experiment=exp, experimental_data = dat, experimental_covariance=exp_cov)
+        sammy_out = get_derivatives(sammyINP, rto, get_theo=True, u_or_p='u')
+        Gs.append(sammy_out.derivatives)
+        
+        if exp.reaction == "transmission":
+            key = "theo_trans"
+        else:
+            key = "theo_xs"
+        Ts.append(sammy_out.pw[key].values)
+        pw_list.append(sammy_out.pw)
+
+    return Gs, Ts, pw_list
+
+def get_Ds_Vs(experiments, datasets, covariance_data):
+    Ds = []; covs = []
+    for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
+        Ds.append(dat["exp"].values)
+        if not exp_cov:
+            covs.append(np.diag(dat["exp_unc"].values**2))
+        else:
+            min_max_E = (np.min(dat.E), np.max(dat.E))
+            mask = (exp_cov['diag_stat'].index>=min_max_E[0]) & (exp_cov['diag_stat'].index<=min_max_E[1])
+            J = exp_cov['Jac_sys'].values[:, mask]
+            covs.append(np.diag(exp_cov['diag_stat'][mask]['var_stat'].values) + J.T @ exp_cov['Cov_sys'] @ J)
+    return Ds, covs
+
+def zero_G_at_no_vary(G, par):
+    # Need to remove all zero cols so inv(hessian) is not singular
+    # nonzero_columns = np.any(G != 0, axis=0)
+    # used_cols = np.nonzero(nonzero_columns)[0]
+    # G = G[:,used_cols]
+    # Pp = P
+    # Pp[used_cols] += (Mp @ G.T @ VDT)
+
+    indices_e = 3*par.index[par['varyE'] == 0].to_numpy()
+    indices_g = 3*par.index[par['varyGg'] == 0].to_numpy() + 1
+    indices_n = 3*par.index[par['varyGn1'] == 0].to_numpy()  + 2
+    G[:,indices_e] = 0.0
+    G[:,indices_g] = 0.0
+    G[:,indices_n] = 0.0
+    return G
+
+
+def get_Pu_vec_and_indices(resonance_ladder,
+                           particle_pair,
+                           external_resonance_indices=[]
+                           ):
+
+    E  = resonance_ladder['E'].to_numpy()
+    Gg = resonance_ladder['Gg'].to_numpy()
+    Gn = resonance_ladder['Gn1'].to_numpy()
+    J_ID = resonance_ladder['J_ID'].to_numpy(dtype=int)
+
+    L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
+    for jpi, mean_params in particle_pair.spin_groups.items():
+        jid = mean_params['J_ID']
+        L[jid-1] = mean_params['Ls'][0]
+
+    ue = p2u_E(E)
+    ug = p2u_g(Gg)
+    un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
+    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
+
+    ires = np.arange(0,len(resonance_ladder), 1)
+    iE = 3*ires
+    igg = 3*ires + 1
+    ign = 3*ires + 2
+
+    iext = []
+    for i in external_resonance_indices:
+        iext.extend([3*i, 3*i+1, 3*i+2])
+    iext = np.array(iext)
+
+    iE_no_step = 3*resonance_ladder.index[resonance_ladder['varyE'] == 0].to_numpy()
+    igg_no_step = 3*resonance_ladder.index[resonance_ladder['varyGg'] == 0].to_numpy() + 1
+    ign_no_step = 3*resonance_ladder.index[resonance_ladder['varyGn1'] == 0].to_numpy()  + 2
+    i_no_step = np.concatenate([iE_no_step, igg_no_step, ign_no_step])
+
+    return Pu, iE, igg, ign, iext, i_no_step
+
+def get_p_resonance_ladder_from_Pu_vector(Pu, 
+                                          initial_reslad,
+                                          particle_pair
+                                          ):
+    J_ID = initial_reslad['J_ID'].to_numpy(dtype=int)
+    L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
+    for jpi, mean_params in particle_pair.spin_groups.items():
+        jid = mean_params['J_ID']
+        L[jid-1] = mean_params['Ls'][0]
+
+    Pu = Pu.reshape(-1,3)
+    Eu  = Pu[:,0]
+    Ggu = Pu[:,1]
+    Gnu = Pu[:,2]
+    Pp = np.zeros_like(Pu)
+    Pp[:,0] = u2p_E(Eu)
+    Pp[:,1] = u2p_g(Ggu)
+    Pp[:,2] = u2p_n(Gnu, Pp[:,0], L[J_ID-1], particle_pair)
+
+    par_post = pd.DataFrame(Pp, columns=['E', 'Gg', 'Gn1'])
+    par_post['J_ID']    = initial_reslad['J_ID']
+    par_post['varyE']   = initial_reslad['varyE']
+    par_post['varyGn1'] = initial_reslad['varyGn1']
+    par_post['varyGg']  = initial_reslad['varyGg']
+
+    return par_post
+
+def get_derivatives_for_step(rto, D, V, 
+                             datasets, covariance_data, ### dont need these two things if I update get_derivatives function Cole created
+                             res_lad, 
+                             particle_pair,
+                             experiments, 
+                             zero_derivs_at_no_vary = True
+                             ):
+    Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
+    G = np.concatenate(Gs, axis=0)
+    T = np.concatenate(Ts)
+
+    # zero derivative for parameters not varied
+    if zero_derivs_at_no_vary:
+        G = zero_G_at_no_vary(G, res_lad)
+
+    # calculate derivative and chi2
+    dchi2_dpar = - 2 * G.T @ np.linalg.inv(V) @ (D - T)
+    hessian_approx = G.T @ np.linalg.inv(V) @ G
+
+    chi2 = (D-T).T @ np.linalg.inv(V) @ (D-T)
+
+    return chi2, dchi2_dpar, hessian_approx, sammy_pws
+
+
+def evaluate_location(rto, Pu, 
+                      starting_ladder, 
+                      particle_pair,
+                      D, V, 
+                      datasets,
+                      covariance_data,
+                      experiments,
+                      ign, 
+                      iE,
+                      iext,
+                      
+                      lasso=False, 
+                      lasso_parameters = {"lambda"     :   1,
+                                          "gamma"      :   2},
+
+                      ridge = False,
+                      ridge_parameters = {"lambda"     :   1,
+                                          "gamma"      :   2},
+
+                      elastic_net = True,
+                      elastic_net_parameters = {"lambda":100, 
+                                                  "gamma":2,
+                                                  "alpha":0.5}
+                      ):
+    
+    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder,particle_pair)
+    chi2, dchi2_dpar, hessian_approx, sammy_pws = get_derivatives_for_step(rto, D, V, datasets, covariance_data, res_lad, particle_pair,experiments)
+    
+    if lasso:
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        if lasso_parameters["weights"] is not None:
+            w = lasso_parameters["weights"]
+            lasso_pen = lasso_parameters["lambda"]* np.sum( gn*np.sign(gn) )
+        else:
+            lasso_pen = lasso_parameters["lambda"]* np.sum( gn*np.sign(gn) )
+        obj = chi2+lasso_pen
+        assert(not ridge); assert(not elastic_net)
+
+    elif ridge:
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        ridge_pen = ridge_parameters["lambda"]* np.sum( gn**2 )
+        obj = chi2 + ridge_pen
+        assert(not lasso); assert(not elastic_net)
+
+    elif elastic_net:
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        elastic_net_pen = elastic_net_parameters["lambda"]* np.sum(elastic_net_parameters["alpha"]*gn**2 + (1-elastic_net_parameters["alpha"])*gn*np.sign(gn))
+        obj = chi2 + elastic_net_pen
+        assert(not ridge); assert(not lasso)
+
+    else:
+        obj = chi2
+
+    return obj, chi2, dchi2_dpar, hessian_approx, sammy_pws, res_lad
+    
+
+
+
+def take_step(Pu, 
+              alpha, 
+              dchi2_dpar, 
+              hessian_approx,
+              ign, iE, iext,
+              
+              gaus_newton=False, 
+
+              lasso=False, 
+              lasso_parameters = {"lambda"     :   1,
+                                 "gamma"      :   2},
+
+              ridge = False,
+              ridge_parameters = {"lambda"     :   1,
+                                 "gamma"      :   2},
+
+              elastic_net = False,
+              elastic_net_parameters = {"lambda":100, 
+                                        "gamma":2,
+                                        "alpha":0.5}
+                                
+                                ):
+    
+    alpha_vec = np.ones_like(Pu)*alpha
+    alpha_vec[iE] = alpha_vec[iE]/100
+    if gaus_newton:
+        # step_direction = np.linalg.inv(dampening*np.diag(np.diag(hessian_approx)) + hessian_approx) @ dchi2_dpar
+        dampening = 1/alpha_vec
+        chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
+    else:
+        chi2_step = alpha_vec*dchi2_dpar
+
+    if lasso: # need to update penalties only on internal resonances
+        lasso_pen = np.zeros_like(Pu)
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        lasso_pen[ign_internal] = lasso_parameters["lambda"]*np.sign(gn)
+        if lasso_parameters["weights"] is not None:
+            w = lasso_parameters["weights"]
+            lasso_pen[ign_internal] /= (w[ign_internal]*np.sign(w[ign_internal]))**lasso_parameters["gamma"]
+        step = chi2_step + alpha*lasso_pen
+        assert(not ridge)
+    elif ridge:
+        ridge_pen = np.zeros_like(Pu)
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        ridge_pen[ign_internal] = ridge_parameters["lambda"]*2*gn
+        step = chi2_step + alpha*ridge_pen
+    elif elastic_net:
+        elastic_net_pen = np.zeros_like(Pu)
+        ign_internal = [i for i in ign if i not in iext]
+        gn = Pu[ign_internal]
+        elastic_net_pen[ign_internal] = elastic_net_parameters["lambda"]*(elastic_net_parameters["alpha"]*2*gn + 1 - elastic_net_parameters["alpha"])
+        step = chi2_step + alpha*elastic_net_pen
+    else:
+        step = chi2_step
+
+    return Pu - step
+
+
+
+
+
+
+
+
+
+def fit(rto, 
+        starting_ladder, 
+        external_resonance_indices, 
+        particle_pair,
+        D, V, experiments, datasets, covariance_data,
+
+        steps = 100, 
+        thresh = 0.01, 
+        alpha = 1e-6, 
+        print_bool = True, 
+        
+        gaus_newton = False, 
+
+        LevMar = True, 
+        LevMarV = 2, 
+        LevMarVd = 5, 
+        maxV = 1e-4, 
+        minV=1e-8, 
+        
+        lasso = False,
+        lasso_parameters = {"lambda":1, 
+                            "gamma":0,
+                            "weights":None},
+        ridge = False,
+        ridge_parameters = {"lambda":1, 
+                            "gamma":0,
+                            "weights":None},
+        elastic_net = True,
+        elastic_net_parameters = {"lambda":1, 
+                                "gamma":0,
+                                "alpha":0.7},
+
+        
+        ):
+
+
+    saved_res_lads = []
+    save_Pu = []
+    saved_pw_lists = []
+    saved_gradients = []
+    chi2_log = []
+    obj_log = []
+
+    Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
+    for istep in range(steps):
+
+        # Get current location derivatives and objective function values
+        obj, chi2, dchi2_dpar, hessian_approx, sammy_pws, res_lad = evaluate_location(rto, Pu_next, starting_ladder, particle_pair,
+                                                                             D, V, datasets, covariance_data, experiments, ign,  iE, iext,
+                                                                            lasso =lasso, lasso_parameters = lasso_parameters,
+                                                                            ridge = ridge, ridge_parameters = ridge_parameters,
+                                                                            elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
+
+        if istep > 1:
+            
+            if LevMar:
+                assert(LevMarV>1)
+                if obj < obj_log[istep-1]:
+                    alpha *= LevMarV
+                    alpha = min(alpha,maxV)
+                else:
+                    if print_bool:
+                        print(f"Decrease alpha and repeat step {int(istep)}")
+                        print(f"\t\t{np.round(float(alpha),8):<10}: {obj:.2f}\t{chi2:.2f}")
+                    while True:  
+                        alpha /= LevMarVd
+                        alpha = max(alpha, minV)
+                        Pu_temp = take_step(Pu, alpha, dchi2_dpar, hessian_approx, ign, iE, iext,
+                                            gaus_newton=gaus_newton, 
+                                            lasso=lasso, lasso_parameters=lasso_parameters,
+                                            ridge=ridge, ridge_parameters=ridge_parameters)
+                        obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp = evaluate_location(rto, Pu_temp, starting_ladder, particle_pair,
+                                                                                                                                    D, V, datasets, covariance_data, experiments, ign,  iE, iext,
+                                                                                                                                    lasso =lasso, lasso_parameters = lasso_parameters,
+                                                                                                                                    ridge = ridge, ridge_parameters = ridge_parameters,
+                                                                                                                                    elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
+                        if print_bool:
+                            print(f"\t\t{np.round(float(alpha),8):<10}: {obj_temp:.2f}\t{chi2_temp:.2f}")
+                        if obj_temp < obj_log[istep-1] or alpha==minV:
+                            obj, chi2, dchi2_dpar, hessian_approx, sammy_pws, res_lad = obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp
+                            Pu_next = Pu_temp
+                            break
+                        else:
+                            pass
+            
+            ### convergence check
+            Dobj = obj_log[istep-1] - obj
+            if Dobj < thresh:
+                if Dobj < 0:
+                    criteria = f"Obj increased, taking solution {istep-1}"
+                    if LevMar and alpha==minV:
+                        criteria = f"Step size below minimum value, taking solution {istep-1}"
+                    if print_bool:
+                        print(criteria)
+                    print(max(istep-1, 0))
+                    break
+                else:
+                    criteria = "Obj improvement below threshold"
+                if print_bool:
+                    print(criteria)
+                print(istep)
+                break
+        
+        if print_bool:
+            print(f"{int(istep)}\t{np.round(alpha,8):<10}:\t{obj:.2f}\t{chi2:.2f}")
+
+        ### update Pu to Pu_next and save things
+        Pu = Pu_next
+        obj_log.append(obj)
+        chi2_log.append(chi2)
+        gradient = dchi2_dpar
+        saved_gradients.append(gradient)
+        save_Pu.append(Pu)
+        saved_pw_lists.append(sammy_pws)
+        saved_res_lads.append(copy(res_lad))
+
+        ### step coeficients
+        Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, ign, iE, iext,
+                            gaus_newton=gaus_newton,
+                            lasso=lasso, lasso_parameters=lasso_parameters,
+                            ridge=ridge, ridge_parameters=ridge_parameters,
+                            elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
+
+    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log
+
+
+
+

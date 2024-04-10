@@ -143,3 +143,35 @@ def get_LL_by_parameter(ladder,
     LL_bypar = np.sum(LL_bypar_bysg, axis=0)
 
     return LL_bypar, LL_bypar_bysg
+
+
+
+
+def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window):
+
+    ### setup spin groups
+    if initialFBopt.fit_all_spin_groups:
+        spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
+    else:
+        assert len(initialFBopt.spin_group_keys)>0
+        spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in initialFBopt.spin_group_keys]
+
+    ### generate intial_feature bank
+    initial_resonance_ladder = get_starting_feature_bank(energy_window,
+                                                        particle_pair,
+                                                        spin_groups,
+                                                        num_Elam= initialFBopt.num_Elam,
+                                                        starting_Gg_multiplier = initialFBopt.starting_Gg_multiplier,
+                                                        starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier, 
+                                                        varyE = initialFBopt.fitpar1[0], 
+                                                        varyGg = initialFBopt.fitpar1[1], 
+                                                        varyGn1 = initialFBopt.fitpar1[2])
+
+    ### setup external resonances
+    if initialFBopt.external_resonances:
+        external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
+    else:
+        external_resonance_ladder = pd.DataFrame()
+    initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
+
+    return initial_resonance_ladder, external_resonance_indices

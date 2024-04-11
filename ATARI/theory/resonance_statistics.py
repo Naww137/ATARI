@@ -5,11 +5,8 @@ from scipy.stats.distributions import chi2
 
 from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
 
-def getD(quantile:float, avgD:float): 
-    """
-    Wigner inverse CDF. Finds the level-spacing associated with the desired quantile.
-    """   
-    return avgD * 2*np.sqrt(-np.log(1-quantile)/np.pi)
+def getD(quantile:float, res_par_avg): 
+    return res_par_avg['<D>'] * 2*np.sqrt(-np.log(1-quantile)/np.pi)
 
 
 def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):

@@ -7,11 +7,12 @@ workspace/
 *.asv
 *.bar*
 */.bar*
-*.dat
+# *.dat
 fort*
 *SAMMY_runDIR*
 *.gif
-
+.vscode/
+/docs/build/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

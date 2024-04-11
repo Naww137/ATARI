@@ -32,23 +32,23 @@ def t_to_e(t:float, d:float, rel:bool=True):
     return E
 
 
-def e_to_t(E:float, d:float, rel:bool=True):
+def e_to_t(E, d, rel:bool):
     """
-    Converts from newton energy to time of flight using relativistic or Newtonian kinematics.
+    Converts energy (eV) to time-of-flight (s)
 
     Parameters
     ----------
-    E : float or ndarray
-        Neutron energies
+    E : ndarray
+        Energy in eV
     d : float
-        Distance for the time of flight measurement in meters.
+        flight-path distance in m
     rel : bool
-        Relative kinematics (True) or Newtonian kinematics (False), default True.
+        Option to use relative calculation
 
     Returns
     -------
-    float or ndarray
-        Expected time of flight measurements
+    ndarray
+        time-of-flight vector corresponding to energies passed in
     """
     if rel:
         mn = 939.56542052e6 # eV/c2

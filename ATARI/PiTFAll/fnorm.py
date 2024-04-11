@@ -5,6 +5,7 @@ from datetime import datetime
 
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 from ATARI.utils.misc import fine_egrid
+from ATARI.ModelData.experimental_model import Experimental_Model
 
 
 
@@ -22,39 +23,44 @@ def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, 
     return sammy_rundirname
 
 
-
-def calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
+def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                         particle_pair, 
                                         resonance_ladder, 
                                         energy_range,
                                         temperature,
-                                        target_thickness,
                                         template, 
                                         reactions):
 
     runDIR = generate_sammy_rundir_uniq_name('./')
 
-    sammyRTO = sammy_classes.SammyRunTimeOptions(
-        path_to_SAMMY_exe = sammy_exe,
-        shell = shell,
-        model = 'XCT',
-        sammy_runDIR = runDIR,
-        inptemplate = template,
-        keep_runDIR=False
-        )
+    sammyRTO = sammy_classes.SammyRunTimeOptions(sammy_exe,
+                             **{"Print"   :   True,
+                              "bayes"   :   False,
+                              "keep_runDIR"     : False,
+                              "sammy_runDIR": runDIR
+                              })
 
     E = fine_egrid(energy_range)
 
+    exp_theo = Experimental_Model(title = "theo",
+                                      reaction='total',
+                                      temp = (temperature,0),
+                                      energy_grid = E,
+                                      energy_range = energy_range
+                                      )
+    exp_theo.template = template
+
     sammyINP = sammy_classes.SammyInputData(
-        particle_pair = particle_pair,
-        resonance_ladder = resonance_ladder,
-        energy_grid = E,
-        temp = temperature,
-        target_thickness= target_thickness)
+        particle_pair,
+        resonance_ladder,
+        template=template,
+        experiment=exp_theo,
+        energy_grid=E
+    )
     
     df = pd.DataFrame({"E":E})
     for rxn in reactions:
-        sammyRTO.reaction = rxn
+        sammyINP.experiment.reaction = rxn
         sammyOUT = sammy_functions.run_sammy(sammyINP, sammyRTO)
         if rxn == "capture" and resonance_ladder.empty: ### if no resonance parameters - sammy does not return a column for capture theo xs
             sammyOUT.pw["theo_xs"] = np.zeros(len(sammyOUT.pw))
@@ -64,25 +70,24 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
     
 
 def get_rxns(true_par, est_par,
-                sammy_exe, shell,
+                sammy_exe,
                 Ta_pair, 
                 energy_range,
-                temperature, 
-                target_thickness,
+                temperature,
                 template, reactions):
     
-    df_est = calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
+    df_est = calc_theo_broad_xs_for_all_reaction(sammy_exe, 
                                         Ta_pair, 
                                         est_par, 
                                         energy_range,
-                                        temperature, target_thickness,
+                                        temperature, 
                                         template, reactions)
 
-    df_true = calc_theo_broad_xs_for_all_reaction(sammy_exe, shell,
+    df_true = calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                             Ta_pair, 
                                             true_par, 
                                             energy_range,
-                                            temperature, target_thickness,
+                                            temperature, 
                                             template, reactions)
     
     return df_est, df_true
@@ -90,53 +95,54 @@ def get_rxns(true_par, est_par,
 
 
 def get_rxn_residuals(true_par, est_par,
-                        sammy_exe, shell,
+                      sammy_exe,
                         Ta_pair, 
                         energy_range,
                         temperature, 
-                        target_thickness,
                         template, reactions):
     
     df_est, df_true = get_rxns(true_par, est_par,
-                            sammy_exe, shell,
+                               sammy_exe,
                             Ta_pair, 
                             energy_range,
                             temperature, 
-                            target_thickness,
                             template, reactions)
     
     E = df_est.E
     assert(np.all(E == df_true.E))
     residuals = df_est-df_true
     residuals["E"] = E
+    relative = (df_est-df_true)/df_true
+    relative["E"] = E
 
-    return residuals
+
+    return residuals, relative
 
 
 
 def build_residual_matrix_dict(est_par_list, true_par_list,
-                        sammy_exe, shell,
-                        Ta_pair, 
+                               sammy_exe,
+                        particle_pair, 
                         energy_range,
                         temperature, 
-                        target_thickness,
                         template, reactions,
                         print_bool=False):
     
     # initialize residual matrix dict
     ResidualMatrixDict = {}
+    ResidualMatrixDictRel = {}
     for rxn in reactions:
         ResidualMatrixDict[rxn] = []
+        ResidualMatrixDictRel[rxn] = []
 
     # loop over all cases in est_par and true_par lists
     i = 0 
     for est, true in zip(est_par_list, true_par_list):
-        rxn_residuals = get_rxn_residuals(true, est,
-                        sammy_exe, shell,
-                        Ta_pair, 
+        rxn_residuals, rxn_relative = get_rxn_residuals(true, est,
+                                          sammy_exe,
+                        particle_pair, 
                         energy_range,
                         temperature, 
-                        target_thickness,
                         template, reactions)
         if print_bool:
             i += 1
@@ -145,12 +151,15 @@ def build_residual_matrix_dict(est_par_list, true_par_list,
         # append reaction residual
         for rxn in reactions:
             ResidualMatrixDict[rxn].append(list(rxn_residuals[rxn]))
+            ResidualMatrixDictRel[rxn].append(list(rxn_relative[rxn]))
+
 
     # convert to numpy array
     for rxn in reactions:
         ResidualMatrixDict[rxn] = np.array(ResidualMatrixDict[rxn])
+        ResidualMatrixDictRel[rxn] = np.array(ResidualMatrixDictRel[rxn])
     
-    return ResidualMatrixDict
+    return ResidualMatrixDict, ResidualMatrixDictRel
 
 
 

@@ -52,7 +52,7 @@ def cts_to_ctr(cts, d_cts, bw, trig):
     d_cts : array-like
         Array of uncertainty on each count data point corresponting to each tof bin.
     bw : array-like
-        Array of tof bin widths.
+        Array of tof bin widths (seconds).
     trig : float or int
         Number of linac pulses.
         
@@ -105,39 +105,110 @@ def sample_true_underlying_parameters(parameter_dict, bool):
 
     return true_parameter_dict
 
+def neutron_background_function(tof,a,b,bkg_func):
+    if bkg_func == "exp":
+        return bkg_func_exp(tof,a,b)
+    elif bkg_func == "power":
+        return bkg_func_power(tof,a,b)
+    else:
+        raise ValueError("bkg_func not regocnized")
 
-def neutron_background_function(tof,a,b):
+def bkg_func_exp(tof,a,b):
+    """
+    Exponential neutron backgroun function
+
+    .. math:: bkg = a*e^(-b*tof)
+
+    Parameters
+    ----------
+    tof : array-like
+        time-of-flight in micro-seconds (us)
+    a : float
+        parameter
+    b : float
+        parameter
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     return a*np.exp(tof*-b)
 
-def gamma_background_function():
-    return
+def bkg_func_power(tof,a,b):
+    """
+    Power law neutron background function
+
+    .. math:: bkg = a*tof^(-b)
+
+    Parameters
+    ----------
+    tof : array-like
+        time-of-flight in micro-seconds (us)
+    a : float
+        parameter
+    b : float
+        parameter
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    return a*(tof)**(-b)
+
+
+def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo, nominal=25):
+    # background_spectrum_bg= pd.DataFrame({'c'    :   np.ones(len(exp_model.energy_grid))*25,
+    #                                  'dc'   :   np.ones(len(exp_model.energy_grid))*np.sqrt(25)})
+
+    # calculate a tof count rate spectra, convert to counts 
+    tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
+    cps_open_approx = np.ones(len(energy_grid))*nominal
+    bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
+    cts_open_approx = cps_open_approx * bin_width * trigo
+
+    # add noise
+    if smooth:
+        cts_open_measured = cts_open_approx
+    else:
+        cts_open_measured = pois_noise(cts_open_approx)
+    cts_open_measured[cts_open_measured==0] = 1
+    dataframe = pd.DataFrame({'tof'    :   tof,
+                                'bw'    :   bin_width,
+                                'ct'     :   cts_open_measured,
+                                'dct'    :   np.sqrt(cts_open_measured)})
+
+    dataframe['E'] = t_to_e((dataframe.tof-t0)*1e-9, FP, True) 
+
+    return dataframe
 
 
 def approximate_neutron_spectrum_Li6det(energy_grid, smooth, FP, t0, trigo):
 
-        def open_count_rate(tof):
-            return (2212.70180199 * np.exp(-3365.55134779*tof*1e-6) + 23.88486286) 
+    def open_count_rate(tof):
+        return (2212.70180199 * np.exp(-3365.55134779*tof*1e-9) + 23.88486286) 
 
-        # calculate a tof count rate spectra, convert to counts 
-        tof = e_to_t(energy_grid, FP, True)*1e6 + t0 
-        cps_open_approx = open_count_rate(tof)
-        bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-6)
-        cts_open_approx = cps_open_approx * bin_width * trigo
+    # calculate a tof count rate spectra, convert to counts 
+    tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
+    cps_open_approx = open_count_rate(tof)
+    bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
+    cts_open_approx = cps_open_approx * bin_width * trigo
 
-        # add noise
-        if smooth:
-            cts_open_measured = cts_open_approx
-        else:
-            cts_open_measured = pois_noise(cts_open_approx)
+    # add noise
+    if smooth:
+        cts_open_measured = cts_open_approx
+    else:
+        cts_open_measured = pois_noise(cts_open_approx)
 
-        open_dataframe = pd.DataFrame({'tof'    :   tof,
-                                        'bw'    :   bin_width,
-                                        'c'     :   cts_open_measured,
-                                        'dc'    :   np.sqrt(cts_open_measured)})
+    open_dataframe = pd.DataFrame({'tof'    :   tof,
+                                    'bw'    :   bin_width,
+                                    'ct'     :   cts_open_measured,
+                                    'dct'    :   np.sqrt(cts_open_measured)})
 
-        open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-6, FP, True) 
+    open_dataframe['E'] = t_to_e((open_dataframe.tof-t0)*1e-9, FP, True) 
 
-        return open_dataframe
+    return open_dataframe
 
 
 
@@ -177,8 +248,8 @@ def sample_true_neutron_spectrum(spectrum_df, cycles=35, mon_unc=0.0160*2):
     for i in range(cycles-1):
         noisy_cycle_data += pois_noise(theo_cycle_data)*monitor_factors[i]
 
-    true_spectrum['c'] = noisy_cycle_data
-    true_spectrum['dc'] = np.sqrt(noisy_cycle_data)
+    true_spectrum['ct'] = noisy_cycle_data
+    true_spectrum['dct'] = np.sqrt(noisy_cycle_data)
 
     return true_spectrum
 

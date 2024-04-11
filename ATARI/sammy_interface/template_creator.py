@@ -1,8 +1,9 @@
 import numpy as np
+from ATARI.ModelData.particle_pair import Particle_Pair
 
 
 def make_input_template(filepath, 
-                model,
+                particle_pair: Particle_Pair,
                 experiment,
                 rto,#: Union[SammyInputData, SammyInputDataYW],
                 alphanumeric = []):
@@ -17,7 +18,7 @@ def make_input_template(filepath,
     # else:
     #     bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
     # alphanumeric = [model.formalism, bayes_cmd] + experiment.inputs['alphanumeric'] + alphanumeric_base + alphanumeric
-    alphanumeric = alphanumeric + alphanumeric_base + experiment.inputs['alphanumeric']
+    alphanumeric = alphanumeric + alphanumeric_base + experiment.sammy_inputs['alphanumeric']
 
     if np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
         broadening = False
@@ -49,10 +50,10 @@ def make_input_template(filepath,
             f.write('%%%card8%%%')
 
             # spin groups
-            f.write(model.spin_groups)
+            f.write(particle_pair.get_sammy_spingroups())
 
             # ResFunc 
-            if experiment.inputs['ResFunc'] is not None:
-                f.write(f"\n{experiment.inputs['ResFunc']}\n")
+            if experiment.sammy_inputs['ResFunc'] is not None:
+                f.write(f"\n{experiment.sammy_inputs['ResFunc']}\n")
                 for resfuncline in experiment.get_resolution_function_lines():
                     f.write(f"{resfuncline}\n")

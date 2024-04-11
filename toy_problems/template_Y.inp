@@ -1,0 +1,23 @@
+Title
+%%%card2%%%
+TWENTY
+EV
+GENERATE PLOT FILE AUTOMATICALLY
+%%%alphanumeric%%%
+USE MULTIPLE SCATTERING
+INFINITE SLAB
+NORMALIZE AS YIELD Rather than cross section
+BROADENING IS WANTED
+DO NOT SHIFT RPI RESOLUTION
+
+%%%card5/6%%%
+%%%card7%%%
+%%%card8%%%
+  1      1    0  3.0       1.0  3.5
+    1    1    0    0       3.0
+  2      1    0  4.0       1.0  3.5
+    1    1    0    0       4.0
+
+RPI C
+BURST 0   10.0      1.0      
+CHANN 0   300.0     100.0     0.8      

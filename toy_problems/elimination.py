@@ -38,7 +38,7 @@ Ta_pair = Particle_Pair(isotope = "Ta181",
 )
 
 # print quant number map up to l_max
-Ta_pair.map_quantum_numbers(print_out=True)
+Ta_pair.map_quantum_numbers(print_out=False)
 
 # add spin group information for both s-wave resonances
 Ta_pair.add_spin_group(Jpi='3.0',

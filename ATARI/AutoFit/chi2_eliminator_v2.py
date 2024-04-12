@@ -562,6 +562,7 @@ class eliminator_by_chi2:
 
             ### final printout, save model data, and continue or break while loop
             if (self.rto.Print):
+                
                 print(f'Current Stage Results {current_level}, N_res = {selected_ladder_chars.par_post.shape[0]}')
                 cols_to_show = ['E', 'Gn1', 'Gg', 'varyE', 'varyGg', 'varyGn1', 'J_ID']
                 print(selected_ladder_chars.par_post[cols_to_show])
@@ -580,6 +581,9 @@ class eliminator_by_chi2:
                 time_per_res  = np.round(tot_el_time/resdif,1)
 
                 print('*'*40)
+                cur_date = datetime.fromtimestamp(time.time()).strftime("%d.%m.%Y %H:%M:%S")
+                print(cur_date)
+                
                 print(f'Current elapsed time: \t {elim_addit_funcs.format_time_2_str(tot_el_time)[1]}')
                 print(f'Time per res.: \t {time_per_res} sec')
                 print()

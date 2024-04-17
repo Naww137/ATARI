@@ -116,7 +116,7 @@ class Syndat_Control:
                ):
 
         generate_pw_true_with_sammy = False
-        par_true = None
+        # par_true = None
         if pw_true_list is not None:
             if self.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")

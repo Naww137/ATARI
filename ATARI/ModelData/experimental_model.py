@@ -149,6 +149,7 @@ class Experimental_Model:
         return self._energy_range
     @energy_range.setter
     def energy_range(self, energy_range):
+        # TODO: truncate energy grid
         self._energy_range = energy_range
 
     @property
@@ -163,6 +164,7 @@ class Experimental_Model:
         return self._energy_grid
     @energy_grid.setter
     def energy_grid(self, energy_grid):
+        # TODO: check and truncate if outside of energy range
         self._energy_grid = energy_grid
 
     @property

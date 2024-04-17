@@ -74,6 +74,27 @@ class syndatOUT:
         h5io.write_par(filepath, isample, self.par_true, "true")
 
 
+    @staticmethod
+    def from_hdf5(filepath, isample, title):  # Could make this also title, the loop over title outside of this dataclass
+        # sample_group = f'sample_{isample}'
+        ### check existing samples
+        # h5f = h5py.File(filepath, "r")
+        # if sample_group in h5f:
+        #     keys = h5f[sample_group].keys()
+        #     titles = ['_'.join(each.split('_')[2:]) for each in keys if each not in ['par_true']]
+        # h5f.close()
+
+        par_true = h5io.read_par(filepath, isample, 'true')
+        pw_reduced_df, cov_data = h5io.read_pw_reduced(filepath, isample, title)
+        syndat_out = syndatOUT(title = title, par_true = par_true, pw_reduced = pw_reduced_df, pw_raw = None, covariance_data = cov_data)
+        # syndat_out_list = []
+        # for title in titles:
+        #     pw_reduced_df, cov_data = h5io.read_pw_reduced(filepath, isample, title)
+        #     syndat_out = syndatOUT(title = title, par_true = par_true, pw_reduced = pw_reduced_df, pw_raw = None, covariance_data = cov_data)
+        #     syndat_out_list.append(syndat_out)
+            
+        return syndat_out
+
 
 
 

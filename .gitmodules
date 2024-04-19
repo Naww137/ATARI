@@ -1,0 +1,3 @@
+[submodule "ATARI/TAZ"]
+	path = ATARI/TAZ
+	url = https://github.com/Oncure/TAZ.git

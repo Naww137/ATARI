@@ -270,6 +270,8 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         #TODO: Filter idc dataframe
         idc = True
     else:
+        if sammyINP.experimental_covariance is not None:
+            raise ValueError("Unknown type passed to sammyINP.experimental_covariance")
         idc = False
 
     write_sampar(sammyINP.resonance_ladder, 

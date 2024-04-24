@@ -82,3 +82,50 @@ def cov2corr(cov):
     std_deviations = np.atleast_2d(np.sqrt(np.diag(cov)))
     corr_matrix = cov/(std_deviations.T @ std_deviations)
     return corr_matrix
+
+
+def corr2cov(corr, variance):
+    """
+    Converts a covariance matrix to a correlation matrix
+
+    Parameters
+    ----------
+    corr : array-like
+        Correlation matrix as np array or pd dataframe
+    variance : array-like
+        Parameter variance.
+
+    Returns
+    -------
+    ndarray 
+        Covariance matrix
+    """
+    std_deviations = np.sqrt(np.diag(variance))
+    cov_matrix = (std_deviations.T @  corr @ std_deviations)
+    return cov_matrix
+
+
+def add_normalization_uncertainty_to_covariance(cov, d, normalization_uncertainty):
+    """
+    Adds normalization covariance to an existing covariance matrix. 
+    Propagation is done for the n variable in the equation: $d_norm = nd$.
+
+    Parameters
+    ----------
+    cov : ndarray
+        Prior covariance matrix
+    d : ndarray
+        Array of data values for uncertainty propagation.
+    normalization_uncertainty : float
+        Standard deviation on normalization constant.
+
+    Returns
+    -------
+    ndarray
+        Updated covariance matrix.
+    """
+    d = np.atleast_2d(d)
+    if d.shape[1] == 1:
+        d = d.T
+    cov_norm = d.T @ np.array([[normalization_uncertainty**2]]) @ d
+    return cov + cov_norm

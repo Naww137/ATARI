@@ -367,6 +367,7 @@ class transmission_rpi_parameters:
                 if isinstance(param_values, pd.DataFrame):
                     new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
                     df = deepcopy(param_values)
+                    df['ct'] = df['ct'].astype(float) # we are sampling counts as floats
                     df.loc[:,'ct'] = new_c
                     df.loc[:,'dct'] = np.sqrt(new_c)
                     sampled_params[param_name] = df

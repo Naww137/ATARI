@@ -6,7 +6,7 @@ from ATARI.theory.experimental import e_to_t
 import ATARI.utils.hdf5 as h5io
 
 from ATARI.ModelData.particle_pair import Particle_Pair
-from typing import Optional
+from typing import Optional, List
 
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
@@ -43,7 +43,7 @@ class Syndat_Control:
 
     def __init__(self, 
                  particle_pair: Particle_Pair,
-                 syndat_models: list[Syndat_Model],
+                 syndat_models: List[Syndat_Model],
                  model_correlations, 
                  options: syndatOPT
                  ):
@@ -88,7 +88,7 @@ class Syndat_Control:
     def sample(self, 
                sammyRTO=None,
                num_samples=1,
-               pw_true_list: Optional[list[pd.DataFrame]] = None
+               pw_true_list: Optional[List[pd.DataFrame]] = None
                ):
 
         generate_pw_true_with_sammy = False

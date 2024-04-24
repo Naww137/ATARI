@@ -23,36 +23,59 @@ class InitialFBOPT:
         If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
     width_elimination: bool = True
         Option to eliminate resonances during fitting stages based on neutron width.
-    Gn_threshold: bool = True
+    Gn_threshold: Float = 1e-2
         Neutron width threshold for width-based elimination
     decrease_chi2_threshold_for_width_elimination: bool = True
         If running width elimination, decrease the chi2 threshold convergence criteria
-    max_steps: bool = True
+
+    max_steps: int = 50
         Maximum number of steps in non-linear least squares solution scheme.
-    iterations: bool = True
+    iterations: int = 2
         Number of internal SAMMY iterations of G for nonlinearity.
     step_threshold: bool = True
         Chi2 improvement threshold convergence criteria.
+    step_threshold_lag: int = 1
+        Requires a number of steps that the improvement threshold is not met before terminating.
+        Intended to be used with batch settings.
+
     LevMar: bool = True
+        Option to use the Levenberg-Marquardt algorithm.
+    LevMarV: float = 1.5
+        Levenberg-Marquardt dampening parameter up-scaling factor.
+    LevMarVd: float = 5
+        Levenberg-Marquardt dampening parameter down-scaling factor.
 
-    LevMarV: bool = True
+    batch_fitpar: bool = False
+        Option to batch fitting parameters, batches will be done by resonances with fitted parameters determined by fitpar1 or fitpar2 setting.
+    batch_fitpar_ifit = 10
+        Number of resonances to fit per batch.
+    steps_per_batch = 2
+        Number of update steps to take for a given batch.
+    batch_fitpar_random = False
+        Option to randomly assign resonances to a batch, when false, 
+        the number of fitted resonances (determined by batch_fitpar_ifit) is uniformly spaced across the resonance dataframe and shifted by 1.
 
-    LevMarVd: bool = True
+    initial_parameter_uncertainty: float = 0.05
+        Initial fractional parameter uncertainty, will be updated with each step if LevMar=True.
 
-    LevMarV0: bool = True
-    
-    fit_Gg: bool = True
-        Fit gamma width in fit 2.
+    fitpar1: list = [0,0,1]
+        Boolean list for fit 1 that determines which parameters will be optimized (E, Gg, Gn1).
+    fitpar2: list = [1,1,1]
+        Boolean list for fit 2 that determines which parameters will be optimized (E, Gg, Gn1).
     fit_all_spin_groups: bool = True
-
+        Option to initialize feature bank with all spin groups present in particle_pair.
+        If False, spin_group_keys will control which spin groups to use and must be provided.
     spin_group_keys: list = []
+        List of spin group keys (corresponding to spin groups in particle pair) to be used in initialization of feature bank.
+        Only used if fit_all_spin_groups == False.
 
     num_Elam: Optional[int] = None
-        Number of resonance features in starting feature bank for each spin group
+        Number of resonance features in starting feature bank for each spin group.
+        If None, the number of resonance features will be set to approximately 1.6 per eV.
     starting_Gg_multiplier: float = 1.0
-        Factor of average capture width used in initial feature bank
-    starting_Gn1_multiplier: float = 1.0
-        Factor of Q01 neutron width used in initial feature bank
+        Factor of average capture width used in initial feature bank.
+    starting_Gn1_multiplier: float = 50.0
+        Factor of Q01 neutron width used in initial feature bank.
     """
     def __init__(self, **kwargs):
         self._external_resonances = True
@@ -61,16 +84,24 @@ class InitialFBOPT:
         self._Gn_threshold = 1e-2
         self._decrease_chi2_threshold_for_width_elimination = True
 
-        self._max_steps = 30
+        self._max_steps = 50
         self._iterations = 2
         self._step_threshold = 0.001
+        self._step_threshold_lag = 1
+
         self._LevMar = True
         self._LevMarV = 1.5
         self._LevMarVd = 5
-        self._LevMarV0 = 0.05
-        self._batch_fitpar = False
 
-        self._fit_Gg = True
+        self._initial_parameter_uncertainty = 0.05
+
+        self._batch_fitpar = False
+        self._batch_fitpar_ifit = 10
+        self._steps_per_batch = 2
+        self._batch_fitpar_random = False
+
+        self._fitpar1 = [0,0,1]
+        self._fitpar2 = [1,1,1]
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
 
@@ -143,6 +174,13 @@ class InitialFBOPT:
         self._step_threshold = step_threshold
     
     @property
+    def step_threshold_lag(self):
+        return self._step_threshold_lag
+    @step_threshold_lag.setter
+    def step_threshold_lag(self, step_threshold_lag):
+        self._step_threshold_lag = step_threshold_lag
+
+    @property
     def LevMar(self):
         return self._LevMar
     @LevMar.setter
@@ -164,11 +202,11 @@ class InitialFBOPT:
         self._LevMarVd = LevMarVd
 
     @property
-    def LevMarV0(self):
-        return self._LevMarV0
-    @LevMarV0.setter
-    def LevMarV0(self, LevMarV0):
-        self._LevMarV0 = LevMarV0
+    def initial_parameter_uncertainty(self):
+        return self._initial_parameter_uncertainty
+    @initial_parameter_uncertainty.setter
+    def initial_parameter_uncertainty(self, initial_parameter_uncertainty):
+        self._initial_parameter_uncertainty = initial_parameter_uncertainty
 
     @property
     def batch_fitpar(self):
@@ -177,13 +215,40 @@ class InitialFBOPT:
     def batch_fitpar(self, batch_fitpar):
         self._batch_fitpar = batch_fitpar
 
+    @property
+    def batch_fitpar_ifit(self):
+        return self._batch_fitpar_ifit
+    @batch_fitpar_ifit.setter
+    def batch_fitpar_ifit(self, batch_fitpar_ifit):
+        self._batch_fitpar_ifit = batch_fitpar_ifit
 
     @property
-    def fit_Gg(self):
-        return self._fit_Gg
-    @fit_Gg.setter
-    def fit_Gg(self, fit_Gg):
-        self._fit_Gg = fit_Gg
+    def steps_per_batch(self):
+        return self._steps_per_batch
+    @steps_per_batch.setter
+    def steps_per_batch(self, steps_per_batch):
+        self._steps_per_batch = steps_per_batch
+
+    @property
+    def batch_fitpar_random(self):
+        return self._batch_fitpar_random
+    @batch_fitpar_random.setter
+    def batch_fitpar_random(self, batch_fitpar_random):
+        self._batch_fitpar_random = batch_fitpar_random
+
+    @property
+    def fitpar2(self):
+        return self._fitpar2
+    @fitpar2.setter
+    def fitpar2(self, fitpar2):
+        self._fitpar2 = fitpar2
+
+    @property
+    def fitpar1(self):
+        return self._fitpar1
+    @fitpar1.setter
+    def fitpar1(self, fitpar1):
+        self._fitpar1 = fitpar1
 
     @property
     def fit_all_spin_groups(self):
@@ -286,7 +351,8 @@ class InitialFB:
             experiments,
             covariance_data,
             sammyRTO,
-            external_resonance_ladder = pd.DataFrame()
+            external_resonance_ladder = pd.DataFrame()#,
+            # internal_resonance_ladder = None,
             ):
         
         rto = copy(sammyRTO)
@@ -301,12 +367,14 @@ class InitialFB:
         
         ### generate intial_feature bank
         initial_resonance_ladder = get_starting_feature_bank(energy_range,
-                                                             particle_pair,
-                                                             spin_groups,
+                                                            particle_pair,
+                                                            spin_groups,
                                                             num_Elam= self.options.num_Elam,
                                                             starting_Gg_multiplier = self.options.starting_Gg_multiplier,
                                                             starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
-                                                            varyE = 0, varyGg = 0, varyGn1 = 1)
+                                                            varyE = self.options.fitpar1[0], 
+                                                            varyGg = self.options.fitpar1[1], 
+                                                            varyGn1 = self.options.fitpar1[2])
     
         ### setup external resonances
         if self.options.external_resonances:
@@ -330,13 +398,22 @@ class InitialFB:
             max_steps = self.options.max_steps,
             iterations = self.options.iterations,
             step_threshold = self.options.step_threshold,
+            step_threshold_lag = self.options.step_threshold_lag,
+
             LevMar = self.options.LevMar,
             LevMarV = self.options.LevMarV,
             LevMarVd = self.options.LevMarVd,
+
             batch_fitpar = self.options.batch_fitpar,
+            batch_fitpar_ifit = self.options.batch_fitpar_ifit,
+            steps_per_batch = self.options.steps_per_batch,
+            batch_fitpar_random = self.options.batch_fitpar_random,
+
+            external_resonance_indices = external_resonance_indices,
+
             minF = 1e-5,
             maxF = 2.0,
-            initial_parameter_uncertainty = self.options.LevMarV0,
+            initial_parameter_uncertainty = self.options.initial_parameter_uncertainty,
             
             autoelim_threshold = None,
             LS = False,
@@ -353,10 +430,10 @@ class InitialFB:
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
-        if self.options.fit_Gg:
-            internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, varyE=1, varyGg=1, varyGn1=1)
-        else:
-            internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, varyE=1, varyGg=0, varyGn1=1)
+        internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, 
+                                                                 varyE = self.options.fitpar2[0],
+                                                                 varyGg = self.options.fitpar2[1],
+                                                                 varyGn1 = self.options.fitpar2[2])
         reslad_1, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder)
         sammyINPyw.resonance_ladder = reslad_1
 

@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths
 from ATARI.ModelData.particle import Particle, Ta181, Neutron
-from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
 
 
 
@@ -161,7 +161,7 @@ class Particle_Pair:
 
     @property
     def target(self):
-        raise AttributeError('Cannot access target information. It can only be set.')
+        return Particle(Z=0, A=int(round(self._M)), I=self._I, mass=self._M, name=self._isotope)
     @target.setter
     def target(self, target):
         if not isinstance(target, Particle):
@@ -172,7 +172,7 @@ class Particle_Pair:
 
     @property
     def projectile(self):
-        raise AttributeError('Cannot access projectile information. It can only be set.')
+        return Particle(Z=0, A=int(round(self._m)), I=self._i, mass=self._m, name='neutron?')
     @projectile.setter
     def projectile(self, projectile):
         if not isinstance(projectile, Particle):
@@ -272,7 +272,100 @@ class Particle_Pair:
         self.spin_groups[Jpi] = res_par_avg_dict
         return
 
+    def penetration_factor(self, E, l:int):
+        """
+        Calculates the penetration factor for the given particle pair.
 
+        Parameters
+        ----------
+        E : float, array-like
+            Resonance energy.
+        l : int
+            The orbital angular momentum quantum number.
+        
+        Returns
+        -------
+        P : float, array-like
+            The penetration factor.
+        """
+        S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.M, self.m, l)
+        return P
+    def gn2_to_Gn(self, gn2, E, l:int):
+        """
+        Converts reduced neutron widths to partial neutron widths.
+
+        Parameters
+        ----------
+        gn2 : float, array-like
+            Reduced neutron widths.
+        E : float, array-like
+            Resonance energy.
+        l : int
+            The orbital angular momentum quantum number.
+
+        Returns
+        -------
+        Gn : float, array-like
+            Partial neutron widths.
+        """
+        P = self.penetration_factor(np.array(E), l)
+        Gn = g2_to_G(np.array(gn2), P)
+        return Gn
+    def Gn_to_gn2(self, Gn, E, l:int):
+        """
+        Converts partial neutron widths to reduced neutron widths.
+
+        Parameters
+        ----------
+        Gn : float, array-like
+            Partial neutron widths.
+        E : float, array-like
+            Resonance energy.
+        l : int
+            The orbital angular momentum quantum number.
+
+        Returns
+        -------
+        gn2 : float, array-like
+            Reduced neutron widths.
+        """
+        P = self.penetration_factor(np.array(E), l)
+        gn2 = G_to_g2(np.array(Gn), P)
+        return gn2
+    def gg2_to_Gg(self, gg2):
+        """
+        Converts reduced capture widths to partial capture widths.
+
+        Parameters
+        ----------
+        gg2 : float, array-like
+            Reduced capture widths.
+
+        Returns
+        -------
+        Gg : float, array-like
+            Partial capture widths.
+        """
+        P = 1.0 # penetrability is 1 for capture widths
+        Gg = g2_to_G(np.array(gg2), P)
+        return Gg
+    def Gg_to_gg2(self, Gg):
+        """
+        Converts partial capture widths to reduced capture widths.
+
+        Parameters
+        ----------
+        Gg : float, array-like
+            Partial capture widths.
+
+        Returns
+        -------
+        gg2 : float, array-like
+            Reduced capture widths.
+        """
+        P = 1.0 # penetrability is 1 for capture widths
+        gg2 = G_to_g2(np.array(Gg), P)
+        return gg2
 
     def map_quantum_numbers(self, print_out):
         """
@@ -466,9 +559,57 @@ class Particle_Pair:
 
         return sgstring
 
+    def expand_ladder(self, resonance_ladder=None):
+        """
+        Expands the columns of the resonance ladder to include both reduced widths and full widths
+        for neutron and capture widths, and L, and Jpi values.
 
+        Parameters
+        ----------
+        resonance_ladder: Dataframe, optional
+            The resonance ladder. If not provided, the true dataframe from particle_pair is used.
+        
+        Returns
+        -------
+        resonance_ladder: Dataframe
+            The updated resonance ladder.
+        """
 
+        true_ladder = (resonance_ladder is None)
+        if true_ladder:
+            resonance_ladder = self.resonance_ladder
 
+        if ('J_ID' in resonance_ladder) and ('Jpi' not in resonance_ladder):
+            for Jpi, spin_group in self.spin_groups.items():
+                resonance_ladder.loc[resonance_ladder['J_ID'] == spin_group['J_ID'], 'Jpi'] = Jpi
+                
+        if ('J_ID' in resonance_ladder) and ('L' not in resonance_ladder):
+            for spin_group in self.spin_groups.values():
+                resonance_ladder.loc[resonance_ladder['J_ID'] == spin_group['J_ID'], 'L'] = spin_group['Ls']
+
+        if ('Gg' in resonance_ladder) and ('gg2' not in resonance_ladder):
+            resonance_ladder['gg2'] = self.Gg_to_gg2(resonance_ladder['Gg'])
+        elif ('Gg' not in resonance_ladder) and ('gg2' in resonance_ladder):
+            resonance_ladder['Gg'] = self.gg2_to_Gg(resonance_ladder['gg2'])
+
+        if ('E' in resonance_ladder) and ('L' in resonance_ladder):
+            if ('Gn1' in resonance_ladder) and ('gn2' not in resonance_ladder):
+                resonance_ladder['gn2'] = np.nan
+                for l in resonance_ladder['L'].unique():
+                    sub_ladder = resonance_ladder[resonance_ladder['L'] == l]
+                    gn2 = self.Gn_to_gn2(sub_ladder['Gn1'], sub_ladder['E'], int(l)).reshape(-1,)
+                    resonance_ladder.loc[resonance_ladder['L'] == l, 'gn2'] = gn2
+            elif ('Gn1' not in resonance_ladder) and ('gn2' in resonance_ladder):
+                resonance_ladder['Gn1'] = np.nan
+                for l in resonance_ladder['L'].unique():
+                    sub_ladder = resonance_ladder[resonance_ladder['L'] == l]
+                    Gn1 = self.gn2_to_Gn(sub_ladder['gn2'], sub_ladder['E'], int(l)).reshape(-1,)
+                    resonance_ladder.loc[resonance_ladder['L'] == l, 'Gn1'] = Gn1
+
+        if true_ladder:
+            self.resonance_ladder = resonance_ladder
+
+        return resonance_ladder
 
 # class Particle_Pair:
 #     """

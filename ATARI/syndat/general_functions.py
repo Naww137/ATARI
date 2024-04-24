@@ -158,13 +158,13 @@ def bkg_func_power(tof,a,b):
     return a*(tof)**(-b)
 
 
-def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo):
+def approximate_gamma_background_spectrum(energy_grid, smooth, FP, t0, trigo, nominal=25):
     # background_spectrum_bg= pd.DataFrame({'c'    :   np.ones(len(exp_model.energy_grid))*25,
     #                                  'dc'   :   np.ones(len(exp_model.energy_grid))*np.sqrt(25)})
 
     # calculate a tof count rate spectra, convert to counts 
     tof = e_to_t(energy_grid, FP, True)*1e9 + t0 
-    cps_open_approx = np.ones(len(energy_grid))*25
+    cps_open_approx = np.ones(len(energy_grid))*nominal
     bin_width = abs(np.append(np.diff(tof), np.diff(tof)[-1])*1e-9)
     cts_open_approx = cps_open_approx * bin_width * trigo
 

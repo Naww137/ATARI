@@ -2,7 +2,69 @@ import pandas as pd
 import numpy as np
 from ATARI.theory.scattering_params import FofE_recursive
 from copy import deepcopy, copy
+import pickle
+import os
+from typing import Union
+from ATARI.syndat.control import Syndat_Control
+from ATARI.syndat.syndat_model import Syndat_Model
 
+
+
+# ----------------------------------------------------------------------------------
+# Syndat saving and loading functions
+# ----------------------------------------------------------------------------------
+
+def save_syndat_model(syndat_model: Syndat_Model, 
+                      path: str,
+                      clear_samples: bool = True):
+    assert isinstance(syndat_model, Syndat_Model)
+
+    if clear_samples:
+        syndat_model.clear_samples()
+
+    try:
+        file = open(path, "wb")
+        pickle.dump(syndat_model, file)
+        file.close()
+    except:
+        if not clear_samples:
+            raise ValueError("Pickling syndat model failed and clear_samples is False, make sure samples for this syndat_model were not generated with syndat_control.")
+        else:
+            raise ValueError("Pickling syndat model failed, cause is unknown")
+        
+
+def save_syndat_control(syndat_control: Syndat_Control, 
+                        path: str,
+                        clear_samples: bool = False):
+    if clear_samples:
+        raise ValueError("Not implemented")
+
+    file = open(path, "wb")
+    pickle.dump(syndat_control, file)
+    file.close()
+
+def load_syndat(filepath: str) -> Union[Syndat_Model, Syndat_Control]:
+    file = open(filepath, "rb")
+    syndat = pickle.load(file)
+    file.close()
+    return syndat
+
+
+def save_general_object(object, 
+                        path: str,
+                        ):
+    try:
+        file = open(path, "wb")
+        pickle.dump(object, file)
+        file.close()
+    except:
+        raise ValueError("Pickling syndat model failed, cause is unknown")
+    
+def load_general_object(filepath: str):
+    file = open(filepath, "rb")
+    obj = pickle.load(file)
+    file.close()
+    return obj
 
 # ----------------------------------------------------------------------------------
 # User interface functions
@@ -27,6 +89,27 @@ def update_dict(old, additional):
 # ----------------------------------------------------------------------------------
 # ATARI internal object utilities
 # ----------------------------------------------------------------------------------
+
+
+def get_explicit_covariance_from_cov_data_dict(covariance_data: dict):
+    """
+    Expands implicit covariance data (in dictionary) to the full, explicit data covariance matrix.
+
+    Parameters
+    ----------
+    covariance_data : dict
+        Dictionary containing elements of the implicit data covariance.
+
+    Returns
+    -------
+    ndarray
+        Explicit data covariance matrix
+    """
+    # mask = (exp_cov['diag_stat'].index>=min_max_E[0]) & (exp_cov['diag_stat'].index<=min_max_E[1])
+    # J = exp_cov['Jac_sys'].values[:, mask]
+    # covs.append(np.diag(exp_cov['diag_stat'][mask]['var_stat'].values) + J.T @ exp_cov['Cov_sys'] @ J)
+
+    return np.diag(covariance_data['diag_stat']['var_stat'].values) + covariance_data['Jac_sys'].values.T @ covariance_data['Cov_sys'] @ covariance_data['Jac_sys'].values
 
 
 

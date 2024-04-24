@@ -3,470 +3,18 @@
 import numpy as np
 import os
 import shutil
-from pathlib import Path
-# from ATARI.theory import scattering_params
 import pandas as pd
 import subprocess
 from copy import copy
-
-# from ATARI.utils.atario import fill_resonance_ladder
-from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.stats import chi2_val
 
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData, SammyInputDataYW
 
 from typing import Optional, Union
 from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
-
+from ATARI.sammy_interface.sammy_io import *
 
 # module_dirname = os.path.dirname(__file__)
-
-# =============================================================================
-#  Readers
-# =============================================================================
-def readlst(filepath):
-    """
-    Reads a sammy .lst or .dat file.
-
-    _extended_summary_
-
-    Parameters
-    ----------
-    filepath : str
-        Full path to the .lst or .dat file.
-
-    Returns
-    -------
-    DataFrame
-        DataFrame with headers.
-    """
-    if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
-        if df.index.equals(pd.RangeIndex(len(df))):
-            pass
-        else:
-            df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
-    else:
-        df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
-    return df
-
-def readpar(filepath):
-    """
-    Reads a sammy .par file.
-
-    Parameters
-    ----------
-    filepath : str
-        Full path to the .par file you want to read
-
-    Returns
-    -------
-    DataFrame
-        DataFrame with appropriately names columns
-    """
-    column_widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
-    data = []
-    with open(filepath, 'r') as file:
-        lines = file.readlines()
-        for line in lines:
-
-            if line.isspace():
-                break # end of resonance region
-
-            row = []
-            start = 0
-            for iw, width in enumerate(column_widths):
-                value = line[start:start+width].strip()
-                if value == '':
-                    value = None
-                else:
-                    # if iw == 0: # energy can be negative
-                        # value = float(value)
-                    # else: # widths cannots
-                    try:
-                        value = float(value)
-                    except:
-                        sign='+'
-                        splitvals = value.split('-')
-                        if splitvals[0] == '':
-                            splitvals = splitvals[1::]
-                            sign = '-'
-
-                        if len(splitvals) == 1:
-                            splitvals = splitvals[0].split('+')
-                            if splitvals[0] == '':
-                                splitvals = splitvals[1::]
-                                sign = '+'
-                            joiner = 'e+'
-
-                        else:
-                            joiner = 'e-'
-
-                        if sign == '-':
-                            value = -float(joiner.join(splitvals))
-                        else:
-                            value = float(joiner.join(splitvals))
-                            
-
-                row.append(value)
-                start += width
-            data.append(row)
-    df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
-    return df.dropna(axis=1)
-
-
-def read_ECSCM(file_path):
-    """
-    Reads a sammy generated ECSCM in as a pandas dataframe.
-
-    Parameters
-    ----------
-    file_path : str
-        Path to the sammy generated SAMCOV.PUB file.
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-
-    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
-    df_tdte = data.iloc[:,0:3]
-    df_tdte.columns = ["theo", "theo_unc", "E"]
-
-    # assert top rows == left columns
-    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
-    dftest=dftest.T
-    dftest.columns = ["theo", "theo_unc", "E"]
-    assert(np.all(dftest == df_tdte))
-
-    dfcov = data.iloc[:, 3:]
-
-    return df_tdte, dfcov
-
-# =============================================================================
-# Sammy Parameter File
-# =============================================================================
-def format_float(value, width, sep=''):
-    formatted_value = f'{abs(value):0<15f}'  
-
-    if value < 0:
-        formatted_value = f'{sep}-' + formatted_value
-    else:
-        formatted_value = f'{sep} ' + formatted_value
-
-    if len(formatted_value) > width:
-        formatted_value = formatted_value[:width]
-
-    return formatted_value
-
-
-def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
-    df = copy(df)
-    def gn2G(row):
-        _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
-        Gn = 2*np.sum(P)*row.gn2
-        return Gn.item()
-    
-    def nonzero_ifvary(row):
-        for par in ["E", "Gg", "Gn1", "Gn2", "Gn3"]:
-            if row[f"vary{par}"] == 1.0 and row[par] < 1e-5:
-                row[par] = 1e-5
-        return row
-
-    cols = df.columns.values
-    if "Gn1" not in cols:
-        if "Gn" not in cols:
-            if "gn2" not in cols:
-                raise ValueError("Neutron width (Gn1, Gn, gn2) not in parameter dataframe.")
-            else:
-                df["Gn1"] = df.apply(lambda row: gn2G(row), axis=1)
-        else:
-            df.rename(columns={"Gn":"Gn1"}, inplace=True)
-    if "Gg" not in cols:
-        if "Gt" not in cols:
-            raise ValueError("Gg nor Gt in parameter dataframe")
-        else:
-            df['Gg'] = df['Gt'] - df['Gn1']
-
-    for vary in ["varyE", "varyGg", "varyGn1", "varyGn2", "varyGn3"]:
-        if vary not in cols:
-            if vary_parm:
-                df[vary] = np.ones(len(df))
-            else:
-                df[vary] = np.zeros(len(df))
-
-    if "Gn2" not in cols:
-        df["Gn2"] = np.zeros(len(df))
-        df["varyGn2"] = np.zeros(len(df))
-    if "Gn3" not in cols:
-        df["Gn3"] = np.zeros(len(df))
-        df["varyGn3"] = np.zeros(len(df))
-
-    # if a parameter (width) is zero and it is varied then make it 1e-5
-    df = df.apply(nonzero_ifvary, axis=1)
-
-    # must have J_ID
-    if "J_ID" not in cols:
-        if J_ID is None:
-            raise ValueError("J_ID not in ladder nor provided as input")
-        else:
-            df["J_ID"] = J_ID
-
-    return df
-
-def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
-                                    # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
-    """
-    Writes a formatted sammy.par file.
-
-    This function writes a formatted sammy parameter file from a DataFrame containing resonance parameters.
-    The DataFrame may have
-
-    Parameters
-    ----------
-    df : DataFrame
-        _description_
-    pair : object
-        The pair object is of the particle_pair class in Syndat describing the incident and target particles.
-    vary_parm : Bool
-        Option to set vary parameters (0 or 1) in sammy.par file.
-    initial_parameter_uncertainty : float
-        Global initial parameter uncertainty for Bayes solve.
-    filename : str
-        Filepath/name of sammy.par file being created.
-    template : str, optional
-        Filepath to template file for sammy.par. Included because of the different options for input to sammy, by default None and the SAMMY parameter file will only contain resonance parameters.
-    """
-
-    if df.empty:
-        par_array = []
-    else:
-        df = fill_sammy_ladder(df, pair, vary_parm)
-        par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
-
-        if np.any([each is None for each in df.J_ID]):
-            raise ValueError("NoneType was passed as J_ID in the resonance ladder")
-
-    widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
-    with open(filename, 'w') as file:
-        for row in par_array:
-            for icol, val in enumerate(row):
-                column_width = widths[icol]
-                formatted_value = format_float(val, column_width)
-                file.write(formatted_value)
-            file.write('\n')
-        file.write(f'\n{initial_parameter_uncertainty}\n')
-        
-    
-    return
-        
-      
-
-# ################################################ ###############################################
-# sammy data file
-# ################################################ ###############################################
-
-def write_estruct_file(Energies, filename):
-    # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
-    if np.all([isinstance(E,float) for E in Energies]):
-        pass
-    else:
-        Energies = np.array([float(E) for E in Energies])
-    with open(filename,'w') as f:
-        for ept in Energies:
-            f.write(f'{ept:0<19} {1.0:<19} {1.0:0<7}\n')
-        f.close()
-    return
-
-def write_samdat(exp_pw, exp_cov, filename):
-    """
-    Writes a formatted sammy.dat file.
-
-    These DataFrame keys required correspond to the "trans" DataFrame generated by Syndat.
-    This is an attribute of the experiment object once the experiment is "run".
-    The uncertainty on the experimental data point must be absolute for this formatting as it corresponds to the
-    sammy format with "use twenty significant digits" or "twenty" in the input file. If this flag is not in the
-    sammy input file, the uncertainty should not be absolute and the formatting (space between variables) changes.
-
-    Parameters
-    ----------
-    exp_pw : DataFrame
-        DataFrame containing experimental measurement data, requires columns ["E", "exp"].
-    exp_cov: DataFrame or None
-        DataFrame containting experimental measurement covariance.
-    filename : str
-        Filepath/name for the sammy.dat file being created.
-
-    Raises
-    ------
-    ValueError
-        Energy column not in DataFrame.
-    ValueError
-        Experimental measurement column not in DataFrame.
-    ValueError
-        Experimental measurement uncertainty column not in DataFrame.
-    """
-
-    if 'exp' not in exp_pw:
-        if 'exp_trans' in exp_pw:
-            exp_pw.rename(columns={'exp_trans':'exp', 'exp_trans_unc': 'exp_unc'}, inplace=True)
-        elif 'exp_dat' in exp_pw:
-            exp_pw.rename(columns={'exp_dat':'exp', 'exp_dat_unc': 'exp_unc'}, inplace=True)
-        else:
-            ValueError("Data passed to 'write_expdat_file' does not have the column 'exp'")
-
-    # print("WARNING: if 'twenty' is not specified in sammy.inp, the data file format will change.\nSee 'sammy_interface.write_estruct_file'")
-    if 'exp_unc' not in exp_pw:
-        exp_pw['exp_unc'] = np.sqrt(np.diag(exp_cov))
-    
-    iterable = exp_pw.sort_values('E', axis=0, ascending=True).to_numpy(copy=True)
-    cols = exp_pw.columns
-    if 'E' not in cols:
-        raise ValueError("Data passed to 'sammy_functions.write_expdat_file' does not have the column 'E'")
-    if 'exp' not in cols:
-        raise ValueError("Data passed to 'sammy_functions.write_expdat_file' does not have the column 'exp'")
-
-    iE = cols.get_loc('E')
-    iexp = cols.get_loc('exp')
-    idT = cols.get_loc('exp_unc')
-    
-
-    with open(filename,'w') as f:
-        for each in iterable:
-            f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
-        f.close()
-
-
-def write_idc(filepath, J, C, stat):
-    with open(filepath, 'w+') as f:
-        f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
-        f.write(f"FREE-FORMAt partial derivatives\n")
-        width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
-
-        for E, data in J.items():
-            formatted_E = format_float(E, width)
-            f.write(formatted_E)
-            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
-            f.write(formatted_data_stat_unc)
-            for derivative in data:
-                formatted_derivative = format_float(derivative, width, sep=' ')
-                f.write(formatted_derivative)
-            f.write('\n')
-
-        f.write("\nUNCERTAINTies on data- reduction parameters\n")
-        for sys_uncertainty in np.sqrt(np.diag(C)):
-            formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
-            f.write(formatted_uncertainty)
-        f.write("\n\n")
-        
-        f.write("CORRELATIOns for data-reduction parameters")
-        for i, row in enumerate(C):
-            for corr in row[0:i]:
-                formatted_correlation = format_float(corr, width, sep=' ')
-                f.write(formatted_correlation)
-            f.write("\n")
-            
-
-
-# ################################################ ###############################################
-# Sammy Input file
-# ################################################ ###############################################
-
-def create_sammyinp(filename='sammy.inp', \
-                    template=os.path.join(Path(os.path.dirname(__file__)).parents[0],'templates/sammy_template.inp') ):
-    
-    with open(template, 'r') as f:
-        template_lines = f.readlines()
-    f.close()
-    
-    with open(filename,'w+') as f:
-        for line in template_lines:
-            f.write(line)
-        f.close()
-        
-    return
-
-def write_saminp(filepath, 
-                particle_pair,
-                experimental_model,
-                rto,
-                alphanumeric = None,
-                use_IDC = False,
-                use_ecscm_reaction = False):
-    
-    if alphanumeric is None:
-        alphanumeric = []
-    if use_ecscm_reaction:
-        reaction = rto.ECSCM_rxn
-    else:
-        reaction = experimental_model.reaction
-        
-    # ac = sammy_INP.particle_pair.ac*10  
-    broadening = True
-    
-    if rto.bayes:
-        bayes_cmd = "SOLVE BAYES EQUATIONS"
-    else:
-        bayes_cmd = "DO NOT SOLVE BAYES EQUATIONS"
-    if use_IDC:
-            alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
-    
-    alphanumeric = [particle_pair.formalism, bayes_cmd] + alphanumeric
-
-    with open(filepath,'r') as f:
-        old_lines = f.readlines()
-
-    with open(filepath,'w') as f:
-        for line in old_lines:
-
-            if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
-                broadening = False
-
-            if line.startswith("%%%alphanumeric%%%"):
-                for cmd in alphanumeric:
-                    f.write(f'{cmd}\n')
-            
-            elif line.startswith("%%%card2%%%"):
-                f.write(f"{particle_pair.isotope: <9} {particle_pair.M:<9.8} {float(min(experimental_model.energy_range)):<9.8} {float(max(experimental_model.energy_range)):<9.8}      {rto.options['iterations']: <5} \n")
-
-
-            elif line.startswith('%%%card5/6%%%'):
-                if broadening:
-                    f.write(f'  {float(experimental_model.temp[0]):<8.7}  {float(experimental_model.FP[0]):<8.7}  {float(experimental_model.FP[1]):<8.7}        \n')
-                else:
-                    pass
-
-            elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {float(particle_pair.ac)*10:<8.7}  {float(experimental_model.n[0]):<8.7}                       0.00000          \n')
-
-            elif line.startswith('%%%card8%%%'):
-                f.write(f'{reaction}\n')
-
-            else:
-                f.write(line)
-
-
-           
-
-def make_runDIR(sammy_runDIR):
-    if os.path.isdir(sammy_runDIR):
-        pass
-    else:
-        os.mkdir(sammy_runDIR)
-
-def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
-
-    if os.path.basename(input_template) == input_template:
-        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sammy_templates', input_template)
-    else:
-        template_path = input_template
-
-    shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
-
-
-
-
 
 # ################################################ ###############################################
 # Workflow
@@ -610,17 +158,32 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 
 
 def get_ECSCM(sammyRTO, sammyINP):
+    if sammyINP.ECSCM_experiment is None:
+        print("No specific ECSCM experiment class was given, using the same experiment model as used to fit")
+        exp = sammyINP.experiment
+    else:
+        exp = sammyINP.ECSCM_experiment 
 
     # update_input_files(sammy_INP, sammy_RTO)
-    fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    fill_runDIR_with_templates(exp.template, "sammy.inp", sammyRTO.sammy_runDIR)
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
-                 sammyINP.particle_pair, 
-                 sammyINP.experiment, 
-                 sammyRTO,
-                 alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
-                 use_ecscm_reaction = True)
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes       =   sammyRTO.bayes,
+                iterations  =   sammyRTO.iterations,
+                formalism   =   sammyINP.particle_pair.formalism,
+                isotope     =   sammyINP.particle_pair.isotope,
+                M           =   sammyINP.particle_pair.M,
+                ac          =   sammyINP.particle_pair.ac*10,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,
+                alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
+                )
+    
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
     _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
 
@@ -674,6 +237,13 @@ def check_inputs(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied (only an energy grid)")
             else: 
                 raise ValueError("Run Bayes is set to True but no experimental data was supplied")
+    if sammyRTO.get_ECSCM:
+        if not sammyRTO.bayes:
+            raise ValueError("get_ECSCM is set to True but bayes is False")
+    if sammyINP.experimental_data is None:
+        if sammyINP.energy_grid is None: 
+            raise ValueError("No energy grid was provided")
+
 
 def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 
@@ -693,24 +263,40 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                   sammyINP.experimental_covariance['Jac_sys'],
                   sammyINP.experimental_covariance['Cov_sys'],
                   sammyINP.experimental_covariance['diag_stat'])
+        #TODO: Filter idc dataframe
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
+        #TODO: Filter idc dataframe
         idc = True
     else:
+        if sammyINP.experimental_covariance is not None:
+            raise ValueError("Unknown type passed to sammyINP.experimental_covariance")
         idc = False
 
     write_sampar(sammyINP.resonance_ladder, 
                  sammyINP.particle_pair, 
                  sammyINP.initial_parameter_uncertainty,
                  os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
-    fill_runDIR_with_templates(sammyINP.template, 
+    fill_runDIR_with_templates(sammyINP.experiment.template, 
                                "sammy.inp", 
                                sammyRTO.sammy_runDIR)
-    write_saminp(os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"), 
-                 sammyINP.particle_pair, 
-                 sammyINP.experiment, 
-                 sammyRTO,use_IDC=idc)
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes       =   sammyRTO.bayes,
+                iterations  =   sammyRTO.iterations,
+                formalism   =   sammyINP.particle_pair.formalism,
+                isotope     =   sammyINP.particle_pair.isotope,
+                M           =   sammyINP.particle_pair.M,
+                ac          =   sammyINP.particle_pair.ac*10,
+                reaction    =   sammyINP.experiment.reaction,
+                energy_range=   sammyINP.experiment.energy_range,
+                temp        =   sammyINP.experiment.temp,
+                FP          =   sammyINP.experiment.FP,
+                n           =   sammyINP.experiment.n,
+                use_IDC=idc
+                )
+                
     write_shell_script(sammyINP, 
                        sammyRTO, 
                        use_RPCM=False, 
@@ -757,8 +343,9 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
 # run sammy with the YW scheme
 ########################################################## ###############################################
 
+
 def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOptions, idc_list: list):
-    temp_RTO = copy(sammyRTO)
+
     #### make files for each dataset YW generation
     exp, idc_bool = sammyINPYW.experiments[0], idc_list
     for exp, idc_bool in zip(sammyINPYW.experiments, idc_list):  # fix this !!
@@ -766,22 +353,60 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
             idc_flag = ["USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX"]
         else:
             idc_flag = []
-
-        temp_RTO.bayes = True
-        temp_RTO.options["bayes"] = True
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=["yw"]+idc_flag)
-
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=["yw","Use remembered original parameter values"]+idc_flag)
-
-        temp_RTO.bayes = False
-        temp_RTO.options["bayes"] = False
-        fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", temp_RTO.sammy_runDIR)
-        write_saminp(os.path.join(temp_RTO.sammy_runDIR, f"{exp.title}_plot.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                    alphanumeric=[]+idc_flag)
+        ### make YWY initial
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
+        write_saminp(
+                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
+                    bayes       =   True,
+                    iterations  =   sammyRTO.iterations,
+                    formalism   =   sammyINPYW.particle_pair.formalism,
+                    isotope     =   sammyINPYW.particle_pair.isotope,
+                    M           =   sammyINPYW.particle_pair.M,
+                    ac          =   sammyINPYW.particle_pair.ac*10,
+                    reaction    =   exp.reaction,
+                    energy_range=   exp.energy_range,
+                    temp        =   exp.temp,
+                    FP          =   exp.FP,
+                    n           =   exp.n,
+                    # use_IDC=idc,
+                    alphanumeric=["yw"]+idc_flag
+                                    )
+        ### make YWY for iterations
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
+        write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
+                bayes       =   True,
+                iterations  =   sammyRTO.iterations,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   sammyINPYW.particle_pair.ac*10,
+                reaction    =   exp.reaction,
+                energy_range=   exp.energy_range,
+                temp        =   exp.temp,
+                FP          =   exp.FP,
+                n           =   exp.n,
+                # use_IDC=idc,
+                alphanumeric=["yw","Use remembered original parameter values"]+idc_flag
+                )
+        ### make plotting
+        fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
+        write_saminp(
+                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
+                    bayes       =   False,
+                    iterations  =   sammyRTO.iterations,
+                    formalism   =   sammyINPYW.particle_pair.formalism,
+                    isotope     =   sammyINPYW.particle_pair.isotope,
+                    M           =   sammyINPYW.particle_pair.M,
+                    ac          =   sammyINPYW.particle_pair.ac*10,
+                    reaction    =   exp.reaction,
+                    energy_range=   exp.energy_range,
+                    temp        =   exp.temp,
+                    FP          =   exp.FP,
+                    n           =   exp.n,
+                    # use_IDC=idc,
+                    alphanumeric=[]+idc_flag
+                    )
     
     ### options for least squares
     if sammyINPYW.LS:
@@ -789,16 +414,42 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
     else:
         alphanumeric_LS_opts = []
 
-    #### make files for solving bayes reading in each YW matrix  -- # TODO: I should define a better template/exp here
-    fill_runDIR_with_templates(exp.template, "solvebayes_initial.inp", temp_RTO.sammy_runDIR)
-    temp_RTO.bayes = True
-    temp_RTO.options["bayes"] = True
-    write_saminp(os.path.join(temp_RTO.sammy_runDIR,"solvebayes_initial.inp"), sammyINPYW.particle_pair, exp, temp_RTO,   
-                                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts)
-
-    fill_runDIR_with_templates(exp.template, "solvebayes_iter.inp" , temp_RTO.sammy_runDIR)
-    write_saminp(os.path.join(temp_RTO.sammy_runDIR, "solvebayes_iter.inp"), sammyINPYW.particle_pair, exp, temp_RTO,
-                                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts )
+    ### solve bayes with YWY matrices initial - don't need experimental description
+    fill_runDIR_with_templates(exp.template, "solvebayes_initial.inp", sammyRTO.sammy_runDIR) # need to remove resolutin function from template
+    remove_resolution_function_from_template(os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"))
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"solvebayes_initial.inp"),
+                bayes       =   True,
+                iterations  =   0,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   0.0,
+                reaction    =   'REACTION',
+                energy_range=   (0.0, 0.0),
+                temp        =   (0.0, 0.0),
+                FP          =   (0.0, 0.0),
+                n           =   (0.0, 0.0),
+                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Remember original parameter values"]+alphanumeric_LS_opts
+                )
+    ### solve bayes with YWY matrices iterations - don't need experimental description
+    fill_runDIR_with_templates(exp.template, "solvebayes_iter.inp" , sammyRTO.sammy_runDIR)
+    remove_resolution_function_from_template(os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"))
+    write_saminp(
+                filepath   =    os.path.join(sammyRTO.sammy_runDIR, "solvebayes_iter.inp"),
+                bayes       =   True,
+                iterations  =   0,
+                formalism   =   sammyINPYW.particle_pair.formalism,
+                isotope     =   sammyINPYW.particle_pair.isotope,
+                M           =   sammyINPYW.particle_pair.M,
+                ac          =   0.0,
+                reaction    =   'REACTION',
+                energy_range=   (0.0, 0.0),
+                temp        =   (0.0, 0.0),
+                FP          =   (0.0, 0.0),
+                n           =   (0.0, 0.0),       
+                alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts
+                )
 
 def filter_idc(filepath, pw_df):
     minE = np.min(pw_df.E)
@@ -840,6 +491,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
             if isinstance(cov, dict) and len(cov)>0:
                 write_idc(os.path.join(rundir, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
+                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
@@ -902,6 +554,21 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
             f.write(f"##################################\n# Generate YW for {ds}\n")
             f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n")
             f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
+        f.write("################# read chi2 #######################\n#\n")
+        for ds in dataset_titles:
+            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
+            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
+            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $chi2_string_{ds}")
+        f.write(""""\n""")
+        f.write("""\necho "$1""")
+        for ds in dataset_titles:
+            f.write(f" $ndat_string_{ds}")
+        f.write(""""\n""")
+
     with open(os.path.join(rundir,"BAYiter.sh"), 'w') as f:
         dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
         title = f"bayes_iter$plus_one"
@@ -956,27 +623,38 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 
 
 
-def iterate_for_nonlin_and_update_step_par(iterations, step, rundir):
+def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
                             capture_output=True, timeout=60*10
                             )
-
+    chi2_old = np.inf
     for i in range(1, iterations+1):
-        runsammy_ywy0 = subprocess.run(
+        runsammy_ywyiter = subprocess.run(
                                     ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*10
+                                    capture_output=True, text=True, timeout=60*10
                                     )
 
-        runsammy_bay0 = subprocess.run(
+        runsammy_bayiter = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
                                     capture_output=True, timeout=60*10
                                     )
+        
+        i_chi2s = [float(s) for s in runsammy_ywyiter.stdout.split('\n')[-3].split()]
+        chi2 = np.sum(i_chi2s[1:])
+        if np.isclose(chi2, chi2_old):
+            print(f"{lead}\tConverged step at {i} iterations")
+            break   
+        else:
+            chi2_old = chi2
+
+    if i == iterations:
+        print(f"\t{lead}Step did not converge {i} iterations")
 
     # Move par file from final iteration 
     out = subprocess.run(
         ["sh", "-c", 
-        f"""head -$(($(wc -l < iterate/bayes_iter{iterations+1}.par) - 1)) iterate/bayes_iter{iterations+1}.par > results/step{step+1}.par"""],
+        f"""head -$(($(wc -l < iterate/bayes_iter{i+1}.par) - 1)) iterate/bayes_iter{i+1}.par > results/step{step+1}.par"""],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
     
 
@@ -1004,11 +682,74 @@ mv "results/temp" "results/step{step}.par" """],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
 
+def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
+    # if True:# sammyINPyw.batch_reduce_width:
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    proportion = 0.
+    factor = np.random.rand(len(df))
+    factor[factor <= proportion] = 0.75
+    factor[factor != 1] = 1
+    # df['Gg'] = df['Gg']*factor
+    df['Gn1'] = df['Gn1']*factor
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
 
+
+def get_batch_vector(vector_length, num_ones, ibatch):
+    vector = np.zeros(vector_length)
+    indices = np.arange(0, vector_length, int(vector_length/num_ones))
+    vector[indices] = 1
+
+    if ibatch%vector_length == 0:
+        return vector
+    else:
+        return np.roll(vector, ibatch)
+    
+
+### temporary functions here
+def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
+    if external_resonance_indices is None: external_resonance_indices = []
+    external_resonance_ladder = resonance_ladder.iloc[external_resonance_indices, :]
+    internal_resonance_ladder = copy(resonance_ladder)
+    internal_resonance_ladder.drop(index=external_resonance_indices, inplace=True)
+    return internal_resonance_ladder, external_resonance_ladder
+def concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder):
+    if external_resonance_ladder.empty:
+        resonance_ladder = internal_resonance_ladder
+        external_resonance_indices = []
+    else:
+        resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
+        external_resonance_indices = list(range(len(external_resonance_ladder)))
+    return resonance_ladder, external_resonance_indices
+    
+def batch_fitpar(rundir, istep, sammyINPyw, fudge):
+
+    parfile = os.path.join(rundir,'results',f'step{istep}.par')
+    df = readpar(parfile)
+    df_internal, df_external = separate_external_resonance_ladder(df, sammyINPyw.external_resonance_indices)
+    varyE = np.any(df_internal['varyE']==1)
+    varyGg = np.any(df_internal['varyGg']==1)
+    varyGn1 = np.any(df_internal['varyGn1']==1)
+
+    numpar = len(df_internal)
+    if sammyINPyw.batch_fitpar_random:
+        proportion_ones = sammyINPyw.batch_fitpar_ifit/numpar
+        vary = np.random.rand(numpar)
+        vary[vary <= proportion_ones] = 1
+        vary[vary != 1] = 0
+    else:
+        vary = get_batch_vector(numpar, sammyINPyw.batch_fitpar_ifit, int(istep/sammyINPyw.steps_per_batch))
+
+    df_internal['varyE'] = vary*varyE
+    df_internal['varyGg'] = vary*varyGg
+    df_internal['varyGn1'] = vary*varyGn1
+    df, _ = concat_external_resonance_ladder(df_internal, df_external)
+    write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)    
 
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     istep = 0
+    no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
@@ -1016,37 +757,18 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
     while istep<sammyINPyw.max_steps:
-        
+            
         if sammyINPyw.batch_fitpar:
-            parfile = os.path.join(rundir,'results',f'step{istep}.par')
-            df = readpar(parfile)
-            varyE = np.any(df['varyE']==1)
-            varyGg = np.any(df['varyGg']==1)
-            varyGn1 = np.any(df['varyGn1']==1)
-
-            # if istep % 2 == 0:
-            #     # vary = np.tile([0,0,1,1], int(len(df)/4))
-            #     pattern = np.array([0,0,1,1])
-            # else:
-            #     # vary =  np.tile([1,1,0,0], int(len(df)/4))
-            #     pattern = np.array([1,1,0,0])
-            # Set the proportion of ones
-            proportion_ones = 0.5
-            vary = np.random.rand(len(df))
-            vary[vary <= proportion_ones] = 1
-            vary[vary != 1] = 0
-            
-            # vary = np.tile(pattern, (len(df) // len(pattern)) + 1)[:len(df)]
-            df['varyE'] = vary*varyE
-            df['varyGg'] = vary*varyGg
-            df['varyGn1'] = vary*varyGn1
-            write_sampar(df, sammyINPyw.particle_pair, fudge, parfile)#, vary_parm=False, template=None)
-            
-
+            if istep%sammyINPyw.steps_per_batch == 0:
+                batch_fitpar(rundir, istep, sammyINPyw, fudge)
+            else:
+                pass
+    
         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
         if istep>=1:
+            # par_df_current = par_df_next
 
-            # Levenberg-Marquardt algorithm
+            ### Levenberg-Marquardt algorithm
             if sammyINPyw.LevMar:
                 assert(sammyINPyw.LevMarV>1)
 
@@ -1061,8 +783,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     while True:
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
-                        update_fudge_in_parfile(rundir, istep-1, fudge)
-                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir)
+                        update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
+                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
@@ -1073,36 +795,48 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         else:
                             pass
             
-            # convergence check
+            ### convergence check
             Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
             if Dchi2 < sammyINPyw.step_threshold:
-                if Dchi2 < 0:
-                    criteria = f"Chi2 increased, taking solution {istep-1}"
-                    if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
-                        criteria = f"Fudge below minimum value, taking solution {istep-1}"
+
+                no_improvement_tracker += 1
+                if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                    
+                    if Dchi2 < 0:
+                        criteria = f"Chi2 increased, taking solution {istep-1}"
+                        if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                            criteria = f"Fudge below minimum value, taking solution {istep-1}"
+                        if sammyRTO.Print:
+                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                            print(criteria)
+                        return max(istep-1, 0)
+                    else:
+                        criteria = "Chi2 improvement below threshold"
                     if sammyRTO.Print:
                         print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                         print(criteria)
-                    return max(istep-1, 0)
-                else:
-                    criteria = "Chi2 improvement below threshold"
-                if sammyRTO.Print:
-                    print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
-                    print(criteria)
-                return istep
+                    return istep
                 
+                else:
+                    pass
+            
+            else:   
+                no_improvement_tracker = 0
+            
         
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         update_fudge_in_parfile(rundir, istep, fudge)
+        # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
+
         iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
 
         istep += 1
 
     print("Maximum steps reached")
-    return max(istep-1, 0)
+    return max(istep, 0)
 
 
 
@@ -1121,11 +855,27 @@ def plot_YW(sammyRTO, dataset_titles, i):
     return par, lsts, chi2s, chi2ns
 
 
+def check_inputs_YW(sammyINPyw, sammyRTO):
+    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    if len(np.unique(dataset_titles)) != len(dataset_titles):
+        raise ValueError("Redundant experiment model titles")
+    if np.any([exp.template is None for exp in sammyINPyw.experiments]):
+        raise ValueError(f"One or more experiments do not have template files.")
+    if sammyINPyw.step_threshold_lag > 1 and sammyINPyw.batch_fitpar is False:
+        print("WARNING: you have set a step threshold lag but are not batching fit parameters, this is an odd setting.")
+    if sammyRTO.bayes:
+        if not np.any([each in sammyINPyw.resonance_ladder for each in ["varyE", "varyGg", "varyGn1"]]):
+            raise ValueError("No vary flag columns in resonance ladder")
+        if np.sum([sammyINPyw.resonance_ladder["varyE"], sammyINPyw.resonance_ladder["varyGg"], sammyINPyw.resonance_ladder["varyGn1"]]) == 0:
+            raise ValueError("Bayes set to true but no varied parameters")
+
+    return dataset_titles
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    # dataset_titles = [exp.title for exp in sammyINPyw.experiments]
+    dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
     # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)

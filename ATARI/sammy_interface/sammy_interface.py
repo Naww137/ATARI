@@ -502,7 +502,7 @@ def solve_bayes(exp_dat, exp_cov, resonance_ladder, particle_pair,
     # read output lst and delete sammy_runDIR
     lst_df = readlst(os.path.join(sammy_runDIR, 'SAMMY.LST'))
     # par_df = read_sammy_par(os.path.join(sammy_runDIR, 'sammy.par'))
-    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, delim_whitespace=True, usecols=[0,1,2,6], names=['E', 'Gg', 'Gn','J_ID'], engine='python')
+    par_df = pd.read_csv(os.path.join(sammy_runDIR, 'sammy.par'), skipfooter=2, sep='\s+', usecols=[0,1,2,6], names=['E', 'Gg', 'Gn','J_ID'], engine='python')
     
     if not keep_runDIR:
         shutil.rmtree(sammy_runDIR)

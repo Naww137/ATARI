@@ -1,8 +1,12 @@
 
+import ATARI.utils.hdf5 as h5io
+import h5py
+
 
 
 class syndatOUT:
     def __init__(self, **kwargs):
+        self._title = None
         self._par_true = None
         self._pw_reduced = None
         self._pw_raw = None
@@ -11,6 +15,13 @@ class syndatOUT:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    @property
+    def title(self):
+        return self._title
+    @title.setter
+    def title(self, title):
+        self._title = title
+        
     @property
     def par_true(self):
         return self._par_true
@@ -39,6 +50,29 @@ class syndatOUT:
     def covariance_data(self, covariance_data):
         self._covariance_data = covariance_data
 
+    def to_hdf5(self, filepath, isample):
+        sample_group = f'sample_{isample}'
+        
+        ### check existing samples
+        check_par_true = False
+        h5f = h5py.File(filepath, "a")
+        if sample_group in h5f:
+            if 'par_true' in h5f[sample_group]:
+                check_par_true = True
+            if self.title in h5f[sample_group]:
+                raise ValueError(f"Dataset titled {self.title} already exists in {sample_group}")
+        h5f.close()
+        
+        ### actually write things
+        if check_par_true:
+            existing_true_par = h5io.read_par(filepath, isample, "true")
+            if existing_true_par.equals(self.par_true):
+                pass
+            else:
+                raise ValueError(f"par_true is already written to {sample_group} but does not agree with par_true in {self.title}")
+        h5io.write_pw_reduced(filepath, isample, self.title, self.pw_reduced, cov_data=self.covariance_data)
+        h5io.write_par(filepath, isample, self.par_true, "true")
+
 
 
 
@@ -62,7 +96,7 @@ class syndatOPT:
         Indicate whether to calculate off-diagonal elements of the data covariance matrix.
     explicit_covariance : bool = False
         Indicate whether to return explicit data covariance elements or the decomposed statistical and systematic covariances with systematic derivatives.
-    sampleTURP : bool = True
+    sampleTMP : bool = True
         Option to sample true underlying measurement model (data-reduction) parameters for data generation.
     sampleTNCS : bool = True
         Option to sample true neutron count spectrum for data generation.
@@ -70,17 +104,26 @@ class syndatOPT:
         Option to use a smoothed function for the true neutron count spectrum for data generation.
     save_raw_data : bool = False
         Option to save raw count data, if False, only the reduced transmission data will be saved.
+    force_zero_to_1 : bool = True
+        Option to force sampled 0-counts to counts of 1. 
+        This option is true by default as an artifact of the synthetic data methodology. 
+        In actuallity, un-grouped time bins (on the order of ns widths) may have 0-counts, but the experimentalist will determine a grouping structure that avoids this.
+        Because they synthetic data methodology samples counting statistics on the grouped bin structure, 0-counts are unrealistic.
+        The combination of settings, particularly energy grid and linac triggers, can cause 0-counts.
+        This is an indication that your settings are likely not realistic, however, you should still be able to generate usable data and 0-counts will cause downstream issues.
     """
     def __init__(self, **kwargs):
         self._sampleRES = True
         self._sample_counting_noise = True
-        self._calculate_covariance = False
+        self._calculate_covariance = True
         self._explicit_covariance = False
         self._sampleTMP = True
-        self._sampleTURP = True
+        # self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
         self._save_raw_data = False
+
+        self._force_zero_to_1 = True
 
 
         for key, value in kwargs.items():
@@ -107,12 +150,12 @@ class syndatOPT:
     def sampleTMP(self, sampleTMP):
         self._sampleTMP = sampleTMP
 
-    @property
-    def sampleTURP(self):
-        return self._sampleTURP
-    @sampleTURP.setter
-    def sampleTURP(self, sampleTURP):
-        self._sampleTURP = sampleTURP
+    # @property
+    # def sampleTURP(self):
+    #     return self._sampleTURP
+    # @sampleTURP.setter
+    # def sampleTURP(self, sampleTURP):
+    #     self._sampleTURP = sampleTURP
 
     @property
     def sampleTNCS(self):
@@ -155,5 +198,12 @@ class syndatOPT:
     @save_raw_data.setter
     def save_raw_data(self, save_raw_data):
         self._save_raw_data = save_raw_data
+
+    @property
+    def force_zero_to_1(self):
+        return self._force_zero_to_1
+    @force_zero_to_1.setter
+    def force_zero_to_1(self, force_zero_to_1):
+        self._force_zero_to_1 = force_zero_to_1
 
 

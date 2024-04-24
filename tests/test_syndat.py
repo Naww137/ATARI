@@ -170,49 +170,194 @@ class TestTransmissionRPIModel(unittest.TestCase):
 
 
 
-# class TestYieldRPIModel(unittest.TestCase):
+class TestYieldRPIModel(unittest.TestCase):
 
-#     @classmethod
-#     def setUpClass(cls):
-#         cls.pair = Particle_Pair()
+    @classmethod
+    def setUpClass(cls):
+        #General Purpose Model
+        cls.exp_model=Experimental_Model()
+        cls.yield_true = pd.DataFrame({'tof':cls.exp_model.tof_grid,
+                                       'E':cls.exp_model.energy_grid,
+                                       'true':np.ones(len(cls.exp_model.energy_grid))*1000})
+        
+        #Monte Carlo Test Settings
+        cls.run_count=500
+        cls.convergence_tolerance=0.01
+        cls.uncertainty_tolerance=0.1
 
-#         cls.print_out = False
+        #Diagnostics
+        cls.print_out = False
+        cls.failure_logging=False
 
-#         ## parameters to reduce default uncertainties to be in linear regime
-#         # but don't eliminate covariance because we want to test it 
-#         cls.model_par = {
-#         'trigs' :   (1e7,  0),
-#         'trigo' :   (1e7,  0),
-#         }
+    def test_basic_functionality(self):
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        exp = Capture_Yield_RPI()
+        exp.covariance_data={"cr_flux_cov":0,"br_flux_cov":0}
+        exp.approximate_unknown_data(self.exp_model,False)
+        generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,False)
+        generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,True)
+        model_parameters=exp.sample_true_model_parameters({})
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,model_parameters,True)
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,model_parameters,False)
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,exp.model_parameters,True)
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,exp.model_parameters,False)
 
+    def test_data_type(self):
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,False)
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,exp.model_parameters,False)
+        
+        assert type(generated_counts)==pd.DataFrame,                                    "Returned count data frame is not actually a data frame."
+        assert not(generated_counts.empty),                                             "Returned count data frame has no data."
+        assert "ctg_true" in generated_counts,                                          "Returned count data frame has no true count data."
+        assert "ctg" in generated_counts,                                               "Returned count data frame has no count data."
+        assert "dctg" in generated_counts,                                              "Returned count data frame has count uncertainty data."
+        assert len(generated_counts.ctg_true)==len(self.exp_model.energy_grid),         "True count data is on a different energy grid."
+        assert len(generated_counts.ctg)==len(self.exp_model.energy_grid),              "Count data is on a different energy grid."
+        assert len(generated_counts.dctg)==len(self.exp_model.energy_grid),             "Count uncertainty data is on a different energy grid."
+        
+        assert type(generated_yield)==pd.DataFrame,                                     "Returned yield data frame is not aactually a data frame."
+        assert not(generated_yield.empty),                                              "Returned yield data frame has no data."
+        assert "E" in generated_yield,                                                  "Returned count data frame has no energy grid data."
+        assert "tof" in generated_yield,                                                "Returned count data frame has no time of flight data."
+        assert "true" in generated_yield,                                               "Returned count data frame has true yield data."
+        assert "exp" in generated_yield,                                                "Returned count data frame has no yield data."
+        assert "exp_unc" in generated_yield,                                               "Returned count data frame has yield uncertainty data."
+        assert np.all(np.equal(generated_yield.E.values,self.exp_model.energy_grid)),   "Returned energy grid is different than input."
+        assert np.all(np.equal(generated_yield.tof.values,self.exp_model.tof_grid)),    "Returned time of flight info is different than input."
+        assert np.all(np.equal(generated_yield.true.values,self.yield_true.true)),      "Returned true yield is different than input."
+        assert len(generated_yield.exp)==len(self.exp_model.energy_grid),               "Yield data is on a different energy grid."
+        assert len(generated_yield.exp_unc)==len(self.exp_model.energy_grid),              "Yield uncertainty data is on a different energy grid."
+    
+    def test_parameter_sampling(self):
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        true_model_parameters_dictionary={key:value for key, value in exp.model_parameters.__dict__.items() if not key.startswith('__') and not callable(key)}
+        model_parameters=exp.sample_true_model_parameters({})
+        sampled_model_parameters_dictionary={key:value for key, value in model_parameters.__dict__.items() if not key.startswith('__') and not callable(key)}
+        
+        same_value=0
+        for key,value in true_model_parameters_dictionary.items():
+            if(type(value)==pd.DataFrame):
+                #I am not dealing with this right now, good luck
+                pass
+            else:
+                if(value==sampled_model_parameters_dictionary[key] and not(value[1]==0)):
+                    same_value+=1
+        
+        assert same_value==0, str(same_value)+" paramters are not sampled."
+    
+    def test_no_sampling(self):
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,False)
+        generated_yield,covariance_data=exp.reduce_raw_data(self.yield_true,generated_counts,exp.model_parameters,False)
+        
+        assert np.allclose(generated_yield.exp.values,self.yield_true.true.values), "Returned yield is different than input."
+    
+    def test_sampling(self):
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts_no_sample=exp.generate_raw_data(self.yield_true,exp.model_parameters,False)
+        generated_yield_no_sample,___=exp.reduce_raw_data(self.yield_true,generated_counts_no_sample,exp.model_parameters,False)
+        
+        #Case 1: count data is sampled
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts_samp=exp.generate_raw_data(self.yield_true,exp.model_parameters,True)
+        generated_yield_samp,___=exp.reduce_raw_data(self.yield_true,generated_counts_samp,exp.model_parameters,False)
+        assert not(np.allclose(generated_counts_samp.ctg.values,generated_counts_no_sample.ctg.values)), "Count data is the same with or without count sampling."
+        assert not(np.allclose(generated_yield_samp.exp.values,generated_yield_no_sample.exp.values)), "Yield data is the same with or without count sampling"
+        
+        #Case 2: model parameters are sampled
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts_samp=exp.generate_raw_data(self.yield_true,exp.model_parameters,False)
+        model_parameters=exp.sample_true_model_parameters({"trig_g":exp.model_parameters.trig_g[0], 
+                                                        "trig_bg":exp.model_parameters.trig_bg[0],
+                                                        "trig_f":exp.model_parameters.trig_f[0], 
+                                                        "trig_bf":exp.model_parameters.trig_bf[0],
+                                                        "fn":exp.model_parameters.fn[0],
+                                                        "yield_flux":exp.model_parameters.yield_flux.ct})
+        generated_yield_samp,___=exp.reduce_raw_data(self.yield_true,generated_counts_samp,model_parameters,False)
+        assert np.allclose(generated_counts_samp.ctg.values,generated_counts_no_sample.ctg.values), "Count data is different with only parameter sampling."
+        assert not(np.allclose(generated_yield_samp.exp.values,generated_yield_no_sample.exp.values)), "Yield data is the same with or without parameter sampling"
+        
+        #Case 3: both are sampled
+        exp = Capture_Yield_RPI()
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts_samp=exp.generate_raw_data(self.yield_true,exp.model_parameters,True)
+        model_parameters=exp.sample_true_model_parameters({"trig_g":exp.model_parameters.trig_g[0], 
+                                                        "trig_bg":exp.model_parameters.trig_bg[0],
+                                                        "trig_f":exp.model_parameters.trig_f[0], 
+                                                        "trig_bf":exp.model_parameters.trig_bf[0],
+                                                        "fn":exp.model_parameters.fn[0],
+                                                        "yield_flux":exp.model_parameters.yield_flux.ct})
+        generated_yield_samp,___=exp.reduce_raw_data(self.yield_true,generated_counts_samp,model_parameters,False)
+        assert not(np.allclose(generated_counts_samp.ctg.values,generated_counts_no_sample.ctg.values)), "Count data is the same with or without count sampling."
+        assert not(np.allclose(generated_yield_samp.exp.values,generated_yield_no_sample.exp.values)), "Yield data is the same with or without count sampling"
+    
+    def test_monte_carlo(self):
+        exp = Capture_Yield_RPI()
+        yields=np.empty((len(self.exp_model.energy_grid),self.run_count,2))
+        counts=np.empty((len(self.exp_model.energy_grid),self.run_count,3))
+        for run in range(self.run_count):
+            exp.approximate_unknown_data(self.exp_model,True)
+            generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,True)
+            model_parameters=exp.sample_true_model_parameters({"trig_g":exp.model_parameters.trig_g[0],
+                                                            "trig_bg":exp.model_parameters.trig_bg[0],
+                                                            "trig_f":exp.model_parameters.trig_f[0],
+                                                            "trig_bf":exp.model_parameters.trig_bf[0],
+                                                            "fn":exp.model_parameters.fn[0],
+                                                            "yield_flux":exp.model_parameters.yield_flux.ct})
+            yield_run,___=exp.reduce_raw_data(self.yield_true,generated_counts,model_parameters,False)
+            yields[:,run,0]=yield_run.exp.values
+            yields[:,run,1]=yield_run.exp_unc.values
+            counts[:,run,0]=generated_counts.ctg.values
+            counts[:,run,1]=generated_counts.dctg.values
+        
+        assert np.allclose(np.mean(yields[:,:,0],1),self.yield_true.true.values,rtol=self.convergence_tolerance), "Mean of data does not converge to true."
+        assert np.allclose(np.std(yields[:,:,0],1),np.mean(yields[:,:,1],1),rtol=self.uncertainty_tolerance), "Reported uncertainty is different than distribution width. (try rerunning, sometimes this just fails)"
+    
+    def test_covariance(self):
+        exp = Capture_Yield_RPI()
+        exp.covariance_data={"cr_flux_cov":0,"br_flux_cov":0}
+        exp.approximate_unknown_data(self.exp_model,True)
+        generated_counts=exp.generate_raw_data(self.yield_true,exp.model_parameters,True)
+        model_parameters=exp.sample_true_model_parameters({"trig_g":exp.model_parameters.trig_g[0], 
+                                                            "trig_bg":exp.model_parameters.trig_bg[0],
+                                                            "trig_f":exp.model_parameters.trig_f[0], 
+                                                            "trig_bf":exp.model_parameters.trig_bf[0],
+                                                            "fn":exp.model_parameters.fn[0],
+                                                            "yield_flux":exp.model_parameters.yield_flux.ct})
+        yield_run_T,covariance_data_T=exp.reduce_raw_data(self.yield_true,generated_counts,model_parameters,True,calculate_covariance_matrix=False)
+        yield_run_F,covariance_data_F=exp.reduce_raw_data(self.yield_true,generated_counts,model_parameters,False)
+        full_matrix=covariance_data_T["Cov_Y_jac"].T@covariance_data_T["Cov_Y_cov"]@covariance_data_T["Cov_Y_jac"]
+        
+        assert np.allclose(yield_run_T.exp_unc.values,yield_run_F.exp_unc.values), "Reported uncertainty is differnt between using and not using covariance calcs."
+        assert np.allclose(np.sqrt(np.diag(full_matrix)),yield_run_T.exp_unc.values), "Digonal of covariance matrix does not match reported uncertainty."
+        assert not(("Cov_Y" in covariance_data_F)or("Cov_Y_jac" in covariance_data_F)or("Cov_Y_cov" in covariance_data_F)), "Covariance data is included in output when not using calcs."
 
-#     def test_no_sampling(self):
-#         """
-#         Tests that the measurement model returns the same input as true if all sampling options are off.
-#         """
-#         generative_model = Capture_Yield_RPI()
-#         reductive_model = Capture_Yield_RPI()
-#         residual = no_sampling_returns_true_test(generative_model, reductive_model)
-#         self.assertAlmostEqual(residual, 0, places=10)
+    # def test_default_energy_window(self):
 
-#     def test_default_energy_window(self):
+    #     exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
+    #     df_true = pd.DataFrame({'E': exp_model.energy_grid, 'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
 
-#         exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
-#         df_true = pd.DataFrame({'E': exp_model.energy_grid, 'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
+    #     generative_model = Capture_Yield_RPI(**self.model_par)
+    #     reductive_model = Capture_Yield_RPI(**self.model_par)
 
-#         generative_model = Capture_Yield_RPI(**self.model_par)
-#         reductive_model = Capture_Yield_RPI(**self.model_par)
+    #     synOPT = syndatOPT(smoothTNCS=True, sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True) 
+    #     SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
+    #     mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) 
 
-#         synOPT = syndatOPT(smoothTNCS=True, sampleRES=False, calculate_covariance=True, explicit_covariance=True, sampleTMP=True) 
-#         SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
-#         mean_of_residual, norm_test_on_residual, kstest_on_chi2 = noise_distribution_test2(SynMod, df_true = df_true, ipert=250, print_out=self.print_out) 
-
-#         self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
-#                         "Mean of residuals is not 0")
-#         self.assertTrue( norm_test_on_residual.pvalue>1e-5 ,
-#                         "Normalized residuals are not standard normal")
-#         self.assertTrue( kstest_on_chi2.pvalue>1e-5 , 
-#                         "Chi2 of data does not have appropriate DOF") 
+    #     self.assertTrue( np.isclose(mean_of_residual, 0, atol=1e-1), 
+    #                     "Mean of residuals is not 0")
+    #     self.assertTrue( norm_test_on_residual.pvalue>1e-5 ,
+    #                     "Normalized residuals are not standard normal")
+    #     self.assertTrue( kstest_on_chi2.pvalue>1e-5 , 
+    #                     "Chi2 of data does not have appropriate DOF") 
 
 
 

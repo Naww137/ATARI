@@ -28,9 +28,9 @@ class Syndat_Control:
         ATARI class describing the reaction model.
     syndat_models: list[Syndat_Model]
         list of individual Syndat_Model classes
-    model_correlations: dict
-        Dictionary of uncertain parameters that correlate individual Syndat_Models. 
-        Format is the same as other model parameters: key:(val, unc).
+    model_correlations: list
+        Pass a list of dictionaries describing the uncertain parameters that correlate individual Syndat_Models. 
+        Dictionary format is the same as other model parameters: key:(val, unc) with one additional key value pair with key='models' and value being a boolean list describing which experiments the parameters correlation.
         If supplied, this parameter defined by key will overwrite individual Syndat_Model parameters of the same key.
     options: syndatOPT
         Syndat Options object, only option that will be used is SampleRES.

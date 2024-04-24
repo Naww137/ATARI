@@ -91,6 +91,27 @@ def update_dict(old, additional):
 # ----------------------------------------------------------------------------------
 
 
+def get_explicit_covariance_from_cov_data_dict(covariance_data: dict):
+    """
+    Expands implicit covariance data (in dictionary) to the full, explicit data covariance matrix.
+
+    Parameters
+    ----------
+    covariance_data : dict
+        Dictionary containing elements of the implicit data covariance.
+
+    Returns
+    -------
+    ndarray
+        Explicit data covariance matrix
+    """
+    # mask = (exp_cov['diag_stat'].index>=min_max_E[0]) & (exp_cov['diag_stat'].index<=min_max_E[1])
+    # J = exp_cov['Jac_sys'].values[:, mask]
+    # covs.append(np.diag(exp_cov['diag_stat'][mask]['var_stat'].values) + J.T @ exp_cov['Cov_sys'] @ J)
+
+    return np.diag(covariance_data['diag_stat']['var_stat'].values) + covariance_data['Jac_sys'].values.T @ covariance_data['Cov_sys'] @ covariance_data['Jac_sys'].values
+
+
 
 def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
     if key in resonance_ladder.columns:

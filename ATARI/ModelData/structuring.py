@@ -31,9 +31,12 @@ class vector_parameter:
 
     def __set__(self, instance, value):
         if isinstance(value, DataFrame):
-            assert all(key in value.keys() for key in ['E','tof','ct','dct','bw'])
+            assert all(key in value.keys() for key in ['E','tof'])
+            assert all(key in value.keys() for key in ['ct','dct','bw']) or all(key in value.keys() for key in ["Y", "dY"])
             value.sort_values("E", ignore_index=True,inplace=True)
             value.reset_index(drop=True, inplace=True)
+        # elif isinstance(value, np.ndarry)
+        
         elif value is None:
             pass
         else:
@@ -49,17 +52,6 @@ class Model_Parameters(Protocol):
     def sample_parameters(self, true_model_parameters: dict) -> "Model_Parameters":
         ...
 
-    # @property
-    # def neutron_spectrum(self) -> Optional[vector_parameter]:
-    #     ...
-    # @neutron_spectrum.setter
-    # def neutron_spectrum(self, value: Optional[DataFrame]):
-    #     ...
-
-    # @property
-    # def model_parameter_dict(self) -> dict:
-    #     ...
-
 
 class Generative_Measurement_Model(Protocol):
 
@@ -73,9 +65,6 @@ class Generative_Measurement_Model(Protocol):
     def approximate_unknown_data(self, exp_model) -> None:
         ...
 
-    # @property
-    # def neutron_spectrum_triggers(self) -> int:
-    #     ...
     
     @property
     def model_parameters(self) -> Model_Parameters:
@@ -95,10 +84,6 @@ class Reductive_Measurement_Model(Protocol):
     def approximate_unknown_data(self, exp_model) -> None:
         ...
         
-    # @property
-    # def neutron_spectrum_triggers(self) -> int:
-    #     ...
-
     @property
     def model_parameters(self) -> Model_Parameters:
         ...

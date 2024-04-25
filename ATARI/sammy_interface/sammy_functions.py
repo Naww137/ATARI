@@ -292,7 +292,8 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                 temp        =   sammyINP.experiment.temp,
                 FP          =   sammyINP.experiment.FP,
                 n           =   sammyINP.experiment.n,
-                use_IDC=idc
+                use_IDC     =   idc,
+                alphanumeric =  sammyINP.alphanumeric
                 )
                 
     write_shell_script(sammyINP, 

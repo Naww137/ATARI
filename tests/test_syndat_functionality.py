@@ -377,7 +377,7 @@ class TestSyndatControl(unittest.TestCase):
 
         # test building syndat out object from hdf5
         for isample in range(3):
-            out_list = syndatOUT.from_hdf5(save_file, isample)
+            out_list = [syndatOUT.from_hdf5(save_file, isample, title) for title in ["1", "2", "3"]]
             self.assertTrue(len(out_list) == len(self.syndat_models))
             for each in out_list:
                 self.assertIsInstance(each, syndatOUT)

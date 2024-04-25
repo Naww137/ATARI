@@ -1875,7 +1875,7 @@ def plot_xs_differences(cand_sol : list,
                                   cs_calc_res_dfs_list[1][column], 
                                   color='red', 
                                   alpha=0.5,
-                                  label = r'E = ' + str(np.round(sse_values[idx],2)))
+                                  label = r'$\varepsilon$ = ' + str(np.round(sse_values[idx],2)))
         # end fill between two lines
 
         #axs[idx].set_title(title_list[idx]+' = '+str(np.round(sse_values[idx],2)))

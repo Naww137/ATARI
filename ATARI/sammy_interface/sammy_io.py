@@ -515,7 +515,7 @@ def write_saminp(filepath   :   str,
                 FP          :   tuple,
                 n           :   tuple,
 
-                alphanumeric:   bool    = None,
+                alphanumeric:   str    = None,
                 use_IDC     :   bool    = False,
                 use_least_squares: bool = False,
                 derivatives : bool = False,

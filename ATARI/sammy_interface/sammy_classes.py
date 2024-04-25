@@ -126,6 +126,7 @@ class SammyInputData:
     initial_parameter_uncertainty: Optional[float] = 1.0
 
     ECSCM_experiment: Optional[Experimental_Model] = None
+    alphanumeric = []
 
     
 

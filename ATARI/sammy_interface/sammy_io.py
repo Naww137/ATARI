@@ -523,6 +523,7 @@ def write_saminp(filepath   :   str,
 
                 ):
     
+    alphanumeric = copy(alphanumeric)
     if alphanumeric is None:
         alphanumeric = []
 

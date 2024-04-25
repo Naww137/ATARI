@@ -142,33 +142,14 @@ class TestTransmissionRPIModel(unittest.TestCase):
         
         self.assertFalse(any([np.all(s1.covariance_data[key] == s5.covariance_data[key]) for key in s1.covariance_data.keys() if key not in ['Cov_sys']]))
 
-    
-    # def test_sample_saving(self, sammy_path):
-    #     self.pair.add_spin_group(Jpi='3.0', J_ID=1, D=9.0030, gn2_avg=452.56615, gn2_dof=1, gg2_avg=32.0, gg2_dof=1000)
-
-    #     exp_model = Experimental_Model(channel_widths={"maxE": [3000],"chw": [1200.0],"dchw": [0.8]})
-    #     df_true = pd.DataFrame({'E': exp_model.energy_grid, 'tof':exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(exp_model.energy_grid)) })#np.ones(len(exp_model.energy_grid))*0.9 })
-
-    #     generative_model = Transmission_RPI(**self.model_par)
-    #     reductive_model = Transmission_RPI(**self.model_par)
-
-    #     synOPT = syndatOPT(sampleRES=True, calculate_covariance=True, explicit_covariance=True, sampleTMP=True, smoothTNCS=True) 
-    #     SynMod = Syndat_Model(generative_experimental_model=exp_model, generative_measurement_model=generative_model, reductive_measurement_model=reductive_model, options=synOPT)
-
-    #     SynMod.sample(pw_true=df_true, num_samples=5)
-    #     s1 = SynMod.samples[0]
-    #     s5 = SynMod.samples[4]
-
-                
-    #     self.assertTrue(all(s1.pw_reduced.tof == s5.pw_reduced.tof))
-    #     self.assertFalse(all(s1.pw_reduced.exp_unc == s5.pw_reduced.exp_unc))
-    #     self.assertFalse(all(s1.pw_reduced.exp == s5.pw_reduced.exp))
-
-    #     self.assertTrue([np.all(np.isclose(s1.covariance_data[key], s5.covariance_data[key], atol=1e-5)) for key in s1.covariance_data.keys()])
 
 
 
 
+### This is a great implementation of the unittest framework
+### However, ultimately we want your RPI model to work within the larger syndat framework (using syndat_model) like the tests above for transmission
+### Admitedly, these are not proper "unit" tests, rather they are integration tests and we are using the unittest class.
+### 
 
 class TestYieldRPIModel(unittest.TestCase):
 

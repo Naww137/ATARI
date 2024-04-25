@@ -507,13 +507,6 @@ class Transmission_RPI:
         assert isinstance(self.model_parameters.open_neutron_spectrum, pd.DataFrame)
         assert(np.isclose(max(abs(self.model_parameters.open_neutron_spectrum.tof.values - raw_data.tof.values)/raw_data.tof.values), 0,atol=1e-7))
 
-        ### complete raw dataframe with count rates using reductive model parameters
-        cr, dcr = cts_to_ctr(raw_data.cts, raw_data.dcts, raw_data.bw, self.model_parameters.trigs[0])
-        raw_data['cs']  = cr
-        raw_data['dcs'] = dcr
-        Cr, dCr = cts_to_ctr(self.model_parameters.open_neutron_spectrum.ct, self.model_parameters.open_neutron_spectrum.dct, self.model_parameters.open_neutron_spectrum.bw, self.model_parameters.trigo[0])
-        raw_data['co']  = Cr
-        raw_data['dco'] = dCr
 
         # create transmission object
         trans = pd.DataFrame()
@@ -554,11 +547,15 @@ class Transmission_RPI:
                                                               self.model_parameters.a_b[1],
                                                               options.calculate_covariance,
                                                               self.model_parameters.bkg_func)
+        
+        ### complete raw dataframe with count rates from reduction: rates=Cr,dCr, cr,dcr
+        raw_data['co'], raw_data['dco'], raw_data['cs'], raw_data['dcs'] = rates
 
+        ### unpack uncertainty/covariance data and save 
         diag_stat, diag_sys, Jac_sys, Cov_sys = unc_data
 
         if options.calculate_covariance:
-            # TODO: update options to be like sammy - if not explicit covariance then trans['exp_unc'] should be statistical error
+            # TODO: Update below to use utils.atario function for getting explicit cov
             CovT_sys = Jac_sys.T @ Cov_sys @ Jac_sys
             CovT = np.diag(diag_stat) + CovT_sys
             CovT = pd.DataFrame(CovT, columns=trans.E, index=trans.E)

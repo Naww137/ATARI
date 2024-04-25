@@ -106,6 +106,9 @@ class InitialFBOPT:
         self._spin_group_keys = []
 
         self._num_Elam = None
+        
+        self._Elam_shift = 0
+
         self._starting_Gg_multiplier = 1
         self._starting_Gn1_multiplier = 50
 
@@ -272,6 +275,16 @@ class InitialFBOPT:
     def num_Elam(self, num_Elam):
         self._num_Elam = num_Elam
 
+    
+    @property
+    def Elam_shift(self):
+        """Shift in energy for all res. beginning from left border of the window (used for each spin group) """
+        return self._Elam_shift
+    @Elam_shift.setter
+    def Elam_shift(self, Elam_shift):
+        self._Elam_shift = Elam_shift
+
+
     @property
     def starting_Gg_multiplier(self):
         return self._starting_Gg_multiplier
@@ -423,6 +436,8 @@ class InitialFB:
 
         ### Fit 1 on Gn only
         print("========================================\n\tFIT 1\n========================================")
+        print(f"Options to vary: {self.options.fitpar1}")
+
         outs_fit_1 = self.fit_and_eliminate(rto, sammyINPyw, external_resonance_indices)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
@@ -431,6 +446,8 @@ class InitialFB:
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
+        print(f"Options to vary: {self.options.fitpar2}")
+
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
         internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, 
                                                                  varyE = self.options.fitpar2[0],
@@ -470,7 +487,7 @@ class InitialFB:
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
                         sammyINPyw.step_threshold *= 0.1
-                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neuton width")
+                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neutron width")
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyINPyw.resonance_ladder = resonance_ladder
                     sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)

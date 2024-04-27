@@ -3617,6 +3617,7 @@ def plot_multiple_hist(values_list: list,
                         bins: int, 
                         cumulative: bool, 
                         colors: list, 
+                        alphas: list,
                         captions: list, 
                         title: str = '',
                         x_label: str = '',
@@ -3624,15 +3625,19 @@ def plot_multiple_hist(values_list: list,
                         stacked: bool = False,
                         show_numbers: bool = False,
                         zorders: list = [],
-                        x_lim = None):
+                        x_lim = None,
+                        fig_size = (8,4)):
     
     # create a new figure and axis
-    fig_new, ax_new = plt.subplots()
+    fig_new, ax_new = plt.subplots(figsize=fig_size)
 
     # checking the range of values to compare the distr
     min_val = min([min(values) for values in values_list])
     max_val = max([max(values) for values in values_list])
     bins = np.linspace(min_val, max_val, num=bins)
+
+    if (len(alphas)<len(values_list)):
+        alphas = [0.5] * len(values_list)
 
     # create the histograms
     for i, values in enumerate(values_list):
@@ -3640,7 +3645,7 @@ def plot_multiple_hist(values_list: list,
                                           bins=bins, 
                                           density=False, 
                                           stacked=stacked, 
-                                          alpha=0.4, 
+                                          alpha=alphas[i], 
                                           cumulative=cumulative, 
                                           color=colors[i], 
                                           label=captions[i])
@@ -3662,7 +3667,7 @@ def plot_multiple_hist(values_list: list,
     if len(x_label)>0:
         ax_new.set_xlabel(x_label)
     
-    ax_new.legend()
+    ax_new.legend(fontsize='small')
 
     if (x_lim is not None):
         ax_new.set_xlim(x_lim)

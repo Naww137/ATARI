@@ -471,6 +471,31 @@ def dyson_mehta_delta_3_predict(L:int, ensemble:str='GOE'):
         raise ValueError(f'Unknown ensemble, {ensemble}. Please choose from "GOE", "Poisson" or "picket".')
     return delta_3
 
+# =====================================================================
+# Missing Fraction Estimation
+# =====================================================================
+
+def fraction_missing_gn2(gn2_trunc:float, gn2m:float=1.0, dof:int=1):
+    """
+    Gives the fraction of missing resonances due to the truncation in reduced neutron width.
+
+    Parameters
+    ----------
+    trunc : float
+        The lower limit on the reduced neutron width.
+    gn2m  : float
+        The mean reduced neutron width. Default = 1.0.
+    dof   : int
+        The number of degrees of freedom for the chi-squared distribution.
+
+    Returns
+    -------
+    fraction_missing : float
+        The fraction of missing resonances within the spingroup.
+    """
+    fraction_missing = porter_thomas_dist(mean=gn2m, df=dof, trunc=0.0).cdf(gn2_trunc)
+    return fraction_missing
+
 # def compare_pdf_to_samples(reduced_widths_square_vector, avg_reduced_width_square, dof):
 #     """
 #     Compare samples to pdf (re-scaled).

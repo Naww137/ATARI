@@ -27,20 +27,6 @@ def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):
 
     return res_par_avg
 
-def wigner_LL(resonance_levels  : Union[np.ndarray, list], 
-              average_spacing   : float                    ) -> float:
-    resonance_levels = np.sort(list(resonance_levels))
-    Di = np.diff(resonance_levels)
-    probs = wigner_PDF(Di, average_spacing)
-    return np.sum(np.log(probs))
-
-def width_LL(resonance_widths   : Union[np.ndarray, list],
-                  average_width : float,
-                  dof           :float                      ) -> float:
-    probs = chisquare_PDF(resonance_widths, dof, average_width)
-    return np.sum(np.log(probs))
-
-
 # =====================================================================
 # Resonance level sampling
 # =====================================================================
@@ -495,6 +481,45 @@ def fraction_missing_gn2(gn2_trunc:float, gn2m:float=1.0, dof:int=1):
     """
     fraction_missing = porter_thomas_dist(mean=gn2m, df=dof, trunc=0.0).cdf(gn2_trunc)
     return fraction_missing
+  
+# =====================================================================
+# Log Likelihood
+# =====================================================================
+
+def wigner_LL(resonance_levels  : Union[np.ndarray, list], 
+              average_spacing   : float                    ) -> float:
+    resonance_levels = np.sort(list(resonance_levels))
+    Di = np.diff(resonance_levels)
+    probs = wigner_PDF(Di, average_spacing)
+    return np.sum(np.log(probs))
+
+def width_LL(resonance_widths   : Union[np.ndarray, list],
+                  average_width : float,
+                  dof           :float                      ) -> float:
+    probs = chisquare_PDF(resonance_widths, dof, average_width)
+    return np.sum(np.log(probs))
+
+def log_likelihood(particle_pair, resonance_ladder, energy_range=None):
+    """
+    ...
+    """
+
+    if energy_range is not None:
+        resonance_ladder = resonance_ladder[(resonance_ladder['E'] > energy_range[0]) & (resonance_ladder['E'] < energy_range[1])]
+
+    log_likelihood = 1.0
+    for jpi in resonance_ladder['Jpi'].unique():
+        mean_parameters = particle_pair.spin_groups[jpi]
+        resonance_ladder_sg = resonance_ladder[resonance_ladder['Jpi'] == jpi]
+        E  = resonance_ladder_sg['E'  ].to_numpy()
+        Gn = resonance_ladder_sg['Gn1'].to_numpy()
+        
+        log_likelihood *= wigner_LL(E , mean_parameters['<D>'])
+        log_likelihood *=  width_LL(Gn, mean_parameters['<D>'], mean_parameters['n_dof'])
+        
+    return log_likelihood
+
+
 
 # def compare_pdf_to_samples(reduced_widths_square_vector, avg_reduced_width_square, dof):
 #     """

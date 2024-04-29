@@ -66,10 +66,10 @@ class __LevelSpacingRatioDistribution(rv_continuous):
     'Level-spacing Ratio Distribution'
     def _pdf(self, x, beta:int):
         beta = beta[0]
-        if   beta == 1:     C_beta = 27/8
-        elif beta == 2:     C_beta = 81*sqrt(3)/(4*pi)
-        elif beta == 4:     C_beta = 729*sqrt(3)/(4*pi)
-        else:               raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
+        if   beta == 1:   C_beta = 27/8
+        elif beta == 2:   C_beta =  81*sqrt(3)/(4*pi)
+        elif beta == 4:   C_beta = 729*sqrt(3)/(4*pi)
+        else:             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
         gamma = 1+(3/2)*beta
         return C_beta * (x + x**2)**beta / (1 + x + x**2)**gamma
     def _cdf(self, x, beta:int):
@@ -139,28 +139,40 @@ class __PorterThomasDistribution(rv_continuous):
     def _pdf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.zeros(x.shape)
+        y = np.zeros_like(x)
         y[x >  trunc] = chi2.pdf(x[x >  trunc], df=df, scale=mean/df) / norm
         y[(x < 0) & (df == 1)] = 0
         return y
     def _cdf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.zeros(x.shape)
+        y = np.zeros_like(x)
         y[x >  trunc] = 1 + (chi2.cdf(x, df=df, scale=mean/df)-1) / norm
         return y
     def _sf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.ones(x.shape)
+        y = np.ones_like(x)
         y[x >  trunc] = chi2.sf(x, df=df, scale=mean/df) / norm
         return y
     def _ppf(self, q, mean:float, df:int, trunc:float):
+        # Getting the sign:
+        sign = np.ones_like(q)
+        sign[q < 0.5] = -1
+        q = 2.0 * abs(q - 0.5)
+        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = (q - 1) * norm + 1
-        return chi2.ppf(qp, df=df, scale=mean/df)
+        x = chi2.ppf(qp, df=df, scale=mean/df)
+        return sign * x
     def _isf(self, q, mean:float, df:int, trunc:float):
+        # Getting the sign:
+        sign = np.ones_like(q)
+        sign[q < 0.5] = -1
+        q = 2.0 * abs(q - 0.5)
+        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = q * norm
-        return chi2.isf(qp, df=df, scale=mean/df)
-porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', a=-np.inf, b=np.inf, shapes='mean, df, trunc')
+        x = chi2.isf(qp, df=df, scale=mean/df)
+        return sign * x
+porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', shapes='mean, df, trunc')

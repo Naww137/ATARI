@@ -67,7 +67,7 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
     runsammy_process = subprocess.run(
                                 ["sh", "-c", f"./pipe.sh"], 
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
-                                capture_output=True, text=True, timeout=60*10
+                                capture_output=True, text=True, timeout=60*30
                                 )
     if 'STOP' in runsammy_process.stderr:
         raise ValueError(f"\n\n===========================\nSAMMY Failed with output:\n\n {runsammy_process.stdout}")

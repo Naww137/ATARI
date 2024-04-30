@@ -74,6 +74,11 @@ class elim_OPTs:
         which parameters are fitted on the final stage - list of 0/1, - [E, Gg, Gn1]
         by default - [1,0,1]
 
+    fitpar_internal: list = [1,0,1]
+        Boolean list for internal ladder that determines which parameters will be optimized (E, Gg, Gn1).
+    fitpar_external: list = [0,1,1]
+        Boolean list for external ladder (usually fixed E) that determines which parameters will be optimized (E, Gg, Gn1).
+
     TODO:
     path_selection_mode: string
         TBD: determines how on each elimination level the candidate solution will be selected
@@ -109,6 +114,9 @@ class elim_OPTs:
         self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 10)
 
         self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) #by default vary this vars on the final stage of the elim for current level
+
+        self._fitpar_internal = kwargs.get("fitpar_internal", [1,0,1])
+        self._fitpar_external = kwargs.get("fitpar_external", [0,1,1])
 
         # all that passed through
         for key, value in kwargs.items():
@@ -202,6 +210,20 @@ class elim_OPTs:
     @LevMarV0_priorpassed.setter
     def LevMarV0_priorpassed(self,LevMarV0_priorpassed):
         self._LevMarV0_priorpassed = LevMarV0_priorpassed
+
+    @property
+    def fitpar_internal(self):
+        return self._fitpar_internal
+    @fitpar_internal.setter
+    def fitpar_internal(self,fitpar_internal):
+        self._fitpar_internal = fitpar_internal
+
+    @property
+    def fitpar_external(self):
+        return self._fitpar_external
+    @fitpar_external.setter
+    def fitpar_external(self,fitpar_external):
+        self._fitpar_external = fitpar_external
     
 
     
@@ -300,7 +322,7 @@ class eliminator_by_chi2:
 
         # ladder for processing - from direct input
         ladder_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = ladder_df,
-                                                                    vary_list=[1,0,1]
+                                                                    vary_list=self.options.fitpar_internal #[1,0,1]
                                                                     )
         
         if (self.rto.Print):
@@ -311,7 +333,7 @@ class eliminator_by_chi2:
 
         # set all req. vary fields
         fixed_res_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = fixed_resonances_df,
-                                                                    vary_list=[0,1,1] # do not allow to change energy
+                                                                    vary_list=self.options.fitpar_external #[0,1,1] # do not allow to change energy
                                                                     )
         
         if (self.rto.Print):

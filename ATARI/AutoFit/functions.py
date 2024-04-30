@@ -118,6 +118,7 @@ def concat_external_resonance_ladder(internal_resonance_ladder, external_resonan
         resonance_ladder = internal_resonance_ladder
         external_resonance_indices = []
     else:
+        assert(np.all([each in external_resonance_ladder.keys() for each in internal_resonance_ladder.keys()]))
         resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
         external_resonance_indices = list(range(len(external_resonance_ladder)))
     return resonance_ladder, external_resonance_indices
@@ -148,7 +149,7 @@ def get_LL_by_parameter(ladder,
 
 
 
-def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window):
+def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None):
 
     ### setup spin groups
     if initialFBopt.fit_all_spin_groups:
@@ -171,7 +172,11 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window):
 
     ### setup external resonances
     if initialFBopt.external_resonances:
-        external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
+        # external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
+        if external_resonance_ladder is None:
+            external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
+        else:
+            assert(np.all([each in external_resonance_ladder.keys() for each in initial_resonance_ladder.keys()]))
     else:
         external_resonance_ladder = pd.DataFrame()
     initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)

@@ -652,6 +652,9 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
 
     if i == iterations:
         print(f"\t{lead}Step did not converge {i} iterations")
+        converged=False
+    else:
+        converged=True
 
     # Move par file from final iteration 
     out = subprocess.run(
@@ -659,6 +662,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
         f"""head -$(($(wc -l < iterate/bayes_iter{i+1}.par) - 1)) iterate/bayes_iter{i+1}.par > results/step{step+1}.par"""],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
     
+    return converged
 
 def run_YWY0_and_get_chi2(rundir, step):
     runsammy_ywy0 = subprocess.run(
@@ -800,7 +804,10 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
-                        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
+                        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
+                        if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
+                            fudge /= sammyINPyw.LevMarVd
+                            fudge = max(fudge, sammyINPyw.minF)
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
@@ -848,7 +855,10 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
-        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+        if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
+            fudge /= sammyINPyw.LevMarVd
+            fudge = max(fudge, sammyINPyw.minF)
 
 
         ### 2 step Lasso if on
@@ -1020,7 +1030,7 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         ### Solve Bayes for this step
-        iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
 
 
         ### 2 step Lasso if on

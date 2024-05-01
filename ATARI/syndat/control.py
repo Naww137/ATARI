@@ -63,33 +63,13 @@ class Syndat_Control:
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
 
-        # self.clear_samples()
 
-
-    # @property
-    # def samples(self) -> list:
-    #     return self._samples
-    # @samples.setter
-    # def samples(self, samples):
-    #     self._samples = samples
-    # def clear_samples(self):
-    #     self.samples = []  
-    
-    # def clear_samples(self):
-    #     for syn_mod in self.sy
-    #     return
-    
     def get_sample(self,i):
         data = {}
         for syn_mod in self.syndat_models:
             data[syn_mod.title] = syn_mod.samples[i]
         return data
-    
-    # @samples.setter
-    # def samples(self, samples):
-    #     self._samples = samples
-    # def clear_samples(self):
-    #     self.samples = []  
+
 
     @property
     def titles(self) -> list:

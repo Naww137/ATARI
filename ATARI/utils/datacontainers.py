@@ -6,6 +6,7 @@ from copy import deepcopy, copy
 import h5py
 import pandas as pd
 
+
 @dataclass
 class Evaluation_Data:
     """
@@ -83,8 +84,11 @@ class Evaluation_Data:
             
             if exists:
                 pw_reduced_df, _ = h5io.read_pw_reduced(filepath, isample, title)
+                model_keys = [each for each in data.keys() if each not in ["E", "exp", "exp_unc"] ]
+                if all([k in pw_reduced_df.keys() for k in model_keys]):
+                    print(f"Experimental pointwise models {model_keys} already exist in dataframe for {title}, overwriting")
                 data = pw_reduced_df.merge(data, how='inner', validate="1:1")
-            h5io.write_pw_reduced(filepath, isample, title, data, cov_data=cov, overwrite=overwrite)
+            h5io.write_pw_reduced(filepath, isample, title, data, cov_data=cov)
 
 
 
@@ -150,20 +154,75 @@ class Evaluation:
     
     pw_theoretical          : Optional[pd.DataFrame] = None
     evaluation_data         : Optional[Evaluation_Data] = None
+    chi2                    : Optional[pd.Series] = None
+
 
     @classmethod
     def from_pkl(title, filepath):
         pass
+        # needs to be specific to AutoFitOUT pkl? Not sure if that object is stable yet
 
     @classmethod
     def from_hdf5(cls, title, filepath, isample):
         respar = h5io.read_par(filepath, isample, title)
-        # could also look for existing experimental and theoretical pointwise
+        # could also look for existing experimental and theoretical pointwise and chi2
         return cls(title, respar)
+    
 
+    @staticmethod
+    def reduce_sammyOUT_pw(sammy_pw_list, experimental_models):
+        """
+        Reduces the list of pointwise dataframes from sammyOUT_YW to only columns: exp, exp_unc, and theo.
+        This is useful to do before instantiating an Evaluation data object with experimental pointwise data for an evaluation model.
+        Performing this function first reduces clutter in the naming scheme particularly once saved to an hdf5 file.
+
+        Parameters
+        ----------
+        sammy_pw_list : _type_
+            _description_
+        experimental_models : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        pw_models = copy(sammy_pw_list)
+        for i, exp_df in enumerate(pw_models):
+            exp_df.drop(columns=["theo_xs_bayes", "theo_trans_bayes"], inplace=True)
+            if experimental_models[i].reaction == "capture":
+                exp_df.drop(columns=["exp_trans", "exp_trans_unc", "theo_trans"], inplace=True)
+                exp_df.rename(columns={"exp_xs":"exp", "exp_xs_unc":"exp_unc", "theo_xs":"theo"}, inplace=True)
+            elif experimental_models[i].reaction == "transmission":
+                exp_df.drop(columns=["exp_xs", "exp_xs_unc", "theo_xs"], inplace=True)
+                exp_df.rename(columns={"exp_trans":"exp", "exp_trans_unc":"exp_unc", "theo_trans":"theo"}, inplace=True)
+        return pw_models
+
+    @staticmethod
+    def chi2_list_to_series(chi2_list, evaluation_title, experimental_titles):
+        """
+        Converts a chi2 list (usually from sammyOUT class) to a properly formatted series for the Evaluation class.
+
+        Parameters
+        ----------
+        chi2_list : _type_
+            _description_
+        evaluation_title : _type_
+            _description_
+        experimental_titles : _type_
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        return pd.Series(chi2_list, index=experimental_titles, name=evaluation_title)
 
     def to_hdf5(self, filepath, isample, overwrite=True):
         sample_group = f'sample_{isample}'
+        chi2_exists = False
         h5f = h5py.File(filepath, "a")
         if sample_group in h5f:
             if f'par_{self.title}' in h5f[sample_group]:
@@ -171,8 +230,8 @@ class Evaluation:
                     print(f"Parameters titled {self.title} already exists in {sample_group}, overwriting")
                 else:
                     raise ValueError("Overwrite=False is not implemented yet")
-            else:
-                pass
+            if f'chi2' in h5f[sample_group]:
+                chi2_exists = True
         h5f.close()
 
         h5io.write_par(filepath, isample, self.respar, self.title)
@@ -188,6 +247,17 @@ class Evaluation:
                         mapper[key] = f"{key}_{self.title}"
                 exp_df.rename(columns=mapper, inplace=True)
             self.evaluation_data.to_hdf5(filepath, isample)
+
+        if chi2_exists:
+            df = pd.read_hdf(filepath, f"sample_{isample}/chi2")
+            if self.title in df.keys():
+                print(f"Chi2 for model {self.title} already exists, overwriting")
+                df.drop(columns="fit_2", inplace=True)
+            df = df.join(self.chi2, validate='1:1')
+            df.to_hdf(filepath, f"sample_{isample}/chi2")
+        else:
+            pd.DataFrame(self.chi2).to_hdf(filepath, f"sample_{isample}/chi2")
+
 
 
     def truncate(self, energy_range, E_external_resonances=0):

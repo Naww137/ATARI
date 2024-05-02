@@ -252,7 +252,7 @@ class Evaluation:
             df = pd.read_hdf(filepath, f"sample_{isample}/chi2")
             if self.title in df.keys():
                 print(f"Chi2 for model {self.title} already exists, overwriting")
-                df.drop(columns="fit_2", inplace=True)
+                df.drop(columns=self.title, inplace=True)
             df = df.join(self.chi2, validate='1:1')
             df.to_hdf(filepath, f"sample_{isample}/chi2")
         else:

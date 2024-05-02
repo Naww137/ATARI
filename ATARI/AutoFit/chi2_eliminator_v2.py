@@ -70,8 +70,8 @@ class elim_OPTs:
         determines the number of resonances on a current level on a path from N->N-1 where deep fit start from (see default value)
 
     # TODO: 
-    final_stage_vary_pars: list
-        which parameters are fitted on the final stage - list of 0/1, - [E, Gg, Gn1]
+    elim_stage_internal_vary_pars: list
+        which parameters are fitted - list of 0/1, - [E, Gg, Gn1]
         by default - [1,0,1]
 
     TODO:
@@ -108,7 +108,7 @@ class elim_OPTs:
 
         self._start_deep_fit_from = kwargs.get('start_deep_fit_from', 10)
 
-        self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) #by default vary this vars on the final stage of the elim for current level
+        self._elim_stage_internal_vary_pars = kwargs.get('elim_stage_internal_vary_pars', [1,0,1]) #by default vary this vars on the final stage of the elim for current level
 
         # all that passed through
         for key, value in kwargs.items():
@@ -122,6 +122,14 @@ class elim_OPTs:
     @chi2_allowed.setter
     def chi2_allowed(self, chi2_allowed):
         self._chi2_allowed = chi2_allowed
+
+
+    @property
+    def elim_stage_internal_vary_pars(self):
+        return self._elim_stage_internal_vary_pars
+    @elim_stage_internal_vary_pars.setter
+    def elim_stage_internal_vary_pars(self, elim_stage_internal_vary_pars):
+        self._elim_stage_internal_vary_pars = elim_stage_internal_vary_pars
     
     # stop or not if we didn't found the model that passess the test (just dive deep to 1 res. model)
     @property
@@ -131,13 +139,13 @@ class elim_OPTs:
     def stop_at_chi2_thr(self, stop_at_chi2_thr):
         self._stop_at_chi2_thr = stop_at_chi2_thr
 
-    # allow to fit listed perameters on the final stage of each level
-    @property
-    def final_stage_vary_pars (self):
-        return self._final_stage_vary_pars 
-    @final_stage_vary_pars .setter
-    def final_stage_vary_pars (self, final_stage_vary_pars ):
-        self._final_stage_vary_pars = final_stage_vary_pars 
+    # # allow to fit listed perameters on the final stage of each level
+    # @property
+    # def final_stage_vary_pars (self):
+    #     return self._final_stage_vary_pars 
+    # @final_stage_vary_pars .setter
+    # def final_stage_vary_pars (self, final_stage_vary_pars ):
+    #     self._final_stage_vary_pars = final_stage_vary_pars 
 
     # stop or not if we found a solution inside a subset that passed the test (greedy in time)
     @property
@@ -300,7 +308,7 @@ class eliminator_by_chi2:
 
         # ladder for processing - from direct input
         ladder_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = ladder_df,
-                                                                    vary_list=[1,0,1]
+                                                                    vary_list=self.options.elim_stage_internal_vary_pars
                                                                     )
         
         if (self.rto.Print):

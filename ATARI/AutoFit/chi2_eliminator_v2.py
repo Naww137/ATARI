@@ -280,7 +280,7 @@ class eliminator_by_chi2:
             experiments = experiments,
 
             max_steps = 0,
-            iterations = 2,
+            iterations = 10,
             step_threshold = 0.01,
             autoelim_threshold = None,
 

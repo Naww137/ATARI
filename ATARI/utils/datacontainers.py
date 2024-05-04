@@ -85,8 +85,12 @@ class Evaluation_Data:
             if exists:
                 pw_reduced_df, _ = h5io.read_pw_reduced(filepath, isample, title)
                 model_keys = [each for each in data.keys() if each not in ["E", "exp", "exp_unc"] ]
-                if all([k in pw_reduced_df.keys() for k in model_keys]):
-                    print(f"Experimental pointwise models {model_keys} already exist in dataframe for {title}, overwriting")
+                for k in model_keys:
+                    if k in pw_reduced_df.keys():
+                        print(f"Experimental pointwise models {model_keys} already exist in dataframe for {title}, overwriting")
+                        pw_reduced_df.drop(columns=k, inplace=True)
+                if pw_reduced_df.merge(data, how='inner', validate="1:1").empty:
+                    raise ValueError(f"One of the following columns does not match in {isample}, {title}: E, exp, exp_unc") 
                 data = pw_reduced_df.merge(data, how='inner', validate="1:1")
             h5io.write_pw_reduced(filepath, isample, title, data, cov_data=cov)
 
@@ -156,16 +160,25 @@ class Evaluation:
     evaluation_data         : Optional[Evaluation_Data] = None
     chi2                    : Optional[pd.Series] = None
 
-
+    @property
+    def resonance_ladder(self):
+        return self.respar
+    
     @classmethod
     def from_pkl(title, filepath):
         pass
         # needs to be specific to AutoFitOUT pkl? Not sure if that object is stable yet
 
     @classmethod
-    def from_hdf5(cls, title, filepath, isample):
+    def from_hdf5(cls, title, filepath, isample, experimental_titles=None, experimental_models=None):
         respar = h5io.read_par(filepath, isample, title)
-        # could also look for existing experimental and theoretical pointwise and chi2
+        
+        # # could also look for existing experimental and theoretical pointwise and chi2 - have to see if this evalutations title is in the dataframe columns
+        # if experimental_titles is not None and experimental_models is not None:
+        #     h5f = h5py.File(filepath, 'r')
+        #     for each in experimental_titles:
+        #     h5f.close()
+        # from_hdf5(cls, experimental_titles, experimental_models, filepath, isample)
         return cls(title, respar)
     
 

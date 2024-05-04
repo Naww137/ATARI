@@ -189,14 +189,20 @@ def add_fine_grid_doppler_only(performance_test_filepath,
     h5f = h5py.File(performance_test_filepath, "r")
     isamples = []
     theo_exists_list = []
+    par_exists_list =[]
     for isample in range(isample_max):
         isample_key = f"sample_{isample}"
         if isample_key in h5f.keys():
             isamples.append(isample)
             theo_exists_list.append(f"theo_pw" in h5f[isample_key].keys())
+            par_exists_list.append(f"par_{model_title}" in h5f[isample_key].keys())
     h5f.close()
 
-    for isample, theo_exists in zip(isamples, theo_exists_list):
+    for isample, theo_exists, par_exists in zip(isamples, theo_exists_list, par_exists_list):
+
+        if not par_exists:
+            print(f"model {model_title} doesn't exist for sample {isample}")
+            continue
 
         if theo_exists:
             theo_df = pd.read_hdf(performance_test_filepath, f'/sample_{isample}/theo_pw')

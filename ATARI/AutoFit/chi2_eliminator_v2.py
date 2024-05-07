@@ -318,9 +318,11 @@ class eliminator_by_chi2:
         
 
         # set all req. vary fields
-        fixed_res_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = fixed_resonances_df,
-                                                                    vary_list=[0,1,1] # do not allow to change energy
-                                                                    )
+
+        fixed_res_df = fixed_resonances_df.copy()
+        # fixed_res_df = elim_addit_funcs.set_varying_fixed_params(ladder_df = fixed_resonances_df,
+        #                                                             vary_list=[0,1,1] # do not allow to change energy
+        #                                                             )
         
         if (self.rto.Print):
             print('Side resonances used:')

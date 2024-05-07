@@ -513,9 +513,14 @@ def log_likelihood(particle_pair, resonance_ladder, energy_range=None):
         resonance_ladder_sg = resonance_ladder[resonance_ladder['Jpi'] == jpi]
         E  = resonance_ladder_sg['E'  ].to_numpy()
         Gn = resonance_ladder_sg['Gn1'].to_numpy()
+        L  = resonance_ladder_sg['L'].to_numpy()
         
         log_likelihood += wigner_LL(E , mean_parameters['<D>'])
-        log_likelihood +=  width_LL(Gn, mean_parameters['<D>'], mean_parameters['n_dof'])
+        
+        gn2  = particle_pair.Gn_to_gn2(Gn, E, L[0])
+        gn2m = mean_parameters['<gn2>']
+        log_likelihood += np.sum(-gn2/(2*gn2m) - 0.5*np.log(2*np.pi*gn2m)) # little gamma width LL
+        # log_likelihood +=  width_LL(Gn, mean_parameters['<gn2>'], mean_parameters['n_dof']) # big gamma width LL
         
     return log_likelihood
 

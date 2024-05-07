@@ -507,15 +507,15 @@ def log_likelihood(particle_pair, resonance_ladder, energy_range=None):
     if energy_range is not None:
         resonance_ladder = resonance_ladder[(resonance_ladder['E'] > energy_range[0]) & (resonance_ladder['E'] < energy_range[1])]
 
-    log_likelihood = 1.0
+    log_likelihood = 0.0
     for jpi in resonance_ladder['Jpi'].unique():
         mean_parameters = particle_pair.spin_groups[jpi]
         resonance_ladder_sg = resonance_ladder[resonance_ladder['Jpi'] == jpi]
         E  = resonance_ladder_sg['E'  ].to_numpy()
         Gn = resonance_ladder_sg['Gn1'].to_numpy()
         
-        log_likelihood *= wigner_LL(E , mean_parameters['<D>'])
-        log_likelihood *=  width_LL(Gn, mean_parameters['<D>'], mean_parameters['n_dof'])
+        log_likelihood += wigner_LL(E , mean_parameters['<D>'])
+        log_likelihood +=  width_LL(Gn, mean_parameters['<D>'], mean_parameters['n_dof'])
         
     return log_likelihood
 

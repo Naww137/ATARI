@@ -1646,8 +1646,6 @@ def calc_theo_broadened_xs_for_reactions(
         )
 
         # Construct the file path..
-        # we need to construct it for each reaction type?? 
-        # What the difference then for each reaction type?
         template_filename = os.path.join(settings['running_path'], 'theo.inp') # current working directory!!
         
         if not os.path.exists(template_filename):
@@ -2062,7 +2060,8 @@ def plot_xs_differences_calc_avg_error(
         plot_multiple_hist(values_list = [resid_matrix[rxn][0]], 
                     bins = 100, 
                     cumulative = False, 
-                    colors = ['r', 'b' ], 
+                    colors = ['r', 'b' ],
+                    alphas = [0.5, 0.5], 
                     captions = [f'{rxn},' +r'<$\sigma$>'+ f' {np.round(mean_xs_val,1)}  MAE(R) = {np.round(mean_abs_error,1)}'],
                     title = f'Residuals distribution',
                     show_kde = False,

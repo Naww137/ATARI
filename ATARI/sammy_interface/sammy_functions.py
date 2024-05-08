@@ -129,7 +129,20 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
                                     capture_output=True, timeout=60*10
                                     )
 
-    resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
+    try:
+        resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
+    except:
+        with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"), 'r') as f:
+            readlines = f.readlines()
+        with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"), 'w') as f:
+            inres = False
+            for line in readlines:
+                if line.lower().startswith("resonances"):
+                    inres = True
+                if inres:
+                    f.write(line)
+        resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"))
+    
     # could also read endf spin groups here! 
 
     with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.INP"), 'r') as f:
@@ -805,9 +818,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
                         converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
-                        if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
-                            fudge /= sammyINPyw.LevMarVd
-                            fudge = max(fudge, sammyINPyw.minF)
+                        # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
+                        #     fudge /= sammyINPyw.LevMarVd
+                        #     fudge = max(fudge, sammyINPyw.minF)
                         i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
 
                         if sammyRTO.Print:
@@ -856,9 +869,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
         converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
-        if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
-            fudge /= sammyINPyw.LevMarVd
-            fudge = max(fudge, sammyINPyw.minF)
+        # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
+        #     fudge /= sammyINPyw.LevMarVd
+        #     fudge = max(fudge, sammyINPyw.minF)
 
 
         ### 2 step Lasso if on

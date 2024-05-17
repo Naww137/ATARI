@@ -277,7 +277,7 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
     
     def nonzero_ifvary(row):
         for par in ["E", "Gg", "Gn1", "Gn2", "Gn3"]:
-            if row[f"vary{par}"] == 1.0 and row[par] < 1e-5:
+            if row[f"vary{par}"] == 1.0 and abs(row[par]) < 1e-5:
                 row[par] = 1e-5
         return row
 

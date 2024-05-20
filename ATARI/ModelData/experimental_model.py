@@ -226,4 +226,5 @@ class Experimental_Model:
         
         self.energy_range = new_energy_range
         self.energy_grid = self.energy_grid[(self.energy_grid>min(new_energy_range)) & (self.energy_grid<max(new_energy_range))]
+        self.tof_grid =  e_to_t(self.energy_grid,self.FP[0], True)*1e9 + self.t0[0]
         return

@@ -102,6 +102,7 @@ class TestTransmissionRPICovariance(unittest.TestCase):
         return exp, std, CovT
 
     def test_with_Bi_exp(self):
+        print("testing background function 'exp'")
         mc_mean, mc_std, mc_cov = self.monte_carlo('exp')
         lp_mean, lp_std, lp_cov = self.linear_first_order('exp')
         self.assertAlmostEqual(np.max(abs((mc_mean - lp_mean)/mc_mean)),    0, places=3)
@@ -109,6 +110,7 @@ class TestTransmissionRPICovariance(unittest.TestCase):
         self.assertAlmostEqual(np.max(np.abs((mc_cov-lp_cov)/mc_cov)),      0, places=1)
 
     def test_with_Bi_power(self):
+        print("testing background function 'power'")
         mc_mean, mc_std, mc_cov = self.monte_carlo('power')
         lp_mean, lp_std, lp_cov = self.linear_first_order('power')
         self.assertAlmostEqual(np.max(abs((mc_mean - lp_mean)/mc_mean)),    0, places=3)

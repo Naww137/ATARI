@@ -17,6 +17,7 @@ def plot_reduced_data_T(datasets,
                       true_pars = pd.DataFrame(), 
                       prior_pars = pd.DataFrame(),
                       fit_pars = pd.DataFrame(),
+                      plot_datasets_true: bool = False,
                       title: str = '',
                       show_spingroups: bool = True,
                       xlim = None, 
@@ -30,10 +31,11 @@ def plot_reduced_data_T(datasets,
         if exp.reaction == "transmission":
             model_key = "theo_trans"
         elif exp.reaction == "capture":
-            raise ValueError("Passed capture experiment to plot T")
+            print("Passed capture experiment to plot T, skipping")
+            continue
 
-        plt.errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
-                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+        plt.errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0, #f'{colors[i]}'
+                                                fmt='.', color='k', alpha=0.75, linewidth=0.25, markersize=3, capsize=1.0, label="exp") #exp.title
         
         if len(fits) != 0:
             if (len(fits_chi2) != 0):
@@ -42,21 +44,10 @@ def plot_reduced_data_T(datasets,
                 fit_label = f'{f_model_name} {exp.title}'
             plt.plot(fits[i].E, fits[i][model_key], color='k', zorder=1, lw=1.5, label=fit_label) # colors[i]
         
-        # if len(priors) != 0:
-        #     if (len(priors_chi2) != 0):
-        #         prior_label = f'{pr_model_name} {exp.title} ({priors_chi2[i]})'
-        #     else:
-        #         prior_label = f'{pr_model_name} {exp.title}'
-
-        #     plt.plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5, label=prior_label)
-        
-        # if len(true) != 0:
-        #     if (len(true_chi2) != 0):
-        #         true_label = f'{t_model_name} {exp.title} ({true_chi2[i]})'
-        #     else:
-        #         true_label = f'{t_model_name} {exp.title}'
-                
-        #     plt.plot(true[i].E, true[i][model_key], '-', color='green', zorder=1, alpha=0.5, lw=1.5, label=true_label)
+        if plot_datasets_true:
+            plt.plot(datasets[i].E, datasets[i]['true'], '-', color='r', zorder=5, alpha=1.0, lw=1.5, label="true")
+            # plt.plot(datasets[i].E, datasets[i]['true'], '-', color='b', zorder=5, alpha=1.0, lw=1.5, label="fit")
+            # plt.fill_between(datasets[i].E, datasets[i]['true']-datasets[i]['true']*0.05, datasets[i]['true']+datasets[i]['true']*0.05, color='b', zorder=6, alpha=0.25, lw=1.5, label="unc")
 
 
     # Set the y-axis limits with additional space for text and capture ymax before changing
@@ -132,9 +123,9 @@ def plot_reduced_data_T(datasets,
     plt.title(add_title, fontsize=10)
     
     # ### make it pretty
-    plt.ylabel("T")
+    plt.ylabel("Transmission")
     plt.xlabel("Energy (eV)")
-    plt.xscale('log')
+    # plt.xscale('log')
     plt.xlim(xlim)
     plt.ylim([-0.1,ymax])
     plt.legend(fontsize='small', loc='lower right')
@@ -589,6 +580,73 @@ def plot_datafits(datasets, experiments,
     
     # end additional info if present
     axes[0].set_title(add_title, fontsize=10)
+    
+
+    # ### make it pretty
+    for ax in axes:
+        # ax.set_xlim([200,250])
+        ax.set_ylim([-0.1,1.1])
+        ax.legend(fontsize='small', loc='lower right')
+
+    fig.supxlabel('Energy (eV)')
+    fig.tight_layout()
+
+    return fig
+
+
+
+
+def plot_datafits_compiled(experimental_dataframes, 
+                           experiments, 
+                            model_names = [],
+                            model_pars = [],
+                            title: str = '',
+                            show_spingroups: bool = True,
+                            fig_size : tuple = (6,4)
+                            ):
+
+    colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
+
+    for i, exp in enumerate(experiments):
+        if exp.reaction == "transmission":
+            iax = 0
+        elif exp.reaction == "capture":
+            iax = 1
+        else:
+            raise ValueError()
+
+        axes[iax].errorbar(experimental_dataframes[i].E, experimental_dataframes[i].exp, yerr=experimental_dataframes[i].exp_unc, zorder=0,
+                                                fmt='.', color='k', alpha=0.75, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
+        
+        for imod, mod in enumerate(model_names):
+            # fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
+            model_key = f"theo_{mod}"
+            if i == len(experiments)-1:
+                axes[iax].plot(experimental_dataframes[i].E, experimental_dataframes[i][model_key], color=colors[imod], zorder=1, lw=1.5, label=mod) # colors[i]
+            else:
+                axes[iax].plot(experimental_dataframes[i].E, experimental_dataframes[i][model_key], color=colors[imod], zorder=1, lw=1.5)#, label=mod) # colors[i]
+        
+    # Set the y-axis limits with additional space for text and capture ymax before changing
+    
+    y_top_padding = 0.1 
+    x_offset = 0.05
+
+    ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+    for ax in axes:
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + y_top_padding)
+
+
+        
+    axes[0].set_ylabel("T")
+    axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+    # set title
+    fig.suptitle(title, fontsize=14)
+    
+    # end additional info if present
+    # axes[0].set_title(add_title, fontsize=10)
     
 
     # ### make it pretty

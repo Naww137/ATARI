@@ -511,9 +511,7 @@ class Particle_Pair:
             # sample resonance levels for each spin group with negative parity
             [levels, level_spacing] = sample_RRR_levels(self.energy_range, Jinfo["<D>"], ensemble=ensemble, rng=rng)
             N = len(levels)
-            # if no resonance levels sampled, dont try to sample widths
-            if N == 0:
-                continue
+
             # sample reduced widths
             gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], rng=rng)
             gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)

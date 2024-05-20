@@ -1649,6 +1649,7 @@ def calc_theo_broadened_xs_for_reactions(
         # we need to construct it for each reaction type?? 
         # What the difference then for each reaction type?
         template_filename = os.path.join(settings['running_path'], 'theo.inp') # current working directory!!
+        exp_model_theo.template=template_filename
         
         if not os.path.exists(template_filename):
             template_creator.make_input_template(template_filename, Ta_pair, exp_model_theo, rto)

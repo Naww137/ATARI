@@ -276,11 +276,11 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                   sammyINP.experimental_covariance['Jac_sys'],
                   sammyINP.experimental_covariance['Cov_sys'],
                   sammyINP.experimental_covariance['diag_stat'])
-        #TODO: Filter idc dataframe
+        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
-        #TODO: Filter idc dataframe
+        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
         idc = True
     else:
         if sammyINP.experimental_covariance is not None:

@@ -481,7 +481,7 @@ def filter_idc(filepath, pw_df):
 
             elif in_partial_derivatives:
                 E = float(line.split()[0]) 
-                if (round(E,5)>=round(minE,5)) & (round(E,5)<=round(maxE,5)):
+                if (round(E,5)>=round(minE,5)-1e-5) & (round(E,5)<=round(maxE,5)+1e-5):
                     pass
                 else:
                     continue
@@ -905,6 +905,110 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     return max(istep, 0)
 
 
+from ATARI.utils.datacontainers import Evaluation_Data
+from copy import deepcopy
+
+def get_batched_evaluation_data_list(batches, experimental_titles, datasets, experiments, covariance_data):
+    batch_titles_all_exp = []
+    batch_experiments_all_exp = []
+    batch_datasets_all_exp = []
+    batch_covdat_all_exp = []
+
+    for title, dat, exp, cov_dat in zip(experimental_titles, datasets, experiments, covariance_data):
+    
+        N = len(dat)
+        remainder = N%batches
+        N_per_batch = int((N-remainder)/batches)
+        rand_int = np.random.choice(N, size=N, replace=False) 
+        
+        batch_titles = []
+        batch_experiments = []
+        batch_datasets = []
+        batch_covdat = []
+
+        for i in range(batches):
+            if i == batches - 1:
+                end = (i+1)*N_per_batch + remainder
+            else:
+                end = (i+1)*N_per_batch
+
+            index = rand_int[i*N_per_batch:end]
+            batch_dat  = dat.iloc[index, :].sort_values("E")
+            if cov_dat:
+                stat = cov_dat['diag_stat'].iloc[index, :].sort_index()
+                Jac  = cov_dat['Jac_sys'].iloc[:, index].T.sort_index().T
+                cov = {'Jac_sys':Jac, 'diag_stat': stat, 'Cov_sys': cov_dat["Cov_sys"]}
+            else:
+                cov = {}
+
+            batch_titles.append(title)
+            batch_experiments.append(exp)
+            batch_datasets.append(batch_dat)
+            batch_covdat.append(cov)
+
+        batch_titles_all_exp.append(batch_titles)
+        batch_experiments_all_exp.append(batch_experiments)
+        batch_datasets_all_exp.append(batch_datasets)
+        batch_covdat_all_exp.append(batch_covdat)
+
+
+    evaluation_data_for_each_batch = []
+    for i in range(batches):
+        titles=[]
+        exps = []
+        dats = []
+        covdats = []
+        for j in range(len(experimental_titles)):
+            titles.append(batch_titles_all_exp[j][i])
+            exps.append(batch_experiments_all_exp[j][i])
+            dats.append(batch_datasets_all_exp[j][i])
+            covdats.append(batch_covdat_all_exp[j][i])
+        evaluation_data_for_each_batch.append(Evaluation_Data(titles, exps, dats, covdats))
+
+    return evaluation_data_for_each_batch
+
+
+def perform_minibatch_fits(max_steps, batches, sammyINPyw, sammyRTO, dataset_titles):
+    epoch_samouts = []
+    batch_samouts = []
+    epochs = max_steps
+    sammyINPyw_copy = deepcopy(sammyINPyw)
+    sammyRTO_copy = deepcopy(sammyRTO)
+    sammyINPyw_copy.minibatch = False
+
+    epoch_chi2 = np.inf
+    e = 0
+    while True:
+
+        evaluation_data_for_each_batch = get_batched_evaluation_data_list(batches, dataset_titles, sammyINPyw.datasets, sammyINPyw.experiments, sammyINPyw.experimental_covariance)
+        for b in range(batches):
+            print(f"-----------\nBatch {b}\n-----------")
+            sammyINPyw_copy.datasets= evaluation_data_for_each_batch[b].datasets
+            sammyINPyw_copy.experiments = evaluation_data_for_each_batch[b].experimental_models
+            sammyINPyw_copy.experimental_covariance= evaluation_data_for_each_batch[b].covariance_data
+            samout = run_sammy_YW(sammyINPyw_copy, sammyRTO_copy)
+            sammyINPyw_copy.resonance_ladder = copy(samout.par_post)
+            batch_samouts.append(samout)
+
+        ## epoch solve on all data
+        print(f"===========\nEpoch {e}\n=============")
+        sammyINPyw_copy.datasets= sammyINPyw.datasets
+        sammyINPyw_copy.experiments = sammyINPyw.experiments
+        sammyINPyw_copy.experimental_covariance= deepcopy(sammyINPyw.experimental_covariance)
+        samout = run_sammy_YW(sammyINPyw_copy, sammyRTO_copy)
+        sammyINPyw.resonance_ladder = copy(samout.par_post)
+        epoch_samouts.append(samout)
+
+        epoch_chi2_new = np.sum(samout.chi2_post)
+        if epoch_chi2-epoch_chi2_new < sammyINPyw.step_threshold or e > epochs:
+            break
+        else:
+            epoch_chi2 = epoch_chi2_new
+            e += 1
+
+    return epoch_samouts[-1]
+
+
 
 def plot_YW(sammyRTO, dataset_titles, i):
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
@@ -940,9 +1044,7 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    # dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
-    # sammyINPyw.reactions = [exp.reaction for exp in sammyINPyw.experiments]
 
     setup_YW_scheme(sammyRTO, sammyINPyw)
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
@@ -954,12 +1056,19 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     
     ### run bayes
     if sammyRTO.bayes:
-        ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-        par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyRTO, dataset_titles, ifinal)
-        sammy_OUT.pw_post = lsts_post
-        sammy_OUT.par_post = par_post
-        sammy_OUT.chi2_post = chi2list_post
-        sammy_OUT.chi2n_post = chi2nlist_post
+        if sammyINPyw.minibatch:
+            sammy_OUT = perform_minibatch_fits(sammyINPyw.max_steps, sammyINPyw.minibatches, sammyINPyw, sammyRTO, dataset_titles)
+            sammy_OUT.pw=lsts
+            sammy_OUT.par=par
+            sammy_OUT.chi2=chi2list
+            sammy_OUT.chi2n=chi2nlist
+        else:
+            ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
+            par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyRTO, dataset_titles, ifinal)
+            sammy_OUT.pw_post = lsts_post
+            sammy_OUT.par_post = par_post
+            sammy_OUT.chi2_post = chi2list_post
+            sammy_OUT.chi2n_post = chi2nlist_post
 
 
     if not sammyRTO.keep_runDIR:

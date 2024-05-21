@@ -664,7 +664,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
             chi2_old = chi2
 
     if i == iterations:
-        print(f"\t{lead}Step did not converge {i} iterations")
+        print(f"\t{lead}Step did not converge in {i} iterations")
         converged=False
     else:
         converged=True

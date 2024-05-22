@@ -1077,7 +1077,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
             sammy_OUT.chi2n_post = chi2nlist_post
 
 
-    if not sammyRTO.keep_runDIR:
+    if not sammyRTO.keep_runDIR and os.path.isdir(sammyRTO.keep_runDIR):
         shutil.rmtree(sammyRTO.sammy_runDIR)
 
     return sammy_OUT

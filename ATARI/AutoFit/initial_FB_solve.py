@@ -100,6 +100,9 @@ class InitialFBOPT:
         self._steps_per_batch = 2
         self._batch_fitpar_random = False
 
+        self._minibatch = True
+        self._minibatches = 5
+
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,1,1]
         self._fit_all_spin_groups = True
@@ -238,6 +241,20 @@ class InitialFBOPT:
     @batch_fitpar_random.setter
     def batch_fitpar_random(self, batch_fitpar_random):
         self._batch_fitpar_random = batch_fitpar_random
+
+    @property
+    def minibatch(self):
+        return self._minibatch
+    @minibatch.setter
+    def minibatch(self, minibatch):
+        self._minibatch = minibatch
+
+    @property
+    def minibatches(self):
+        return self._minibatches
+    @minibatches.setter
+    def minibatches(self, minibatches):
+        self._minibatches = minibatches
 
     @property
     def fitpar2(self):
@@ -395,6 +412,9 @@ class InitialFB:
             batch_fitpar_ifit = self.options.batch_fitpar_ifit,
             steps_per_batch = self.options.steps_per_batch,
             batch_fitpar_random = self.options.batch_fitpar_random,
+
+            minibatch=self.options.minibatch,
+            minibatches=self.options.minibatches,
 
             external_resonance_indices = external_resonance_indices,
 

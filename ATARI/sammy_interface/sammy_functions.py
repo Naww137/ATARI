@@ -1001,12 +1001,18 @@ def perform_minibatch_fits(max_steps, batches, sammyINPyw, sammyRTO, dataset_tit
 
         epoch_chi2_new = np.sum(samout.chi2_post)
         if epoch_chi2-epoch_chi2_new < sammyINPyw.step_threshold or e > epochs:
+            if epoch_chi2-epoch_chi2_new < 0:
+                print(f"Taking previous epoch result")
+                ibest = -2
+            else:
+                ibest = -1
+                print(f"Taking current epoch result")
             break
         else:
             epoch_chi2 = epoch_chi2_new
             e += 1
 
-    return epoch_samouts[-1]
+    return epoch_samouts[ibest]
 
 
 

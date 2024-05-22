@@ -185,7 +185,7 @@ class SammyInputDataYW:
     batch_fitpar_random: bool = False
 
     minibatch   :   bool = True
-    minibatches :   int  = 5
+    minibatches :   int  = 4
 
     external_resonance_indices: Optional[list] = None
 

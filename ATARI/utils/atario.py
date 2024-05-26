@@ -135,9 +135,13 @@ def expand_sammy_ladder_2_atari(particle_pair, ladder) -> pd.DataFrame:
         # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
         gn2 = row.Gn1/2/P_array[0].item()
 
-        return gg2, gn2, J, L
+        # for 1 eV - reduced width gn2_1ev?
+        _, P_array_1ev, _, _ = FofE_recursive([1], particle_pair.ac, particle_pair.M, particle_pair.m, L)
+        gn2_1ev = row.Gn1/2/P_array_1ev[0].item()
 
-    ladder[["gg2","gn2","Jpi","L"]] = ladder.apply(lambda row: get_J_L_Wred(row), axis=1,result_type='expand')
+        return gg2, gn2, gn2_1ev, J, L
+
+    ladder[["gg2","gn2","gn2_1ev", "Jpi","L"]] = ladder.apply(lambda row: get_J_L_Wred(row), axis=1,result_type='expand')
 
     return ladder
 

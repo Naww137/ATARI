@@ -2271,7 +2271,10 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_grid, lwave=0):
         ladder_subset = ladder_subset[(ladder_subset['L'] == lwave) & (ladder_subset['Jpi'] == Jpi)]
 
         # add a new column with Gn1_in_eV
-        ladder_subset['Gn1_in_eV'] = ladder_subset['Gn1']/1000 
+        #ladder_subset['Gn1_in_eV'] = ladder_subset['Gn1']/1000 
+        
+        #add a new column with Gn1_in_eV
+        ladder_subset['Gn1_in_eV'] = ladder_subset['gn2_1ev']/1000 
 
         N_res_Jpi = len(ladder_subset)
 

@@ -309,7 +309,7 @@ def plot_reduced_data_TY(datasets   :  list,
                 fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
             else:
                 fit_label = f'{f_model_name} {exp.title}'
-            axes[iax].plot(fits[i].E, fits[i][model_key], color='k', zorder=1, lw=1.5, label=fit_label, marker='.') # colors[i]
+            axes[iax].plot(fits[i].E, fits[i][model_key], zorder=1, lw=1.5, label=fit_label, color=colors[i]) #marker='.') #color='k',
         
         if len(priors) != 0:
             if (len(priors_chi2) != 0):

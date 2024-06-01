@@ -2274,13 +2274,13 @@ def calc_SF_Gn1(Ta_pair, ladder_df, energy_grid, lwave=0):
         #ladder_subset['Gn1_in_eV'] = ladder_subset['Gn1']/1000 
         
         #add a new column with Gn1_in_eV
-        ladder_subset['Gn1_in_eV'] = ladder_subset['gn2_1ev']/1000 
+        ladder_subset['Gn1_in_eV'] = ladder_subset['gn2']/1000 
 
         N_res_Jpi = len(ladder_subset)
 
         SF_Gn1_l = np.zeros_like(energy_grid)
 
-        # Manually set the first element to 0
+        # set the first element to 0
         SF_Gn1_l[0] = 0
 
         delta_E = energy_grid[-1] - energy_grid[0]
@@ -2334,11 +2334,11 @@ def calc_SF_error_by_Jpi(SF_dict_true: dict,
     sum_SF_error = 0
 
     for key in SF_dict_true:
-        
+
+        # per spin group        
+        # last values in energy grid
         sum_SF_true += SF_dict_true[key]['lastval']
         sum_SF_sol += SF_dict_sol[key]['lastval']
-
-        # per spin group
 
         # error
         result_dict['by_Jpi'][key] = {}
@@ -2354,6 +2354,19 @@ def calc_SF_error_by_Jpi(SF_dict_true: dict,
         result_dict['by_Jpi'][key]['abs_rel_error']  = np.abs(SF_sg_error) / SF_dict_true[key]['lastval'] * 100
 
         result_dict['squared_error_sum_separate_Jpi'] += result_dict['by_Jpi'][key]['sq_error']
+
+        ## AREA between curves
+        # curves of SF over E
+        curve_SF_E_sol = SF_dict_sol[key]['df']
+        curve_SF_E_true = SF_dict_true[key]['df']
+
+        # checking data have similar energy grid
+
+        if (curve_SF_E_sol['E'].equals(curve_SF_E_true['E'])):
+            print('Curves have similar energy grids')
+
+
+        ## end AREA between curves
     
 
 

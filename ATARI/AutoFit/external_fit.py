@@ -462,7 +462,12 @@ def sgd(rto,
 
         steps = 100, 
         thresh = 0.01,
+
         alpha = 1e-3, 
+        beta_1 = 0.9,
+        beta_2 = 0.999,
+        epsilon = 1e-8,
+
         print_bool = True, 
 
         batches = 25, 
@@ -497,9 +502,6 @@ def sgd(rto,
 
     ### Initialize adam parameters
     t = 0
-    beta_1 = 0.9
-    beta_2 = 0.999
-    epsilon = 1e-8
     mt = np.zeros_like(Pu_next)
     vt = np.zeros_like(Pu_next)
     # decay_rate = np.array(decay_rate)
@@ -532,17 +534,16 @@ def sgd(rto,
         rand_int = np.random.choice(N, size=N, replace=False) 
         # Performing minibatch moves
         for i in range(batches):
-
             Pu = Pu_next
             t += 1
             # Pu_next = take_step(Pu, alpha, dchi2_dpar[ibatch], hessian_approx[ibatch], dreg_dpar[ibatch], iE, gaus_newton=gaus_newton, momentum=momentum)
 
-            if i == batches - 1:
-                end = (i+1)*N_per_batch + remainder
-            else:
-                end = (i+1)*N_per_batch
-
-            index = rand_int[i*N_per_batch:end]
+            # if i == batches - 1:
+            #     end = (i+1)*N_per_batch + remainder
+            # else:
+            #     end = (i+1)*N_per_batch
+            # index = rand_int[i*N_per_batch:end]
+            index = np.random.choice(N, size=int(N/batches), replace=False) 
             s_i = s[index]
             U_i = U[:, index]
             Vt_i = Vt[index, :]

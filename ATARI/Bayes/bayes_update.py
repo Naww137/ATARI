@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 from copy import copy
 from math import pi
 import numpy as np
@@ -10,7 +10,8 @@ import warnings
 from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   du_dp_E, du_dp_g, du_dp_n
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyInputDataYW, SammyOutputData
-from ATARI.sammy_interface.sammy_deriv import get_derivatives
+from ATARI.ModelData.experimental_model import Experimental_Model
+from ATARI.sammy_interface.sammy_deriv import get_derivatives, get_derivatives_YW
 from ATARI.Bayes import utils
 
 def BayesMW(P, M, G, V, D, T):
@@ -209,33 +210,6 @@ def Bayes(sammy_out:SammyOutputData,
     # par_post = particle_pair.expand_ladder(par_post)
     return par_post, Mpu
 
-# =================================================================================================
-#   Incomplete Functions
-# =================================================================================================
-
-# def BayesIter(P, M, V, D, func, num_iterations:int=1, model='NV'):
-#     """
-#     ...
-#     """
-
-#     if M is None:
-#         model = 'MW'
-#     if   model == 'IQ':     Bayes = BayesIQ
-#     elif model == 'NV':     Bayes = BayesNV
-#     elif model == 'MW':     Bayes = BayesMW
-#     else:                   raise NotImplementedError('...')
-#     Pn = P;  Mn = M
-#     for iter in range(num_iterations):
-#         Tn, Gn = func(Pn)
-#         T = Tn - Gn @ (P - Pn)
-#         Pn, Mn = Bayes(P, M, Gn, V, D, T)
-#     return Pn, Mn
-
-
-
-
-
-
 
 
 
@@ -249,214 +223,69 @@ def Bayes(sammy_out:SammyOutputData,
 #   New Bayes Implementation
 # =================================================================================================
 
-# def Bayes_extended(sammy_inp:SammyInputData,
-#                    sammy_rto:SammyRunTimeOptions,
-#                    RPCM:np.ndarray=None,
-#                    WigLL:bool=True, PTLL:bool=True):
-#     """
-#     ...
-#     """
-
-#     particle_pair = sammy_inp.particle_pair
-    
-#     # Prior matrices:
-#     Mu, V, D = Bayes_prior_matrices(sammy_inp, sammy_rto, RPCM)
-
-#     # Iterating Bayes:
-#     for iter in range(sammy_rto.iterations):
-#         # Getting derivatives:
-#         sammy_out = get_derivatives(sammy_inp, sammy_rto, find_theo_trans=True, u_or_p='u')
-
-#         # Gathering the rest of the matrices:
-#         Pu, Gu, Tn, P_vary = Bayes_matrices(sammy_out, particle_pair, sammy_rto)
-        
-#         # Updating prior fit for iteration scheme:
-#         if iter == 0:
-#             Pu0 = Pu
-#             T = Tn
-#         else:
-#             T = Tn + Gu @ (Pu0 - Pu)
-
-#         # Bayes Likelihoods:
-#         Ui, W, C = Bayes_likelihoods(sammy_inp.resonance_ladder, particle_pair, WigLL, PTLL)
-
-#         # Running Bayes:
-#         Ppu, Mpu = Bayes_conditioner(sammy_rto, Pu0, Mu, Gu, V, D, T, P_vary, Ui, W, C, scheme=sammy_rto.bayes_scheme)
-
-#         # Converting from U to P parameters:
-#         par = sammy_inp.resonance_ladder
-#         J_IDs = par['J_ID'].to_numpy(dtype=int)
-#         Ls    = par['L'   ].to_numpy(dtype=int)
-#         Ppu = Ppu.reshape(-1,3)
-#         Eu  = Ppu[:,0]
-#         Ggu = Ppu[:,1]
-#         Gnu = Ppu[:,2]
-#         Ppp = np.zeros_like(Ppu)
-#         Ppp[:,0] = u2p_E(Eu)
-#         Ppp[:,1] = u2p_g(Ggu)
-#         Ppp[:,2] = u2p_n(Gnu, Ppp[:,0], Ls[J_IDs-1], particle_pair)
-#         # filling in posterior parameter dataframe:
-#         par_post = pd.DataFrame(Ppp, columns=['E', 'Gg', 'Gn1'])
-#         par_post['J_ID']    = par['J_ID']
-#         par_post['L']       = par['L']
-#         par_post['Jpi']     = par['Jpi']
-#         par_post['varyE']   = par['varyE']
-#         par_post['varyGn1'] = par['varyGn1']
-#         par_post['varyGg']  = par['varyGg']
-#         sammy_inp.resonance_ladder = par_post
-#     return par_post, Mpu
-
-# def Bayes_prior_matrices(sammy_inp:SammyInputData,
-#                          sammy_rto:SammyRunTimeOptions,
-#                          RPCM:np.ndarray=None):
-#     """
-#     ...
-#     """
-
-#     # Parameters:
-#     par = sammy_inp.resonance_ladder
-#     particle_pair = sammy_inp.particle_pair
-#     E    = par['E'].to_numpy()
-#     Gg   = par['Gg'].to_numpy()
-#     Gn   = par['Gn1'].to_numpy()
-#     J_ID = par['J_ID'].to_numpy(dtype=int)
-#     L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
-#     for jpi, mean_params in particle_pair.spin_groups.items():
-#         jid = mean_params['J_ID']
-#         L[jid-1] = mean_params['Ls'][0]
-#     # converting to U-parameters
-#     ue = p2u_E(E)
-#     ug = p2u_g(Gg)
-#     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-#     Pu = np.column_stack((ue, ug, un)).reshape(-1,)
-    
-#     # Pointwise Data:
-#     D = sammy_inp.experimental_data['exp_trans'].to_numpy()
-#     V = sammy_inp.experimental_covariance
-#     if V is None:
-#         raise NotImplementedError('Bayes without data covariance matrix not implemented yet.')
-    
-#     if sammy_rto.use_least_squares:
-#         Mu = None
-#     elif RPCM is not None:
-#         Mp = RPCM 
-#         dU_dP = np.zeros_like(Pu)
-#         dU_dP[ ::3] = du_dp_E(E)
-#         dU_dP[1::3] = du_dp_g(Gg)
-#         dU_dP[2::3] = du_dp_n(Gn, E, L[J_ID-1], particle_pair)
-#         Mu = dU_dP[NA,:] * Mp * dU_dP[:,NA]
-#     else: # use fudge factor
-#         fudge = sammy_inp.initial_parameter_uncertainty
-#         warnings.warn('Only least squares matches SAMMY. An approximation is used with prior covariances.')
-#         dPp = np.zeros((len(E),3))
-#         dPp[:,0] = 0.5 * 0.001 * (Gg + Gn) # FIXME: THIS IS SUPPOSED TO BE A MULTIPLE OF THE BROADENNED WIDTH!!!
-#         dPp[:,1] = fudge * Gg
-#         dPp[:,2] = fudge * Gn
-#         dPu = np.zeros((len(E),3))
-#         dPu[:,0] = du_dp_E(E ) * dPp[:,0]
-#         dPu[:,1] = du_dp_g(Gg) * dPp[:,1]
-#         dPu[:,2] = du_dp_n(Gn, E, L[J_ID-1], particle_pair) * dPp[:,2]
-#         dPu = dPu.reshape(-1,)
-#         Mu = dPu**2
-#     return Mu, V, D
-
-# def Bayes_matrices(sammy_out:SammyOutputData,
-#                    particle_pair:Particle_Pair,
-#                    sammy_rto:SammyRunTimeOptions):
-#     """
-#     ...
-#     """
-
-#     # Parameters:
-#     par = sammy_out.par
-#     E    = par['E'].to_numpy()
-#     Gg   = par['Gg'].to_numpy()
-#     Gn   = par['Gn1'].to_numpy()
-#     J_ID = par['J_ID'].to_numpy(dtype=int)
-#     L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
-#     for jpi, mean_params in particle_pair.spin_groups.items():
-#         jid = mean_params['J_ID']
-#         L[jid-1] = mean_params['Ls'][0]
-#     # converting to U-parameters
-#     ue = p2u_E(E)
-#     ug = p2u_g(Gg)
-#     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-#     Pu = np.column_stack((ue, ug, un)).reshape(-1,)
-
-#     # Derivatives:
-#     Gu = sammy_out.derivatives
-
-#     # Parameter vary conditions:
-#     P_vary = np.zeros((3*len(par),), dtype=bool)
-#     P_vary[ ::3] = par['varyE'  ].to_numpy()
-#     P_vary[1::3] = par['varyGg' ].to_numpy()
-#     P_vary[2::3] = par['varyGn1'].to_numpy()
-    
-#     # Pointwise Data:
-#     pw  = sammy_out.pw
-#     T = pw['theo_trans'].to_numpy()
-    
-#     return Pu, Gu, T, P_vary
-
-from time import time
-
 def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
                    sammy_rto:SammyRunTimeOptions,
                    RPCM:np.ndarray=None,
                    WigLL:bool=True, PTLL:bool=True):
     """
-    ...
-    """
+    The new Bayes implementation outside of SAMMY. This includes Wigner and Porter-Thomas
+    log-likelihoods when specified.
 
-    print('start')
-    t0 = time()
+    Parameters
+    ----------
+    sammy_inp : SammyInputData or SammyInputDataYW
+        The SAMMY input object.
+    sammy_rto : SammyRunTimeOptions
+        The SAMMY runtime options.
+    RPCM : array, optional
+        The optional resonance parameter covariance matrix. If not specified,
+        `initial_parameter_uncertainty` is used. If `use_least_squares` is on, the RPCM is ignored.
+    WigLL : bool
+        If true, Wigner log-likelihoods are included. Default is True.
+    PTLL : bool
+        If true, Porter-Thoas log-likelihoods are included. Default is True.
+
+    Returns
+    -------
+    par_post : DataFrame
+        The optimized resonance parameters
+    Mpu : array
+        The outgoing resonance parameter covariance matrix.
+    chi2 : float
+        The outgoing chi2 value(s).
+    """
 
     particle_pair = sammy_inp.particle_pair
     YW = isinstance(sammy_inp, SammyInputDataYW)
+    if YW:      exp = sammy_inp.experiments
+    else:       exp = sammy_inp.experiment
     
     # Prior matrices:
     Mu, V, D = Bayes_prior_matrices(sammy_inp, sammy_rto, RPCM)
 
-    print(f'After prior matrices: {time()-t0} s')
-    t0 = time()
-
     # Iterating Bayes:
     for iter in range(sammy_rto.iterations):
         # Getting derivatives:
-        sammy_out = get_derivatives(sammy_inp, sammy_rto, find_theo_trans=True, u_or_p='u') # FIXME: YW DERIVATIVES?
-        print(f'After derivatives: {time()-t0} s')
-        t0 = time()
+        if YW:  sammy_out = get_derivatives_YW(sammy_inp, sammy_rto, u_or_p='u')
+        else:   sammy_out = get_derivatives(sammy_inp, sammy_rto, u_or_p='u')
 
         # Gathering the rest of the matrices:
-        Pu, Gu, Tn, P_vary = Bayes_matrices(sammy_out, particle_pair, sammy_rto)
-        print(f'After Bayes Matrices: {time()-t0} s')
-        t0 = time()
+        Pu, Gu, Tn, P_vary = Bayes_matrices(sammy_out, particle_pair, exp, sammy_rto)
 
         # Updating prior fit for iteration scheme:
         if iter == 0:
+            # sammy_out0 = sammy_out
             Pu0 = Pu
             T = Tn
         else:
-            if YW:
-                T = [Tnj + Guj @ (Pu0j - Puj) \
-                     for Tnj, Guj, Pu0j, Puj in zip(Tn, Gu, Pu0, Pu)]
-            else:
-                T = Tn + Gu @ (Pu0 - Pu)
-
-            print(f'After Iteration Stuff: {time()-t0} s')
-            t0 = time()
+            T = update_theo_matrix(Tn, Gu, Pu0, Pu, YW)
+        find_Mp = (iter == sammy_rto.iterations - 1) # only find posterior matrix for the last iteration
 
         # Bayes Likelihoods:
-        Ui, W, C = Bayes_likelihoods(sammy_inp.resonance_ladder, particle_pair, WigLL, PTLL)
-
-        print(f'After Likelihood Stuff: {time()-t0} s')
-        t0 = time()
+        Ui, W, C = Bayes_likelihoods(sammy_inp.resonance_ladder, particle_pair, sammy_rto, WigLL, PTLL)
 
         # Running Bayes:
-        Ppu, Mpu = Bayes_conditioner(sammy_rto, Pu0, Mu, Gu, V, D, T, P_vary, Ui, W, C, scheme=sammy_rto.bayes_scheme)
-
-        print(f'After Bayes Run: {time()-t0} s')
-        t0 = time()
+        Ppu, Mpu, chi2 = Bayes_conditioner(sammy_rto, Pu0, Mu, Gu, V, D, T, P_vary, Ui, W, C, scheme=sammy_rto.bayes_scheme, find_Mp=find_Mp)
 
         # Converting from U to P parameters:
         par = sammy_inp.resonance_ladder
@@ -467,7 +296,7 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         Ggu = Ppu[:,1]
         Gnu = Ppu[:,2]
         Ppp = np.zeros_like(Ppu)
-        Ppp[:,0] = u2p_E(Eu)
+        Ppp[:,0] = Eu # Ppp[:,0] = u2p_E(Eu)
         Ppp[:,1] = u2p_g(Ggu)
         Ppp[:,2] = u2p_n(Gnu, Ppp[:,0], Ls[J_IDs-1], particle_pair)
         # filling in posterior parameter dataframe:
@@ -480,14 +309,17 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         par_post['varyGg']  = par['varyGg']
         sammy_inp.resonance_ladder = par_post
 
-        print(f'After u-to-p conversion: {time()-t0} s')
-        t0 = time()
-    return par_post, Mpu
+    # sammy_out = SammyOutputData(pw=sammy_out0.pw, par=sammy_out0.par, chi2=sammy_out0.chi2, chi2n=sammy_out0.chi2n,
+    #                             par_post=par_post)
+
+    return par_post, Mpu, chi2
 
 def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
                          sammy_rto:SammyRunTimeOptions,
                          RPCM:np.ndarray=None):
     """
+    Finds the Bayes matrices that are consistent between iterations.
+
     ...
     """
 
@@ -505,33 +337,36 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         jid = mean_params['J_ID']
         L[jid-1] = mean_params['Ls'][0]
     # converting to U-parameters
-    ue = p2u_E(E)
+    # ue = p2u_E(E)
     ug = p2u_g(Gg)
     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
+    Pu = np.column_stack((E, ug, un)).reshape(-1,)
     
-    # Pointwise Data:
+    # Pointwise Data and Covariance:
     if YW:
-        D = [dataset.pw_reduced.exp.to_numpy() for dataset in sammy_inp.datasets]
+        D = [];     V = []
+        for dataset, experimental_covariance in zip(sammy_inp.datasets, sammy_inp.experimental_covariance):
+            D.append(dataset.exp.to_numpy())
+            if experimental_covariance:
+                V.append(experimental_covariance)
+            else:
+                D_err = dataset.exp_unc.to_numpy()
+                V.append({'diag_stat': pd.DataFrame({'var_stat':D_err**2}, index=dataset.E)})
     else:
         D = sammy_inp.experimental_data.exp.to_numpy()
-    # Covariance:
-    if sammy_inp.experimental_covariance is None:
-        if YW:
-            D_errs = [dataset.pw_reduced.exp_unc.to_numpy() for dataset in sammy_inp.datasets]
-            V = [{'diag_stat': D_err**2} for D_err in D_errs]
+        if sammy_inp.experimental_covariance:
+            V = sammy_inp.experimental_covariance
         else:
             D_err = sammy_inp.experimental_data.exp_unc.to_numpy()
-            V = {'diag_stat': D_err**2}
-    else:
-        V = sammy_inp.experimental_covariance
+            V = {'diag_stat': pd.DataFrame({'var_stat':D_err**2}, index=sammy_inp.experimental_data.E)}
     
+    # Resonance Parameter Covariance Matrix:
     if sammy_rto.use_least_squares:
         Mu = None
     elif RPCM is not None:
         Mp = RPCM 
         dU_dP = np.zeros_like(Pu)
-        dU_dP[ ::3] = du_dp_E(E)
+        dU_dP[ ::3] = 1.0 #du_dp_E(E)
         dU_dP[1::3] = du_dp_g(Gg)
         dU_dP[2::3] = du_dp_n(Gn, E, L[J_ID-1], particle_pair)
         Mu = dU_dP[NA,:] * Mp * dU_dP[:,NA]
@@ -543,17 +378,22 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         dPp[:,1] = fudge * Gg
         dPp[:,2] = fudge * Gn
         dPu = np.zeros((len(E),3))
-        dPu[:,0] = du_dp_E(E ) * dPp[:,0]
+        # dPu[:,0] = du_dp_E(E ) * dPp[:,0]
+        dPu[:,0] = dPp[:,0]
         dPu[:,1] = du_dp_g(Gg) * dPp[:,1]
         dPu[:,2] = du_dp_n(Gn, E, L[J_ID-1], particle_pair) * dPp[:,2]
         dPu = dPu.reshape(-1,)
         Mu = dPu**2
     return Mu, V, D
 
+# Using P-parameter Energies:
 def Bayes_matrices(sammy_out:SammyOutputData,
                    particle_pair:Particle_Pair,
+                   experiment:Union[Experimental_Model,List[Experimental_Model]],
                    sammy_rto:SammyRunTimeOptions):
     """
+    Finds the Bayes matrices that change between iterations.
+
     ...
     """
 
@@ -568,13 +408,19 @@ def Bayes_matrices(sammy_out:SammyOutputData,
         jid = mean_params['J_ID']
         L[jid-1] = mean_params['Ls'][0]
     # converting to U-parameters
-    ue = p2u_E(E)
+    # ue = p2u_E(E)
     ug = p2u_g(Gg)
     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
+    Pu = np.column_stack((E, ug, un)).reshape(-1,)
 
     # Derivatives:
-    Gu = sammy_out.derivatives # FIXME: YW DERIVATIVES?
+    Gu = sammy_out.derivatives
+    # Converting u-parameter energies into p-parameter energies
+    if isinstance(Gu, list):
+        for Gu_ in Gu:
+            Gu_[:,::3] *= du_dp_E(E)
+    else:
+        Gu[:,::3] *= du_dp_E(E)
 
     # Parameter vary conditions:
     P_vary = np.zeros((3*len(par),), dtype=bool)
@@ -585,26 +431,54 @@ def Bayes_matrices(sammy_out:SammyOutputData,
     # Pointwise Data:
     pw = sammy_out.pw
     if type(pw) == list: # YW scheme
-        T = [pw_set['theo_trans'].to_numpy() for pw_set in pw]
+        T = []
+        for pw_set, exp in zip(pw, experiment):
+            if exp.reaction == "transmission":
+                T.append(pw_set['theo_trans'].to_numpy())
+            else:
+                T.append(pw_set['theo_xs'].to_numpy())
     else:
-        T = pw['theo_trans'].to_numpy()
+        if experiment.reaction == "transmission":
+            T = pw['theo_trans'].to_numpy()
+        else:
+            T = pw['theo_xs'].to_numpy()
     
     return Pu, Gu, T, P_vary
 
-def Bayes_likelihoods(resonance_ladder:pd.DataFrame, particle_pair:Particle_Pair, WigLL:bool=True, PTLL:bool=True):
+def update_theo_matrix(Tn, Gn, P0, Pn, YW:bool):
     """
+    Updates the theoretical matrix, `T`, for implicit iteration.
+
+    Source: SAMMY Manual (section IV.A.3)
+    """
+
+    if YW:
+        T = []
+        for Tnj, Gnj in zip(Tn, Gn):
+            T.append(Tnj + Gnj @ (P0 - Pn))
+    else:
+        T = Tn + Gn @ (P0 - Pn)
+    return T
+
+# P-parameter Energies:
+def Bayes_likelihoods(resonance_ladder:pd.DataFrame, particle_pair:Particle_Pair, sammy_rto:SammyRunTimeOptions, WigLL:bool=True, PTLL:bool=True):
+    """
+    Finds the Wigner and Porter-Thomas Log-likelihood matrices, if desired.
+    
     ...
     """
 
+    # energy_window = sammy_rto.energy_window
+    energy_window = particle_pair.energy_range
     resonance_ladder = copy(resonance_ladder).sort_values(by=['J_ID','E'], ignore_index=True)
-    E     = resonance_ladder['E'   ].to_numpy()
+    Ep    = resonance_ladder['E'   ].to_numpy()
     # Gn    = resonance_ladder['Gn1' ].to_numpy()
     # Gg    = resonance_ladder['Gg'  ].to_numpy()
     J_IDs = resonance_ladder['J_ID'].to_numpy(dtype=int)
     # Ls    = resonance_ladder['L'   ].to_numpy(dtype=int)
 
     # Number of resonances and spingroups:
-    Nres  = len(E)
+    Nres  = len(Ep)
     N_sgs = len(np.unique(J_IDs))
     
     # Finding first occurrences:
@@ -632,7 +506,7 @@ def Bayes_likelihoods(resonance_ladder:pd.DataFrame, particle_pair:Particle_Pair
         Dms  [sg_idx] = mean_parameters['<D>']
 
     # Converting from P to U parameter:
-    Eu  = p2u_E(E)
+    # Eu = p2u_E(Ep)
     # Gnu = p2u_n(Gn, E, Ls)
     # Ggu = p2u_g(Gg)
     
@@ -644,30 +518,50 @@ def Bayes_likelihoods(resonance_ladder:pd.DataFrame, particle_pair:Particle_Pair
     for sg_idx in range(N_sgs):
         if WigLL:
             indices = slice(first_indices[sg_idx], first_indices[sg_idx+1])
-            Du = np.diff(Eu[indices])
+            Ep_g = Ep[indices]
+            Dp_g = np.diff(Ep_g)
             Dm = Dms[sg_idx]
-            dEu1 =   pi*Du**3 / Dm**2 - 2/Du
-            dEu2 = 3*pi*Du**2 / Dm**2 + 2/Du**2
+            coef = pi/Dm**2
+            dEu1  = 1.0/Dp_g - coef*Dp_g
+            dEu2  = -dEu1
+            dEu11 = 1.0/Dp_g**2 + coef
+            dEu22 = dEu11
+            dEu12 = -dEu11
+            dEu21 = dEu12
             for idx, i in enumerate(range(first_indices[sg_idx], first_indices[sg_idx+1]-1)):
-                W[3*i  ,3*i  ] += dEu2[idx]
-                W[3*i+1,3*i+1] += dEu2[idx]
-                W[3*i  ,3*i+1] -= dEu2[idx]
-                W[3*i+1,3*i  ] -= dEu2[idx]
-            indices_m1 = slice(3*(first_indices[sg_idx]  ), 3*(first_indices[sg_idx+1]-1))
-            indices_p1 = slice(3*(first_indices[sg_idx]+1), 3*(first_indices[sg_idx+1]  ))
-            C[indices_p1] += 2*dEu1
-            C[indices_m1] -= 2*dEu1
+                i1 = 3*i; i2 = 3*(i+1)
+                W[i1,i1] += 2*dEu11[idx]
+                W[i2,i2] += 2*dEu22[idx]
+                W[i1,i2] += 2*dEu12[idx]
+                W[i2,i1] += 2*dEu21[idx]
+                C[i1] += 2*dEu1[idx]
+                C[i2] += 2*dEu2[idx]
+            # Edge cases:
+            if energy_window is not None:
+                F1dEu1  = coef*(Ep_g[0]  - energy_window[0] )
+                F1dEu11 = coef
+                F1dEu2  = coef*(Ep_g[-1] - energy_window[-1])
+                F1dEu22 = coef
+                iL = 3*(first_indices[sg_idx  ]  )
+                iR = 3*(first_indices[sg_idx+1]-1)
+                W[iL,iL] += 2*F1dEu11
+                W[iR,iR] += 2*F1dEu22
+                C[iL] += 2*F1dEu1
+                C[iR] += 2*F1dEu2
         else:
-            W = None;    C = None
+            W = None
+            C = None
         if PTLL:
-            indices = slice(3*first_indices[sg_idx]+2, 3*first_indices[sg_idx+1]+2)
+            indices = slice(3*first_indices[sg_idx]+2, 3*first_indices[sg_idx+1]+2, 3)
             Ui[indices] = 1.0 / gn2ms[sg_idx]
         else:
             Ui = None
     return Ui, W, C
 
-def Bayes_conditioner(sammy_rto:SammyRunTimeOptions, P, M, G, V, D, T, P_vary, Ui=None, W=None, C=None, scheme:str='MW'):
+def Bayes_conditioner(sammy_rto:SammyRunTimeOptions, P, M, G, V, D, T, P_vary, Ui=None, W=None, C=None, scheme:str='MW', find_Mp:bool=True):
     """
+    Conditions the Bayes matrices by only solving for the parameters that change.
+
     ...
     """
 
@@ -692,27 +586,24 @@ def Bayes_conditioner(sammy_rto:SammyRunTimeOptions, P, M, G, V, D, T, P_vary, U
     if sammy_rto.use_least_squares and (scheme != 'MW'):
         print('Using MW scheme for least squares bayes solve.')
         scheme = 'MW'
-    if   scheme == 'MW':
-        bayes_func = Bayes_ext_MW
-    elif scheme == 'IQ':
-        bayes_func = Bayes_ext_IQ
-    elif scheme == 'NV':
-        bayes_func = Bayes_ext_NV
-    else:
-        raise ValueError(f'Unknown Bayes scheme, {scheme}.')
-    Ppc, Mpc = bayes_func(Pc, Mc, Gc, V, D, T, Uic, Wc, Cc)
+    if   scheme == 'MW':    bayes_func = Bayes_ext_MW
+    elif scheme == 'IQ':    bayes_func = Bayes_ext_IQ
+    elif scheme == 'NV':    bayes_func = Bayes_ext_NV
+    else:                   raise ValueError(f'Unknown Bayes scheme, {scheme}.')
+    Ppc, Mpc, chi2 = bayes_func(Pc, Mc, Gc, V, D, T, Uic, Wc, Cc, find_Mp=find_Mp)
     
     # Restoring unprocessed parameters:
     Pp = P
     Pp[used_cols] = Ppc
-    N_pars = G.shape[1]
+    if YW:      N_pars = G[0].shape[1]
+    else:       N_pars = G.shape[1]
     Mp = np.zeros((N_pars,N_pars))
     Mp[used_cols,:][:,used_cols] = Mpc
-    return Pp, Mp
+    return Pp, Mp, chi2
 
 def Bayes_YW(G, V, D, T):
     """
-    ...
+    Provides the Y and W matrices for the SAMMY Bayes equations.
 
     Source: SAMMY Manual (section IV.E.1)
     """
@@ -721,17 +612,17 @@ def Bayes_YW(G, V, D, T):
         N_pars = G[0].shape[1]
         W = np.zeros((N_pars,N_pars))
         Y = np.zeros((N_pars,))
+        chi2 = []
         for Gj, Vj, Dj, Tj in zip(G, V, D, T):
-            ViG = utils.implicit_data_cov_solve(Vj, Gj)
-            W += Gj.T @ ViG
-            Y += ViG.T @ (Dj - Tj)
+            Yj, Wj, chi2j = utils.YW_implicit_data_cov_solve(Vj, Gj, Dj-Tj)
+            Y    += Yj
+            W    += Wj
+            chi2.append(chi2j)
     else:
-        ViG = utils.implicit_data_cov_solve(V, G)
-        W = G.T @ ViG
-        Y = ViG.T @ (D - T)
-    return Y, W
+        Y, W, chi2 = utils.YW_implicit_data_cov_solve(V, G, D-T)
+    return Y, W, chi2
 
-def Bayes_ext_MW(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None):
+def Bayes_ext_MW(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None, find_Mp:bool=True):
     """
     The MW Bayes Scheme for SAMMY. This method is most useful when the use_least_squares method is
     used (i.e. M is None). 
@@ -739,69 +630,129 @@ def Bayes_ext_MW(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None):
     Source: SAMMY Manual (section IV.B.3)
     """
 
-    Y, W = Bayes_YW(G, V, D, T)
+    # Getting YW parameters:
+    Y, W, chi2 = Bayes_YW(G, V, D, T)
+
+    # Compiling Mp inverse:
     Mpi = W
     if M is not None:
         M_diag = (M.ndim == 1)
-        if M_diag:  Mpi += np.diag(1.0/M) # np.fill_diagonal(MiV, MiV.diagonal() + 1.0/M)
-        else:       Mpi += np.linalg.inv(M)
+        if M_diag:  Mpi += np.diag(1.0/M) # np.fill_diagonal(Mpi, Mpi.diagonal() + 1.0/M)
+        else:       Mpi += utils.psd_inv(M)
     if PTVar is not None:
-        Mpi += np.diag(PTVar) # np.fill_diagonal(MiV, MiV.diagonal() + PTVar)
+        Mpi += np.diag(PTVar) # np.fill_diagonal(Mpi, Mpi.diagonal() + PTVar)
     if WigCov is not None:
         Mpi += WigCov
-    Mp = np.linalg.inv(Mpi)
-    del Mpi
+        # print(WigCov[:5,:5])
+        # print(np.linalg.inv(WigCov)[:5,:5])
+    # print((np.diag(PTVar)/Mpi)[:4,:4])
+    # print(W[:4,:4])
+    # print(PTVar[:4])
+    # print()
 
-    # Log Likelihood Components:
+    # Log Likelihood Components of Y:
     if PTVar is not None:
-        Y += PTVar * P
+        Y -= 2 * PTVar * P
     if WigVec is not None:
-        Y += WigVec
+        Y -= WigVec
+    # print((2*PTVar * P/Y)[:4])
 
     # Finding Posterior Parameters:
-    Pp = P + Mp @ Y
-    return Pp, Mp
+    if find_Mp:
+        Mp = utils.psd_inv(Mpi)
+        Pp = P + Mp @ Y
+    else:
+        Pp = P + utils.psd_solve(Mpi, Y)
+        Mp = None
+    return Pp, Mp, chi2
 
-def Bayes_ext_IQ(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None):
+def Bayes_ext_IQ(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None, find_Mp:bool=True):
     """
     The IQ Bayes Scheme for SAMMY.
 
     Source: SAMMY Manual (section IV.B.2)
     """
     
-    Y, W = Bayes_YW(G, V, D, T)
+    # Getting YW parameters:
+    Y, W, chi2 = Bayes_YW(G, V, D, T)
+
+    # Compiling Mp inverse:
     MiQ = W
     if PTVar is not None:
         MiQ += np.diag(PTVar) # np.fill_diagonal(MiQ, MiQ.diagonal() + PTVar)
     if WigCov is not None:
         MiQ += WigCov
-
+    # finding Q:
     M_diag = (M.ndim == 1)
     if M_diag:  Q = MiQ * M[:,NA]
     else:       Q = M @ MiQ
     del MiQ
 
-    I = np.eye(*M.shape)
-    if M_diag:  Mp = np.linalg.solve(I+Q, np.diag(M))
-    else:       Mp = np.linalg.solve(I+Q, M)
-    del I, Q
-
     # Log Likelihood Components:
     if PTVar is not None:
-        Y += PTVar * P
+        Y += 2*PTVar * P
     if WigVec is not None:
         Y += WigVec
 
     # Finding Posterior Parameters:
-    Pp = P + Mp @ Y
-    return Pp, Mp
+    I = np.eye(*Q.shape)
+    if find_Mp:
+        if M_diag:  Mp = utils.psd_solve(I+Q, np.diag(M))
+        else:       Mp = utils.psd_solve(I+Q, M)
+        Pp = P + Mp @ Y
+    else:
+        if M_diag:  MY = M[:,NA] * Y
+        else:       MY = M @ Y
+        Pp = P + utils.psd_solve(I+Q, MY)
+        Mp = None
+    return Pp, Mp, chi2
 
-def Bayes_ext_NV(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None):
+def Bayes_ext_NV(P, M, G, V, D, T, PTVar=None, WigCov=None, WigVec=None, find_Mp:bool=True):
     """
     The NV Bayes Scheme for SAMMY.
 
     Source: SAMMY Manual (section IV.B.1)
     """
 
+    # NOTE: THIS METHOD DOES NOT SEEM TO WORK WITH LIKELIHOODS or WY SCHEME!!!
     raise NotImplementedError('NV scheme for extended Bayes has not been implemented yet.')
-    return Pp, Mp
+
+    return Pp, Mp, chi2
+
+# =================================================================================================
+#   Legacy Code
+# =================================================================================================
+
+# U-parameter Wigner Matrix:
+#             indices = slice(first_indices[sg_idx], first_indices[sg_idx+1])
+#             Eu_g = Eu[indices]
+#             Ep_g = Eu_g * Eu_g
+#             Dp_g = np.diff(Ep_g)
+#             Dm = Dms[sg_idx]
+#             coef = pi/Dm**2
+#             dEu1  = -coef*Dp_g*Eu_g[:-1] + 2*Eu_g[:-1] / Dp_g
+#             dEu2  =  coef*Dp_g*Eu_g[1:]  - 2/Eu_g[1:]  / Dp_g
+#             dEu11 =  coef*(2*Ep_g[:-1] - Dp_g) + 2*(Ep_g[1:]+Ep_g[:-1])/Dp_g**2
+#             dEu22 =  coef*(2*Ep_g[1:]  + Dp_g) + 2*(Ep_g[1:]+Ep_g[:-1])/Dp_g**2
+#             dEu12 = -2*coef*Eu_g[1:]*Eu_g[:-1] + 4*Eu_g[1:]*Eu_g[:-1]/Dp_g**2
+#             dEu21 = dEu12
+#             for idx, i in enumerate(range(first_indices[sg_idx], first_indices[sg_idx+1]-1)):
+#                 i1 = 3*i; i2 = 3*(i+1)
+#                 W[i1,i1] += 2*dEu11[idx]
+#                 W[i2,i2] += 2*dEu22[idx]
+#                 W[i1,i2] += 2*dEu12[idx]
+#                 W[i2,i1] += 2*dEu21[idx]
+#                 C[i1] += 2*dEu1[idx]
+#                 C[i2] += 2*dEu2[idx]
+#             # Edge cases:
+#             if energy_window is not None:
+#                 F1dEu1  = coef*(Ep_g[0]-energy_window[0])*Eu_g[0]
+#                 F1dEu11 = coef*(3*Ep_g[0]-energy_window[0])
+#                 F1dEu2  = coef*(Ep_g[-1]-energy_window[-1])*Eu_g[-1]
+#                 F1dEu22 = coef*(3*Ep_g[-1]-energy_window[-1])
+#                 iL = 3*(first_indices[sg_idx  ]  )
+#                 iR = 3*(first_indices[sg_idx+1]-1)
+#                 W[iL,iL] += 2*F1dEu11
+#                 W[iR,iR] += 2*F1dEu22
+#                 C[iL] += 2*F1dEu1
+#                 C[iR] += 2*F1dEu2

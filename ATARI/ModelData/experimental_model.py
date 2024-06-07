@@ -59,15 +59,16 @@ class Experimental_Model:
         
         self.additional_resfunc_lines = []
 
-        self.channel_widths = {
-            "maxE": [np.max(self.energy_range)],
-            "chw": [100.0],
-            "dchw": [0.8]
-        }
-
         # update kwargs to get user input for some parameters
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        if 'channel_widths' not in kwargs:
+            self.channel_widths = {
+                "maxE": [np.max(self.energy_range)],
+                "chw": [100.0],
+                "dchw": [0.8]
+            }
 
         # default misc inputs
         if self.reaction == 'capture':

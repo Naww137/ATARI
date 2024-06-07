@@ -1,7 +1,10 @@
-from typing import List
 import numpy as np
 from numpy import newaxis as NA
 from scipy.linalg import cho_factor, cho_solve
+
+#%%================================================================================================
+# Special Linear Algebra
+#==================================================================================================
 
 def psd_solve(V, A):
     """
@@ -21,11 +24,29 @@ def psd_solve(V, A):
         The solution matrix.
     """
 
-    c, L = cho_factor(V)
-    B = cho_solve((c, L), A)
+    U, opt = cho_factor(V)
+    B = cho_solve((U, opt), A)
     return B
 
+def psd_inv(V):
+    """
+    Inverts V, where V is symmetric, positive-semidefinite. `psd_inv` uses Cholesky decomposition
+    to perform the matrix solve faster.
 
+    Parameters
+    ----------
+    V : array
+        The positive-semidefinite matrix.
+    
+    Returns
+    -------
+    Vi : array
+        The solution matrix.
+    """
+
+    U, opt = cho_factor(V)
+    Vi = cho_solve((U, opt), np.eye(V.shape[0]))
+    return Vi
 
 #%%================================================================================================
 # Implicit Data Covariance
@@ -39,8 +60,7 @@ def implicit_data_cov_build(exp_cov:dict):
     """
 
     v = exp_cov['diag_stat'].values
-    has_sys_unc = ('Cov_sys' in exp_cov)
-    if has_sys_unc:
+    if 'Cov_sys' in exp_cov:
         m = exp_cov['Cov_sys']
         g = exp_cov['Jac_sys'].values.T
         V = np.diag(v) + g @ m @ g.T
@@ -56,13 +76,39 @@ def implicit_data_cov_solve(exp_cov:dict, x:np.ndarray):
     """
 
     v = exp_cov['diag_stat'].values
-    has_sys_unc = ('Cov_sys' in exp_cov)
-    if has_sys_unc:
+    if 'Cov_sys' in exp_cov:
         m = exp_cov['Cov_sys']
         g = exp_cov['Jac_sys'].values.T
         h = g / v
-        Z = np.linalg.inv(m) + g.T @ h
-        y = x / v - h @ np.linalg.solve(Z, (h.T @ x))
+        Z = psd_inv(m) + g.T @ h
+        y = x / v - h @ psd_solve(Z, (h.T @ x)) # Woodbury Matrix Identity
     else:
         y = x / v
     return y
+
+def YW_implicit_data_cov_solve(exp_cov:dict, G:np.ndarray, DT:np.ndarray):
+    """
+    ...
+
+    See section IV.D.3 of the SAMMY manual.
+    """
+
+    DT = DT[:,NA]
+    v = exp_cov['diag_stat'].values
+    if 'Cov_sys' in exp_cov:
+        m = exp_cov['Cov_sys']
+        g = exp_cov['Jac_sys'].values.T
+        h = g / v
+        Z = psd_inv(m) + g.T @ h
+        ViDT = (DT / v - h @ psd_solve(Z, (h.T @ DT)))[:,0]
+        Y = G.T @ ViDT
+        chi2 = float( DT.T @ ViDT )
+        del ViDT
+        W = G.T @ (G  / v - h @ psd_solve(Z, (h.T @ G )))
+    else:
+        ViDT = (DT / v)[:,0]
+        Y = G.T @ ViDT
+        chi2 = float( DT.T @ ViDT )
+        del ViDT
+        W = G.T @ (G / v)
+    return Y, W, chi2

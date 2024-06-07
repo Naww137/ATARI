@@ -499,27 +499,27 @@ def create_sammyinp(filename='sammy.inp', \
         
     return
 
-def write_saminp(filepath   :   str, 
+def write_saminp(filepath    : str, 
 
-                bayes       :   bool,
-                iterations  :   int,
+                bayes        : bool,
+                iterations   : int,
 
-                formalism   :   str,
-                isotope     :   str,
-                M           :   float,
-                ac          :   float,
+                formalism    : str,
+                isotope      : str,
+                M            : float,
+                ac           : float,
 
-                reaction    :   str,
-                energy_range,
-                temp        :   tuple,
-                FP          :   tuple,
-                n           :   tuple,
+                reaction     : str,
+                energy_range : tuple,
+                temp         : tuple,
+                FP           : tuple,
+                n            : tuple,
 
-                alphanumeric:   str    = None,
-                use_IDC     :   bool    = False,
-                use_least_squares: bool = False,
-                derivatives : bool = False,
-                bayes_scheme  : bool = None
+                alphanumeric      : str  = None,
+                use_IDC           : bool = False,
+                use_least_squares : bool = False,
+                derivatives       : bool = False,
+                bayes_scheme      : bool = None
 
                 ):
     

@@ -283,9 +283,11 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
         idc = True
     else:
-        if sammyINP.experimental_covariance is not None:
+        if not sammyINP.experimental_covariance:
+            idc = False
+        else:
             raise ValueError("Unknown type passed to sammyINP.experimental_covariance")
-        idc = False
+        
 
     write_sampar(sammyINP.resonance_ladder, 
                  sammyINP.particle_pair, 

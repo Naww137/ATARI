@@ -33,16 +33,23 @@ from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
 def get_Ds_Vs(experiments, datasets, covariance_data, normalization_uncertainty = 0.038):
     Ds = []; covs = []
     for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
-        Ds.append(dat["exp"].values)
+        # sort everything first
+        d = dat.sort_values("E")
+        d.reset_index(drop=True, inplace=True)
+
+        Ds.append(d["exp"].values)
         if not exp_cov:
-            c = np.diag(dat["exp_unc"].values**2)
-            c = add_normalization_uncertainty_to_covariance(c, dat["exp"].values, normalization_uncertainty)
+            c = np.diag(d["exp_unc"].values**2)
+            c = add_normalization_uncertainty_to_covariance(c, d["exp"].values, normalization_uncertainty)
             covs.append(c)
         else:
-            min_max_E = (np.min(dat.E), np.max(dat.E))
-            mask = (exp_cov['diag_stat'].index>=min_max_E[0]) & (exp_cov['diag_stat'].index<=min_max_E[1])
-            J = exp_cov['Jac_sys'].values[:, mask]
-            covs.append(np.diag(exp_cov['diag_stat'][mask]['var_stat'].values) + J.T @ exp_cov['Cov_sys'] @ J)
+            diag_stat = exp_cov["diag_stat"].sort_values("E")
+            diag_stat.reset_index(drop=True)
+            Jac_sys = exp_cov["Jac_sys"].sort_index(axis=1)
+            min_max_E = (np.min(d.E), np.max(d.E))
+            mask = (diag_stat.index>=min_max_E[0]) & (diag_stat.index<=min_max_E[1])
+            J = Jac_sys.values[:, mask]
+            covs.append(np.diag(diag_stat[mask]['var_stat'].values) + J.T @ exp_cov['Cov_sys'] @ J)
     return Ds, covs
 
 def zero_G_at_no_vary(G, par):
@@ -269,7 +276,7 @@ def get_regularization_location_and_gradient(Pu, ign, iE, iext,
 def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=False, momentum = 0):
     
     alpha_vec = np.ones_like(Pu)*alpha
-    # alpha_vec[iE] = alpha * Pu[ign] #alpha_vec[iE]
+    alpha_vec[iE] = alpha/100 #* Pu[ign] #alpha_vec[iE]
     # alpha_vec[ign] = alpha * Pu[ign]
     if gaus_newton: 
         dampening = 1/alpha_vec
@@ -312,7 +319,7 @@ def fit(rto,
         ridge_parameters = {"lambda":1, 
                             "gamma":0,
                             "weights":None},
-        elastic_net = True,
+        elastic_net = False,
         elastic_net_parameters = {"lambda":1, 
                                 "gamma":0,
                                 "alpha":0.7}

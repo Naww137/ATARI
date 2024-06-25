@@ -6,8 +6,6 @@ import pandas as pd
 from copy import copy
 
 
-
-
 class InitialFBOPT:
     """
     Options for the initial feature bank solver module.
@@ -78,49 +76,62 @@ class InitialFBOPT:
         Factor of Q01 neutron width used in initial feature bank.
     """
     def __init__(self, **kwargs):
-        self._external_resonances = True
 
+        ### IFB settings
+        self._external_resonances = True
+        self._fit_all_spin_groups = True
+        self._spin_group_keys = []
+        self._num_Elam = None
+        self._Elam_shift = 0
+        self._starting_Gg_multiplier = 1
+        self._starting_Gn1_multiplier = 50
+
+        ### Procedural settings
+        self._fitpar1 = [0,0,1]
+        self._fitpar2 = [1,1,1]
         self._width_elimination = True
         self._Gn_threshold = 1e-2
         self._decrease_chi2_threshold_for_width_elimination = True
 
-        self._max_steps = 50
-        self._iterations = 2
-        self._step_threshold = 0.001
-        self._step_threshold_lag = 1
+        ### Solver settings
+        self._solver = "YW"
 
+        self._max_steps = 50
+        self._step_threshold = 0.001
         self._LevMar = True
         self._LevMarV = 1.5
         self._LevMarVd = 5
+        self._minibatch = True
+        self._minibatches = 5
 
+        # YW specific
+        self._iterations = 2
+        self._step_threshold_lag = 1
         self._initial_parameter_uncertainty = 0.05
-
         self._batch_fitpar = False
         self._batch_fitpar_ifit = 10
         self._steps_per_batch = 2
         self._batch_fitpar_random = False
 
-        self._minibatch = True
-        self._minibatches = 5
-
-        self._fitpar1 = [0,0,1]
-        self._fitpar2 = [1,1,1]
-        self._fit_all_spin_groups = True
-        self._spin_group_keys = []
-
-        self._num_Elam = None
-        
-        self._Elam_shift = 0
-
-        self._starting_Gg_multiplier = 1
-        self._starting_Gn1_multiplier = 50
+        # EXT specific
+        self._alpha = 1e-3
+        gaus_newton : bool = False
 
 
-
+        ### set kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
-    
 
+        ### check kwargs against solver
+        if self.solver == "YW":
+            pass
+        elif self.solver == "EXT":
+            YW_specific_kwargs = ["iterations","step_threshold_lag","initial_parameter_uncertainty","batch_fitpar","batch_fitpar_ifit","steps_per_batch","batch_fitpar_random"]
+            for key in kwargs.keys():
+                if key in YW_specific_kwargs:
+                    print(f"Warning: User passed YW specific argument {key} while solver is EXT, this argument will have no effect.")
+    
+    ### define repr
     def __repr__(self):
         string=''
         for prop in dir(self):
@@ -128,6 +139,22 @@ class InitialFBOPT:
                 string += f"{prop}: {getattr(self, prop)}\n"
         return string
     
+
+    ### Getters and setters for options
+
+    @property
+    def solver(self):
+        return self._solver
+    @solver.setter
+    def solver(self, solver):
+        if solver == "YW":
+            pass
+        elif solver == "EXT":
+            pass
+        else:
+            raise ValueError(f"Solver string {solver} not recognized")
+        self._solver = solver
+
     @property
     def width_elimination(self):
         return self._width_elimination
@@ -284,7 +311,6 @@ class InitialFBOPT:
     def spin_group_keys(self, spin_group_keys):
         self._spin_group_keys = [float(each) for each in spin_group_keys]
 
-
     @property
     def num_Elam(self):
         return self._num_Elam
@@ -292,7 +318,6 @@ class InitialFBOPT:
     def num_Elam(self, num_Elam):
         self._num_Elam = num_Elam
 
-    
     @property
     def Elam_shift(self):
         """Shift in energy for all res. beginning from left border of the window (used for each spin group) """
@@ -300,7 +325,6 @@ class InitialFBOPT:
     @Elam_shift.setter
     def Elam_shift(self, Elam_shift):
         self._Elam_shift = Elam_shift
-
 
     @property
     def starting_Gg_multiplier(self):
@@ -315,6 +339,7 @@ class InitialFBOPT:
     @starting_Gn1_multiplier.setter
     def starting_Gn1_multiplier(self, starting_Gn1_multiplier):
         self._starting_Gn1_multiplier = starting_Gn1_multiplier
+
 
 
 
@@ -362,7 +387,6 @@ class InitialFBOUT:
 
 
 
-
 class InitialFB:
 
     def __init__(self,
@@ -371,8 +395,6 @@ class InitialFB:
         self.options = options
         # if options.Fit:
             # self.fit()
-
-
 
     def fit(self,
             particle_pair,

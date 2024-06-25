@@ -546,3 +546,53 @@ def sgd(rto,
         
 
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log
+
+
+
+from ATARI.sammy_interface.sammy_classes import SammyInputDataEXT, SammyRunTimeOptions
+import scipy
+
+def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
+    
+    rto_temp = deepcopy(rto)
+    rto_temp.bayes = False
+    
+    ### get prior
+    inpyw = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=sammyINP.resonance_ladder,  
+                                                datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+    sammyOUT = run_sammy_YW(inpyw, rto_temp)
+
+    ### iterate to convergence externally
+    Ds, covs = get_Ds_Vs(sammyINP.experiments, sammyINP.datasets, sammyINP.experimental_covariance, normalization_uncertainty=0.0)
+    D = np.concatenate(Ds); V = scipy.linalg.block_diag(*covs)
+
+    saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
+                                                                                    sammyINP.resonance_ladder, 
+                                                                                    sammyINP.external_resonance_indices, 
+                                                                                    sammyINP.particle_pair,
+                                                                                    D, V, 
+                                                                                    sammyINP.experiments, sammyINP.datasets, sammyINP.experimental_covariance,
+                                                                                    sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, rto.Print, sammyINP.gaus_newton, 
+                                                                                    sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
+                                                                                    sammyINP.lasso, sammyINP.lasso_parameters,
+                                                                                    sammyINP.ridge, sammyINP.ridge_parameters,
+                                                                                    sammyINP.elastic_net, sammyINP.elastic_net_parameters)
+    
+    # saved_res_lads_sgd, save_Pu_sgd, saved_pw_lists_sgd, saved_gradients_sgd, chi2_log_sgd, obj_log_sgd = external_fit.sgd(sammy_rto_fit, 
+    #     starting_ladder, external_resonance_indices, particle_pair,
+    #     D, V, experiments, datasets, covariance_data,
+    #     steps = 2, thresh = 0.01, alpha = 1e-2, #beta_1 = 0.5, 
+    #     batches = 600, batch_components=True, print_bool = True, gaus_newton = False,
+    #     )
+
+
+    ### get posterior
+    inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder = saved_res_lads[-1],  
+                                                datasets=sammyINP.datasets, experiments =sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+    sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
+    sammyOUT.pw_post = sammyOUT_post.pw
+    sammyOUT.par_post = sammyOUT_post.par
+    sammyOUT.chi2_post = sammyOUT_post.chi2
+    sammyOUT.chi2n_post = sammyOUT_post.chi2n
+
+    return sammyOUT

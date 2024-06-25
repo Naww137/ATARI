@@ -875,31 +875,6 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         #     fudge /= sammyINPyw.LevMarVd
         #     fudge = max(fudge, sammyINPyw.minF)
 
-
-        ### 2 step Lasso if on
-        # Lasso = True
-        # lambda_lasso = 0.0005
-        # gamma_lasso = 2
-        # if Lasso:
-        # # def Lasso_from_previous_step(rundir, istep, sammyINPyw, fudge):
-        #     parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
-        #     par_df_next = readpar(parfile_next)
-        #     df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
-        #     df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
-        #     fit_mask = df_internal_current.varyGn1 == 1
-        #     # fit_mask_next = df_internal_next.varyGn1 == 1
-
-        #     alpha = fudge*df_internal_current['Gn1'][fit_mask].values/10
-        #     # weight = could be model evaluated at par_df_current['Gn1'].values and Elam
-        #     # more traditional weight is OLS estimate of par_df_current['Gn1'].values but we don't have that
-        #     weight = 1/(df_internal_current['Gn1'][fit_mask].values**gamma_lasso * 2*np.sqrt(abs(df_internal_current['Gn1'][fit_mask].values)))
-        #     dL_dP = lambda_lasso*weight*np.sign(df_internal_current['Gn1'][fit_mask].values)
-
-        #     df_internal_next['Gn1'][fit_mask] = df_internal_next['Gn1'][fit_mask].values - alpha*dL_dP
-        #     par_df_next, _ = concat_external_resonance_ladder(df_internal_next, df_external_next)
-        #     write_sampar(par_df_next, sammyINPyw.particle_pair, fudge, parfile_next)
-
-
         ### update step
         istep += 1
 

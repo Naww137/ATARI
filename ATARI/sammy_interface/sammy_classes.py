@@ -153,7 +153,7 @@ class SammyOutputData:
 
 
 ### New scheme
-
+### should eventually move to a parent class for sammyINP and child classes for specific iteration schemes
 
 @dataclass
 class SammyInputDataYW:
@@ -171,6 +171,8 @@ class SammyInputDataYW:
     experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
     experimental_covariance: Optional[list[Union[dict, str]]] #= None
 
+    external_resonance_indices: Optional[list] = None
+
     max_steps: int = 1
     iterations: int = 2
     step_threshold: float = 0.01
@@ -187,8 +189,6 @@ class SammyInputDataYW:
     minibatch   :   bool = False
     minibatches :   int  = 4
 
-    external_resonance_indices: Optional[list] = None
-
     LevMar: bool = True
     LevMarV: float = 1.5
     LevMarVd: float = 5.0
@@ -199,5 +199,77 @@ class SammyInputDataYW:
 
 
 
+@dataclass
+class SolverOPTs:
+    _solver = "base"
+
+    max_steps       : int       = 1
+    step_threshold  : float     = 0.01
+
+    LevMar          : bool      = True
+    LevMarV         : float     = 1.5
+    LevMarVd        : float     = 5.0
+    minF            : float     = 1e-5
+    maxF            : float     = 10
+
+@dataclass
+class SolverOPTs_YW(SolverOPTs):
+    _solver = "yw"
+
+    initial_parameter_uncertainty   : float     = 1e-3
+    iterations                      : int       = 2
+    step_threshold_lag              : int       = 1
+    autoelim_threshold              : Optional[float] = None
+
+    LS                              : bool      = False
+    batch_fitpar                    : bool      = False
+    batch_fitpar_ifit               : int       = 10
+    steps_per_batch                 : int       = 1
+    batch_fitpar_random             : bool      = False
+    minibatch                       : bool      = False
+    minibatches                     : int       = 4
+
+@dataclass
+class SolverOPTs_EXT(SolverOPTs):
+    _solver = "ext"
+
+    alpha           : float     = 1e-3
+    gaus_newton     : bool      = False
+
+    lasso           : bool      = False
+    lasso_parameters = {"lambda":1, 
+                        "gamma":0,
+                        "weights":None}
+    
+    ridge           : bool      = False
+    ridge_parameters = {"lambda":1, 
+                        "gamma":0,
+                        "weights":None}
+    
+    elastic_net     : bool      = False
+    elastic_net_parameters = {"lambda":1,
+                            "gamma":0,
+                            "alpha":0.7}
+
+@dataclass
+class SammyInput:
+    """
+    Input data for sammy run.
+
+    This object holds at minimum the particle pair description and a resonance ladder.
+    An appropriate energy grid must also be supplied either in a DataFrame with experimental data or standalone as a series or array.
+    The other attributes hold information about the data, experiment, and the initial parameter uncertainty.
+    """
+    particle_pair: Particle_Pair
+    resonance_ladder: DataFrame
+
+    datasets : list[DataFrame]
+    experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
+    experimental_covariance: Optional[list[Union[dict, str]]] #= None
+
+    external_resonance_indices: Optional[list] = None
+
+    solver_options: SolverOPTs = field(default_factory=SolverOPTs)
+    
 
 

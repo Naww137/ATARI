@@ -223,7 +223,7 @@ def evaluate_chi2_location_and_gradient(rto, Pu, starting_ladder, particle_pair,
 def get_regularization_location_and_gradient(Pu, ign, iE, iext,
         lasso=False, lasso_parameters =     {"lambda":1,    "gamma":2},
         ridge = False, ridge_parameters =   {"lambda":1,    "gamma":2},
-        elastic_net=True,elastic_net_parameters = {"lambda":1, "gamma":2, "alpha":0.5} ):
+        elastic_net=False,elastic_net_parameters = {"lambda":1, "gamma":2, "alpha":0.5} ):
     
     if lasso:
         ign_internal = [i for i in ign if i not in iext]
@@ -337,6 +337,8 @@ def fit(rto,
     obj_log = []
 
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
+    # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
+    print(f"Stepping until convergence\nste\talpha\t:\tobj\tchi2\n")
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
@@ -356,7 +358,8 @@ def fit(rto,
                     alpha = min(alpha,maxV)
                 else:
                     if print_bool:
-                        print(f"Decrease alpha and repeat step {int(istep)}")
+                        # print(f"Repeat step {int(istep)}, \talpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
+                        print(f"Repeat step {int(istep)}, \talpha: objective\tchi2")
                         print(f"\t\t{np.round(float(alpha),8):<10}: {obj:.2f}\t{chi2:.2f}")
                     while True:  
                         alpha /= LevMarVd
@@ -384,7 +387,7 @@ def fit(rto,
                 if Dobj < 0:
                     criteria = f"Obj increased, taking solution {istep-1}"
                     if LevMar and alpha==minV:
-                        criteria = f"Step size below minimum value, taking solution {istep-1}"
+                        criteria = f"Alpha below minimum value, taking solution {istep-1}"
                     if print_bool:
                         print(criteria)
                     print(max(istep-1, 0))
@@ -397,7 +400,7 @@ def fit(rto,
                 break
         
         if print_bool:
-            print(f"{int(istep)}\t{np.round(alpha,8):<10}:\t{obj:.2f}\t{chi2:.2f}")
+            print(f"{int(istep)}\t{np.round(float(alpha),7):<8}:\t{obj:.2f}\t{chi2:.2f}")
 
         ### update Pu to Pu_next and save things
         Pu = Pu_next
@@ -413,52 +416,6 @@ def fit(rto,
         Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=gaus_newton)
 
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log
-
-
-
-def fit_and_characterize(rto, 
-                        starting_ladder, 
-                        external_resonance_indices, 
-                        particle_pair,
-                        D, V, experiments, datasets, covariance_data,
-                        steps, thresh, alpha, print_bool, gaus_newton, 
-                        LevMar,LevMarV,LevMarVd,maxV,minV,
-                        lasso,lasso_parameters,
-                        ridge, ridge_parameters,
-                        elastic_net, elastic_net_parameters):
-    
-    saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
-                                                                                    starting_ladder, 
-                                                                                    external_resonance_indices, 
-                                                                                    particle_pair,
-                                                                                    D, V, experiments, datasets, covariance_data,
-                                                                                    steps, thresh, alpha, print_bool, gaus_newton, 
-                                                                                    LevMar,LevMarV,LevMarVd,maxV,minV,
-                                                                                    lasso,lasso_parameters,
-                                                                                    ridge, ridge_parameters,
-                                                                                    elastic_net, elastic_net_parameters)
-    
-    rto_temp = deepcopy(rto)
-    rto_temp.bayes = False
-    inpyw = sammy_classes.SammyInputDataYW(
-                particle_pair = particle_pair,
-                resonance_ladder = saved_res_lads[-1],  
-
-                datasets= datasets,
-                experiments = experiments,
-                experimental_covariance= covariance_data)
-
-    sammyOUT = run_sammy_YW(inpyw, rto_temp)
-
-    return sammyOUT
-
-
-
-
-
-
-
-
 
 
 def sgd(rto, 
@@ -507,16 +464,10 @@ def sgd(rto,
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     
 
-    ### Initialize adam parameters
+    ### Initialize ADAM parameters
     t = 0
     mt = np.zeros_like(Pu_next)
     vt = np.zeros_like(Pu_next)
-    # decay_rate = np.array(decay_rate)
-    # if np.any(decay_rate < 0) or np.any(decay_rate > 1):
-    #     raise ValueError("'decay_rate' must be between zero and one")
-    # alpha = np.array(alpha)
-    # if np.any(alpha <= 0):
-    #     raise ValueError("learn_rate 'alpha' must be greater than zero")
 
     N = V.shape[0]
     remainder = N%batches
@@ -538,7 +489,7 @@ def sgd(rto,
         #                                                                         elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
 
     
-        rand_int = np.random.choice(N, size=N, replace=False) 
+        # rand_int = np.random.choice(N, size=N, replace=False) 
         # Performing minibatch moves
         for i in range(batches):
             Pu = Pu_next
@@ -550,7 +501,8 @@ def sgd(rto,
             # else:
             #     end = (i+1)*N_per_batch
             # index = rand_int[i*N_per_batch:end]
-            index = np.random.choice(N, size=int(N/batches), replace=False) 
+            # index = np.random.choice(N, size=int(N/batches), replace=False) 
+            index = np.random.choice(N, size=1, replace=False) 
             s_i = s[index]
             U_i = U[:, index]
             Vt_i = Vt[index, :]

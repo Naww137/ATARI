@@ -1,32 +1,69 @@
+import inspect
+from ATARI.sammy_interface import sammy_classes, sammy_functions
+from ATARI.AutoFit.external_fit import run_sammy_EXT
+import pandas as pd
 
-from ATARI.sammy_interface import sammy_classes
-from ATARI.AutoFit.initial_FB_solve import InitialFBOPT
+# def filter_kwargs_for_class(cls, **kwargs):
+#     cls_signature = inspect.signature(cls)
+#     valid_params = cls_signature.parameters
+#     # return {k: v for k, v in kwargs.items() if k in valid_params}
+#     dictionary = {}
+#     for k, v in kwargs.items():
+#         if k in valid_params:
+#             dictionary[k] = v
+#         else:
+#             print(f"Warning: kwarg {k} not need for solver, will not have effect")
+#     return dictionary
+            
+def filter_public_attributes(obj):
+    return {key: getattr(obj, key) for key in dir(obj) if not key.startswith('_')}
 
+class Solver:
+    def __init__(self, sammyRTO, sammyINP, fit_func):
+        self.sammyRTO = sammyRTO
+        self.sammyINP = sammyINP
+        self.fit_func = fit_func
 
-def sammyINP_solver_factory(options:InitialFBOPT, particle_pair, resonance_ladder, datasets, experiments, experimental_covariance, external_resonance_indices):
-
-    universal_attributes = ["max_steps","step_threshold","LevMar","LevMarV","LevMarVd"]#,"minF","maxF"]
-    universal_kwargs = {attr: getattr(options, attr) for attr in universal_attributes}
+    def fit(self, resonance_ladder, external_resonance_indices):
+        self.sammyINP.resonance_ladder=resonance_ladder
+        self.sammyINP.external_resonance_indices=external_resonance_indices
+        return self.fit_func(self.sammyINP, self.sammyRTO)
     
-    if options.solver == "YW":
-        solver_attributes = ["iterations","step_threshold_lag","initial_parameter_uncertainty"]
-        solver_kwargs = {attr: getattr(options, attr) for attr in solver_attributes}
-        solver_kwargs['autoelim_threshold'] = None
-        solver_kwargs['LS'] = False
-        solver_kwargs['minF'] = 1e-5
-        solver_kwargs['maxF'] = 2.0
+    def set_bayes(self, bayes_boolean):
+        self.sammyRTO.bayes=bayes_boolean
     
-        inp = sammy_classes.SammyInputDataYW(particle_pair, resonance_ladder, datasets, experiments,experimental_covariance,external_resonance_indices=external_resonance_indices,
-                                             **universal_kwargs, **solver_kwargs)
 
+def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experiments, experimental_covariance, experiments_no_pup=None, cap_norm_unc=0.0384200):
 
-    elif options.solver == "EXT":
-        solver_attributes = ["alpha","gaus_newton","lasso","lasso_parameters","ridge","ridge_parameters","elastic_net","elastic_net_parameters"]
-        solver_kwargs = {attr: getattr(options, attr) for attr in solver_attributes}
+    if solver == "YW":
+        sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
+                                                  datasets=datasets, 
+                                                  experiments=experiments, 
+                                                  experimental_covariance=experimental_covariance, 
+                                                  external_resonance_indices = [], 
+                                                  **filter_public_attributes(solver_options))
+        fit_func = sammy_functions.run_sammy_YW
 
-        inp = sammy_classes.SammyInputDataEXT(particle_pair, resonance_ladder, datasets, experiments,experimental_covariance,external_resonance_indices=external_resonance_indices,
-                                        **universal_kwargs, **solver_kwargs)
+    elif solver == "EXT":
+
+        if experiments_no_pup is None:
+            raise ValueError("experiments with no PUP must be specified")
+
+        sammyINP = sammy_classes.SammyInputDataEXT(particle_pair, pd.DataFrame(), 
+                                                   datasets, 
+                                                   experiments=experiments,
+                                                   experiments_no_pup=experiments_no_pup, 
+                                                   experimental_covariance=experimental_covariance, 
+                                                   external_resonance_indices=[], 
+                                                   cap_norm_unc=cap_norm_unc, 
+                                                   **filter_public_attributes(solver_options))
+        fit_func = run_sammy_EXT
     else:
         raise ValueError("Solver not recognized")
+    
+    return Solver(rto, sammyINP,fit_func)
 
-    return inp
+
+
+
+

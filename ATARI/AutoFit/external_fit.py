@@ -1,7 +1,8 @@
 from ATARI.sammy_interface.sammy_io import *
 from ATARI.sammy_interface.sammy_functions import *
 from ATARI.sammy_interface.sammy_deriv import get_derivatives
-from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   du_dp_E, du_dp_g, du_dp_n
+from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
+from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   get_Pu_vec_from_reslad
 import numpy as np
 import pandas as pd
 from ATARI.sammy_interface import sammy_classes
@@ -29,10 +30,9 @@ def get_Gs_Ts(resonance_ladder,
 
     return Gs, Ts, pw_list
 
-from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
-def get_Ds_Vs(experiments, datasets, covariance_data, normalization_uncertainty = 0.038):
+def get_Ds_Vs(datasets, covariance_data, normalization_uncertainty = 0.038):
     Ds = []; covs = []
-    for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
+    for dat, exp_cov in zip(datasets, covariance_data):
         # sort everything first
         d = dat.sort_values("E")
         d.reset_index(drop=True, inplace=True)
@@ -74,20 +74,21 @@ def get_Pu_vec_and_indices(resonance_ladder,
                            external_resonance_indices=[]
                            ):
 
-    E  = resonance_ladder['E'].to_numpy()
-    Gg = resonance_ladder['Gg'].to_numpy()
-    Gn = resonance_ladder['Gn1'].to_numpy()
-    J_ID = resonance_ladder['J_ID'].to_numpy(dtype=int)
+    # E  = resonance_ladder['E'].to_numpy()
+    # Gg = resonance_ladder['Gg'].to_numpy()
+    # Gn = resonance_ladder['Gn1'].to_numpy()
+    # J_ID = resonance_ladder['J_ID'].to_numpy(dtype=int)
 
-    L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
-    for jpi, mean_params in particle_pair.spin_groups.items():
-        jid = mean_params['J_ID']
-        L[jid-1] = mean_params['Ls'][0]
+    # L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
+    # for jpi, mean_params in particle_pair.spin_groups.items():
+    #     jid = mean_params['J_ID']
+    #     L[jid-1] = mean_params['Ls'][0]
 
-    ue = p2u_E(E)
-    ug = p2u_g(Gg)
-    un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
+    # ue = p2u_E(E)
+    # ug = p2u_g(Gg)
+    # un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
+    # Pu = np.column_stack((ue, ug, un)).reshape(-1,)
+    Pu = get_Pu_vec_from_reslad(resonance_ladder, particle_pair)
 
     ires = np.arange(0,len(resonance_ladder), 1)
     iE = 3*ires
@@ -277,7 +278,7 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
     
     alpha_vec = np.ones_like(Pu)*alpha
     alpha_vec[iE] = alpha/100 #* Pu[ign] #alpha_vec[iE]
-    # alpha_vec[ign] = alpha * Pu[ign]
+    alpha_vec[ign] = alpha * Pu[ign]**2
     if gaus_newton: 
         dampening = 1/alpha_vec
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
@@ -285,8 +286,9 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
         chi2_step = alpha_vec*dchi2_dpar
     
     total_gradient = chi2_step + alpha*dreg_dpar + momentum
-    total_gradient[iE] = np.where(total_gradient[iE]>0.1, 0.1, total_gradient[iE])
-    total_gradient[iE] = np.where(total_gradient[iE]<-0.1, -0.1, total_gradient[iE])
+    max_estep = 0.05#Pu[ign]**2/10
+    total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
+    # total_gradient[iE] = np.where(total_gradient[iE]<-0.05, -0.1, total_gradient[iE])
 
     return Pu - total_gradient
 
@@ -338,7 +340,7 @@ def fit(rto,
 
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
-    print(f"Stepping until convergence\nste\talpha\t:\tobj\tchi2\n")
+    print(f"Stepping until convergence\nstep\talpha\t:\tobj\tchi2\n")
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
@@ -501,8 +503,8 @@ def sgd(rto,
             # else:
             #     end = (i+1)*N_per_batch
             # index = rand_int[i*N_per_batch:end]
-            # index = np.random.choice(N, size=int(N/batches), replace=False) 
-            index = np.random.choice(N, size=1, replace=False) 
+            index = np.random.choice(N, size=int(N/batches), replace=False) 
+            # index = np.random.choice(N, size=1, replace=False) 
             s_i = s[index]
             U_i = U[:, index]
             Vt_i = Vt[index, :]
@@ -549,7 +551,7 @@ def sgd(rto,
 
 
 
-from ATARI.sammy_interface.sammy_classes import SammyInputDataEXT, SammyRunTimeOptions
+from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputDataEXT
 import scipy
 
 def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
@@ -558,41 +560,49 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
     rto_temp.bayes = False
     
     ### get prior
-    inpyw = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=sammyINP.resonance_ladder,  
-                                                datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+    inpyw = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, 
+                                           resonance_ladder=sammyINP.resonance_ladder,  
+                                           datasets=sammyINP.datasets, 
+                                           experiments=sammyINP.experiments, 
+                                           experimental_covariance=sammyINP.experimental_covariance)
     sammyOUT = run_sammy_YW(inpyw, rto_temp)
 
     ### iterate to convergence externally
-    Ds, covs = get_Ds_Vs(sammyINP.experiments, sammyINP.datasets, sammyINP.experimental_covariance, normalization_uncertainty=0.0)
-    D = np.concatenate(Ds); V = scipy.linalg.block_diag(*covs)
+    if rto.bayes:
+        Ds, covs = get_Ds_Vs(sammyINP.datasets, 
+                             sammyINP.experimental_covariance, 
+                             normalization_uncertainty=sammyINP.cap_norm_unc)
+        D = np.concatenate(Ds); V = scipy.linalg.block_diag(*covs)
 
-    saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
-                                                                                    sammyINP.resonance_ladder, 
-                                                                                    sammyINP.external_resonance_indices, 
-                                                                                    sammyINP.particle_pair,
-                                                                                    D, V, 
-                                                                                    sammyINP.experiments, sammyINP.datasets, sammyINP.experimental_covariance,
-                                                                                    sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, rto.Print, sammyINP.gaus_newton, 
-                                                                                    sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
-                                                                                    sammyINP.lasso, sammyINP.lasso_parameters,
-                                                                                    sammyINP.ridge, sammyINP.ridge_parameters,
-                                                                                    sammyINP.elastic_net, sammyINP.elastic_net_parameters)
+        saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
+                                                                                        sammyINP.resonance_ladder, 
+                                                                                        sammyINP.external_resonance_indices, 
+                                                                                        sammyINP.particle_pair,
+                                                                                        D, V, 
+                                                                                        sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
+                                                                                        sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, rto.Print, sammyINP.gaus_newton, 
+                                                                                        sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
+                                                                                        sammyINP.lasso, sammyINP.lasso_parameters,
+                                                                                        sammyINP.ridge, sammyINP.ridge_parameters,
+                                                                                        sammyINP.elastic_net, sammyINP.elastic_net_parameters)
+        ### could alternatively do SGD
+        # saved_res_lads_sgd, save_Pu_sgd, saved_pw_lists_sgd, saved_gradients_sgd, chi2_log_sgd, obj_log_sgd = external_fit.sgd(sammy_rto_fit, 
+        #     starting_ladder, external_resonance_indices, particle_pair,
+        #     D, V, experiments, datasets, covariance_data,
+        #     steps = 2, thresh = 0.01, alpha = 1e-2, #beta_1 = 0.5, 
+        #     batches = 600, batch_components=True, print_bool = True, gaus_newton = False,
+        #     )
+
+        ### get posterior
+        inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
+                                                    datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+        sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
+        sammyOUT.pw_post = sammyOUT_post.pw
+        sammyOUT.par_post = sammyOUT_post.par
+        sammyOUT.chi2_post = sammyOUT_post.chi2
+        sammyOUT.chi2n_post = sammyOUT_post.chi2n
     
-    # saved_res_lads_sgd, save_Pu_sgd, saved_pw_lists_sgd, saved_gradients_sgd, chi2_log_sgd, obj_log_sgd = external_fit.sgd(sammy_rto_fit, 
-    #     starting_ladder, external_resonance_indices, particle_pair,
-    #     D, V, experiments, datasets, covariance_data,
-    #     steps = 2, thresh = 0.01, alpha = 1e-2, #beta_1 = 0.5, 
-    #     batches = 600, batch_components=True, print_bool = True, gaus_newton = False,
-    #     )
-
-
-    ### get posterior
-    inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder = saved_res_lads[-1],  
-                                                datasets=sammyINP.datasets, experiments =sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
-    sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
-    sammyOUT.pw_post = sammyOUT_post.pw
-    sammyOUT.par_post = sammyOUT_post.par
-    sammyOUT.chi2_post = sammyOUT_post.chi2
-    sammyOUT.chi2n_post = sammyOUT_post.chi2n
+    else:
+        pass
 
     return sammyOUT

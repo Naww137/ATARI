@@ -189,7 +189,7 @@ class SammyInputDataYW:
     minibatch   :   bool = False
     minibatches :   int  = 4
 
-    LevMar: bool = True
+    LevMar: bool = False
     LevMarV: float = 1.5
     LevMarVd: float = 5.0
     minF:   float = 1e-5
@@ -206,7 +206,7 @@ class SolverOPTs:
     max_steps       : int       = 1
     step_threshold  : float     = 0.01
 
-    LevMar          : bool      = True
+    LevMar          : bool      = False
     LevMarV         : float     = 1.5
     LevMarVd        : float     = 5.0
     minF            : float     = 1e-5
@@ -216,7 +216,7 @@ class SolverOPTs:
 class SolverOPTs_YW(SolverOPTs):
     _solver = "yw"
 
-    initial_parameter_uncertainty   : float     = 1e-3
+    initial_parameter_uncertainty   : float     = 0.1
     iterations                      : int       = 2
     step_threshold_lag              : int       = 1
     autoelim_threshold              : Optional[float] = None
@@ -237,22 +237,16 @@ class SolverOPTs_EXT(SolverOPTs):
     gaus_newton     : bool      = False
 
     lasso           : bool      = False
-    lasso_parameters = {"lambda":1, 
-                        "gamma":0,
-                        "weights":None}
+    lasso_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})
     
     ridge           : bool      = False
-    ridge_parameters = {"lambda":1, 
-                        "gamma":0,
-                        "weights":None}
-    
+    ridge_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})
+
     elastic_net     : bool      = False
-    elastic_net_parameters = {"lambda":1,
-                            "gamma":0,
-                            "alpha":0.7}
+    elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
 
 @dataclass
-class SammyInput:
+class SammyInputDataEXT:
     """
     Input data for sammy run.
 
@@ -265,11 +259,34 @@ class SammyInput:
 
     datasets : list[DataFrame]
     experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
+    experiments_no_pup: list[Experimental_Model]
     experimental_covariance: Optional[list[Union[dict, str]]] #= None
 
-    external_resonance_indices: Optional[list] = None
+    external_resonance_indices: Optional[list] #= None
+    cap_norm_unc: float = 0.0
 
-    solver_options: SolverOPTs = field(default_factory=SolverOPTs)
+    ### alternatively could have nested class for solver options
+    # solver_options: SolverOPTs_EXT = field(default_factory=SolverOPTs_EXT)
+    max_steps       : int       = 1
+    step_threshold  : float     = 0.01
+
+    LevMar          : bool      = False
+    LevMarV         : float     = 1.5
+    LevMarVd        : float     = 5.0
+    minF            : float     = 1e-6
+    maxF            : float     = 1e-2
+
+    alpha           : float     = 1e-3
+    gaus_newton     : bool      = False
+
+    lasso           : bool      = False
+    lasso_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})
+    
+    ridge           : bool      = False
+    ridge_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})
+
+    elastic_net     : bool      = False
+    elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
     
 
 

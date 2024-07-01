@@ -264,6 +264,8 @@ class SammyInputDataEXT:
 
     external_resonance_indices: Optional[list] #= None
     cap_norm_unc: float = 0.0
+    remove_V: bool = False
+
 
     ### alternatively could have nested class for solver options
     # solver_options: SolverOPTs_EXT = field(default_factory=SolverOPTs_EXT)

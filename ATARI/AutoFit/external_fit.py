@@ -572,7 +572,11 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
         Ds, covs = get_Ds_Vs(sammyINP.datasets, 
                              sammyINP.experimental_covariance, 
                              normalization_uncertainty=sammyINP.cap_norm_unc)
-        D = np.concatenate(Ds); V = scipy.linalg.block_diag(*covs)
+        D = np.concatenate(Ds); 
+        if sammyINP.remove_V:
+            V = np.diag(np.ones(len(D)))
+        else:
+            V = scipy.linalg.block_diag(*covs)
 
         saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
                                                                                         sammyINP.resonance_ladder, 

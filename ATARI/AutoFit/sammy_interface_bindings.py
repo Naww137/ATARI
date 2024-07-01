@@ -33,7 +33,10 @@ class Solver:
         self.sammyRTO.bayes=bayes_boolean
     
 
-def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experiments, experimental_covariance, experiments_no_pup=None, cap_norm_unc=0.0384200):
+def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experiments, experimental_covariance, 
+                   experiments_no_pup=None, 
+                   cap_norm_unc=0.0384200,
+                   remove_V = False):
 
     if solver == "YW":
         sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
@@ -56,6 +59,7 @@ def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experim
                                                    experimental_covariance=experimental_covariance, 
                                                    external_resonance_indices=[], 
                                                    cap_norm_unc=cap_norm_unc, 
+                                                   remove_V = remove_V,
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

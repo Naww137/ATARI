@@ -236,6 +236,13 @@ class SolverOPTs_EXT(SolverOPTs):
     alpha           : float     = 1e-3
     gaus_newton     : bool      = False
 
+    minibatch       : bool      = False
+    batch_size      : int       = 10
+    patience        : int       = 25
+    beta_1          : float     = 0.9
+    beta_2          : float     = 0.999
+    epsilon         : float     = 1e-8
+
     lasso           : bool      = False
     lasso_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})
     
@@ -280,6 +287,13 @@ class SammyInputDataEXT:
 
     alpha           : float     = 1e-3
     gaus_newton     : bool      = False
+    
+    minibatch       : bool      = False
+    batch_size      : int       = 10
+    patience        : int       = 25
+    beta_1          : float     = 0.9
+    beta_2          : float     = 0.999
+    epsilon         : float     = 1e-8
 
     lasso           : bool      = False
     lasso_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "weights":None})

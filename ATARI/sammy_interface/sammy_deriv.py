@@ -80,6 +80,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
         for i, drow in enumerate(pu_derivs):
             if np.all(np.isclose(row,drow, atol=1e-4)):
                 ider.extend([i*3,i*3+1,i*3+2])
+                break                                           # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
     assert(len(ider) == len(sammyINP.resonance_ladder)*3)
     assert(np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-4)))
     

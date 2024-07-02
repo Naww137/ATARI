@@ -427,7 +427,8 @@ def sgd(rto,
         D, V, experiments, datasets, covariance_data,
 
         steps = 100, 
-        thresh = 0.01,
+        patience = 10,
+        batch_size = 25, 
 
         alpha = 1e-3, 
         beta_1 = 0.9,
@@ -436,10 +437,8 @@ def sgd(rto,
 
         print_bool = True, 
 
-        batches = 25, 
-        batch_components = False,
-
-        gaus_newton = False, 
+        # batch_components = False,
+        # gaus_newton = False, 
         
         lasso = False,
         lasso_parameters = {"lambda":1, 
@@ -462,6 +461,7 @@ def sgd(rto,
     saved_gradients = []
     chi2_log = []
     obj_log = []
+    # chi2_validation = []
 
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     
@@ -470,10 +470,10 @@ def sgd(rto,
     t = 0
     mt = np.zeros_like(Pu_next)
     vt = np.zeros_like(Pu_next)
+    best_obj = float('inf')
+    ibest_obj = 0
 
     N = V.shape[0]
-    remainder = N%batches
-    N_per_batch = int((N-remainder)/batches)
     U, s, Vt = np.linalg.svd(V, full_matrices=False)
 
 
@@ -490,73 +490,72 @@ def sgd(rto,
         #                                                                         ridge = ridge, ridge_parameters = ridge_parameters,
         #                                                                         elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
 
-    
-        # rand_int = np.random.choice(N, size=N, replace=False) 
-        # Performing minibatch moves
-        for i in range(batches):
-            Pu = Pu_next
-            t += 1
-            # Pu_next = take_step(Pu, alpha, dchi2_dpar[ibatch], hessian_approx[ibatch], dreg_dpar[ibatch], iE, gaus_newton=gaus_newton, momentum=momentum)
+        # for i in range(int(N/batch_size)):
+        Pu = Pu_next
+        t += 1
+        
+        # random indices of components
+        index = np.random.choice(N, size=batch_size, replace=False) 
+        s_i = s[index]; U_i = U[:, index]; Vt_i = Vt[index, :]
+        # anti_index = np.array([i for i in range(N) if i not in index])
+        # s_ai = s[anti_index]; U_ai = U[:, anti_index]; Vt_ai = Vt[anti_index, :]
 
-            # if i == batches - 1:
-            #     end = (i+1)*N_per_batch + remainder
-            # else:
-            #     end = (i+1)*N_per_batch
-            # index = rand_int[i*N_per_batch:end]
-            index = np.random.choice(N, size=int(N/batches), replace=False) 
-            # index = np.random.choice(N, size=1, replace=False) 
-            s_i = s[index]
-            U_i = U[:, index]
-            Vt_i = Vt[index, :]
+        # Get derivatives and theory
+        res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
+        Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
+        G = np.concatenate(Gs, axis=0); T = np.concatenate(Ts)
+        G = zero_G_at_no_vary(G, res_lad)
 
-            res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
-            Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
-            G = np.concatenate(Gs, axis=0); T = np.concatenate(Ts)
+        ## calculate chi2 and derivative
+        chi2 = (D-T).T @ U @ np.diag(1/s) @ Vt @ (D-T)
+        # chi2_validation.append((D-T).T @ U_ai @ np.diag(1/s_ai) @ Vt_ai @ (D-T))
+        obj = chi2 + reg_pen
 
-            chi2 = (D-T).T @ np.linalg.inv(V) @ (D-T)
-            obj = chi2 + reg_pen
-            if print_bool:
-                print(f"{int(t)}\t:\t{obj:.2f}\t{chi2:.2f}")
-                
-            if True: #zero_derivs_at_no_vary:
-                G = zero_G_at_no_vary(G, res_lad)
+        ### check convergence and print
+        if print_bool:
+            print(f"{int(t)}\t:\t{obj:.2f}\t{chi2:.2f}")
+        if obj < best_obj:
+            best_obj = obj
+            ibest_obj = t
+            convergence_counter = 0
+        else:
+            convergence_counter += 1
+        if convergence_counter >= patience:
+            print(f"Early stopping: total objective function has not improved over {patience} steps")
+            break
 
-            Vinv = Vt_i.T @ np.linalg.inv(np.diag(s_i)) @ U_i.T
-            dchi2_dpar =  - 2 * G.T @ Vinv @ (D - T)
-            hessian_approx =  G.T @ Vinv @ G
-            #### The following should be more efficient but verify!
-            # dchi2_dpar =  - 2 * G.T@Vt_i.T @ np.linalg.inv(np.diag(s_i)) @ U.T@(D - T)
-            # hessian_approx =  G.T@Vt_i.T @ np.linalg.inv(np.diag(s_i)) @ U.T@ G
+        dchi2_dpar =  - 2 * G.T@U_i @ np.diag(1/s_i) @ Vt_i@(D - T)
+        hessian_approx =  G.T@U_i @ np.diag(1/s_i) @Vt_i@G
+        # dchi2_dpar = np.clip(dchi2_dpar, -100, 100) ### Gradient cliping (value, could also do norm) for exploding gradients and numerical stability
 
-            # dchi2_dpar = np.clip(dchi2_dpar, -100, 100) ### Gradient cliping (value, could also do norm) for exploding gradients and numerical stability
-            dObj_dtheta = dchi2_dpar + dreg_dpar
-            mt = (beta_1 * mt + (1 - beta_1) * dObj_dtheta)
-            vt = (beta_2 * vt + (1 - beta_2) * dObj_dtheta**2) 
-            mt_hat = (mt / (1 - beta_1**t))
-            vt_hat = (vt/ (1 - beta_2**t))
-            
-            Pu_next = (Pu - (alpha * mt_hat) / (np.sqrt(vt_hat) + epsilon))
+        dObj_dtheta = dchi2_dpar + dreg_dpar
+        mt = (beta_1 * mt + (1 - beta_1) * dObj_dtheta)
+        vt = (beta_2 * vt + (1 - beta_2) * dObj_dtheta**2) 
+        mt_hat = (mt / (1 - beta_1**t))
+        vt_hat = (vt/ (1 - beta_2**t))
+        
+        Pu_next = (Pu - (alpha * mt_hat) / (np.sqrt(vt_hat) + epsilon))
 
-            # obj_log.append(obj)
-            chi2_log.append(chi2)
-            saved_gradients.append(dchi2_dpar)
-            save_Pu.append(Pu)
-            saved_pw_lists.append(sammy_pws)
-            saved_res_lads.append(copy(res_lad))
-                
-        print(f"Epoch {istep} done")
+        obj_log.append(obj)
+        chi2_log.append(chi2)
+        saved_gradients.append(dchi2_dpar)
+        save_Pu.append(Pu)
+        saved_pw_lists.append(sammy_pws)
+        saved_res_lads.append(copy(res_lad))
+
+        # print(f"Epoch {istep} done")
         
 
-    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log
+    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest_obj
 
 
 
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputDataEXT
 import scipy
 
-def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
+def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     
-    rto_temp = deepcopy(rto)
+    rto_temp = deepcopy(sammyRTO)
     rto_temp.bayes = False
     
     ### get prior
@@ -568,7 +567,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
     sammyOUT = run_sammy_YW(inpyw, rto_temp)
 
     ### iterate to convergence externally
-    if rto.bayes:
+    if sammyRTO.bayes:
         Ds, covs = get_Ds_Vs(sammyINP.datasets, 
                              sammyINP.experimental_covariance, 
                              normalization_uncertainty=sammyINP.cap_norm_unc)
@@ -578,33 +577,37 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, rto:SammyRunTimeOptions):
         else:
             V = scipy.linalg.block_diag(*covs)
 
-        saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(rto, 
-                                                                                        sammyINP.resonance_ladder, 
-                                                                                        sammyINP.external_resonance_indices, 
-                                                                                        sammyINP.particle_pair,
-                                                                                        D, V, 
-                                                                                        sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
-                                                                                        sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, rto.Print, sammyINP.gaus_newton, 
-                                                                                        sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
-                                                                                        sammyINP.lasso, sammyINP.lasso_parameters,
-                                                                                        sammyINP.ridge, sammyINP.ridge_parameters,
-                                                                                        sammyINP.elastic_net, sammyINP.elastic_net_parameters)
-        ### could alternatively do SGD
-        # saved_res_lads_sgd, save_Pu_sgd, saved_pw_lists_sgd, saved_gradients_sgd, chi2_log_sgd, obj_log_sgd = external_fit.sgd(sammy_rto_fit, 
-        #     starting_ladder, external_resonance_indices, particle_pair,
-        #     D, V, experiments, datasets, covariance_data,
-        #     steps = 2, thresh = 0.01, alpha = 1e-2, #beta_1 = 0.5, 
-        #     batches = 600, batch_components=True, print_bool = True, gaus_newton = False,
-        #     )
-
-        ### get posterior
-        inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
-                                                    datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
-        sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
-        sammyOUT.pw_post = sammyOUT_post.pw
-        sammyOUT.par_post = sammyOUT_post.par
-        sammyOUT.chi2_post = sammyOUT_post.chi2
-        sammyOUT.chi2n_post = sammyOUT_post.chi2n
+        if sammyINP.minibatch:
+            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest = sgd(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
+                                                                                                    sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
+                                                                                                    sammyINP.max_steps, sammyINP.patience, sammyINP.batch_size,
+                                                                                                    sammyINP.alpha, sammyINP.beta_1, sammyINP.beta_2, sammyINP.epsilon, sammyRTO.Print)
+            inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[ibest],  
+                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
+                                                        max_steps=sammyINP.max_steps,
+                                                        step_threshold=sammyINP.step_threshold,
+                                                        LevMar = sammyINP.LevMar,LevMarV = sammyINP.LevMarV,LevMarVd = sammyINP.LevMarVd,minF = sammyINP.minF,maxF = sammyINP.maxF)
+            sammyOUT_post = run_sammy_YW(inpyw_post, sammyRTO)
+            sammyOUT.pw_post = sammyOUT_post.pw_post
+            sammyOUT.par_post = sammyOUT_post.par_post
+            sammyOUT.chi2_post = sammyOUT_post.chi2_post
+            sammyOUT.chi2n_post = sammyOUT_post.chi2n_post
+        else:
+            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
+                                                                                            sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
+                                                                                            sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, sammyRTO.Print, sammyINP.gaus_newton, 
+                                                                                            sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
+                                                                                            sammyINP.lasso, sammyINP.lasso_parameters,
+                                                                                            sammyINP.ridge, sammyINP.ridge_parameters,
+                                                                                            sammyINP.elastic_net, sammyINP.elastic_net_parameters)
+            
+            inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
+                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+            sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
+            sammyOUT.pw_post = sammyOUT_post.pw
+            sammyOUT.par_post = sammyOUT_post.par
+            sammyOUT.chi2_post = sammyOUT_post.chi2
+            sammyOUT.chi2n_post = sammyOUT_post.chi2n
     
     else:
         pass

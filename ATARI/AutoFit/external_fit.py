@@ -516,7 +516,7 @@ def sgd(rto,
             print(f"{int(t)}\t:\t{obj:.2f}\t{chi2:.2f}")
         if obj < best_obj:
             best_obj = obj
-            ibest_obj = t
+            ibest_obj = t-1
             convergence_counter = 0
         else:
             convergence_counter += 1

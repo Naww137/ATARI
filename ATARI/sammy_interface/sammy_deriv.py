@@ -83,7 +83,8 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
                 break                                           # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
     assert(len(ider) == len(sammyINP.resonance_ladder)*3)
     if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-4)):
-        print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {np.max(abs(np.array(derivs_dict["U"])[ider] - pu_reslad))}")
+        maxdiff = np.max( abs(np.array(derivs_dict["U"])[ider] - pu_reslad))
+        print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {maxdiff}")
     
     derivs_dict["PARTIAL_DERIVATIVES"] = derivs_dict["PARTIAL_DERIVATIVES"][:, ider]
 

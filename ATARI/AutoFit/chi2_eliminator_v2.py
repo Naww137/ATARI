@@ -333,9 +333,9 @@ class eliminator_by_chi2:
         # compiling to one ladder
         ladder = pd.concat([fixed_res_df, ladder_df], ignore_index=True)
         
-        # # sorting by energy
-        ladder = ladder.sort_values(by='E')
-        ladder = ladder.reset_index(drop=True)
+        # # # sorting by energy
+        # ladder = ladder.sort_values(by='E')
+        # ladder = ladder.reset_index(drop=True)
 
         self.sammyINPyw.resonance_ladder = ladder
 

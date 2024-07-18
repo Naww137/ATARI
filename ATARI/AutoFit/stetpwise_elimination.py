@@ -359,10 +359,10 @@ class eliminator_by_chi2:
         # compiling to one ladder
         # ladder = pd.concat([fixed_res_df, ladder_df], ignore_index=True)
         ladder, fixed_res_indices = concat_external_resonance_ladder(ladder_df, fixed_res_df)
-        
+
         # sorting by energy
-        ladder = ladder.sort_values(by='E')
-        ladder = ladder.reset_index(drop=True)
+        # ladder = ladder.sort_values(by='E')
+        # ladder = ladder.reset_index(drop=True)
 
         # self.sammyINPyw.resonance_ladder = ladder
         # self.solver = sammy_interface_bindings.Solver_factory(self.rto, self.options.solver, self.options.solver_options, particle_pair, ladder, datasets, experiments, covariance_data, fixed_res_indices) 

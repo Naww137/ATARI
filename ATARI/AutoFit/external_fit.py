@@ -278,7 +278,7 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
     
     alpha_vec = np.ones_like(Pu)*alpha
     alpha_vec[iE] = alpha/100 #* Pu[ign] #alpha_vec[iE]
-    alpha_vec[ign] = alpha * Pu[ign]**2
+    # alpha_vec[ign] = alpha * Pu[ign]**2
     if gaus_newton: 
         dampening = 1/alpha_vec
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
@@ -286,7 +286,7 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
         chi2_step = alpha_vec*dchi2_dpar
     
     total_gradient = chi2_step + alpha*dreg_dpar + momentum
-    max_estep = 0.05#Pu[ign]**2/10
+    max_estep = 0.05 #Pu[ign]**2/10
     total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
     # total_gradient[iE] = np.where(total_gradient[iE]<-0.05, -0.1, total_gradient[iE])
 
@@ -344,14 +344,14 @@ def fit(rto,
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
-        chi2, dchi2_dpar, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments)
-        reg_pen, dreg_dpar = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
+        chi2, dchi2_dpar_next, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments)
+        reg_pen, dreg_dpar_next = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
                                                                     lasso =lasso, lasso_parameters = lasso_parameters,
                                                                     ridge = ridge, ridge_parameters = ridge_parameters,
                                                                     elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
         obj = chi2 + reg_pen
         
-        if istep > 1:
+        if istep > 0:
             
             if LevMar:
                 assert(LevMarV>1)
@@ -377,7 +377,7 @@ def fit(rto,
                         if print_bool:
                             print(f"\t\t{np.round(float(alpha),8):<10}: {obj_temp:.2f}\t{chi2_temp:.2f}")
                         if obj_temp < obj_log[istep-1] or alpha==minV:
-                            obj, chi2, dchi2_dpar, hessian_approx, dreg_dpar, sammy_pws, res_lad = obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
+                            obj, chi2, dchi2_dpar_next, hessian_approx, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
                             Pu_next = Pu_temp
                             break
                         else:
@@ -406,6 +406,8 @@ def fit(rto,
 
         ### update Pu to Pu_next and save things
         Pu = Pu_next
+        dchi2_dpar = dchi2_dpar_next
+        dreg_dpar = dreg_dpar_next
         obj_log.append(obj)
         chi2_log.append(chi2)
         gradient = dchi2_dpar
@@ -584,14 +586,16 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                                                                                     sammyINP.alpha, sammyINP.beta_1, sammyINP.beta_2, sammyINP.epsilon, sammyRTO.Print)
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[ibest],  
                                                         datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
-                                                        max_steps=sammyINP.max_steps,
-                                                        step_threshold=sammyINP.step_threshold,
-                                                        LevMar = sammyINP.LevMar,LevMarV = sammyINP.LevMarV,LevMarVd = sammyINP.LevMarVd,minF = sammyINP.minF,maxF = sammyINP.maxF)
+                                                        max_steps=sammyINP.max_steps, step_threshold=sammyINP.step_threshold,
+                                                        LevMar = sammyINP.LevMar,LevMarV = sammyINP.LevMarV,LevMarVd = sammyINP.LevMarVd,minF = sammyINP.minF,maxF = sammyINP.maxF,
+                                                        initial_parameter_uncertainty=0.1, iterations=5)
             sammyOUT_post = run_sammy_YW(inpyw_post, sammyRTO)
             sammyOUT.pw_post = sammyOUT_post.pw_post
             sammyOUT.par_post = sammyOUT_post.par_post
             sammyOUT.chi2_post = sammyOUT_post.chi2_post
             sammyOUT.chi2n_post = sammyOUT_post.chi2n_post
+            sammyOUT.Pu = save_Pu[0]
+            sammyOUT.Pu_post = save_Pu[-1]
         else:
             saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
                                                                                             sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
@@ -608,6 +612,8 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
             sammyOUT.par_post = sammyOUT_post.par
             sammyOUT.chi2_post = sammyOUT_post.chi2
             sammyOUT.chi2n_post = sammyOUT_post.chi2n
+            sammyOUT.Pu = save_Pu[0]
+            sammyOUT.Pu_post = save_Pu[-1]
     
     else:
         pass

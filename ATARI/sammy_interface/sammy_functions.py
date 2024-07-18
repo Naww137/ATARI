@@ -661,11 +661,13 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
         chi2 = np.sum(i_chi2s[1:])
         if np.isclose(chi2, chi2_old):
             print(f"{lead}\tConverged step at {i} iterations")
+            converged = True
             break   
         else:
             chi2_old = chi2
+            converged = False
 
-    if i == iterations:
+    if i == iterations and not converged:
         print(f"\t{lead}Step did not converge in {i} iterations")
         converged=False
     else:

@@ -172,6 +172,7 @@ def add_fine_grid_doppler_only(performance_test_filepath,
                                template =  os.path.realpath(os.path.join(os.path.dirname(__file__), "../sammy_interface/sammy_templates/dop_2sg.inp")),
                                reactions = ['elastic', 'capture'],
                                overwrite = False,
+                               isample_min = 0
                                ):
                                
     # Check if file exists
@@ -190,7 +191,7 @@ def add_fine_grid_doppler_only(performance_test_filepath,
     isamples = []
     theo_exists_list = []
     par_exists_list =[]
-    for isample in range(isample_max):
+    for isample in range(isample_min, isample_max):
         isample_key = f"sample_{isample}"
         if isample_key in h5f.keys():
             isamples.append(isample)
@@ -211,7 +212,11 @@ def add_fine_grid_doppler_only(performance_test_filepath,
                 par_df = h5io.read_par(performance_test_filepath, isample, model_title)
                 pw_df = fnorm.calc_theo_broad_xs_for_all_reaction(sammy_exe, particle_pair,  par_df,  energy_range, temperature, template,  reactions)
                 pw_df.rename(columns=mapper, inplace=True)
-                theo_df = theo_df.merge(pw_df, how='inner', validate="1:1")
+                theo_df = theo_df.merge(pw_df, how='inner', validate="1:1", on="E", suffixes=('_keep', ''))
+                theo_df = theo_df[[col for col in theo_df.columns if not col.endswith('_keep')]]
+                if theo_df.empty:
+                    print(theo_df, pw_df)
+                    raise ValueError("theoretical dataframe did not merge properly")
                 theo_df.to_hdf(performance_test_filepath, f"sample_{isample}/theo_pw")
 
         else:

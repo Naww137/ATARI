@@ -49,6 +49,7 @@ def eliminate_small_Gn(resonance_ladder, threshold):
     fraction_eliminated = np.count_nonzero(resonance_ladder.Gn1<threshold)/len(resonance_ladder)
     return_resonance_ladder =copy(resonance_ladder)
     return_resonance_ladder = return_resonance_ladder[return_resonance_ladder.Gn1>threshold]
+    return_resonance_ladder.reset_index(inplace=True, drop=True)
     return return_resonance_ladder, fraction_eliminated
 
 

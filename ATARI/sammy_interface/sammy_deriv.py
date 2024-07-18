@@ -82,7 +82,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
                 ider.extend([i*3,i*3+1,i*3+2])
                 break                                           # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
     assert(len(ider) == len(sammyINP.resonance_ladder)*3)
-    if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-4)):
+    if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-3)):
         maxdiff = np.max( abs(np.array(derivs_dict["U"])[ider] - pu_reslad))
         print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {maxdiff}")
     
@@ -96,31 +96,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     else:
         raise ValueError('"u_or_p" can only be "u" or "p".')
     
-    # if get_theo: # if we also need the theoretical value, run sammy again and get theoretical value
-    #     sammy_functions.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
-    #     sammy_functions.write_saminp(
-    #                                 filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
-    #                                 bayes       =   False,
-    #                                 iterations  =   sammyRTO.iterations,
-    #                                 formalism   =   sammyINP.particle_pair.formalism,
-    #                                 isotope     =   sammyINP.particle_pair.isotope,
-    #                                 M           =   sammyINP.particle_pair.M,
-    #                                 ac          =   sammyINP.particle_pair.ac*10,
-    #                                 reaction    =   sammyINP.experiment.reaction,
-    #                                 energy_range=   sammyINP.experiment.energy_range,
-    #                                 temp        =   sammyINP.experiment.temp,
-    #                                 FP          =   sammyINP.experiment.FP,
-    #                                 n           =   sammyINP.experiment.n,
-    #                                 use_IDC=False,
-    #                                 derivatives=False,
-    #                                 )
-    #     sammy_functions.write_shell_script(sammyINP, 
-    #                                     sammyRTO, 
-    #                                     use_RPCM=False, 
-    #                                     use_IDC=False)
-    #     lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO)
-    
-    ### I don't thinkk get_theo above is necessary, instead, you can just fill in with derivs_dict["THEORY"]
+    ### assert that the data read into derivs dict is the same as in lst out
     if sammyINP.experiment.reaction == "transmission":
         assert(np.isclose(np.sum((lst_df.exp_trans - np.array(derivs_dict["DATA"]))**2), 0, atol=1e-8))
         lst_df.theo_trans = np.array(derivs_dict["THEORY"])

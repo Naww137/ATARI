@@ -36,6 +36,7 @@ def get_new_lam(save_lambdas, save_nres, current_target_ires, lam, l0):
         
 def get_target_ires(
                     target_ires:                int, 
+                    current_ires:               int,
                     solver:                     Solver, 
                     starting_ladder:            DataFrame,
                     external_resonance_indices: list, 
@@ -66,6 +67,8 @@ def get_target_ires(
     
         if numres == target_ires:
             break
+        elif numres < current_ires:
+            break
         else:
             lam = get_new_lam(save_lambdas, save_nres, target_ires, lam, lambda_step)
             if np.any(np.isclose(save_lambdas, lam, atol=1e-2)):
@@ -73,6 +76,9 @@ def get_target_ires(
     
     if save_nres[-1] == target_ires:
         print(f"\n==========\nSuccessfully found model with {target_ires} non-zero resonances")
+        return save_outs[-1], save_outs, save_nres, save_lambdas
+    elif save_nres[-1] < current_ires:
+        print(f"\n==========\nFound next model with {save_nres[-1]} non-zero resonances")
         return save_outs[-1], save_outs, save_nres, save_lambdas
     else:
         print(f"\n==========\nCould NOT find model with {target_ires} non-zero resonances")

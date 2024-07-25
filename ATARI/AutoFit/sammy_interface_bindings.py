@@ -36,7 +36,11 @@ class Solver:
 def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experiments, experimental_covariance, 
                    experiments_no_pup=None, 
                    cap_norm_unc=0.0384200,
-                   remove_V = False):
+                   remove_V = False,
+                   V_is_inv = False,
+                   Vinv = None,
+                   D = None,
+                   ):
 
     if solver == "YW":
         sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
@@ -60,6 +64,9 @@ def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experim
                                                    external_resonance_indices=[], 
                                                    cap_norm_unc=cap_norm_unc, 
                                                    remove_V = remove_V,
+                                                   V_is_inv = V_is_inv,
+                                                   Vinv = Vinv,
+                                                   D = D, 
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

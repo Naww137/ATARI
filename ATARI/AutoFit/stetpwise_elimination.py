@@ -580,7 +580,7 @@ class eliminator_by_chi2:
 
                 print(f'\t proc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_deep)[1]}')
                 print()
-                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {self.options.interm_fit_max_iter} iter. was {sum(posterior_deep_SO.chi2) - base_chi2}')
+                print(f'\t Benefit in chi2: {benefit_deep_chi2}, while initial benefit for {self.options.interm_fit_max_iter} iter. was {np.sum(posterior_deep_SO.chi2) - base_chi2}')
     
                 print('Deep fitting decision about model selection:')
                 print()

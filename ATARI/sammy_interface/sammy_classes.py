@@ -272,6 +272,9 @@ class SammyInputDataEXT:
     external_resonance_indices: Optional[list] #= None
     cap_norm_unc: float = 0.0
     remove_V: bool = False
+    V_is_inv: bool = False
+    Vinv: Optional[ndarray] = None
+    D: Optional[ndarray] = None
 
 
     ### alternatively could have nested class for solver options

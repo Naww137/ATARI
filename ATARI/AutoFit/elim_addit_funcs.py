@@ -1079,6 +1079,9 @@ def reduce_ladder(ladder_df: pd.DataFrame,
 
 def set_varying_fixed_params(ladder_df: pd.DataFrame,
                         vary_list: list):
+    ### do nothing if ladder is empty
+    if ladder_df.empty:
+        return ladder_df
     
     # Check if the length of vary_list is correct
     if len(vary_list) != 3:

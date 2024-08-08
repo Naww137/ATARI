@@ -171,6 +171,9 @@ class SammyInputDataYW:
     experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
     experimental_covariance: Optional[list[Union[dict, str]]] #= None
 
+    idc_at_theory : bool = False
+    measurement_models : Optional[list] = None
+
     external_resonance_indices: Optional[list] = None
 
     max_steps: int = 1
@@ -211,6 +214,8 @@ class SolverOPTs:
     LevMarVd        : float     = 5.0
     minF            : float     = 1e-5
     maxF            : float     = 10
+
+    idc_at_theory   : bool      = False
 
 @dataclass
 class SolverOPTs_YW(SolverOPTs):
@@ -269,7 +274,10 @@ class SammyInputDataEXT:
     experiments_no_pup: list[Experimental_Model]
     experimental_covariance: Optional[list[Union[dict, str]]] #= None
 
-    external_resonance_indices: Optional[list] #= None
+    idc_at_theory : bool = False
+    measurement_models : Optional[list] = None
+
+    external_resonance_indices: Optional[list] = None
     cap_norm_unc: float = 0.0
     remove_V: bool = False
     V_is_inv: bool = False

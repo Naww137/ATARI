@@ -4,19 +4,13 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-# from ATARI.theory import scattering_params
 import pandas as pd
-# import subprocess
 from copy import copy
 
-# from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.theory.scattering_params import FofE_recursive
-# from ATARI.utils.stats import chi2_val
 
-from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData, SammyInputDataYW
 import fortranformat as ff
 from typing import Optional, Union
-from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
 
 
 # module_dirname = os.path.dirname(__file__)
@@ -559,7 +553,6 @@ def write_idc(filepath, J, C, stat):
                 formatted_correlation = format_float(corr, width, sep=' ')
                 f.write(formatted_correlation)
             f.write("\n")
-            
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -631,10 +624,10 @@ def write_saminp(filepath   :   str,
     else:
         raise ValueError(f'The provided bayes_scheme, {bayes_scheme} does not exist.')
     
-    # Least Squares:
-    if use_least_squares:
-        alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
-        alphanumeric.append('REMEMBER ORIGINAL PArameter values')
+    # # Least Squares:
+    # if use_least_squares:
+    #     alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
+    #     alphanumeric.append('REMEMBER ORIGINAL PArameter values')
 
     if use_IDC:
         alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")

@@ -214,7 +214,8 @@ class Syndat_Model:
             pw_true = self.generate_true_experimental_objects(particle_pair, 
                                                     sammyRTO, 
                                                     generate_pw_true_with_sammy,
-                                                    pw_true)
+                                                    pw_true,
+                                                    self.generative_experimental_model)
 
             raw_data = self.generate_raw_observables(pw_true, true_model_parameters={})
 
@@ -265,12 +266,12 @@ class Syndat_Model:
         return red_data, covariance_data, raw_data
         
 
-
-    def generate_true_experimental_objects(self,
-                                           particle_pair: Optional[Particle_Pair],
+    @staticmethod
+    def generate_true_experimental_objects(particle_pair: Optional[Particle_Pair],
                                            sammyRTO: Optional[sammy_classes.SammyRunTimeOptions],
                                            generate_pw_true_with_sammy: bool,
                                            pw_true: Optional[pd.DataFrame] = None,
+                                           generative_experimental_model: Optional[Experimental_Model] = None
                                            ):
         """
         Generates true experimental object using sammy as defined by self.generative_experimental_model.
@@ -291,25 +292,25 @@ class Syndat_Model:
         if generate_pw_true_with_sammy:
             assert sammyRTO is not None
             assert particle_pair is not None
+            assert generative_experimental_model is not None
 
-            rto = deepcopy(sammyRTO)
-            rto.bayes = False
-            rto.derivatives = False
-            rto.theoretical = True
-            template = self.generative_experimental_model.template
+            sammyRTO.bayes = False
+            sammyRTO.derivatives = False
+            # rto.theoretical = True
+            # template = self.generative_experimental_model.template
 
-            if template is None: raise ValueError("Experimental model sammy template has not been assigned")
+            if generative_experimental_model.template is None: raise ValueError("Experimental model sammy template has not been assigned")
 
             sammyINP = sammy_classes.SammyInputData(
                 particle_pair,
                 particle_pair.resonance_ladder,
-                template= template,
-                experiment= self.generative_experimental_model,
-                energy_grid= self.generative_experimental_model.energy_grid
+                # template= template,
+                experiment= generative_experimental_model,
+                energy_grid= generative_experimental_model.energy_grid
             )
-            sammyOUT = sammy_functions.run_sammy(sammyINP, rto)
+            sammyOUT = sammy_functions.run_sammy(sammyINP, sammyRTO)
 
-            if self.reaction == "transmission":
+            if generative_experimental_model.reaction == "transmission":
                 true = "theo_trans"
             else:
                 true = "theo_xs"
@@ -325,7 +326,7 @@ class Syndat_Model:
             pw_true = pw_true
         
         if "tof" not in pw_true:
-            pw_true["tof"] = e_to_t(pw_true.E.values, self.generative_experimental_model.FP[0], True)*1e9+self.generative_experimental_model.t0[0]
+            pw_true["tof"] = e_to_t(pw_true.E.values, generative_experimental_model.FP[0], True)*1e9+generative_experimental_model.t0[0]
         
         return pw_true
     

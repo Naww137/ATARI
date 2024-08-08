@@ -40,7 +40,12 @@ def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experim
                    V_is_inv = False,
                    Vinv = None,
                    D = None,
+                   measurement_models = None,
                    ):
+
+    if solver_options.idc_at_theory:
+        if measurement_models is None:
+            raise ValueError("User specified idc_at_theory, but did not supply a measurement model")
 
     if solver == "YW":
         sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
@@ -48,6 +53,7 @@ def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experim
                                                   experiments=experiments, 
                                                   experimental_covariance=experimental_covariance, 
                                                   external_resonance_indices = [], 
+                                                  measurement_models = measurement_models,
                                                   **filter_public_attributes(solver_options))
         fit_func = sammy_functions.run_sammy_YW
 
@@ -67,6 +73,7 @@ def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experim
                                                    V_is_inv = V_is_inv,
                                                    Vinv = Vinv,
                                                    D = D, 
+                                                   measurement_models = measurement_models,
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

@@ -489,7 +489,35 @@ def filter_idc(filepath, pw_df):
                     continue
             
             f.write(line)
-    
+
+from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.syndat.control import syndatOPT
+
+def update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder):
+    assert sammyINP.idc_at_theory
+    rto_theo = deepcopy(sammyRTO)
+    rto_theo.sammy_runDIR = f"{sammyRTO.sammy_runDIR}_theo"
+    rto_theo.bayes = False
+    rto_theo.keep_runDIR = False
+    sammyINP.particle_pair.resonance_ladder = resonance_ladder
+
+    options = syndatOPT(sampleRES = False,sample_counting_noise = False,sampleTMP = False,sampleTNCS = False) 
+
+    covariance_data_at_theory = []
+    for exp, meas in zip(sammyINP.experiments, sammyINP.measurement_models):
+        if meas is None:
+            cov = {}
+        else:
+            pw_true = Syndat_Model.generate_true_experimental_objects(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
+            raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
+            _, cov, _ = meas.reduce_raw_data(raw_data,  options)
+        covariance_data_at_theory.append(cov)
+
+    for d, exp, cov in zip(sammyINP.datasets, sammyINP.experiments, covariance_data_at_theory):
+        if isinstance(cov, dict) and len(cov)>0:
+            write_idc(os.path.join(sammyRTO.sammy_runDIR, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
+            # filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+
 
 def make_data_for_YW(datasets, experiments, rundir, exp_cov):
     if np.all([isinstance(i, pd.DataFrame) for i in datasets]):
@@ -636,6 +664,8 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
     make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps)
     make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
+
+    return idc_list
     
 
 
@@ -681,10 +711,15 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
     
     return converged
 
-def run_YWY0_and_get_chi2(rundir, step):
+def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
+
+    if sammyINP.idc_at_theory:
+        resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
+        update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
+    
     runsammy_ywy0 = subprocess.run(
                                 ["sh", "-c", f"./YWY0.sh {step}"], 
-                                cwd=os.path.realpath(rundir),
+                                cwd=os.path.realpath(sammyRTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*10
                                 )
     i_ndats = [float(s) for s in runsammy_ywy0.stdout.split('\n')[-2].split()]
@@ -798,7 +833,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 pass
         
         ### get initial YW matrices for iteration and chi2 for current parameters
-        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+        i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
         ### after step 1, do convergence checking
         if istep>=1:
@@ -825,7 +860,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
                         #     fudge /= sammyINPyw.LevMarVd
                         #     fudge = max(fudge, sammyINPyw.minF)
-                        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+                        i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
                         if sammyRTO.Print:
                             print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
@@ -995,11 +1030,15 @@ def perform_minibatch_fits(max_steps, batches, sammyINPyw, sammyRTO, dataset_tit
 
 
 
-def plot_YW(sammyRTO, dataset_titles, i):
+def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
+    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
+
+    if sammyINP.idc_at_theory:
+        update_idc_to_theory(sammyINP, sammyRTO, par)
+
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
                 cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*10
                         )
-    par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     lsts = []
     for dt in dataset_titles:
         lsts.append(readlst(os.path.join(sammyRTO.sammy_runDIR,f"results/{dt}.lst")) )
@@ -1036,7 +1075,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
     ### get prior
-    par, lsts, chi2list, chi2nlist = plot_YW(sammyRTO, dataset_titles, 0)
+    par, lsts, chi2list, chi2nlist = plot_YW(sammyINPyw, sammyRTO, dataset_titles, 0)
     sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list, chi2n=chi2nlist)
     
     ### run bayes
@@ -1049,7 +1088,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
             sammy_OUT.chi2n=chi2nlist
         else:
             ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-            par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyRTO, dataset_titles, ifinal)
+            par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyINPyw, sammyRTO, dataset_titles, ifinal)
             sammy_OUT.pw_post = lsts_post
             sammy_OUT.par_post = par_post
             sammy_OUT.chi2_post = chi2list_post
@@ -1096,7 +1135,7 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
                 pass
         
         ### get initial YW matrices for iteration and chi2 for current parameters
-        i, chi2_list = run_YWY0_and_get_chi2(rundir, istep)
+        i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
         ### after step 1, do convergence checking
         if istep>=1:

@@ -128,7 +128,8 @@ class Syndat_Control:
                 pw_true = syn_mod.generate_true_experimental_objects(self.particle_pair, 
                                                                      sammyRTO, 
                                                                      generate_pw_true_with_sammy,
-                                                                     pwtruelist)
+                                                                     pwtruelist,
+                                                                     syn_mod.generative_experimental_model)
                 pw_true_list.append(pw_true)
 
 

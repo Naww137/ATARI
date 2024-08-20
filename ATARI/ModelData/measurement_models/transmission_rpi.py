@@ -457,6 +457,8 @@ class Transmission_RPI:
         assert true_model_parameters.open_neutron_spectrum is not None
         if len(true_model_parameters.open_neutron_spectrum) != len(pw_true):
             raise ValueError("neutron spectrum and sample data are not of the same length, check energy domain")
+        if not np.all(np.isclose(pw_true.E.values, true_model_parameters.open_neutron_spectrum.E.values, rtol=1e-5)):
+            raise ValueError(f"neutron spectrum and sample data are not on the same grid, check energy domain, max difference = {np.max(abs(pw_true.E.values-true_model_parameters.open_neutron_spectrum.E.values))}")
         
         # gather monitor array
         monitor_array = [true_model_parameters.m1[0], true_model_parameters.m2[0], true_model_parameters.m3[0], true_model_parameters.m4[0]]

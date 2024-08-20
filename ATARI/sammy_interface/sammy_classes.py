@@ -147,6 +147,9 @@ class SammyOutputData:
 
     ECSCM: Optional[DataFrame] = None 
     est_df: Optional[DataFrame] = None
+    covariance_data_at_theory: Optional[dict] = None
+    covariance_data_at_theory_post: Optional[dict] = None
+
     
 
 
@@ -276,6 +279,7 @@ class SammyInputDataEXT:
 
     idc_at_theory : bool = False
     measurement_models : Optional[list] = None
+    V_projection: Optional[ndarray] = None
 
     external_resonance_indices: Optional[list] = None
     cap_norm_unc: float = 0.0

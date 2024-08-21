@@ -3,4 +3,34 @@ AI/ML Tool for Automated Resonance Identification
 
 This is the repository for scripts, documents, and other resources relevant to the ATARI project, a part of Noah Walton's PhD research at the University of Tennessee.
 
-The Performance Testing for Fitting Algorithm (PiTFAll) module can be used a framework for generating large sets of synthetic data, fitting them with a 'black box' fitting routine, and analyzing the results.
+
+Quick Installation
+==================
+ATARI can be installed quickly using pip:
+
+:code:`pip install --upgrade git+https://github.com/Naww137/ATARI.git`
+
+Installing from a cloned directory
+==================================
+To clone ATARI, first migrate to the desired directly. Use the following command to clone the
+ATARI directory:
+
+:code:`git clone https://github.com/Naww137/ATARI.git`
+
+Migrate to the `ATARI` directory and run :code:`pip install .`. Alternatively, if you plan to make
+changes to the code, run :code:`pip install -e .`. Note that the :code:`-e` option may not work on
+all systems. If your python environment is not active, run :code:`python -m pip install .` or
+:code:`python -m pip install -e .`.
+
+Installing Dependencies
+=======================
+ATARI has several dependencies. Most of the dependencies can be read from `requirements.txt`. To
+install these dependencies, run the following line.
+
+:code:`pip install -r requirements.txt`
+
+Most of ATARI's capabilities requires `SAMMY <https://code.ornl.gov/RNSD/SAMMY>`_ to be installed.
+SAMMY is open source and can be coupled to ATARI simply by providing a path to the local SAMMY
+executable after build/install of SAMMY.
+
+...

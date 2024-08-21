@@ -518,6 +518,8 @@ def update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder):
             write_idc(os.path.join(sammyRTO.sammy_runDIR, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
             # filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
 
+    return covariance_data_at_theory
+
 
 def make_data_for_YW(datasets, experiments, rundir, exp_cov):
     if np.all([isinstance(i, pd.DataFrame) for i in datasets]):
@@ -670,7 +672,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 
 
 
-def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
+def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead="", print_bool=False):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
                             capture_output=True, timeout=60*10
@@ -690,7 +692,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
         i_chi2s = [float(s) for s in runsammy_ywyiter.stdout.split('\n')[-3].split()]
         chi2 = np.sum(i_chi2s[1:])
         if np.isclose(chi2, chi2_old):
-            print(f"{lead}\tConverged step at {i} iterations")
+            if print_bool: print(f"{lead}\tConverged step at {i} iterations")
             converged = True
             break   
         else:
@@ -698,7 +700,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
             converged = False
 
     if i == iterations and not converged:
-        print(f"\t{lead}Step did not converge in {i} iterations")
+        if print_bool: print(f"\t{lead}Step did not converge in {i} iterations")
         converged=False
     else:
         converged=True
@@ -715,7 +717,7 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
     if sammyINP.idc_at_theory:
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
-        update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
+        _ = update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
     
     runsammy_ywy0 = subprocess.run(
                                 ["sh", "-c", f"./YWY0.sh {step}"], 
@@ -856,7 +858,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
-                        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t")
+                        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
                         #     fudge /= sammyINPyw.LevMarVd
                         #     fudge = max(fudge, sammyINPyw.minF)
@@ -907,7 +909,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
-        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
         #     fudge /= sammyINPyw.LevMarVd
         #     fudge = max(fudge, sammyINPyw.minF)
@@ -1034,7 +1036,9 @@ def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
 
     if sammyINP.idc_at_theory:
-        update_idc_to_theory(sammyINP, sammyRTO, par)
+        covariance_data_at_theory = update_idc_to_theory(sammyINP, sammyRTO, par)
+    else:
+        covariance_data_at_theory = None
 
     out = subprocess.run(["sh", "-c", f"./plot.sh {i}"], 
                 cwd=os.path.realpath(sammyRTO.sammy_runDIR), capture_output=True, text=True, timeout=60*10
@@ -1046,7 +1050,7 @@ def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     i=i_chi2s[0]
     chi2s=i_chi2s[1:len(dataset_titles)+1]
     chi2ns=i_chi2s[len(dataset_titles)+1:] 
-    return par, lsts, chi2s, chi2ns
+    return par, lsts, chi2s, chi2ns, covariance_data_at_theory
 
 
 def check_inputs_YW(sammyINPyw, sammyRTO):
@@ -1075,8 +1079,8 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
     ### get prior
-    par, lsts, chi2list, chi2nlist = plot_YW(sammyINPyw, sammyRTO, dataset_titles, 0)
-    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list, chi2n=chi2nlist)
+    par, lsts, chi2list, chi2nlist, covdat_at_theory = plot_YW(sammyINPyw, sammyRTO, dataset_titles, 0)
+    sammy_OUT = SammyOutputData(pw=lsts, par=par, chi2=chi2list, chi2n=chi2nlist, covariance_data_at_theory=covdat_at_theory)
     
     ### run bayes
     if sammyRTO.bayes:
@@ -1088,11 +1092,12 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
             sammy_OUT.chi2n=chi2nlist
         else:
             ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
-            par_post, lsts_post, chi2list_post, chi2nlist_post = plot_YW(sammyINPyw, sammyRTO, dataset_titles, ifinal)
+            par_post, lsts_post, chi2list_post, chi2nlist_post, covdat_at_theory_post = plot_YW(sammyINPyw, sammyRTO, dataset_titles, ifinal)
             sammy_OUT.pw_post = lsts_post
             sammy_OUT.par_post = par_post
             sammy_OUT.chi2_post = chi2list_post
             sammy_OUT.chi2n_post = chi2nlist_post
+            sammy_OUT.covariance_data_at_theory_post = covdat_at_theory_post
 
 
     if not sammyRTO.keep_runDIR and os.path.isdir(sammyRTO.sammy_runDIR):
@@ -1176,7 +1181,7 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         ### Solve Bayes for this step
-        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir)
+        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
 
 
         ### 2 step Lasso if on

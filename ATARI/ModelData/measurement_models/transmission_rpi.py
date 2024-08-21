@@ -428,9 +428,11 @@ class Transmission_RPI:
     
     def truncate_energy_range(self, new_energy_range):
         if min(new_energy_range) < min(self.model_parameters.open_neutron_spectrum.E):
-            raise ValueError("new energy range is less than existing transmission_rpi.open_netron_spectrum energy")
+            # raise ValueError("new energy range is less than existing transmission_rpi.open_netron_spectrum energy")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing transmission_rpi.open_netron_spectrum energy {min(self.model_parameters.open_neutron_spectrum.E)}")
         if max(new_energy_range) > max(self.model_parameters.open_neutron_spectrum.E):
-            raise ValueError("new energy range is more than existing transmission_rpi.open_netron_spectrum energy")
+            # raise ValueError("new energy range is more than existing transmission_rpi.open_netron_spectrum energy")
+            print(f"WARNING: new energy min {max(new_energy_range)} is less than existing transmission_rpi.open_netron_spectrum energy {max(self.model_parameters.open_neutron_spectrum.E)}")
         self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[(self.model_parameters.open_neutron_spectrum.E.values < max(new_energy_range)) & (self.model_parameters.open_neutron_spectrum.E.values > min(new_energy_range))].copy()
         return
     

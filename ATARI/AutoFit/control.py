@@ -36,8 +36,6 @@ class AutoFitOPT:
         # for key, value in kwargs.items():
         #     setattr(self, key, value)
 
-
-
 class AutoFitOUT:
     def __init__(self, 
                  initialFBOUT: Optional[InitialFBOUT] = None,

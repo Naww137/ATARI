@@ -7,6 +7,13 @@ import h5py
 import pandas as pd
 
 
+def get_train_test_from_list(list_object, i_exclude, itotal):
+    train = [deepcopy(list_object[i]) for i in range(itotal) if i != i_exclude] 
+    test = [list_object[i_exclude]]
+    return train, test
+
+
+
 @dataclass
 class Evaluation_Data:
     """
@@ -17,6 +24,10 @@ class Evaluation_Data:
     experimental_models     : tuple
     datasets                : tuple
     covariance_data         : tuple
+    
+    measurement_models      : Optional[tuple]    = None
+    experimental_models_no_pup : Optional[tuple] = None
+
 
 
     @classmethod
@@ -100,10 +111,50 @@ class Evaluation_Data:
         # functions to convert to matrix form for external solves (see IFB_dev/fit_w_derivative)
         pass
 
+    def get_train_test_over_datasets(self, i_test):
+        """
+        Splits datasets into training set and testing set where testing set is the single dataset determined by i_test arguement.
+        Returns two new evaluation data instances, one with training data only and the other with testing data only.
+
+        Parameters
+        ----------
+        i_test : int
+            Index of dataset to be isolated in the test set.
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        itotal = len(self.datasets)
+
+        experimental_titles_train, experimental_titles_test = get_train_test_from_list(self.experimental_titles, i_test, itotal)
+        experimental_models_train, experimental_models_test = get_train_test_from_list(self.experimental_models, i_test, itotal)
+        datasets_train, datasets_test = get_train_test_from_list(self.datasets, i_test, itotal)
+        covariance_data_train, covariance_data_test = get_train_test_from_list(self.covariance_data, i_test, itotal)
+        
+        if self.measurement_models:
+            measurement_models_train, measurement_models_test = get_train_test_from_list(self.measurement_models, i_test, itotal)
+            measurement_models_train, measurement_models_test = tuple(measurement_models_train), tuple(measurement_models_test)
+        else:
+            measurement_models_train, measurement_models_test = None, None
+            
+        if self.experimental_models_no_pup:
+            experimental_models_no_pup_train, experimental_models_no_pup_test = get_train_test_from_list(self.experimental_models_no_pup, i_test, itotal)
+            experimental_models_no_pup_train, experimental_models_no_pup_test = tuple(experimental_models_no_pup_train), tuple(experimental_models_no_pup_test)
+        else:
+            experimental_models_no_pup_train, experimental_models_no_pup_test = None, None
+
+        eval_data_train = Evaluation_Data(tuple(experimental_titles_train), tuple(experimental_models_train), tuple(datasets_train), tuple(covariance_data_train), measurement_models=measurement_models_train, experimental_models_no_pup=experimental_models_no_pup_train)
+        eval_data_test = Evaluation_Data(tuple(experimental_titles_test), tuple(experimental_models_test), tuple(datasets_test), tuple(covariance_data_test), measurement_models=measurement_models_test, experimental_models_no_pup=experimental_models_no_pup_test)
+        
+        return eval_data_train, eval_data_test
+    
 
     def truncate(self, energy_range):
         """
-        Truncates all evaluation data to a specific energy region
+        Truncates all evaluation data to a specific energy domain.
+        Returns new evaluation data instance.
 
         Parameters
         ----------
@@ -139,10 +190,29 @@ class Evaluation_Data:
         
             covariance_data.append(filtered_cov)
 
-        # TODO: truncate experiment energy/tof grid and range
         experiments = deepcopy(self.experimental_models)
+        for exp in experiments:
+            exp.truncate_energy_range(energy_range)
 
-        return Evaluation_Data(tuple(self.experimental_titles), tuple(experiments), tuple(datasets), tuple(covariance_data))
+        if self.experimental_models_no_pup:
+            experiments_no_pup = deepcopy(self.experimental_models_no_pup)
+            for exp_no_pup in experiments_no_pup:
+                exp_no_pup.truncate_energy_range(energy_range)
+            experiments_no_pup = tuple(experiments_no_pup)
+        else:
+            experiments_no_pup = None
+
+        if self.measurement_models:
+            measurement_models = deepcopy(self.measurement_models)
+            for meas in measurement_models:
+                if meas:
+                    meas.truncate_energy_range(energy_range)
+            measurement_models = tuple(measurement_models)
+        else:
+            measurement_models = None
+        
+
+        return Evaluation_Data(tuple(self.experimental_titles), tuple(experiments), tuple(datasets), tuple(covariance_data), measurement_models=measurement_models, experimental_models_no_pup=experiments_no_pup)
 
 
 

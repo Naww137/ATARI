@@ -222,7 +222,7 @@ class SolverOPTs:
 
 @dataclass
 class SolverOPTs_YW(SolverOPTs):
-    _solver = "yw"
+    _solver = "YW"
 
     initial_parameter_uncertainty   : float     = 0.1
     iterations                      : int       = 2
@@ -239,7 +239,7 @@ class SolverOPTs_YW(SolverOPTs):
 
 @dataclass
 class SolverOPTs_EXT(SolverOPTs):
-    _solver = "ext"
+    _solver = "EXT"
 
     alpha           : float     = 1e-3
     gaus_newton     : bool      = False

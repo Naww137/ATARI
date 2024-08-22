@@ -314,10 +314,10 @@ class eliminator_by_chi2:
 
     def eliminate(self, 
                   ladder_df : pd.DataFrame,
-                #   particle_pair: Particle_Pair,
-                #   datasets: list,
-                #   covariance_data: list,
-                #   experiments: list,
+                    #   particle_pair: Particle_Pair,
+                    #   datasets: list,
+                    #   covariance_data: list,
+                    #   experiments: list,
                   fixed_resonances_df: pd.DataFrame = pd.DataFrame()
                   ) -> eliminator_OUTput: 
 

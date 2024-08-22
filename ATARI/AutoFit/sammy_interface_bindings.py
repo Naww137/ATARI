@@ -31,49 +31,58 @@ class Solver:
     
     def set_bayes(self, bayes_boolean):
         self.sammyRTO.bayes=bayes_boolean
+
+    # def get_smaller_energy_range()
     
 
-def Solver_factory(rto, solver, solver_options, particle_pair, datasets, experiments, experimental_covariance, 
-                   experiments_no_pup=None, 
+def Solver_factory(rto, 
+                   solver, 
+                   solver_options, 
+                   particle_pair, 
+                #    datasets, experiments, experimental_covariance, 
+                   evaluation_data,
+                #    experiments_no_pup=None, 
                    cap_norm_unc=0.0384200,
                    remove_V = False,
                    V_is_inv = False,
                    Vinv = None,
                    D = None,
-                   measurement_models = None,
+                   V_projection = None,
+                #    measurement_models = None,
                    ):
 
     if solver_options.idc_at_theory:
-        if measurement_models is None:
+        if evaluation_data.measurement_models is None:
             raise ValueError("User specified idc_at_theory, but did not supply a measurement model")
 
     if solver == "YW":
         sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
-                                                  datasets=datasets, 
-                                                  experiments=experiments, 
-                                                  experimental_covariance=experimental_covariance, 
+                                                  datasets=evaluation_data.datasets, 
+                                                  experiments=evaluation_data.experimental_models, 
+                                                  experimental_covariance=evaluation_data.covariance_data, 
                                                   external_resonance_indices = [], 
-                                                  measurement_models = measurement_models,
+                                                  measurement_models = evaluation_data.measurement_models,
                                                   **filter_public_attributes(solver_options))
         fit_func = sammy_functions.run_sammy_YW
 
     elif solver == "EXT":
 
-        if experiments_no_pup is None:
+        if evaluation_data.experimental_models_no_pup is None:
             raise ValueError("experiments with no PUP must be specified")
 
         sammyINP = sammy_classes.SammyInputDataEXT(particle_pair, pd.DataFrame(), 
-                                                   datasets, 
-                                                   experiments=experiments,
-                                                   experiments_no_pup=experiments_no_pup, 
-                                                   experimental_covariance=experimental_covariance, 
+                                                   evaluation_data.datasets, 
+                                                   experiments=evaluation_data.experimental_models,
+                                                   experiments_no_pup=evaluation_data.experiments_no_pup, 
+                                                   experimental_covariance=evaluation_data.covariance_data, 
                                                    external_resonance_indices=[], 
                                                    cap_norm_unc=cap_norm_unc, 
                                                    remove_V = remove_V,
                                                    V_is_inv = V_is_inv,
                                                    Vinv = Vinv,
                                                    D = D, 
-                                                   measurement_models = measurement_models,
+                                                   measurement_models = evaluation_data.measurement_models,
+                                                   V_projection = V_projection,
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

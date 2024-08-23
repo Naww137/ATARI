@@ -86,10 +86,10 @@ class AutoFit:
 
     def fit(self, evaluation_data, resonance_ladder):
         ### Run CV
-        save_test_scores, save_train_scores, save_ires = self.cross_validation(evaluation_data, resonance_ladder)
+        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder)
         try:
             save_ires = np.array(save_ires)
-            test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0)
+            test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
         except:
             raise ValueError("Not all folds resulted in the same number of resonances - change greediness or update code")
         
@@ -161,7 +161,7 @@ class AutoFit:
         # if save:
         self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
 
-        return save_test_scores, save_train_scores, save_ires
+        return save_test_scores, save_train_scores, save_ires, kfolds
     
 
     def get_cross_validation_score(self, input_arguement):

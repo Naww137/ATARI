@@ -32,9 +32,9 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
     runDIR = generate_sammy_rundir_uniq_name('./')
 
     sammyRTO = sammy_classes.SammyRunTimeOptions(sammy_exe,
-                             **{"Print"   :   True,
-                              "bayes"   :   False,
-                              "keep_runDIR"     : False,
+                             **{"Print"     : True,
+                              "bayes"       : False,
+                              "keep_runDIR" : False,
                               "sammy_runDIR": runDIR
                               })
 

@@ -14,6 +14,8 @@ from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.sammy_interface.sammy_deriv import get_derivatives, get_derivatives_YW
 from ATARI.Bayes import utils
 
+# NOTE: below functions are depreciated!
+
 def BayesMW(P, M, G, V, D, T):
     """
     The MW Bayes Scheme for SAMMY. This method is most useful when the use_least_squares method is
@@ -274,7 +276,6 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
 
         # Updating prior fit for iteration scheme:
         if iter == 0:
-            # sammy_out0 = sammy_out
             Pu0 = Pu
             T = Tn
         else:
@@ -287,6 +288,10 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         # Running Bayes:
         Ppu, Mpu, chi2 = Bayes_conditioner(sammy_rto, Pu0, Mu, Gu, V, D, T, P_vary, Ui, W, C, scheme=sammy_rto.bayes_scheme, find_Mp=find_Mp)
 
+        # Checking for invalid parameters:
+        if np.any(Ppu[::3] <= 0.0):
+            raise RuntimeError(f'Incountered negative resonance energies in iteration {iter}:\n{Ppu[::3]}')
+
         # Converting from U to P parameters:
         par = sammy_inp.resonance_ladder
         J_IDs = par['J_ID'].to_numpy(dtype=int)
@@ -296,7 +301,8 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         Ggu = Ppu[:,1]
         Gnu = Ppu[:,2]
         Ppp = np.zeros_like(Ppu)
-        Ppp[:,0] = Eu # Ppp[:,0] = u2p_E(Eu)
+        Ppp[:,0] = Eu # NOTE: THIS IS NOT HOW SAMMY WORKS!
+        # Ppp[:,0] = u2p_E(Eu)
         Ppp[:,1] = u2p_g(Ggu)
         Ppp[:,2] = u2p_n(Gnu, Ppp[:,0], Ls[J_IDs-1], particle_pair)
         # filling in posterior parameter dataframe:
@@ -307,6 +313,9 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         par_post['varyE']   = par['varyE']
         par_post['varyGn1'] = par['varyGn1']
         par_post['varyGg']  = par['varyGg']
+
+        # next step:
+        # NOTE: Levenberg-Marquardt and other gradient techniques can be added here.
         sammy_inp.resonance_ladder = par_post
 
     # sammy_out = SammyOutputData(pw=sammy_out0.pw, par=sammy_out0.par, chi2=sammy_out0.chi2, chi2n=sammy_out0.chi2n,
@@ -366,7 +375,7 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
     elif RPCM is not None:
         Mp = RPCM 
         dU_dP = np.zeros_like(Pu)
-        dU_dP[ ::3] = 1.0 #du_dp_E(E)
+        dU_dP[0::3] = 1.0 #du_dp_E(E)
         dU_dP[1::3] = du_dp_g(Gg)
         dU_dP[2::3] = du_dp_n(Gn, E, L[J_ID-1], particle_pair)
         Mu = dU_dP[NA,:] * Mp * dU_dP[:,NA]
@@ -455,7 +464,8 @@ def update_theo_matrix(Tn, Gn, P0, Pn, YW:bool):
     if YW:
         T = []
         for Tnj, Gnj in zip(Tn, Gn):
-            T.append(Tnj + Gnj @ (P0 - Pn))
+            Tj = Tnj + Gnj @ (P0 - Pn)
+            T.append(Tj)
     else:
         T = Tn + Gn @ (P0 - Pn)
     return T
@@ -599,6 +609,7 @@ def Bayes_conditioner(sammy_rto:SammyRunTimeOptions, P, M, G, V, D, T, P_vary, U
     else:       N_pars = G.shape[1]
     Mp = np.zeros((N_pars,N_pars))
     Mp[used_cols,:][:,used_cols] = Mpc
+
     return Pp, Mp, chi2
 
 def Bayes_YW(G, V, D, T):

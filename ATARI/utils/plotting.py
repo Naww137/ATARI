@@ -659,3 +659,97 @@ def plot_datafits_compiled(experimental_dataframes,
     fig.tight_layout()
 
     return fig
+
+
+
+
+def plot_sammy_pw(sammy_pw_lists, experiments, 
+                priors=[],
+                pars = pd.DataFrame(), 
+                # prior_pars = pd.DataFrame(),
+                # fit_pars = pd.DataFrame(),
+                title: str = '',
+                show_spingroups: bool = True,
+                fig_size : tuple = (6,4)
+                ):
+
+    colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
+
+    for i, exp in enumerate(experiments):
+        if exp.reaction == "transmission":
+            model_key = "theo_trans"
+            exp_key = "exp_trans"
+            iax = 0
+        elif exp.reaction == "capture":
+            model_key = "theo_xs"
+            exp_key = "exp_xs"
+            iax = 1
+        else:
+            raise ValueError()
+
+        axes[iax].errorbar(sammy_pw_lists[i].E, sammy_pw_lists[i][exp_key], yerr=sammy_pw_lists[i][f"{exp_key}_unc"], zorder=0,
+                                                fmt='.', color=f'{colors[i]}', alpha=1.0, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
+        
+        axes[iax].plot(sammy_pw_lists[i].E, sammy_pw_lists[i][f"{model_key}"], color='red', zorder=1, lw=1.5) #, label=fit_label) # colors[i]
+
+        if len(priors) != 0:
+            axes[iax].plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5) #, label=prior_label)
+    
+    y_top_padding = 0.1 
+    x_offset = 0.05
+
+    ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+    for ax in axes:
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + y_top_padding)
+
+    font_size = 8
+    y_text_shift = 0.01  # Adjust as needed, related to font size
+    y_text_positions = [ymax_values[0], ymax_values[1]]
+
+    # show vertical lines for energies
+    
+    # fits
+    for index, res in pars.iterrows():
+        res_E = res.E
+        # Add vertical lines at the resonance energies to both subplots
+        axes[0].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+        axes[1].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+
+        if (show_spingroups):
+            # add txt with
+            sp_gr_txt = np.round(int(res.J_ID),0)
+            
+            y_text_position = ymax  # Position the text at the top of the original y-axis limit
+            x_text_position = res_E + x_offset
+            
+            # Show the text to the right of the line
+            for i, ax in enumerate(axes):
+                y_text_position = ymax_values[i]  # Use original ymax for text position
+                #ax.text(x_text_position, y_text_position, str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=8)
+
+                ax.text(res_E, y_text_positions[i], str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=font_size)
+                y_text_positions[i] -= y_text_shift
+
+
+    axes[0].set_ylabel("T")
+    axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+    # set title
+    fig.suptitle(title, fontsize=14)
+    
+    # # end additional info if present
+    # axes[0].set_title(add_title, fontsize=10)
+    
+
+    # ### make it pretty
+    for ax in axes:
+        # ax.set_xlim([200,250])
+        ax.set_ylim([-0.1,1.1])
+        ax.legend(fontsize='small', loc='lower right')
+
+    fig.supxlabel('Energy (eV)')
+    fig.tight_layout()
+
+    return fig

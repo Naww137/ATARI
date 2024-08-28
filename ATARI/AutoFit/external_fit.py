@@ -244,12 +244,45 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
 
 
 
+from ATARI.syndat.control import syndatOPT
+from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.AutoFit.external_fit import get_Gs_Ts
+
+def get_V_at_T(inp, rto, ladder):
+    rto_theo = deepcopy(rto)
+    rto_theo.sammy_runDIR = f"{rto.sammy_runDIR}_theo"
+    rto_theo.bayes = False
+    rto_theo.keep_runDIR = False
+    inp.particle_pair.resonance_ladder = ladder
+
+    options = syndatOPT(sampleRES = False,sample_counting_noise = False,sampleTMP = False,sampleTNCS = False) 
+
+    covariance_data_at_theory = []
+    for exp, meas in zip(inp.experiments, inp.measurement_models):
+        if meas is None:
+            cov = {}
+        else:
+            pw_true = Syndat_Model.generate_true_experimental_objects(particle_pair=inp.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
+            raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
+            _, cov, _ = meas.reduce_raw_data(raw_data,  options)
+        covariance_data_at_theory.append(cov)
+
+    Ds, covs = get_Ds_Vs(inp.datasets, covariance_data_at_theory, normalization_uncertainty=0.038)
+    del rto_theo
+
+    return scipy.linalg.block_diag(*covs)
+
+
 def fit(rto, 
         starting_ladder, 
         external_resonance_indices, 
         particle_pair,
         D, V, experiments, datasets, covariance_data,
+
         V_is_inv = False,
+        V_at_theory = False,
+        measurement_models = None,
+        V_projection = None,
 
         steps = 100, 
         thresh = 0.01, 
@@ -275,12 +308,21 @@ def fit(rto,
         elastic_net = False,
         elastic_net_parameters = {"lambda":1, 
                                 "gamma":0,
-                                "alpha":0.7}
+                                "alpha":0.7},
         ):
 
-    # alpha = np.array(alpha)
-    # if np.any(alpha <= 0):
-    #     raise ValueError("learn_rate 'alpha' must be greater than zero")
+    ### Check inputs
+    assert alpha >0, "learn_rate 'alpha' must be greater than zero"
+
+    if V_at_theory:
+        assert measurement_models is not None, "User provided V_at_theory==True but did not provide measurement models"
+        inp = sammy_classes.SammyInputDataYW(particle_pair=particle_pair, resonance_ladder=pd.DataFrame(), experiments=experiments, datasets=datasets, experimental_covariance=covariance_data, measurement_models=measurement_models)
+        if V_projection is None:
+            do_V_projection = False
+        else:
+            do_V_projection = True
+            assert V_is_inv is True, "V projection is currently only setup on Vinv"
+
 
     saved_res_lads = []
     save_Pu = []
@@ -295,7 +337,14 @@ def fit(rto,
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
-        chi2, dchi2_dpar_next, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments, V_is_inv=V_is_inv)
+        if V_at_theory:
+            V = get_V_at_T(inp, rto, starting_ladder)
+            if V_is_inv:
+                V = np.linalg.inv(V)
+            if do_V_projection:
+                V = V_projection @ V @ V_projection
+
+        chi2, dchi2_dpar_next, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data,experiments, V_is_inv=V_is_inv)
         reg_pen, dreg_dpar_next = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
                                                                     lasso =lasso, lasso_parameters = lasso_parameters,
                                                                     ridge = ridge, ridge_parameters = ridge_parameters,
@@ -318,6 +367,14 @@ def fit(rto,
                         alpha /= LevMarVd
                         alpha = max(alpha, minV)
                         Pu_temp = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=gaus_newton)
+
+                        if V_at_theory:
+                            V = get_V_at_T(inp, rto, starting_ladder)
+                            if V_is_inv:
+                                V = np.linalg.inv(V)
+                            if do_V_projection:
+                                V = V_projection @ V @ V_projection
+                                
                         chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp = evaluate_chi2_location_and_gradient(rto, Pu_temp, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments, V_is_inv=V_is_inv)
                         reg_pen_temp, dreg_dpar_temp = get_regularization_location_and_gradient(Pu_temp, ign, iE, iext,
                                                                                                 lasso =lasso, lasso_parameters = lasso_parameters,
@@ -525,10 +582,13 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                            resonance_ladder=sammyINP.resonance_ladder,  
                                            datasets=sammyINP.datasets, 
                                            experiments=sammyINP.experiments, 
-                                           experimental_covariance=sammyINP.experimental_covariance)
+                                           experimental_covariance=sammyINP.experimental_covariance,
+                                           idc_at_theory=sammyINP.idc_at_theory,
+                                           measurement_models=sammyINP.measurement_models)
     sammyOUT = run_sammy_YW(inpyw, rto_temp)
-    if sammyINP.V_is_inv:
-        assert(sammyINP.Vinv is not None)
+
+    if sammyINP.V_is_inv and not sammyINP.idc_at_theory:
+        assert sammyINP.Vinv is not None
         assert(sammyINP.D is not None)
         assert(sammyINP.remove_V is False)
         V = sammyINP.Vinv
@@ -571,7 +631,8 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
 
         else:
             saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
-                                                                                            sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance, sammyINP.V_is_inv,
+                                                                                            sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance, 
+                                                                                            sammyINP.V_is_inv, sammyINP.idc_at_theory, sammyINP.measurement_models, sammyINP.V_projection,
                                                                                             sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, sammyRTO.Print, sammyINP.gaus_newton, 
                                                                                             sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
                                                                                             sammyINP.lasso, sammyINP.lasso_parameters,
@@ -579,14 +640,30 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                                                                             sammyINP.elastic_net, sammyINP.elastic_net_parameters)
             
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
-                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance)
+                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
+                                                        idc_at_theory=sammyINP.idc_at_theory, measurement_models=sammyINP.measurement_models)
             sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
             sammyOUT.pw_post = sammyOUT_post.pw
             sammyOUT.par_post = sammyOUT_post.par
             sammyOUT.Pu = save_Pu[0]
             sammyOUT.Pu_post = save_Pu[-1]
 
-            if sammyINP.V_is_inv:
+
+            if sammyINP.idc_at_theory:
+                if sammyINP.V_projection is not None:
+                    Ds, covs = get_Ds_Vs(sammyINP.datasets, sammyOUT_post.covariance_data_at_theory, normalization_uncertainty=sammyINP.cap_norm_unc)
+                    V = scipy.linalg.block_diag(*covs)
+                    if sammyINP.V_is_inv:
+                        V = np.linalg.inv(V)
+                    V = sammyINP.V_projection @ V @ sammyINP.V_projection
+
+                    chi2 = get_chi2(D, V, sammyOUT_post.pw, sammyINP.experiments_no_pup)
+                    sammyOUT.chi2_post = chi2
+                    sammyOUT.chi2n_post = chi2/np.sum([len(each) for each in sammyOUT_post.pw])
+                else:
+                    pass # because chi2 from run_sammy_YW will already have updated covariance
+
+            elif sammyINP.V_is_inv: # if V_is_inv and idc_at_theory is not true, then static Vinv provided must be used to calculate chi2
                 chi2 = get_chi2(D, sammyINP.Vinv, sammyOUT_post.pw, sammyINP.experiments_no_pup)
                 sammyOUT.chi2_post = chi2
                 sammyOUT.chi2n_post = chi2/np.sum([len(each) for each in sammyOUT_post.pw])

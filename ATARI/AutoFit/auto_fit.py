@@ -28,7 +28,7 @@ class AutoFitOUT:
 @dataclass
 class AutoFitOPT:
     # save options
-    save_elimination_history        : bool  = True
+    save_elimination_history        : bool  = False
     save_CV_elimination_history     : bool  = False
 
     # parallel options
@@ -37,6 +37,7 @@ class AutoFitOPT:
 
     # other
     print_bool                      : bool  = True
+    use_1std_rule                   : bool  = True
 
 
 
@@ -96,7 +97,8 @@ class AutoFit:
         ### Get cardinality from CV results
         ilowest = np.argmin(test)
         lowest = test[ilowest]
-        lowest_std = test_std[ilowest]
+        if self.options.use_1std_rule: lowest_std = test_std[ilowest]
+        else: lowest_std = 0
         iselect = ilowest
         for i in range(ilowest, len(test)):
             if test[i] < lowest + lowest_std:
@@ -111,8 +113,8 @@ class AutoFit:
         initial_samout = fe.initial_fit(resonance_ladder)
         elimination_history = fe.eliminate(initial_samout.par_post, target_ires=Nres_target)
 
-        # if save_elimination_history:
-        self.output.elimination_history = elimination_history
+        if self.options.save_elimination_history:
+            self.output.elimination_history = elimination_history
         self.output.final_samout = elimination_history.elimination_history[Nres_target]['selected_ladder_chars']
 
         return self.output

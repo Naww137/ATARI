@@ -1054,6 +1054,7 @@ def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
 
 
 def check_inputs_YW(sammyINPyw, sammyRTO):
+    empty = False
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     if len(np.unique(dataset_titles)) != len(dataset_titles):
         raise ValueError("Redundant experiment model titles")
@@ -1061,18 +1062,22 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
         raise ValueError(f"One or more experiments do not have template files.")
     if sammyINPyw.step_threshold_lag > 1 and sammyINPyw.batch_fitpar is False:
         print("WARNING: you have set a step threshold lag but are not batching fit parameters, this is an odd setting.")
+    if sammyINPyw.resonance_ladder.empty:
+        empty = True
+        sammyINPyw.resonance_ladder = pd.DataFrame({"E": [1.0], "Gg":[0.000001], "Gn":[0.000001],"varyE":[1], "varyGg":[0], "varyGn1":[0], "J_ID":[1]})
+        sammyINPyw.max_steps = 1
     if sammyRTO.bayes:
         if not np.any([each in sammyINPyw.resonance_ladder for each in ["varyE", "varyGg", "varyGn1"]]):
             raise ValueError("No vary flag columns in resonance ladder")
         if np.sum([sammyINPyw.resonance_ladder["varyE"], sammyINPyw.resonance_ladder["varyGg"], sammyINPyw.resonance_ladder["varyGn1"]]) == 0:
             raise ValueError("Bayes set to true but no varied parameters")
 
-    return dataset_titles
+    return dataset_titles, empty
 
 def run_sammy_YW(sammyINPyw, sammyRTO):
 
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
-    dataset_titles = check_inputs_YW(sammyINPyw, sammyRTO)
+    dataset_titles, empty = check_inputs_YW(sammyINPyw, sammyRTO)
 
     setup_YW_scheme(sammyRTO, sammyINPyw)
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
@@ -1099,6 +1104,10 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
             sammy_OUT.chi2n_post = chi2nlist_post
             sammy_OUT.covariance_data_at_theory_post = covdat_at_theory_post
 
+    if empty:
+        sammy_OUT.par = pd.DataFrame(columns=['E', 'Gg', 'Gn1', 'varyE', 'varyGg', 'varyGn1', 'J_ID'])
+        sammy_OUT.par_post = pd.DataFrame(columns=['E', 'Gg', 'Gn1', 'varyE', 'varyGg', 'varyGn1', 'J_ID'])
+        
 
     if not sammyRTO.keep_runDIR and os.path.isdir(sammyRTO.sammy_runDIR):
         shutil.rmtree(sammyRTO.sammy_runDIR)

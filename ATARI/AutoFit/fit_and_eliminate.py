@@ -315,7 +315,7 @@ class FitAndEliminate:
 
     def eliminate(self, 
                   ladder_df : pd.DataFrame,
-                  target_ires = 1,
+                  target_ires = 0,
                   fixed_resonances_df: pd.DataFrame = pd.DataFrame()
                   ): 
 
@@ -638,9 +638,9 @@ class FitAndEliminate:
             else:
                 # not stopping continuing up to 1 res..
                 if self.options.print_bool: print('Skipping stopping by chi2 test, going to 1 res model')
-                if(selected_ladder_chars.par_post.shape[0]==fixed_res_df.shape[0]+1):
+                if(selected_ladder_chars.par_post.shape[0]==fixed_res_df.shape[0]):
                 #if(ladder.shape[0]==fixed_res_df.shape[0]+1):
-                    if self.options.print_bool: print('Reached one resonance model.. stopping')
+                    if self.options.print_bool: print('Reached 0 resonance model.. stopping')
                     break
                 else:
                     ladder = selected_ladder_chars.par_post

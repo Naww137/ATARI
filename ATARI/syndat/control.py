@@ -8,8 +8,8 @@ import ATARI.utils.hdf5 as h5io
 from ATARI.ModelData.particle_pair import Particle_Pair
 from typing import Optional, List
 
-from ATARI.syndat.syndat_model import Syndat_Model
-from ATARI.syndat.data_classes import syndatOPT, syndatOUT
+# from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.syndat.data_classes import syndatOUT
 import os
 
 
@@ -48,7 +48,7 @@ class Syndat_Control:
 
     def __init__(self, 
                  particle_pair: Particle_Pair,
-                 syndat_models: list[Syndat_Model],
+                 syndat_models: list, #[Syndat_Model],
                  model_correlations: list = [], 
                  sampleRES = True,
                  save_covariance = True,

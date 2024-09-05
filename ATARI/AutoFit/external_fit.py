@@ -225,7 +225,7 @@ def get_regularization_location_and_gradient(Pu, ign, iE, iext,
 
 
 def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=False, momentum = 0):
-    
+
     alpha_vec = np.ones_like(Pu)*alpha
     alpha_vec[iE] = alpha/100 #* Pu[ign] #alpha_vec[iE]
     # alpha_vec[ign] = alpha * Pu[ign]**2
@@ -234,6 +234,9 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
     else:
         chi2_step = alpha_vec*dchi2_dpar
+
+    # could do LM with lambda*diag(hessian) or lambda*diag(I)
+    # could do just GLS -> corresponds to GN iteration (i.e., no lambda*diag)
     
     total_gradient = chi2_step + alpha*dreg_dpar + momentum
     max_estep = 0.05 #Pu[ign]**2/10
@@ -244,7 +247,7 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_ne
 
 
 
-from ATARI.syndat.control import syndatOPT
+from ATARI.syndat.data_classes import syndatOPT
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.AutoFit.external_fit import get_Gs_Ts
 
@@ -331,6 +334,7 @@ def fit(rto,
     chi2_log = []
     obj_log = []
 
+    total_derivative_evaluations = 0
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
     print(f"Stepping until convergence\nstep\talpha\t:\tobj\tchi2\n")
@@ -345,6 +349,7 @@ def fit(rto,
                 V = V_projection @ V @ V_projection
 
         chi2, dchi2_dpar_next, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data,experiments, V_is_inv=V_is_inv)
+        total_derivative_evaluations += 1
         reg_pen, dreg_dpar_next = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
                                                                     lasso =lasso, lasso_parameters = lasso_parameters,
                                                                     ridge = ridge, ridge_parameters = ridge_parameters,
@@ -376,6 +381,7 @@ def fit(rto,
                                 V = V_projection @ V @ V_projection
                                 
                         chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp = evaluate_chi2_location_and_gradient(rto, Pu_temp, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments, V_is_inv=V_is_inv)
+                        total_derivative_evaluations += 1
                         reg_pen_temp, dreg_dpar_temp = get_regularization_location_and_gradient(Pu_temp, ign, iE, iext,
                                                                                                 lasso =lasso, lasso_parameters = lasso_parameters,
                                                                                                 ridge = ridge, ridge_parameters = ridge_parameters,
@@ -427,7 +433,7 @@ def fit(rto,
         ### step coeficients
         Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=gaus_newton)
 
-    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log
+    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
 
 def sgd(rto, 
@@ -486,7 +492,7 @@ def sgd(rto,
     N = V.shape[0]
     U, s, Vt = np.linalg.svd(V, full_matrices=False)
 
-
+    total_derivative_evaluations = 0
     for istep in range(steps):
         
         #### Need to split regularization gradient into batches too
@@ -510,6 +516,7 @@ def sgd(rto,
         # Get derivatives and theory
         res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
         Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
+        total_derivative_evaluations += 1
         G = np.concatenate(Gs, axis=0); T = np.concatenate(Ts)
         G = zero_G_at_no_vary(G, res_lad)
 
@@ -553,7 +560,7 @@ def sgd(rto,
         # print(f"Epoch {istep} done")
         
 
-    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest_obj
+    return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest_obj, total_derivative_evaluations
 
 
 
@@ -576,6 +583,10 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     
     rto_temp = deepcopy(sammyRTO)
     rto_temp.bayes = False
+
+    empty = False
+    if sammyINP.resonance_ladder.empty:
+        empty = True
     
     ### get prior
     inpyw = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, 
@@ -608,10 +619,16 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
             V = scipy.linalg.block_diag(*covs)
 
     ### iterate to convergence externally
-    if sammyRTO.bayes:
+    if empty:
+        sammyOUT.pw_post = sammyOUT.pw
+        sammyOUT.par_post = sammyOUT.par
+        sammyOUT.chi2_post = sammyOUT.chi2
+        sammyOUT.chi2n_post = sammyOUT.chi2n
+
+    elif sammyRTO.bayes:
 
         if sammyINP.minibatch:
-            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest = sgd(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
+            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest, total_derivative_evaluations = sgd(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
                                                                                                     sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
                                                                                                     sammyINP.max_steps, sammyINP.patience, sammyINP.batch_size,
                                                                                                     sammyINP.alpha, sammyINP.beta_1, sammyINP.beta_2, sammyINP.epsilon, sammyRTO.Print)
@@ -625,12 +642,13 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
             sammyOUT.par_post = sammyOUT_post.par_post
             sammyOUT.chi2_post = sammyOUT_post.chi2_post
             sammyOUT.chi2n_post = sammyOUT_post.chi2n_post
+            sammyOUT.total_derivative_evaluations = total_derivative_evaluations
             sammyOUT.Pu = save_Pu[0]
             sammyOUT.Pu_post = save_Pu[-1]
 
 
         else:
-            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
+            saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
                                                                                             sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance, 
                                                                                             sammyINP.V_is_inv, sammyINP.idc_at_theory, sammyINP.measurement_models, sammyINP.V_projection,
                                                                                             sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, sammyRTO.Print, sammyINP.gaus_newton, 
@@ -645,6 +663,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
             sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
             sammyOUT.pw_post = sammyOUT_post.pw
             sammyOUT.par_post = sammyOUT_post.par
+            sammyOUT.total_derivative_evaluations = total_derivative_evaluations
             sammyOUT.Pu = save_Pu[0]
             sammyOUT.Pu_post = save_Pu[-1]
 
@@ -660,8 +679,10 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                     chi2 = get_chi2(D, V, sammyOUT_post.pw, sammyINP.experiments_no_pup)
                     sammyOUT.chi2_post = chi2
                     sammyOUT.chi2n_post = chi2/np.sum([len(each) for each in sammyOUT_post.pw])
-                else:
-                    pass # because chi2 from run_sammy_YW will already have updated covariance
+
+                else: # because chi2 from run_sammy_YW will already have updated covariance
+                    sammyOUT.chi2_post = sammyOUT_post.chi2
+                    sammyOUT.chi2n_post = sammyOUT_post.chi2n
 
             elif sammyINP.V_is_inv: # if V_is_inv and idc_at_theory is not true, then static Vinv provided must be used to calculate chi2
                 chi2 = get_chi2(D, sammyINP.Vinv, sammyOUT_post.pw, sammyINP.experiments_no_pup)

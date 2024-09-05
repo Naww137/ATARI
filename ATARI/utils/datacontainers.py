@@ -29,6 +29,9 @@ class Evaluation_Data:
     experimental_models_no_pup : Optional[tuple] = None
 
 
+    @property
+    def N(self):
+        return sum([len(each) for each in self.datasets])
 
     @classmethod
     def from_hdf5(cls, experimental_titles, experimental_models, sample_file, isample):

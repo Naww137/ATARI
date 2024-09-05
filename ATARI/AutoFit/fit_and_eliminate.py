@@ -244,6 +244,7 @@ class FitAndEliminate:
         self.solver_initial = solver_initial
         self.solver_eliminate = solver_eliminate
         self.options = options
+        self.total_derivative_evaluations = 0
         # self.options = options
 
 
@@ -279,6 +280,9 @@ class FitAndEliminate:
 
             outs_fit_2 = self.fit_and_eliminate_by_Gn(reslad_1, external_resonance_indices)
             samout_final = outs_fit_2[-1]
+
+            for out in outs_fit_1 + outs_fit_2:
+                self.total_derivative_evaluations += out.total_derivative_evaluations
         
         return samout_final #InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
     
@@ -911,6 +915,7 @@ class FitAndEliminate:
         self.solver_eliminate.sammyINP.initial_parameter_uncertainty = LevMarV0
         
         sammy_OUT = self.solver_eliminate.fit(ladder_df, [])
+        self.total_derivative_evaluations += sammy_OUT.total_derivative_evaluations
 
         time_proc = time.time() - time_start
 

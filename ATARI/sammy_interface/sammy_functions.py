@@ -490,29 +490,10 @@ def filter_idc(filepath, pw_df):
             
             f.write(line)
 
-from ATARI.syndat.syndat_model import Syndat_Model
-from ATARI.syndat.control import syndatOPT
+from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 
 def update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder):
-    assert sammyINP.idc_at_theory
-    rto_theo = deepcopy(sammyRTO)
-    rto_theo.sammy_runDIR = f"{sammyRTO.sammy_runDIR}_theo"
-    rto_theo.bayes = False
-    rto_theo.keep_runDIR = False
-    sammyINP.particle_pair.resonance_ladder = resonance_ladder
-
-    options = syndatOPT(sampleRES = False,sample_counting_noise = False,sampleTMP = False,sampleTNCS = False) 
-
-    covariance_data_at_theory = []
-    for exp, meas in zip(sammyINP.experiments, sammyINP.measurement_models):
-        if meas is None:
-            cov = {}
-        else:
-            pw_true = Syndat_Model.generate_true_experimental_objects(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
-            raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
-            _, cov, _ = meas.reduce_raw_data(raw_data,  options)
-        covariance_data_at_theory.append(cov)
-
+    covariance_data_at_theory = get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder)
     for d, exp, cov in zip(sammyINP.datasets, sammyINP.experiments, covariance_data_at_theory):
         if isinstance(cov, dict) and len(cov)>0:
             write_idc(os.path.join(sammyRTO.sammy_runDIR, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
@@ -711,7 +692,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead="", pr
         f"""head -$(($(wc -l < iterate/bayes_iter{i+1}.par) - 1)) iterate/bayes_iter{i+1}.par > results/step{step+1}.par"""],
         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
     
-    return converged
+    return converged, i
 
 def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
@@ -822,6 +803,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     par_df_current = sammyINPyw.resonance_ladder
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
+    total_derivative_evaluations = 0
     ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
@@ -858,7 +840,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         fudge /= sammyINPyw.LevMarVd
                         fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
-                        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
+                        converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
+                        total_derivative_evaluations += iterations
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
                         #     fudge /= sammyINPyw.LevMarVd
                         #     fudge = max(fudge, sammyINPyw.minF)
@@ -886,13 +869,13 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         if sammyRTO.Print:
                             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                             print(criteria)
-                        return max(istep-1, 0)
+                        return max(istep-1, 0), total_derivative_evaluations
                     else:
                         criteria = "Chi2 improvement below threshold"
                     if sammyRTO.Print:
                         print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
                         print(criteria)
-                    return istep
+                    return istep, total_derivative_evaluations
                 
                 else:
                     pass
@@ -909,7 +892,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
-        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
+        converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
+        total_derivative_evaluations += iterations
         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
         #     fudge /= sammyINPyw.LevMarVd
         #     fudge = max(fudge, sammyINPyw.minF)
@@ -918,7 +902,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         istep += 1
 
     print("Maximum steps reached")
-    return max(istep, 0)
+    return max(istep, 0), total_derivative_evaluations
 
 
 from ATARI.utils.datacontainers import Evaluation_Data
@@ -1096,13 +1080,14 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
             sammy_OUT.chi2=chi2list
             sammy_OUT.chi2n=chi2nlist
         else:
-            ifinal = step_until_convergence_YW(sammyRTO, sammyINPyw)
+            ifinal, total_derivative_evaluations = step_until_convergence_YW(sammyRTO, sammyINPyw)
             par_post, lsts_post, chi2list_post, chi2nlist_post, covdat_at_theory_post = plot_YW(sammyINPyw, sammyRTO, dataset_titles, ifinal)
             sammy_OUT.pw_post = lsts_post
             sammy_OUT.par_post = par_post
             sammy_OUT.chi2_post = chi2list_post
             sammy_OUT.chi2n_post = chi2nlist_post
             sammy_OUT.covariance_data_at_theory_post = covdat_at_theory_post
+            sammy_OUT.total_derivative_evaluations = total_derivative_evaluations
 
     if empty:
         sammy_OUT.par = pd.DataFrame(columns=['E', 'Gg', 'Gn1', 'varyE', 'varyGg', 'varyGn1', 'J_ID'])
@@ -1190,7 +1175,7 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
             print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
         
         ### Solve Bayes for this step
-        converged = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
+        converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
 
 
         ### 2 step Lasso if on

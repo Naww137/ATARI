@@ -5,8 +5,8 @@ from copy import deepcopy, copy
 import pickle
 import os
 from typing import Union
-from ATARI.syndat.control import Syndat_Control
-from ATARI.syndat.syndat_model import Syndat_Model
+# from ATARI.syndat.control import Syndat_Control
+# from ATARI.syndat.syndat_model import Syndat_Model
 
 
 
@@ -14,10 +14,10 @@ from ATARI.syndat.syndat_model import Syndat_Model
 # Syndat saving and loading functions
 # ----------------------------------------------------------------------------------
 
-def save_syndat_model(syndat_model: Syndat_Model, 
+def save_syndat_model(syndat_model, #: Syndat_Model, 
                       path: str,
                       clear_samples: bool = True):
-    assert isinstance(syndat_model, Syndat_Model)
+    # assert isinstance(syndat_model, Syndat_Model)
 
     if clear_samples:
         syndat_model.clear_samples()
@@ -33,7 +33,7 @@ def save_syndat_model(syndat_model: Syndat_Model,
             raise ValueError("Pickling syndat model failed, cause is unknown")
         
 
-def save_syndat_control(syndat_control: Syndat_Control, 
+def save_syndat_control(syndat_control,#: Syndat_Control, 
                         path: str,
                         clear_samples: bool = False):
     if clear_samples:
@@ -43,7 +43,7 @@ def save_syndat_control(syndat_control: Syndat_Control,
     pickle.dump(syndat_control, file)
     file.close()
 
-def load_syndat(filepath: str) -> Union[Syndat_Model, Syndat_Control]:
+def load_syndat(filepath: str) :#-> Union[Syndat_Model, Syndat_Control]:
     file = open(filepath, "rb")
     syndat = pickle.load(file)
     file.close()

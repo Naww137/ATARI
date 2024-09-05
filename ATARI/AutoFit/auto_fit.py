@@ -25,6 +25,7 @@ class AutoFitOUT:
     total_time                  : Optional[float]               = None
 
 
+
 @dataclass
 class AutoFitOPT:
     # save options
@@ -111,7 +112,7 @@ class AutoFit:
 
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options)
         initial_samout = fe.initial_fit(resonance_ladder)
-        elimination_history = fe.eliminate(initial_samout.par_post, target_ires=Nres_target)
+        elimination_history = fe.eliminate(initial_samout.par_post, target_ires=Nres_target)#, fixed_resonances_df=fixed_resonances)
 
         if self.options.save_elimination_history:
             self.output.elimination_history = elimination_history

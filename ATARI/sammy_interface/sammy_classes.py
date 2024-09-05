@@ -149,6 +149,8 @@ class SammyOutputData:
     est_df: Optional[DataFrame] = None
     covariance_data_at_theory: Optional[dict] = None
     covariance_data_at_theory_post: Optional[dict] = None
+    
+    total_derivative_evaluations = 0
 
     
 

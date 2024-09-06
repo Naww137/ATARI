@@ -8,20 +8,6 @@ from ATARI.AutoFit.spin_group_selection import SpinSelectOPT, SpinSelect, SpinSe
 from typing import Optional
 from ATARI.sammy_interface import sammy_classes
 
-class Evaluation_Data:
-    def __init__(self):
-        self.pw_data = []
-        self.covariance_data = []
-        self.experimental_models = []
-
-    def add_dataset(self,
-                    pointwise_data,
-                    covariance_data,
-                    experimental_model
-                    ):
-        self.pw_data.append(pointwise_data)
-        self.covariance_data.append(covariance_data)
-        self.experimental_models.append(experimental_model)
 
 
 

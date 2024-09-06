@@ -100,12 +100,18 @@ class InitialFBOPT:
         self._steps_per_batch = 2
         self._batch_fitpar_random = False
 
+        self._minibatch = True
+        self._minibatches = 5
+
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,1,1]
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
 
         self._num_Elam = None
+        
+        self._Elam_shift = 0
+
         self._starting_Gg_multiplier = 1
         self._starting_Gn1_multiplier = 50
 
@@ -237,6 +243,20 @@ class InitialFBOPT:
         self._batch_fitpar_random = batch_fitpar_random
 
     @property
+    def minibatch(self):
+        return self._minibatch
+    @minibatch.setter
+    def minibatch(self, minibatch):
+        self._minibatch = minibatch
+
+    @property
+    def minibatches(self):
+        return self._minibatches
+    @minibatches.setter
+    def minibatches(self, minibatches):
+        self._minibatches = minibatches
+
+    @property
     def fitpar2(self):
         return self._fitpar2
     @fitpar2.setter
@@ -271,6 +291,16 @@ class InitialFBOPT:
     @num_Elam.setter
     def num_Elam(self, num_Elam):
         self._num_Elam = num_Elam
+
+    
+    @property
+    def Elam_shift(self):
+        """Shift in energy for all res. beginning from left border of the window (used for each spin group) """
+        return self._Elam_shift
+    @Elam_shift.setter
+    def Elam_shift(self, Elam_shift):
+        self._Elam_shift = Elam_shift
+
 
     @property
     def starting_Gg_multiplier(self):
@@ -351,40 +381,14 @@ class InitialFB:
             experiments,
             covariance_data,
             sammyRTO,
-            external_resonance_ladder = pd.DataFrame()#,
+            external_resonance_ladder = None#,
             # internal_resonance_ladder = None,
             ):
         
         rto = copy(sammyRTO)
         assert rto.bayes == True
 
-        ### setup spin groups
-        if self.options.fit_all_spin_groups:
-            spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
-        else:
-            assert len(self.options.spin_group_keys)>0
-            spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
-        
-        ### generate intial_feature bank
-        initial_resonance_ladder = get_starting_feature_bank(energy_range,
-                                                            particle_pair,
-                                                            spin_groups,
-                                                            num_Elam= self.options.num_Elam,
-                                                            starting_Gg_multiplier = self.options.starting_Gg_multiplier,
-                                                            starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
-                                                            varyE = self.options.fitpar1[0], 
-                                                            varyGg = self.options.fitpar1[1], 
-                                                            varyGn1 = self.options.fitpar1[2])
-    
-        ### setup external resonances
-        if self.options.external_resonances:
-            if external_resonance_ladder.empty:
-                external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range, particle_pair)
-            else:
-                pass
-        else:
-            external_resonance_ladder = pd.DataFrame()
-        initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
+        initial_resonance_ladder, external_resonance_indices = get_initial_resonance_ladder(self.options, particle_pair, energy_range, external_resonance_ladder=external_resonance_ladder)
 
         ### setup sammy inp
         sammyINPyw = sammy_classes.SammyInputDataYW(
@@ -409,6 +413,9 @@ class InitialFB:
             steps_per_batch = self.options.steps_per_batch,
             batch_fitpar_random = self.options.batch_fitpar_random,
 
+            minibatch=self.options.minibatch,
+            minibatches=self.options.minibatches,
+
             external_resonance_indices = external_resonance_indices,
 
             minF = 1e-5,
@@ -421,6 +428,8 @@ class InitialFB:
 
         ### Fit 1 on Gn only
         print("========================================\n\tFIT 1\n========================================")
+        print(f"Options to vary: {self.options.fitpar1}")
+
         outs_fit_1 = self.fit_and_eliminate(rto, sammyINPyw, external_resonance_indices)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
@@ -429,6 +438,8 @@ class InitialFB:
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
+        print(f"Options to vary: {self.options.fitpar2}")
+
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
         internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, 
                                                                  varyE = self.options.fitpar2[0],
@@ -468,7 +479,7 @@ class InitialFB:
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
                         sammyINPyw.step_threshold *= 0.1
-                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neuton width")
+                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neutron width")
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyINPyw.resonance_ladder = resonance_ladder
                     sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
@@ -477,15 +488,6 @@ class InitialFB:
 
         return outs
     
-
-    def fit_E_Gn(self,
-                 rto,
-                 sammyINPyw):
-        
-
-        return
-
-
 
     # def report(self, string):
     #     if self.report_to_file:

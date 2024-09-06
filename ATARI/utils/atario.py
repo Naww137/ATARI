@@ -150,7 +150,8 @@ def expand_sammy_ladder_2_atari(particle_pair, ladder) -> pd.DataFrame:
             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
         else:
             L = Ls[0]
-        _, P_array, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, L)
+
+        _, P_array, _, _ = FofE_recursive(np.abs([row.E]), particle_pair.ac, particle_pair.M, particle_pair.m, L)
         gg2 = row.Gg/2
         # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
         gn2 = row.Gn1/2/P_array[0].item()

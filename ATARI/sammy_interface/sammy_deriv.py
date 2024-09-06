@@ -43,7 +43,7 @@ def get_derivatives(sammy_inp:SammyInputData, sammy_rto:SammyRunTimeOptions, u_o
                           sammy_inp.initial_parameter_uncertainty,
                           os.path.join(sammy_rto.sammy_runDIR, 'SAMMY.PAR'))
     # making templates:
-    sammy_io.fill_runDIR_with_templates(sammy_inp.template, "sammy.inp", sammy_rto.sammy_runDIR)
+    sammy_io.fill_runDIR_with_templates(sammy_inp.experiment.template, "sammy.inp", sammy_rto.sammy_runDIR)
     # making sammy input file:
     sammy_io.write_saminp(
                         filepath     =   os.path.join(sammy_rto.sammy_runDIR,"sammy.inp"),
@@ -182,7 +182,8 @@ def find_interpolation_array(particle_pair, exp_model_T, sammyRTO:SammyRunTimeOp
                     exp_model_T.energy_grid = E_grid
                     sammyINP = SammyInputData(particle_pair,
                                               particle_pair.resonance_ladder,
-                                              os.path.realpath('template_T.inp'),
+                                            #   os.path.realpath('template_T.inp'),
+                                                exp_model_T.template,
                                               exp_model_T,
                                               energy_grid=exp_model_T.energy_grid)
                     sammy_out = get_derivatives(sammyINP, sammyRTO, find_theo_trans=True, u_or_p=u_or_p)

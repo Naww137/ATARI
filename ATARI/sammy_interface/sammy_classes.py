@@ -78,7 +78,10 @@ class SammyRunTimeOptions:
         # What to use when calculating:
         self.iterations = 2
         self.bayes_scheme = None
+
+        ### YWY specific
         self.use_least_squares = False
+        self.save_lsts_YW_steps = False
 
         self.energy_window = None
         self.get_ECSCM = False
@@ -116,12 +119,12 @@ class SammyInputData:
     """
     particle_pair: Particle_Pair
     resonance_ladder: DataFrame
-    template: str
 
     experiment: Experimental_Model
     experimental_data: Optional[Union[DataFrame,ndarray]] = None
     experimental_covariance: Optional[dict] = None
     energy_grid: Optional[arraytype_id] = None
+    template: Optional[str] = None # outdated and should not be used in most cases
 
     initial_parameter_uncertainty: Optional[float] = 1.0
 
@@ -181,6 +184,9 @@ class SammyInputDataYW:
     batch_fitpar_ifit: int = 10
     steps_per_batch: int = 1
     batch_fitpar_random: bool = False
+
+    minibatch   :   bool = False
+    minibatches :   int  = 4
 
     external_resonance_indices: Optional[list] = None
 

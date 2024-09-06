@@ -63,33 +63,13 @@ class Syndat_Control:
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
 
-        # self.clear_samples()
 
-
-    # @property
-    # def samples(self) -> list:
-    #     return self._samples
-    # @samples.setter
-    # def samples(self, samples):
-    #     self._samples = samples
-    # def clear_samples(self):
-    #     self.samples = []  
-    
-    # def clear_samples(self):
-    #     for syn_mod in self.sy
-    #     return
-    
     def get_sample(self,i):
         data = {}
         for syn_mod in self.syndat_models:
             data[syn_mod.title] = syn_mod.samples[i]
         return data
-    
-    # @samples.setter
-    # def samples(self, samples):
-    #     self._samples = samples
-    # def clear_samples(self):
-    #     self.samples = []  
+
 
     @property
     def titles(self) -> list:
@@ -116,7 +96,7 @@ class Syndat_Control:
                ):
 
         generate_pw_true_with_sammy = False
-        par_true = None
+        # par_true = None
         if pw_true_list is not None:
             if self.sampleRES:
                 raise ValueError("User provided a pw_true but also asked to sampleRES")

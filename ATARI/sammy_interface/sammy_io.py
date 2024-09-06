@@ -43,13 +43,17 @@ def readlst(filepath):
         DataFrame with headers.
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        #df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
         if df.index.equals(pd.RangeIndex(len(df))):
             pass
         else:
+            #df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
             df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
+            
     else:
-        df = pd.read_csv(filepath, sep='\s+', names=['E','exp','exp_unc'])
+        #df = pd.read_csv(filepath, delim_whitespace=True, names=['E','exp','exp_unc'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):
@@ -251,6 +255,79 @@ def readpds(pdsfilepath):
     return res_dict
 
 
+def read_idc(filepath):
+    """
+    Reads a formatted SAMMY.IDC file into the dictionary format used by ATARI.
+
+    Parameters
+    ----------
+    filepath : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    with open(filepath, 'r') as f:
+        in_partial_derivatives = False
+        in_uncertainties = False
+        in_correlations = False
+        E = []
+        stat_unc = []
+        derivatives = []
+        correlations = []
+        for line in f.readlines():
+            
+            if not line.strip():
+                in_partial_derivatives = False
+                in_uncertainties = False
+                in_correlations = False
+
+            if line.lower().startswith("nu"):
+                num_params = int(line.split()[-1])
+            
+            elif line.lower().startswith("free-forma"):
+                in_partial_derivatives = True
+
+            elif line.lower().startswith("uncertaint"):
+                in_uncertainties = True
+            
+            elif line.lower().startswith("correlatio"):
+                in_correlations = True
+
+            elif in_partial_derivatives:
+                splitline = line.split()
+                E.append(float(splitline[0]))
+                stat_unc.append(float(splitline[1]))
+                derivatives.append([float(x) for x in splitline[2:]])
+
+            elif in_uncertainties:
+                uncertainties = [float(e) for e in line.split()]
+
+            elif in_correlations:
+                correlations.append([float(x) for x in line.split()])
+
+    ### compile matrices
+    Corr = np.diag(np.ones_like(uncertainties))
+    for i in range(len(correlations)):
+        for j in range(len(correlations[i])):
+            Corr[i+1, j] = correlations[i][j]
+            Corr[j,i+1] = correlations[i][j]
+
+    Cov_sys = np.diag(uncertainties) @ Corr @ np.diag(uncertainties)
+    Jac_sys = pd.DataFrame(np.array(derivatives).T, columns = pd.Series(E, name="E"))
+    diag_stat = pd.DataFrame(np.array(stat_unc)**2, columns = ["var_stat"], index=pd.Series(E, name="E"))
+
+    cov_dat = {
+        "diag_stat" : diag_stat,
+        "Jac_sys"   : Jac_sys,
+        "Cov_sys"   : Cov_sys
+    }
+
+    return cov_dat
+
 # =============================================================================
 # Sammy Parameter File
 # =============================================================================
@@ -277,6 +354,11 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
     
     def nonzero_ifvary(row):
         for par in ["E", "Gg", "Gn1", "Gn2", "Gn3"]:
+            if row[f"vary{par}"] == 1.0:
+                if row[par] == 0:
+                    row[par] = 1e-6
+                elif abs(row[par]) < 1e-5:
+                    row[par] = 1e-5*np.sign(row[par])
             if row[f"vary{par}"] == 1.0:
                 if row[par] == 0:
                     row[par] = 1e-6

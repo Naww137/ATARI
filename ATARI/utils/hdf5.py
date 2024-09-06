@@ -47,15 +47,19 @@ def read_par(case_file:str, isample:int, title:str) -> pd.DataFrame:
 
 ### Write data
 import os
-def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=None):
-    ### check for existing dataset in isample
-    if os.path.isfile(case_file):
-        h5f = h5py.File(case_file, 'r')
-        if f"sample_{isample}" in h5f.keys():
-            if f"exp_dat_{dataset_title}" in h5f[f"sample_{isample}"].keys():
-                h5f.close()
-                raise ValueError(f"Dataset with title {dataset_title} already exists for sample_{isample}")
-        h5f.close()
+def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=None, overwrite=True):
+    # ### check existing samples
+    # h5f = h5py.File(case_file, "a")
+    # if f"sample_{isample}" in h5f:
+    #     if f"exp_dat_{dataset_title}" in h5f[f"sample_{isample}"]:
+    #         if overwrite:
+    #             # print(f"Dataset titled exp_dat_{dataset_title} already exists in sample_{isample}, overwriting")
+    #             pass
+    #         else:
+    #             raise ValueError("Overwrite=False is not implemented yet")
+    #     else:
+    #         pass
+    # h5f.close()
 
     ### write data
     pw_reduced_df.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/pw_reduced")
@@ -63,8 +67,10 @@ def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=
         for key, val in cov_data.items():
             if isinstance(val, np.ndarray):
                 h5f = h5py.File(case_file, 'a')
-                # h5f.create_dataset(f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}", data=val)
-                h5f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}"]=val
+                if f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}" in h5f:
+                    h5f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}"][:]=val
+                else:
+                    h5f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}"]=val
                 h5f.close()
             elif isinstance(val, pd.DataFrame):
                 val.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}")

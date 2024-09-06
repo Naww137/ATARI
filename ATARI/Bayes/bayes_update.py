@@ -7,6 +7,7 @@ from numpy import newaxis as NA
 import scipy.sparse as sp
 import warnings
 
+from ATARI.sammy_interface import sammy_classes, sammy_functions, template_creator
 from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   du_dp_E, du_dp_g, du_dp_n
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyInputDataYW, SammyOutputData
@@ -228,7 +229,8 @@ def Bayes(sammy_out:SammyOutputData,
 def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
                    sammy_rto:SammyRunTimeOptions,
                    RPCM:np.ndarray=None,
-                   WigLL:bool=True, PTLL:bool=True):
+                   WigLL:bool=True, PTLL:bool=True,
+                   pw_post:bool=True):
     """
     The new Bayes implementation outside of SAMMY. This includes Wigner and Porter-Thomas
     log-likelihoods when specified.
@@ -246,6 +248,8 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         If true, Wigner log-likelihoods are included. Default is True.
     PTLL : bool
         If true, Porter-Thoas log-likelihoods are included. Default is True.
+    pw_post : bool
+        If true, posterior point-wise values are calculated and returned.
 
     Returns
     -------
@@ -270,6 +274,8 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         # Getting derivatives:
         if YW:  sammy_out = get_derivatives_YW(sammy_inp, sammy_rto, u_or_p='u')
         else:   sammy_out = get_derivatives(sammy_inp, sammy_rto, u_or_p='u')
+        if iter == 0:
+            sammy_out0 = copy(sammy_out)
 
         # Gathering the rest of the matrices:
         Pu, Gu, Tn, P_vary = Bayes_matrices(sammy_out, particle_pair, exp, sammy_rto)
@@ -301,8 +307,8 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         Ggu = Ppu[:,1]
         Gnu = Ppu[:,2]
         Ppp = np.zeros_like(Ppu)
-        Ppp[:,0] = Eu # NOTE: THIS IS NOT HOW SAMMY WORKS!
-        # Ppp[:,0] = u2p_E(Eu)
+        # Ppp[:,0] = Eu # NOTE: THIS IS NOT HOW SAMMY WORKS!
+        Ppp[:,0] = u2p_E(Eu)
         Ppp[:,1] = u2p_g(Ggu)
         Ppp[:,2] = u2p_n(Gnu, Ppp[:,0], Ls[J_IDs-1], particle_pair)
         # filling in posterior parameter dataframe:
@@ -318,14 +324,32 @@ def Bayes_extended(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         # NOTE: Levenberg-Marquardt and other gradient techniques can be added here.
         sammy_inp.resonance_ladder = par_post
 
-    # sammy_out = SammyOutputData(pw=sammy_out0.pw, par=sammy_out0.par, chi2=sammy_out0.chi2, chi2n=sammy_out0.chi2n,
-    #                             par_post=par_post)
+    if pw_post:
+        # Calculating posterior point-wise data:
+        rto = sammy_classes.SammyRunTimeOptions(sammy_rto.path_to_SAMMY_exe,
+                                            bayes             = False,
+                                            derivatives       = False,
+                                            keep_runDIR       = False,
+                                            sammy_runDIR      = f'sammy_runDIR_pw_post',
+                                            Print             = True)
+        sammyINP_post_bayes = sammy_classes.SammyInputDataYW(particle_pair,
+                                                par_post,
+                                                sammy_inp.datasets,
+                                                sammy_inp.experiments,
+                                                experimental_covariance = sammy_inp.experimental_covariance)
+        sammy_out_new = sammy_functions.run_sammy_YW(sammyINP_post_bayes, rto)
+        sammy_out = SammyOutputData(pw=sammy_out0.pw, par=sammy_out0.par, chi2=sammy_out0.chi2, chi2n=sammy_out0.chi2n,
+                                    pw_post=sammy_out_new.pw, par_post=sammy_out_new.par, chi2_post=sammy_out_new.chi2, chi2n_post=sammy_out_new.chi2n)
+    else:
+        sammy_out = SammyOutputData(pw=sammy_out0.pw, par=sammy_out0.par, chi2=sammy_out0.chi2, chi2n=sammy_out0.chi2n,
+                                    par_post=par_post, chi2_post=chi2)
 
-    return par_post, Mpu, chi2
+    # return par_post, Mpu, chi2
+    return sammy_out, Mpu
 
 def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
                          sammy_rto:SammyRunTimeOptions,
-                         RPCM:np.ndarray=None):
+                         RPCM=None):
     """
     Finds the Bayes matrices that are consistent between iterations.
 
@@ -346,10 +370,10 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         jid = mean_params['J_ID']
         L[jid-1] = mean_params['Ls'][0]
     # converting to U-parameters
-    # ue = p2u_E(E)
+    ue = p2u_E(E)
     ug = p2u_g(Gg)
     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-    Pu = np.column_stack((E, ug, un)).reshape(-1,)
+    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
     
     # Pointwise Data and Covariance:
     if YW:
@@ -375,7 +399,8 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
     elif RPCM is not None:
         Mp = RPCM 
         dU_dP = np.zeros_like(Pu)
-        dU_dP[0::3] = 1.0 #du_dp_E(E)
+        # dU_dP[0::3] = 1.0
+        dU_dP[0::3] = du_dp_E(E)
         dU_dP[1::3] = du_dp_g(Gg)
         dU_dP[2::3] = du_dp_n(Gn, E, L[J_ID-1], particle_pair)
         Mu = dU_dP[NA,:] * Mp * dU_dP[:,NA]
@@ -387,8 +412,8 @@ def Bayes_prior_matrices(sammy_inp:Union[SammyInputData,SammyInputDataYW],
         dPp[:,1] = fudge * Gg
         dPp[:,2] = fudge * Gn
         dPu = np.zeros((len(E),3))
-        # dPu[:,0] = du_dp_E(E ) * dPp[:,0]
-        dPu[:,0] = dPp[:,0]
+        # dPu[:,0] = dPp[:,0]
+        dPu[:,0] = du_dp_E(E ) * dPp[:,0]
         dPu[:,1] = du_dp_g(Gg) * dPp[:,1]
         dPu[:,2] = du_dp_n(Gn, E, L[J_ID-1], particle_pair) * dPp[:,2]
         dPu = dPu.reshape(-1,)
@@ -417,10 +442,10 @@ def Bayes_matrices(sammy_out:SammyOutputData,
         jid = mean_params['J_ID']
         L[jid-1] = mean_params['Ls'][0]
     # converting to U-parameters
-    # ue = p2u_E(E)
+    ue = p2u_E(E)
     ug = p2u_g(Gg)
     un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
-    Pu = np.column_stack((E, ug, un)).reshape(-1,)
+    Pu = np.column_stack((ue, ug, un)).reshape(-1,)
 
     # Derivatives:
     Gu = sammy_out.derivatives
@@ -527,6 +552,7 @@ def Bayes_likelihoods(resonance_ladder:pd.DataFrame, particle_pair:Particle_Pair
         Ui = np.zeros((3*Nres,))     # Width distribution
     for sg_idx in range(N_sgs):
         if WigLL:
+            # raise NotImplementedError('Wigner distribution derivatives for U-parameter energies has not been implemented yet.')
             indices = slice(first_indices[sg_idx], first_indices[sg_idx+1])
             Ep_g = Ep[indices]
             Dp_g = np.diff(Ep_g)

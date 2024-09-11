@@ -316,7 +316,13 @@ class Evaluation:
         """
         return pd.Series(chi2_list, index=experimental_titles, name=evaluation_title)
 
-    def to_hdf5(self, filepath, isample, overwrite=True):
+    def to_hdf5(self, filepath, isample, overwrite=True, experimental_titles = None):
+
+        if isinstance(self.chi2, list):
+            if experimental_titles is None:
+                raise ValueError("Please provide ordered experimental titles or change self.chi2 to series")
+            self.chi2 = self.chi2_list_to_series(self.chi2, self.title, experimental_titles)
+
         sample_group = f'sample_{isample}'
         chi2_exists = False
         h5f = h5py.File(filepath, "a")

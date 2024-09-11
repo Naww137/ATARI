@@ -6,8 +6,8 @@ from copy import deepcopy
 from ATARI.syndat.general_functions import *
 from ATARI.syndat.data_classes import syndatOPT, syndatOUT
 
-from ATARI.sammy_interface import sammy_classes
-from ATARI.sammy_interface.sammy_misc import generate_true_experiment
+from ATARI.sammy_interface import sammy_classes, sammy_functions
+# from ATARI.sammy_interface.sammy_misc import generate_true_experiment
 from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
@@ -212,7 +212,7 @@ class Syndat_Model:
                 particle_pair.sample_resonance_ladder()
                 par_true = particle_pair.resonance_ladder 
            
-            pw_true = generate_true_experiment(particle_pair, sammyRTO, generate_pw_true_with_sammy, pw_true, self.generative_experimental_model)
+            pw_true = self.generate_true_experimental_objects(particle_pair, sammyRTO, generate_pw_true_with_sammy, pw_true, self.generative_experimental_model)
 
             raw_data = self.generate_raw_observables(pw_true, true_model_parameters={})
 
@@ -263,13 +263,53 @@ class Syndat_Model:
         return red_data, covariance_data, raw_data
     
 
-    def generate_true_experimental_objects(particle_pair: Optional[Particle_Pair],
+    def generate_true_experimental_objects(self, particle_pair: Optional[Particle_Pair],
                                            sammyRTO: Optional[sammy_classes.SammyRunTimeOptions],
                                            generate_pw_true_with_sammy: bool,
                                            pw_true: Optional[pd.DataFrame] = None,
                                            generative_experimental_model: Optional[Experimental_Model] = None
                                            ):
-        return generate_true_experiment(particle_pair,sammyRTO,generate_pw_true_with_sammy,pw_true,generative_experimental_model)
+        # return generate_true_experiment(particle_pair,sammyRTO,generate_pw_true_with_sammy,pw_true,generative_experimental_model)
+        if generate_pw_true_with_sammy:
+            assert sammyRTO is not None
+            assert particle_pair is not None
+            assert generative_experimental_model is not None
+
+            sammyRTO.bayes = False
+            sammyRTO.derivatives = False
+            # rto.theoretical = True
+            # template = self.generative_experimental_model.template
+
+            if generative_experimental_model.template is None: raise ValueError("Experimental model sammy template has not been assigned")
+
+            sammyINP = sammy_classes.SammyInputData(
+                particle_pair,
+                particle_pair.resonance_ladder,
+                # template= template,
+                experiment= generative_experimental_model,
+                energy_grid= generative_experimental_model.energy_grid
+            )
+            sammyOUT = sammy_functions.run_sammy(sammyINP, sammyRTO)
+
+            if generative_experimental_model.reaction == "transmission":
+                true = "theo_trans"
+            else:
+                true = "theo_xs"
+            assert isinstance(sammyOUT.pw, pd.DataFrame)
+            pw_true = sammyOUT.pw.loc[:, ["E", true]]
+            pw_true.rename(columns={true: "true"}, inplace=True)
+
+        else:
+            assert pw_true is not None
+            if np.any(pw_true.true.values == np.nan):
+                raise ValueError("'true' in supplied pw true contains a Nan, please make sure you are supplying the correct pw_true")
+
+            pw_true = pw_true
+        
+        if "tof" not in pw_true:
+            pw_true["tof"] = e_to_t(pw_true.E.values, generative_experimental_model.FP[0], True)*1e9+generative_experimental_model.t0[0]
+        
+        return pw_true
         
     # @staticmethod
     # def generate_true_experimental_objects(particle_pair: Optional[Particle_Pair],

@@ -2,19 +2,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import normaltest, chi2, norm, ks_1samp, norm
-from ATARI.syndat.control import syndatOPT, Syndat_Model
 from ATARI.ModelData.experimental_model import Experimental_Model
+from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.syndat.data_classes import syndatOPT
 
-
-def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000]):
+def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000], N = 10):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
         2. the normalized residuals (data-true)/(data_uncertainty) fall on a standard normal distribution
     """
 
-    energy_grid = np.sort(np.random.default_rng().uniform(min(energy_range),max(energy_range),10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
-    df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.1,1,10)})
+    energy_grid = np.sort(np.random.default_rng().uniform(min(energy_range),max(energy_range), N)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
+    df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1, N)})
     df_true.sort_values('E', ascending=True, inplace=True)
 
     # reset syndat model samples, energy grid, and open neutron spectrum
@@ -74,7 +74,7 @@ def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, ener
         print(f"Standard normal test: {norm_test_on_residual}")
         print(f"Chi2 ks test: {kstest_on_chi2}")
 
-    return mean_of_residual, norm_test_on_residual, kstest_on_chi2
+    return mean_of_residual, norm_test_on_residual, kstest_on_chi2, chi2_gofs
 
 
 

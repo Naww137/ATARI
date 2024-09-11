@@ -24,7 +24,7 @@ class Solver:
         self.sammyINP = sammyINP
         self.fit_func = fit_func
 
-    def fit(self, resonance_ladder, external_resonance_indices):
+    def fit(self, resonance_ladder, external_resonance_indices=[]):
         self.sammyINP.resonance_ladder=resonance_ladder
         self.sammyINP.external_resonance_indices=external_resonance_indices
         return self.fit_func(self.sammyINP, self.sammyRTO)

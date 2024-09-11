@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import multiprocessing
 import os
 from ATARI.utils.file_handling import clean_and_make_directory, return_random_subdirectory
+from ATARI.utils.datacontainers import Evaluation
 
 @dataclass
 class CrossValidationOUT:
@@ -18,6 +19,7 @@ class CrossValidationOUT:
 
 @dataclass
 class AutoFitOUT:
+    final_evaluation            : Optional[Evaluation]          = None
     final_samout                : Optional[SammyOutputData]     = None
     Nres_target                 : Optional[int]                 = None
     elimination_history         : Optional[eliminator_OUTput]   = None

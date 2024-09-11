@@ -228,10 +228,13 @@ class Evaluation:
 
     title                   : str
     respar                  : pd.DataFrame
+
+    external_resonance_indices: Optional[list] = None
     
     pw_theoretical          : Optional[pd.DataFrame] = None
     evaluation_data         : Optional[Evaluation_Data] = None
     chi2                    : Optional[pd.Series] = None
+    
 
     @property
     def resonance_ladder(self):
@@ -253,6 +256,13 @@ class Evaluation:
         #     h5f.close()
         # from_hdf5(cls, experimental_titles, experimental_models, filepath, isample)
         return cls(title, respar)
+    
+    @classmethod
+    def from_samout(cls, title, samout, post=True, external_resonance_indices=None):
+        if post:
+            return cls(title, respar=samout.par_post, chi2=samout.chi2_post, external_resonance_indices=external_resonance_indices)
+        else:
+            return cls(title, respar=samout.par, chi2=samout.chi2, external_resonance_indices=external_resonance_indices)
     
 
     @staticmethod
@@ -346,11 +356,25 @@ class Evaluation:
 
 
 
-    def truncate(self, energy_range, E_external_resonances=0):
+    def truncate(self, energy_range, external_resonance_energy_buffer=0, reset_index=True, inplace=False):
+        if inplace: respar = self.respar
+        else: respar = copy(self.respar)
+
         min_max_E = (min(energy_range), max(energy_range))
-        respar = copy(self.respar)
-        respar = respar[(respar.E>=min_max_E[0]-E_external_resonances) & (respar.E<=min_max_E[1]+E_external_resonances)]
+        
+        respar = respar[(respar.E>=min_max_E[0]-external_resonance_energy_buffer) & (respar.E<=min_max_E[1]+external_resonance_energy_buffer)]
+
         # if self.evaluation_data is not None:
             # eval_data = self.evaluation_data.truncate()
-        return Evaluation(self.title, respar)
+        if reset_index:
+            respar.reset_index(inplace=True, drop=True)
+
+        external_respar = respar[(respar.E<=min_max_E[0]) | (respar.E>=min_max_E[1])]
+        external_resonance_indices = external_respar.index.to_list()
+
+        if inplace: 
+            self.external_resonance_indices = external_resonance_indices
+            self.respar = respar
+        else: 
+            return Evaluation(self.title, respar, external_resonance_indices=external_resonance_indices)
 

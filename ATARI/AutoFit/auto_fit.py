@@ -88,6 +88,8 @@ class AutoFit:
 
     def fit(self, evaluation_data, resonance_ladder):
         ### Run CV
+        if self.options.print_bool:
+            print("=============\nRunning Cross Validation\n=============")
         save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder)
         try:
             save_ires = np.array(save_ires)
@@ -110,6 +112,9 @@ class AutoFit:
         solver_initial = Solver_factory(self.rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data) 
         solver_elim = Solver_factory(self.rto_train, self.solver_options_eliminate._solver, self.solver_options_eliminate, self.particle_pair, evaluation_data)
 
+        if self.options.print_bool:
+            print(f"=============\nFitting to {Nres_target} Resonances\n=============")
+            
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options)
         initial_samout = fe.initial_fit(resonance_ladder)
         elimination_history = fe.eliminate(initial_samout.par_post, target_ires=Nres_target)#, fixed_resonances_df=fixed_resonances)

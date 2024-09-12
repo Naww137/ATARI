@@ -47,7 +47,7 @@ def Solver_factory(rto,
                    V_is_inv = False,
                    Vinv = None,
                    D = None,
-                   V_projection = None,
+                #    V_projection = None,
                 #    measurement_models = None,
                    ):
 
@@ -82,7 +82,7 @@ def Solver_factory(rto,
                                                    Vinv = Vinv,
                                                    D = D, 
                                                    measurement_models = evaluation_data.measurement_models,
-                                                   V_projection = V_projection,
+                                                #    V_projection = V_projection,
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

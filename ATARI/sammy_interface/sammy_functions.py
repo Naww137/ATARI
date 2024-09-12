@@ -650,7 +650,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead=""):
     for i in range(1, iterations+1):
         runsammy_ywyiter = subprocess.run(
                                     ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, text=True, text=True, timeout=60*10
+                                    capture_output=True, text=True, timeout=60*10
                                     )
 
         runsammy_bayiter = subprocess.run(

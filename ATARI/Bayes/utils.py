@@ -102,13 +102,45 @@ def YW_implicit_data_cov_solve(exp_cov:dict, G:np.ndarray, DT:np.ndarray):
         Z = psd_inv(m) + g.T @ h
         ViDT = (DT / v - h @ psd_solve(Z, (h.T @ DT)))[:,0]
         Y = G.T @ ViDT
-        chi2 = float( DT.T @ ViDT )
-        del ViDT
         W = G.T @ (G  / v - h @ psd_solve(Z, (h.T @ G )))
     else:
         ViDT = (DT / v)[:,0]
         Y = G.T @ ViDT
-        chi2 = float( DT.T @ ViDT )
-        del ViDT
         W = G.T @ (G / v)
-    return Y, W, chi2
+    chi2 = float( DT.T @ ViDT )
+    chi2n = chi2 / len(DT)
+    return Y, W, chi2, chi2n
+
+def implicit_data_cov_chi2(exp_cov:dict, DT:np.ndarray):
+    """
+    ...
+    """
+
+    DT = DT[:,NA]
+    v = exp_cov['diag_stat'].values
+    if 'Cov_sys' in exp_cov:
+        m = exp_cov['Cov_sys']
+        g = exp_cov['Jac_sys'].values.T
+        h = g / v
+        Z = psd_inv(m) + g.T @ h
+        ViDT = (DT / v - h @ psd_solve(Z, (h.T @ DT)))[:,0]
+    else:
+        ViDT = (DT / v)[:,0]
+    chi2 = float( DT.T @ ViDT )
+    return chi2
+
+def implicit_data_cov_inv(exp_cov:dict):
+    """
+    ...
+    """
+
+    v = exp_cov['diag_stat'].values
+    if 'Cov_sys' in exp_cov:
+        m = exp_cov['Cov_sys']
+        g = exp_cov['Jac_sys'].values.T
+        h = g / v
+        Z = psd_inv(m) + g.T @ h
+        Vinv = (1/v - h @ psd_solve(Z, h.T))[:,0]
+    else:
+        Vinv = (1 / v)[:,0]
+    return Vinv

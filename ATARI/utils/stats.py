@@ -124,16 +124,12 @@ def add_normalization_uncertainty_to_covariance(cov, d, normalization_uncertaint
     ndarray
         Updated covariance matrix.
     """
-<<<<<<< HEAD
-    d = np.atleast_2d(d)
-=======
     # d = np.hstack((np.ones((len(dat),1)), -np.diag(dat["exp"].values)))
     # cn = np.zeros((len(dat)+1, len(dat)+1))
     # cn[1:, 1:] = np.diag(dat["exp_unc"].values**2)
     # cn[0,0] = 0.0384200**2
     # V = d @ cn @ d.T
     d = np.ones((len(d),1))
->>>>>>> robustIFB
     if d.shape[1] == 1:
         d = d.T
     cov_norm = d.T @ np.array([[normalization_uncertainty**2]]) @ d

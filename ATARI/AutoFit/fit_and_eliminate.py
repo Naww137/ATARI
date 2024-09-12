@@ -222,6 +222,14 @@ class eliminator_OUTput:
     success: bool = False
     elim_tot_time: float = np.inf
 
+@dataclass 
+class FitAndEliminateOUT:
+
+    initial_fits        : Optional[list] = None
+    elimination_history : Optional[dict] = None
+
+    derivative_evaluations : Optional[list] = None
+
 
 
 class FitAndEliminate:
@@ -245,7 +253,12 @@ class FitAndEliminate:
         self.solver_eliminate = solver_eliminate
         self.options = options
         self.total_derivative_evaluations = 0
+        # self.derivative_evaluations = []
         # self.options = options
+
+        self.output = FitAndEliminateOUT()
+        self.output.derivative_evaluations = []
+        self.output.initial_fits = []
 
 
     def initial_fit(self,
@@ -282,7 +295,9 @@ class FitAndEliminate:
             samout_final = outs_fit_2[-1]
 
             for out in outs_fit_1 + outs_fit_2:
+                self.output.initial_fits.append(out)
                 self.total_derivative_evaluations += out.total_derivative_evaluations
+                self.output.derivative_evaluations.append(out.total_derivative_evaluations)
         
         return samout_final #InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
     
@@ -453,7 +468,7 @@ class FitAndEliminate:
             best_model_chars = initial_ladder_chars
             base_chi2 = np.sum(initial_ladder_chars.chi2)
 
-            # if we are on the level of target resonances - just stop - by default don't stop until 1
+            # if we are on the level of target resonances - just stop - by default don't stop until 0
             if (current_level==target_ires):
                 break
 
@@ -486,6 +501,7 @@ class FitAndEliminate:
 
                 LevMarV0 = self.options.LevMarV0_priorpassed # if prior passed, starting step should be small
 
+                level_derivative_evaluations = 0
             ### else test all N-1 fitted models 
             else:
                 fitted_test_out = self.test_fitted_models(current_level,
@@ -497,7 +513,7 @@ class FitAndEliminate:
                                         best_model_chi2,
                                         any_model_passed_test)
                 
-                best_removed_resonance, best_model_chars, any_model_passed_test = fitted_test_out
+                best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations = fitted_test_out
 
                 LevMarV0 = self.options.start_fudge_for_deep_stage
 
@@ -516,11 +532,11 @@ class FitAndEliminate:
                     print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}')
                     print()
 
-                posterior_deep_SO, sol_fit_time_deep = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
+                posterior_deep_SO, sol_fit_time_deep, derivative_evaluations = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
                                                                         max_steps = deep_fit_max_iter,
                                                                         step_threshold = deep_fit_step_thr,
                                                                         LevMarV0 = LevMarV0)           
-
+                level_derivative_evaluations += derivative_evaluations
             else:
                 if (self.options.print_bool):
                     print()
@@ -565,6 +581,7 @@ class FitAndEliminate:
                 final_model_passed_test = False
 
             level_time = time.time() - level_start_time
+            self.output.derivative_evaluations.append(level_derivative_evaluations)
 
             ### printout
             if (self.options.print_bool):
@@ -662,15 +679,16 @@ class FitAndEliminate:
         else:
             elim_success = False
 
-        el_out = eliminator_OUTput(
-            ladder_OUT = ladder_OUT,
-            ladder_IN = ladder_IN,
-            elimination_history= model_history,
-            success = elim_success,
-            elim_tot_time = total_time
-            )
+        # el_out = eliminator_OUTput(
+        #     ladder_OUT = ladder_OUT,
+        #     ladder_IN = ladder_IN,
+        #     elimination_history= model_history,
+        #     success = elim_success,
+        #     elim_tot_time = total_time
+        #     )
+        self.output.elimination_history = model_history
 
-        return el_out
+        return model_history
 
 
     def test_priors(self,
@@ -777,7 +795,7 @@ class FitAndEliminate:
         # TODO: change this..
         best_removed_resonance = None
         best_model_chars = None
-
+        level_derivative_evaluations = 0
 
         # selecting the most perspective model from the chi2 point of view with limited iterations allowed
         for j in range(current_level):  # For every resonance in the current ladder
@@ -802,12 +820,12 @@ class FitAndEliminate:
                 print(prior_ladder)
                 print()
 
-            posterior_interm_SO, sol_fit_time_interm = self.fit_YW_by_ig(
+            posterior_interm_SO, sol_fit_time_interm, derivative_evaluations = self.fit_YW_by_ig(
                 ladder_df = prior_ladder,
                 max_steps = self.options.interm_fit_max_iter,
                 step_threshold = self.options.interm_fit_step_thr
                 )
-
+            level_derivative_evaluations += derivative_evaluations
             cur_sol_chars = posterior_interm_SO
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
 
@@ -878,7 +896,7 @@ class FitAndEliminate:
 
             print('End Doing limited iterations to find the best model inside current level...')
 
-        return (best_removed_resonance, best_model_chars, any_model_passed_test)
+        return (best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations)
 
 
 
@@ -916,10 +934,11 @@ class FitAndEliminate:
         
         sammy_OUT = self.solver_eliminate.fit(ladder_df, [])
         self.total_derivative_evaluations += sammy_OUT.total_derivative_evaluations
+        # self.output.derivative_evaluations.append(sammy_OUT.total_derivative_evaluations)
 
         time_proc = time.time() - time_start
 
-        return sammy_OUT, time_proc
+        return sammy_OUT, time_proc, sammy_OUT.total_derivative_evaluations
 
 
     def remove_resonance(self,

@@ -1,6 +1,6 @@
 from copy import copy
 from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
-from ATARI.AutoFit.fit_and_eliminate import FitAndEliminate, FitAndEliminateOPT, eliminator_OUTput
+from ATARI.AutoFit.fit_and_eliminate import FitAndEliminate, FitAndEliminateOPT, FitAndEliminateOUT
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SolverOPTs, Particle_Pair, SammyOutputData
 import numpy as np
 from typing import Optional
@@ -22,7 +22,7 @@ class AutoFitOUT:
     final_evaluation            : Optional[Evaluation]          = None
     final_samout                : Optional[SammyOutputData]     = None
     Nres_target                 : Optional[int]                 = None
-    elimination_history         : Optional[eliminator_OUTput]   = None
+    fit_and_eliminate_output    : Optional[FitAndEliminateOUT]  = None
     cross_validation_output     : Optional[CrossValidationOUT]  = None
     total_time                  : Optional[float]               = None
 

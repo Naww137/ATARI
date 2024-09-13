@@ -237,7 +237,11 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_st
     if mode == "GD":
         chi2_step = alpha_vec*dchi2_dpar
     elif mode == "GLS":
-        chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hessian_approx) @ dchi2_dpar) /10 # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
+        chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hessian_approx) @ dchi2_dpar) # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
+        Q = copy(Pu)
+        Q[iE] = Pu[ign]
+        Q /= 10
+        chi2_step = np.where(abs(chi2_step)>abs(Q), np.sign(chi2_step)*abs(Q), chi2_step)
     elif mode == "LMa": 
         dampening = 1/alpha_vec
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
@@ -246,14 +250,16 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_st
         chi2_step = np.linalg.inv(dampening*np.diag(np.diag(hessian_approx)+1e-10) + hessian_approx) @ dchi2_dpar
     elif mode == "LMc":
         dampening = 1/alpha_vec
-        Q = Pu
+        Q = copy(Pu)
         Q[iE] = Pu[ign]
-        chi2_step = np.linalg.inv(dampening*np.diag(Q) + hessian_approx) @ dchi2_dpar
+        chi2_step = np.linalg.inv(dampening*np.diag(abs(Q)) + hessian_approx) @ dchi2_dpar
     else:
         raise ValueError(f"Solver step direction mode {mode} not recognized")
     
     total_gradient = chi2_step + alpha*dreg_dpar + momentum
 
+    # max_gstep = 
+    # total_gradient = np.where(abs(total_gradient)>max_gstep, np.sign(total_gradient)*max_gstep, total_gradient)
     max_estep = 0.05 
     total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
     
@@ -362,10 +368,13 @@ def fit(rto,
                                                                                                 ridge = ridge, ridge_parameters = ridge_parameters,
                                                                                                 elastic_net = elastic_net, elastic_net_parameters = elastic_net_parameters)
                         obj_temp = chi2_temp + reg_pen_temp
+                        # Dobj = obj_log[istep-1] - obj_temp
+                        # Dobj = obj_temp - obj_log[istep-1] 
 
                         if print_bool:
                             print(f"\t\t{np.round(float(alpha),8):<10}: {obj_temp:.2f}\t{chi2_temp:.2f}")
-                        if obj_temp < obj_log[istep-1] or alpha==minV:
+                        if obj_temp < obj_log[istep-1] or alpha==minV: # or abs(obj_temp - obj_log[istep-1])<thresh:
+                        # if Dobj < thresh or alpha==minV:
                             obj, chi2, dchi2_dpar_next, hessian_approx, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
                             Pu_next = Pu_temp
                             break

@@ -244,7 +244,7 @@ class SolverOPTs_EXT(SolverOPTs):
     _solver = "EXT"
 
     alpha           : float     = 1e-3
-    gaus_newton     : bool      = False
+    solution_mode   : str       = "LMa"
 
     minibatch       : bool      = False
     batch_size      : int       = 10
@@ -303,7 +303,7 @@ class SammyInputDataEXT:
     maxF            : float     = 1e-2
 
     alpha           : float     = 1e-3
-    gaus_newton     : bool      = False
+    solution_mode   : str      = "LMa"
     
     minibatch       : bool      = False
     batch_size      : int       = 10

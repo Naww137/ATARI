@@ -229,24 +229,35 @@ def get_regularization_location_and_gradient(Pu, ign, iE, iext,
 
 
 
-def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=False, momentum = 0):
+def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode="LMa", momentum = 0):
 
     alpha_vec = np.ones_like(Pu)*alpha
-    alpha_vec[iE] = alpha/100 #* Pu[ign] #alpha_vec[iE]
-    # alpha_vec[ign] = alpha * Pu[ign]**2
-    if gaus_newton: 
+    alpha_vec[iE] = alpha/100
+
+    if mode == "GD":
+        chi2_step = alpha_vec*dchi2_dpar
+    elif mode == "GLS":
+        chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hessian_approx) @ dchi2_dpar) /10 # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
+    elif mode == "LMa": 
         dampening = 1/alpha_vec
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
+    elif mode == "LMb":
+        dampening = 1/alpha_vec
+        chi2_step = np.linalg.inv(dampening*np.diag(np.diag(hessian_approx)+1e-10) + hessian_approx) @ dchi2_dpar
+    elif mode == "LMc":
+        dampening = 1/alpha_vec
+        Q = Pu
+        Q[iE] = Pu[ign]
+        chi2_step = np.linalg.inv(dampening*np.diag(Q) + hessian_approx) @ dchi2_dpar
     else:
-        chi2_step = alpha_vec*dchi2_dpar
-
-    # could do LM with lambda*diag(hessian) or lambda*diag(I)
-    # could do just GLS -> corresponds to GN iteration (i.e., no lambda*diag)
+        raise ValueError(f"Solver step direction mode {mode} not recognized")
     
     total_gradient = chi2_step + alpha*dreg_dpar + momentum
-    max_estep = 0.05 #Pu[ign]**2/10
+
+    max_estep = 0.05 
     total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
-    # total_gradient[iE] = np.where(total_gradient[iE]<-0.05, -0.1, total_gradient[iE])
+    
+    total_gradient[i_no_step] = 0
 
     return Pu - total_gradient
 
@@ -274,7 +285,7 @@ def fit(rto,
         alpha = 1e-6, 
         print_bool = True, 
         
-        gaus_newton = False, 
+        mode = "LMa", 
 
         LevMar = True, 
         LevMarV = 2, 
@@ -343,7 +354,7 @@ def fit(rto,
                     while True:  
                         alpha /= LevMarVd
                         alpha = max(alpha, minV)
-                        Pu_temp = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=gaus_newton)
+                        Pu_temp = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode=mode)
                         chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp = evaluate_chi2_location_and_gradient(rto, Pu_temp, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments, inp_for_theory, V_is_inv=V_is_inv)
                         total_derivative_evaluations += 1
                         reg_pen_temp, dreg_dpar_temp = get_regularization_location_and_gradient(Pu_temp, ign, iE, iext,
@@ -395,7 +406,7 @@ def fit(rto,
         saved_res_lads.append(copy(res_lad))
 
         ### step coeficients
-        Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, gaus_newton=gaus_newton)
+        Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode=mode)
 
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
@@ -614,8 +625,8 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
         else:
             saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations = fit(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
                                                                                             sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance, 
-                                                                                            sammyINP.V_is_inv, sammyINP.idc_at_theory, sammyINP.measurement_models, #sammyINP.V_projection,
-                                                                                            sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, sammyRTO.Print, sammyINP.gaus_newton, 
+                                                                                            sammyINP.V_is_inv, sammyINP.idc_at_theory, sammyINP.measurement_models,
+                                                                                            sammyINP.max_steps, sammyINP.step_threshold, sammyINP.alpha, sammyRTO.Print, sammyINP.solution_mode, 
                                                                                             sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
                                                                                             sammyINP.lasso, sammyINP.lasso_parameters,
                                                                                             sammyINP.ridge, sammyINP.ridge_parameters,

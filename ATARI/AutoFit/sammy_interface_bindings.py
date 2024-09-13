@@ -39,16 +39,12 @@ def Solver_factory(rto,
                    solver, 
                    solver_options, 
                    particle_pair, 
-                #    datasets, experiments, experimental_covariance, 
                    evaluation_data,
-                #    experiments_no_pup=None, 
                    cap_norm_unc=0.0384200,
                    remove_V = False,
                    V_is_inv = False,
                    Vinv = None,
                    D = None,
-                #    V_projection = None,
-                #    measurement_models = None,
                    ):
 
     if solver_options.idc_at_theory:
@@ -82,7 +78,6 @@ def Solver_factory(rto,
                                                    Vinv = Vinv,
                                                    D = D, 
                                                    measurement_models = evaluation_data.measurement_models,
-                                                #    V_projection = V_projection,
                                                    **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT
     else:

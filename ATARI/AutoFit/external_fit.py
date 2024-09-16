@@ -238,11 +238,11 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_st
         chi2_step = alpha_vec*dchi2_dpar
     elif mode == "GLS":
         chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hessian_approx) @ dchi2_dpar) # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
-        Q = copy(Pu)
-        Q[iE] = Pu[ign]
-        Q /= 10
-        chi2_step = np.where(abs(chi2_step)>abs(Q), np.sign(chi2_step)*abs(Q), chi2_step)
-    elif mode == "LMa": 
+        # Q = copy(Pu)
+        # Q[iE] = Pu[ign]
+        # Q /= 10
+        # chi2_step = np.where(abs(chi2_step)>abs(Q), np.sign(chi2_step)*abs(Q), chi2_step)
+    elif mode == "LMa" or mode == "LM": 
         dampening = 1/alpha_vec
         chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
     elif mode == "LMb":
@@ -426,6 +426,9 @@ def sgd(rto,
         particle_pair,
         D, V, experiments, datasets, covariance_data,
 
+        V_at_theory = False,
+        measurement_models = None,
+
         steps = 100, 
         patience = 10,
         batch_size = 25, 
@@ -465,6 +468,11 @@ def sgd(rto,
 
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     
+    if V_at_theory:
+        assert measurement_models is not None, "User provided V_at_theory==True but did not provide measurement models"
+        inp_for_theory = sammy_classes.SammyInputDataYW(particle_pair=particle_pair, resonance_ladder=pd.DataFrame(), experiments=experiments, datasets=datasets, experimental_covariance=covariance_data, idc_at_theory=True, measurement_models=measurement_models)
+    else: 
+        inp_for_theory = None
 
     ### Initialize ADAM parameters
     t = 0
@@ -474,7 +482,16 @@ def sgd(rto,
     ibest_obj = 0
 
     N = V.shape[0]
+
+    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu_next, starting_ladder, particle_pair)
+    if inp_for_theory is not None:
+        V = get_V_at_T(inp_for_theory, rto, res_lad)
+    else: pass # don't need to redefine V
+
     U, s, Vt = np.linalg.svd(V, full_matrices=False)
+
+    if print_bool:
+        print(f"SGD batch fraction : {batch_size/N : .2f}");print("-"*10)
 
     total_derivative_evaluations = 0
     for istep in range(steps):
@@ -493,12 +510,19 @@ def sgd(rto,
         
         # random indices of components
         index = np.random.choice(N, size=batch_size, replace=False) 
-        s_i = s[index]; U_i = U[:, index]; Vt_i = Vt[index, :]
         # anti_index = np.array([i for i in range(N) if i not in index])
         # s_ai = s[anti_index]; U_ai = U[:, anti_index]; Vt_ai = Vt[anti_index, :]
 
         # Get derivatives and theory
         res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
+
+        if inp_for_theory is not None:
+            V = get_V_at_T(inp_for_theory, rto, res_lad)
+            U, s, Vt = np.linalg.svd(V, full_matrices=False)
+        else: pass # don't need to redefine V, U,s,Vt
+
+        s_i = s[index]; U_i = U[:, index]; Vt_i = Vt[index, :]
+
         Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
         total_derivative_evaluations += 1
         G = np.concatenate(Gs, axis=0); T = np.concatenate(Ts)
@@ -567,6 +591,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     
     rto_temp = deepcopy(sammyRTO)
     rto_temp.bayes = False
+    N = np.sum([len(each) for each in sammyINP.datasets])
 
     empty = False
     if sammyINP.resonance_ladder.empty:
@@ -611,22 +636,24 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
 
     elif sammyRTO.bayes:
 
-        if sammyINP.minibatch:
+        if sammyINP.solution_mode == "SGD":
             saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, ibest, total_derivative_evaluations = sgd(sammyRTO, sammyINP.resonance_ladder, sammyINP.external_resonance_indices, sammyINP.particle_pair, D, V, 
                                                                                                     sammyINP.experiments_no_pup, sammyINP.datasets, sammyINP.experimental_covariance,
+                                                                                                    sammyINP.idc_at_theory, sammyINP.measurement_models,
                                                                                                     sammyINP.max_steps, sammyINP.patience, sammyINP.batch_size,
                                                                                                     sammyINP.alpha, sammyINP.beta_1, sammyINP.beta_2, sammyINP.epsilon, sammyRTO.Print)
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[ibest],  
                                                         datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
-                                                        max_steps=sammyINP.max_steps, step_threshold=sammyINP.step_threshold,
+                                                        max_steps=25, step_threshold=sammyINP.step_threshold/N,
                                                         LevMar = sammyINP.LevMar,LevMarV = sammyINP.LevMarV,LevMarVd = sammyINP.LevMarVd,minF = sammyINP.minF,maxF = sammyINP.maxF,
-                                                        initial_parameter_uncertainty=0.1, iterations=5)
+                                                        initial_parameter_uncertainty=0.05, iterations=1,
+                                                        idc_at_theory=sammyINP.idc_at_theory, measurement_models=sammyINP.measurement_models)
             sammyOUT_post = run_sammy_YW(inpyw_post, sammyRTO)
             sammyOUT.pw_post = sammyOUT_post.pw_post
             sammyOUT.par_post = sammyOUT_post.par_post
             sammyOUT.chi2_post = sammyOUT_post.chi2_post
             sammyOUT.chi2n_post = sammyOUT_post.chi2n_post
-            sammyOUT.total_derivative_evaluations = total_derivative_evaluations
+            sammyOUT.total_derivative_evaluations = total_derivative_evaluations + sammyOUT_post.total_derivative_evaluations
             sammyOUT.Pu = save_Pu[0]
             sammyOUT.Pu_post = save_Pu[-1]
 

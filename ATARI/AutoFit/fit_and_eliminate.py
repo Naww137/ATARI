@@ -13,7 +13,8 @@ from dataclasses import dataclass
 
 class FitAndEliminateOPT:
     """
-    Options for the initial feature bank solver module.
+    Options for the fit and eliminate class.
+    Currently only implemented for elimination with stepwise regression.
 
     Parameters
     ----------
@@ -29,7 +30,7 @@ class FitAndEliminateOPT:
         ### Initial fit settings
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,0,1]
-        self._width_elimination = True
+        self._width_elimination = False
         self._Gn_threshold = 1e-2
         self._decrease_chi2_threshold_for_width_elimination = True
 

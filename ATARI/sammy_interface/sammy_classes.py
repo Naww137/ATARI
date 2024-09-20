@@ -174,8 +174,9 @@ class SammyInputDataYW:
 
     datasets : list[DataFrame]
     experiments: list[Experimental_Model]  # sammy_interface only needs title and template outside of write_saminp
-    experiments_no_pup: list[Experimental_Model]
-    experimental_covariance: Optional[list[Union[dict, str]]] #= None
+    experimental_covariance: list[Union[dict, str]] #= None
+
+    experiments_no_pup: Optional[list[Experimental_Model]] = None
 
     idc_at_theory : bool = False
     measurement_models : Optional[list] = None

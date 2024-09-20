@@ -601,7 +601,8 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     inpyw = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, 
                                            resonance_ladder=sammyINP.resonance_ladder,  
                                            datasets=sammyINP.datasets, 
-                                           experiments=sammyINP.experiments, 
+                                           experiments=sammyINP.experiments,
+                                           experiments_no_pup = sammyINP.experiments_no_pup, 
                                            experimental_covariance=sammyINP.experimental_covariance,
                                            idc_at_theory=sammyINP.idc_at_theory,
                                            measurement_models=sammyINP.measurement_models)
@@ -643,7 +644,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                                                                                     sammyINP.max_steps, sammyINP.patience, sammyINP.batch_size,
                                                                                                     sammyINP.alpha, sammyINP.beta_1, sammyINP.beta_2, sammyINP.epsilon, sammyRTO.Print)
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[ibest],  
-                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
+                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experiments_no_pup=sammyINP.experiments_no_pup, experimental_covariance=sammyINP.experimental_covariance,
                                                         max_steps=25, step_threshold=sammyINP.step_threshold/N,
                                                         LevMar = sammyINP.LevMar,LevMarV = sammyINP.LevMarV,LevMarVd = sammyINP.LevMarVd,minF = sammyINP.minF,maxF = sammyINP.maxF,
                                                         initial_parameter_uncertainty=0.05, iterations=1,
@@ -669,7 +670,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                                                                             sammyINP.elastic_net, sammyINP.elastic_net_parameters)
             
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
-                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experimental_covariance=sammyINP.experimental_covariance,
+                                                        datasets=sammyINP.datasets, experiments=sammyINP.experiments, experiments_no_pup=sammyINP.experiments_no_pup, experimental_covariance=sammyINP.experimental_covariance,
                                                         idc_at_theory=sammyINP.idc_at_theory, measurement_models=sammyINP.measurement_models)
             sammyOUT_post = run_sammy_YW(inpyw_post, rto_temp)
             sammyOUT.pw_post = sammyOUT_post.pw

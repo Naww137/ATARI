@@ -96,7 +96,7 @@ def get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder):
                 raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
                 _, cov, _ = meas.reduce_raw_data(raw_data,  options)
             covariance_data_at_theory.append(cov)
-    except:
+    except: # weird sammy bug, sometimes need nopup experiments bc it will fail
         for exp, meas in zip(sammyINP.experiments_no_pup, sammyINP.measurement_models):
             if meas is None:
                 cov = {}

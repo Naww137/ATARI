@@ -198,7 +198,7 @@ class AutoFit:
 
         # get test and train scores
         test_scores, train_scores, ires = [], [], []
-        for key, val in elimination_history.elimination_history.items():
+        for key, val in elimination_history.items():
             N_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
             train_scores.append(np.sum(val['selected_ladder_chars'].chi2_post)/N_train)
 

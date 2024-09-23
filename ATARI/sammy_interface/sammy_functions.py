@@ -179,7 +179,8 @@ def get_ECSCM(sammyRTO, sammyINP):
 
     # update_input_files(sammy_INP, sammy_RTO)
     fill_runDIR_with_templates(exp.template, "sammy.inp", sammyRTO.sammy_runDIR)
-    energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), 498) # if more than 498 datapoints then I need a new reader!
+    assert exp.energy_grid <= 498, "ECSCM_experiment.energy grid > 498"
+    energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), exp.energy_grid) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(
                 filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
@@ -901,7 +902,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### update step
         istep += 1
 
-    print("Maximum steps reached")
+    if sammyRTO.Print: print("Maximum steps reached")
     return max(istep, 0), total_derivative_evaluations
 
 

@@ -32,6 +32,10 @@ class Solver:
     def set_bayes(self, bayes_boolean):
         self.sammyRTO.bayes=bayes_boolean
 
+    @property
+    def Ndata(self):
+        return sum([len(each) for each in self.sammyINP.datasets])
+
     # def get_smaller_energy_range()
     
 
@@ -83,7 +87,7 @@ def Solver_factory(rto,
     else:
         raise ValueError("Solver not recognized")
     
-    return Solver(rto, sammyINP,fit_func)
+    return Solver(rto, sammyINP, fit_func)
 
 
 

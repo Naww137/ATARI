@@ -727,7 +727,7 @@ class FitAndEliminate:
             prior_chars = self.evaluate_prior(prior_ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
-            prior_benefit_chi2 = prior_sum_chi2 - base_chi2
+            prior_benefit_chi2 = (prior_sum_chi2 - base_chi2)/self.solver_eliminate.Ndata
 
             ### Check if un-fitted N-1 model still is acceptable
             test_result = "✗"  # Cross mark if the test is not passed

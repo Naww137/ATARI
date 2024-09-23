@@ -73,10 +73,10 @@ class AutoFit:
         else:                                self.solver_options_eliminate = solver_options_eliminate
 
         if AutoFit_options is None: self.options = AutoFitOPT() 
-        else:                       self.options = AutoFit_options
+        else:                       self.options = copy(AutoFit_options)
 
         if fit_and_elim_options is None: self.fit_and_elim_options = FitAndEliminateOPT()
-        else:                            self.fit_and_elim_options = fit_and_elim_options                  
+        else:                            self.fit_and_elim_options = copy(fit_and_elim_options)
         
         self.particle_pair = particle_pair
 
@@ -84,6 +84,9 @@ class AutoFit:
         self.rto_test.bayes = False
         self.rto_train = copy(sammyRTO)
         self.rto_train.bayes = True
+
+        if not self.options.parallel_CV:
+            self.options.parallel_processes = 1
 
         self.output = AutoFitOUT()
 
@@ -123,7 +126,7 @@ class AutoFit:
 
         if self.options.save_elimination_history:
             self.output.elimination_history = elimination_history
-        self.output.final_samout = elimination_history.elimination_history[Nres_target]['selected_ladder_chars']
+        self.output.final_samout = elimination_history[Nres_target]['selected_ladder_chars']
 
         return self.output
 
@@ -184,7 +187,7 @@ class AutoFit:
             rto_train.keep_runDIR=False; rto_test.keep_runDIR=False
             rto_train.sammy_runDIR = return_random_subdirectory(self.rto_train.sammy_runDIR); rto_test.sammy_runDIR = return_random_subdirectory(self.rto_train.sammy_runDIR)
         else:
-            rto_train=self.rto_train; rto_test=self.rto_test
+            rto_train=self.rto_train; rto_test=self.rto_test; fit_and_elim_options = self.fit_and_elim_options
 
         # create solvers
         solver_initial = Solver_factory(rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_train) 

@@ -397,8 +397,18 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
     return df
 
 def check_sampar_inputs(df):
-    # check for same energy and same spin group
-    return 
+    # Define a small perurbation
+    perturbation = 1e-5
+    # Group by column J and apply changes within each group
+    for j_value, group in df.groupby('J_ID'):
+        duplicates = group['E'].duplicated(keep=False)  # Find duplicate E values
+        if duplicates.any():
+            # Perturb the duplicate values in column E
+            # Generate unique perturbations for each duplicate in the group
+            perturb_values = np.random.default_rng().uniform(-perturbation, perturbation, len(duplicates)-1) # np.arange(1, sum(duplicates) + 1) * perturbation
+            df.loc[group.index[duplicates], 'E'] += perturb_values
+
+    return df
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -428,6 +438,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
         par_array = []
     else:
         df = fill_sammy_ladder(df, pair, vary_parm)
+        df = check_sampar_inputs(df)
         par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
         if np.any([each is None for each in df.J_ID]):

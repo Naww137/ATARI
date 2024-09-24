@@ -405,8 +405,8 @@ def check_sampar_inputs(df):
         if duplicates.any():
             # Perturb the duplicate values in column E
             # Generate unique perturbations for each duplicate in the group
-            perturb_values = np.random.default_rng().uniform(-perturbation, perturbation, len(duplicates)-1) # np.arange(1, sum(duplicates) + 1) * perturbation
-            df.loc[group.index[duplicates], 'E'] += perturb_values
+            perturb_values = np.random.default_rng().uniform(-perturbation, perturbation, sum(duplicates)) # np.arange(1, sum(duplicates) + 1) * perturbation
+            df.loc[duplicates, 'E'] += perturb_values
 
     return df
 

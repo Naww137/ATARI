@@ -220,9 +220,11 @@ class Experimental_Model:
     def truncate_energy_range(self,
                               new_energy_range):
         if min(new_energy_range) < min(self.energy_range):
-            raise ValueError("new energy range is less than existing experimental_model.energy_range")
+            # raise ValueError("new energy range is less than existing experimental_model.energy_range")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing experimental_model.energy_range {min(self.energy_range)}")
         if max(new_energy_range) > max(self.energy_range):
-            raise ValueError("new energy range is more than existing experimental_model.energy_range")
+            # raise ValueError("new energy range is more than existing experimental_model.energy_range")
+            print(f"WARNING: new energy max {max(new_energy_range)} is more than existing experimental_model.energy_range {max(self.energy_range)}")
         
         self.energy_range = new_energy_range
         self.energy_grid = self.energy_grid[(self.energy_grid>min(new_energy_range)) & (self.energy_grid<max(new_energy_range))]

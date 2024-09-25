@@ -87,24 +87,24 @@ def get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder):
     options = syndatOPT(sampleRES = False,sample_counting_noise = False,sampleTMP = False,sampleTNCS = False) 
 
     covariance_data_at_theory = []
-    try:
-        for exp, meas in zip(sammyINP.experiments, sammyINP.measurement_models):
-            if meas is None:
-                cov = {}
-            else:
-                pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
-                raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
-                _, cov, _ = meas.reduce_raw_data(raw_data,  options)
-            covariance_data_at_theory.append(cov)
-    except: # weird sammy bug, sometimes need nopup experiments bc it will fail
-        for exp, meas in zip(sammyINP.experiments_no_pup, sammyINP.measurement_models):
-            if meas is None:
-                cov = {}
-            else:
-                pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
-                raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
-                _, cov, _ = meas.reduce_raw_data(raw_data,  options)
-            covariance_data_at_theory.append(cov)
+    # try:
+    for exp, meas in zip(sammyINP.experiments, sammyINP.measurement_models):
+        if meas is None:
+            cov = {}
+        else:
+            pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
+            raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
+            _, cov, _ = meas.reduce_raw_data(raw_data,  options)
+        covariance_data_at_theory.append(cov)
+    # except: # weird sammy bug, sometimes need nopup experiments bc it will fail
+    #     for exp, meas in zip(sammyINP.experiments_no_pup, sammyINP.measurement_models):
+    #         if meas is None:
+    #             cov = {}
+    #         else:
+    #             pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
+    #             raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)
+    #             _, cov, _ = meas.reduce_raw_data(raw_data,  options)
+    #         covariance_data_at_theory.append(cov)
 
     return covariance_data_at_theory
 

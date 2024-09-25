@@ -397,17 +397,12 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
     return df
 
 def check_sampar_inputs(df):
-    # Define a small perurbation
-    perturbation = 1e-5
-    # Group by column J and apply changes within each group
-    for j_value, group in df.groupby('J_ID'):
-        duplicates = group['E'].duplicated(keep=False)  # Find duplicate E values
-        if duplicates.any():
-            # Perturb the duplicate values in column E
-            # Generate unique perturbations for each duplicate in the group
-            perturb_values = np.random.default_rng().uniform(-perturbation, perturbation, sum(duplicates)) # np.arange(1, sum(duplicates) + 1) * perturbation
-            df.loc[duplicates, 'E'] += perturb_values
-
+    # Small perurbation for duplicate resonances
+    duplicates = df.duplicated(subset=['E', 'J_ID'], keep=False)
+    if duplicates.any():
+        random_signs = np.sign(np.random.default_rng().uniform(-1, 1, size=duplicates.sum()))
+        random_mags = np.random.default_rng().uniform(5e-6, 5e-5, size=duplicates.sum())
+        df.loc[duplicates, 'E'] += random_signs*random_mags
     return df
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
@@ -439,6 +434,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
     else:
         df = fill_sammy_ladder(df, pair, vary_parm)
         df = check_sampar_inputs(df)
+        assert np.sum(df.duplicated(subset=['E', 'J_ID'], keep=False)) == 0
         par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
         if np.any([each is None for each in df.J_ID]):
@@ -453,8 +449,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
                 file.write(formatted_value)
             file.write('\n')
         file.write(f'\n{initial_parameter_uncertainty}\n')
-        
-    
+
     return
         
       

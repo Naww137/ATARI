@@ -835,7 +835,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
-                        print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                        print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
 
                     while True:  
                         fudge /= sammyINPyw.LevMarVd
@@ -849,7 +849,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t\t{np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                            print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
 
                         if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
                             break
@@ -868,13 +868,13 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
                             criteria = f"Fudge below minimum value, taking solution {istep-1}"
                         if sammyRTO.Print:
-                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
                             print(criteria)
                         return max(istep-1, 0), total_derivative_evaluations
                     else:
                         criteria = "Chi2 improvement below threshold"
                     if sammyRTO.Print:
-                        print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+                        print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
                         print(criteria)
                     return istep, total_derivative_evaluations
                 
@@ -888,7 +888,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### Log chi2
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
-            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {list(np.round(chi2_list,4))}")
+            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
         
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:

@@ -9,6 +9,7 @@ import multiprocessing
 import os
 from ATARI.utils.file_handling import clean_and_make_directory, return_random_subdirectory
 from ATARI.utils.datacontainers import Evaluation
+from ATARI.AutoFit.functions import * 
 
 @dataclass
 class CrossValidationOUT:
@@ -91,11 +92,11 @@ class AutoFit:
         self.output = AutoFitOUT()
 
 
-    def fit(self, evaluation_data, resonance_ladder):
+    def fit(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
         ### Run CV
         if self.options.print_bool:
             print("=============\nRunning Cross Validation\n=============")
-        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder)
+        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
         try:
             save_ires = np.array(save_ires)
             test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
@@ -121,8 +122,9 @@ class AutoFit:
             print(f"=============\nFitting to {Nres_target} Resonances\n=============")
             
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder)
-        elimination_history = fe.eliminate(initial_samout.par_post, target_ires=Nres_target)#, fixed_resonances_df=fixed_resonances)
+        initial_samout = fe.initial_fit(resonance_ladder, external_resonance_indices=fixed_resonance_indices)
+        internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
+        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonances_df=fixed_resonances)
 
         if self.options.save_elimination_history:
             self.output.elimination_history = elimination_history
@@ -131,7 +133,7 @@ class AutoFit:
         return self.output
 
 
-    def cross_validation(self, evaluation_data, resonance_ladder):
+    def cross_validation(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
 
         ### Split CV data
         if True: #measurement_wise
@@ -154,7 +156,7 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, resonance_ladder) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
+            multi_input = [(train, test, resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 results = pool.map(self.get_cross_validation_score, multi_input)
             ## Pull results
@@ -168,7 +170,7 @@ class AutoFit:
         else:
             save_test_scores, save_train_scores, save_ires = [], [], []
             for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
-                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, resonance_ladder))
+                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, resonance_ladder, fixed_resonance_indices))
                 save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
 
         # if save:
@@ -178,7 +180,7 @@ class AutoFit:
     
 
     def get_cross_validation_score(self, input_arguement):
-        evaluation_data_train, evaluation_data_test, resonance_ladder = input_arguement
+        evaluation_data_train, evaluation_data_test, resonance_ladder, fixed_resonance_indices = input_arguement
         
         # set RTO options if in parallel
         if self.options.parallel_CV:
@@ -196,8 +198,9 @@ class AutoFit:
 
         # fit and eliminate
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder)
-        elimination_history = fe.eliminate(initial_samout.par_post)
+        initial_samout = fe.initial_fit(resonance_ladder,external_resonance_indices=fixed_resonance_indices)
+        internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
+        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonances_df=fixed_resonances)#, target_ires=len(fixed_resonances))
 
         # get test and train scores
         test_scores, train_scores, ires = [], [], []

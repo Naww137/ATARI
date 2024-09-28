@@ -50,7 +50,7 @@ class FitAndEliminateOPT:
         self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', False)              # by default does not stop
         self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1])  # by default vary this vars on the final stage of the elim for current level
         self._fitpar_internal = kwargs.get("fitpar_internal", [1,0,1])
-        self._fitpar_external = kwargs.get("fitpar_external", [0,0,1])
+        self._fitpar_external = kwargs.get("fitpar_external", [0,0,0])
 
         ### Other
         self._print_bool = True
@@ -274,7 +274,9 @@ class FitAndEliminate:
 
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(starting_resonance_ladder, external_resonance_indices)
         internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
+        external_resonance_ladder = update_vary_resonance_ladder(external_resonance_ladder, varyE = self.options.fitpar_external[0], varyGg = self.options.fitpar_external[1], varyGn1 = self.options.fitpar_external[2])
         starting_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder)
+        self.output.external_resonance_indices = external_resonance_indices
 
         outs_fit_1 = self.fit_and_eliminate_by_Gn(starting_resonance_ladder, external_resonance_indices)
         reslad_1 = copy(outs_fit_1[-1].par_post)
@@ -299,6 +301,7 @@ class FitAndEliminate:
                 self.output.initial_fits.append(out)
                 self.total_derivative_evaluations += out.total_derivative_evaluations
                 self.output.derivative_evaluations.append(out.total_derivative_evaluations)
+            self.output.external_resonance_indices = external_resonance_indices
         
         return samout_final #InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
     
@@ -534,6 +537,7 @@ class FitAndEliminate:
                     print()
 
                 posterior_deep_SO, sol_fit_time_deep, derivative_evaluations = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
+                                                                                                 fixed_resonance_df= fixed_res_df,
                                                                         max_steps = deep_fit_max_iter,
                                                                         step_threshold = deep_fit_step_thr,
                                                                         LevMarV0 = LevMarV0)           
@@ -823,6 +827,7 @@ class FitAndEliminate:
 
             posterior_interm_SO, sol_fit_time_interm, derivative_evaluations = self.fit_YW_by_ig(
                 ladder_df = prior_ladder,
+                fixed_resonance_df= fixed_resonances,
                 max_steps = self.options.interm_fit_max_iter,
                 step_threshold = self.options.interm_fit_step_thr
                 )
@@ -915,9 +920,11 @@ class FitAndEliminate:
 
     def fit_YW_by_ig(self, 
                      ladder_df:pd.DataFrame,
+                     fixed_resonance_df, 
                      max_steps: int = 0,
                      step_threshold: float = 0.01,
-                     LevMarV0 = 0.1):
+                     LevMarV0 = 0.1,
+                     ):
         """Wrapper to fit the data with given params using YW scheme"""
 
         time_start = time.time()
@@ -933,8 +940,15 @@ class FitAndEliminate:
         self.solver_eliminate.sammyINP.LevMar = True
         self.solver_eliminate.sammyINP.initial_parameter_uncertainty = LevMarV0
         
-        sammy_OUT = self.solver_eliminate.fit(ladder_df, [])
-        self.total_derivative_evaluations += sammy_OUT.total_derivative_evaluations
+        if ladder_df.shape[0] == fixed_resonance_df.shape[0]:
+            sammy_OUT = self.evaluate_prior(ladder_df)
+            sammy_OUT.pw_post = sammy_OUT.pw
+            sammy_OUT.par_post = sammy_OUT.par
+            sammy_OUT.chi2_post = sammy_OUT.chi2
+            sammy_OUT.chi2n_post = sammy_OUT.chi2n
+        else:
+            sammy_OUT = self.solver_eliminate.fit(ladder_df, [])
+            self.total_derivative_evaluations += sammy_OUT.total_derivative_evaluations
         # self.output.derivative_evaluations.append(sammy_OUT.total_derivative_evaluations)
 
         time_proc = time.time() - time_start

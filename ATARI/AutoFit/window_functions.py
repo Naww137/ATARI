@@ -146,7 +146,9 @@ def get_window_dataframes(window_resonances, index_ranges, all_resonances):
 
 
 ### poor man's parallel over windows
-def write_fitpy(basepath, threads=1):
+def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
+    assert isinstance(fixed_resonance_indices, list)
+
     with open(os.path.join(basepath, "fit.py"), 'w') as f:
         f.write("""import os\n""")
         
@@ -162,6 +164,7 @@ def write_fitpy(basepath, threads=1):
         f.write("""autofit = load_general_object("autofit.pkl")\n""")
         f.write("""data = load_general_object("eval_data.pkl")\n""")
         f.write("""df = pd.read_csv("df.csv")\n""")
-        f.write("""out = autofit.fit(data, df)\n""")
+        f.write(f"""out = autofit.fit(data, df, fixed_resonance_indices={fixed_resonance_indices})\n""")
         f.write("""save_general_object(out, "out.pkl")\n""")
+        
     return

@@ -108,7 +108,7 @@ def generate_external_resonance_ladder(spin_groups: list[dict],
 
 
 def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
-    external_resonance_ladder = resonance_ladder.iloc[external_resonance_indices, :]
+    external_resonance_ladder = resonance_ladder.loc[external_resonance_indices, :]
     internal_resonance_ladder = copy(resonance_ladder)
     internal_resonance_ladder.drop(index=external_resonance_indices, inplace=True)
     return internal_resonance_ladder, external_resonance_ladder

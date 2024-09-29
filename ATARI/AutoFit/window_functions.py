@@ -163,7 +163,7 @@ def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
         f.write("""os.chdir(os.path.dirname(__file__))\n""")
         f.write("""autofit = load_general_object("autofit.pkl")\n""")
         f.write("""data = load_general_object("eval_data.pkl")\n""")
-        f.write("""df = pd.read_csv("df.csv")\n""")
+        f.write("""df = pd.read_csv("df.csv", index_col=0)\n""")
         f.write(f"""out = autofit.fit(data, df, fixed_resonance_indices={fixed_resonance_indices})\n""")
         f.write("""save_general_object(out, "out.pkl")\n""")
         

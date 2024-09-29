@@ -102,8 +102,9 @@ class AutoFit:
             if self.options.save_elimination_history:
                 self.output.elimination_history = None
             solve_prior = Solver_factory(self.rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data)
-            sammy_OUT = solve_prior.fit(resonance_ladder, [])
-            self.output.final_samout = sammy_OUT
+            sammyOUT = solve_prior.fit(resonance_ladder, [])
+            sammyOUT.pw_post = sammyOUT.pw; sammyOUT.par_post = sammyOUT.par; sammyOUT.chi2_post = sammyOUT.chi2; sammyOUT.chi2n_post = sammyOUT.chi2n
+            self.output.final_samout = sammyOUT
             return self.output
 
         ### Run CV

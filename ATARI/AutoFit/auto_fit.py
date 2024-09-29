@@ -93,6 +93,19 @@ class AutoFit:
 
 
     def fit(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
+
+        ### if resonance ladder is all fixed
+        if len(resonance_ladder) == len(fixed_resonance_indices):
+            assert np.all(resonance_ladder.index == fixed_resonance_indices)
+            if self.options.print_bool:
+                print(f"=============\nResonance ladder is all fixed\n=============")
+            if self.options.save_elimination_history:
+                self.output.elimination_history = None
+            solve_prior = Solver_factory(self.rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data)
+            sammy_OUT = solve_prior.fit(resonance_ladder, [])
+            self.output.final_samout = sammy_OUT
+            return self.output
+
         ### Run CV
         if self.options.print_bool:
             print("=============\nRunning Cross Validation\n=============")

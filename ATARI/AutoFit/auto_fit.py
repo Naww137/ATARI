@@ -42,6 +42,7 @@ class AutoFitOPT:
     # other
     print_bool                      : bool  = True
     use_1std_rule                   : bool  = True
+    final_fit_to_0_res              : bool  = False
 
 
 
@@ -126,7 +127,10 @@ class AutoFit:
         for i in range(ilowest, len(test)):
             if test[i] < lowest + lowest_std:
                 iselect = i
-        Nres_target = np.unique(save_ires, axis=0)[0][iselect]
+        Nres_selected = np.unique(save_ires, axis=0)[0][iselect]
+
+        if self.options.final_fit_to_0_res: Nres_target = 0
+        else: Nres_target = Nres_selected
 
         ### Final solve to target Nres with all data 
         solver_initial = Solver_factory(self.rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data) 
@@ -141,8 +145,10 @@ class AutoFit:
         elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonances_df=fixed_resonances)
 
         if self.options.save_elimination_history:
-            self.output.elimination_history = elimination_history
-        self.output.final_samout = elimination_history[Nres_target]['selected_ladder_chars']
+            self.output.fit_and_eliminate_output = fe.output
+        self.output.final_samout = elimination_history[Nres_selected]['selected_ladder_chars']
+        self.output.final_evaluation = Evaluation.from_samout('fit', self.output.final_samout, post=True, external_resonance_indices=fe.output.external_resonance_indices)
+        self.output.total_time = fe.total_derivative_evaluations
 
         return self.output
 

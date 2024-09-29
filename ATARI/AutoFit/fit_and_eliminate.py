@@ -230,6 +230,7 @@ class FitAndEliminateOUT:
     elimination_history : Optional[dict] = None
 
     derivative_evaluations : Optional[list] = None
+    external_resonance_indices : Optional[list] = None
 
 
 
@@ -303,7 +304,7 @@ class FitAndEliminate:
                 self.output.derivative_evaluations.append(out.total_derivative_evaluations)
             self.output.external_resonance_indices = external_resonance_indices
         
-        return samout_final #InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
+        return samout_final 
     
 
 

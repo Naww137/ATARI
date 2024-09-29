@@ -62,7 +62,7 @@ def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=
     # h5f.close()
 
     ### write data
-    pw_reduced_df.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/pw_reduced")
+    pw_reduced_df.to_hdf(case_file, key=f"sample_{isample}/exp_dat_{dataset_title}/pw_reduced")
     if cov_data is not None:
         for key, val in cov_data.items():
             if isinstance(val, np.ndarray):
@@ -73,25 +73,25 @@ def write_pw_reduced(case_file, isample, dataset_title, pw_reduced_df, cov_data=
                     h5f[f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}"]=val
                 h5f.close()
             elif isinstance(val, pd.DataFrame):
-                val.to_hdf(case_file, f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}")
+                val.to_hdf(case_file, key=f"sample_{isample}/exp_dat_{dataset_title}/cov_data/{key}")
             else:
                 raise ValueError(f"Unrecognized type {type(val)} in cov_data")
         
 
 def write_pw_exp(case_file, isample, pw_exp_df, title="exp", CovT=None, CovXS=None):
-    pw_exp_df.to_hdf(case_file, f"sample_{isample}/pw_{title}")
+    pw_exp_df.to_hdf(case_file, key=f"sample_{isample}/pw_{title}")
     if CovT is not None:
-        CovT.to_hdf(case_file, f"sample_{isample}/CovT")
+        CovT.to_hdf(case_file, key=f"sample_{isample}/CovT")
     if CovXS is not None:
-        CovXS.to_hdf(case_file, f"sample_{isample}/CovXS")
+        CovXS.to_hdf(case_file, key=f"sample_{isample}/CovXS")
 
 
 def write_pw_fine(case_file, isample, pw_fine_df):
-    pw_fine_df.to_hdf(case_file, f"sample_{isample}/pw_fine")
+    pw_fine_df.to_hdf(case_file, key=f"sample_{isample}/pw_fine")
 
 
 def write_par(case_file, isample, par, title):
-    par.to_hdf(case_file, f"sample_{isample}/par_{title}")
+    par.to_hdf(case_file, key=f"sample_{isample}/par_{title}")
 
 
 
@@ -104,6 +104,6 @@ def csvpar_2_hdf5(csv, case_file, isample, title):
     # tfit = est_par_df.tfit[0]
     # est_par_df.drop('tfit', axis=1)
 
-    par_df.to_hdf(case_file, f"sample_{isample}/par_{title}")
+    par_df.to_hdf(case_file, key=f"sample_{isample}/par_{title}")
 
     return

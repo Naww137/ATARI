@@ -12,6 +12,7 @@ from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.structuring import Generative_Measurement_Model, Reductive_Measurement_Model
 from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
+from ATARI.utils.atario import save_general_object
 
 
 class Syndat_Model:
@@ -212,9 +213,10 @@ class Syndat_Model:
                 particle_pair.sample_resonance_ladder()
                 par_true = particle_pair.resonance_ladder 
            
+            ### TODO: move this outside of for loop if sample res is false
             pw_true = self.generate_true_experimental_objects(particle_pair, sammyRTO, generate_pw_true_with_sammy, pw_true, self.generative_experimental_model)
 
-            raw_data = self.generate_raw_observables(pw_true, true_model_parameters={})
+            raw_data, true_model_parameters = self.generate_raw_observables(pw_true, true_model_parameters={})
 
             reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
 
@@ -252,7 +254,7 @@ class Syndat_Model:
                                                                         true_model_parameters, 
                                                                         self.options)
         
-        return raw_data
+        return raw_data, true_model_parameters
 
         
     

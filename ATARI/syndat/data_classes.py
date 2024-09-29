@@ -12,6 +12,8 @@ class syndatOUT:
         self._pw_raw = None
         self._covariance_data = {}
 
+        self._true_model_parameters = None
+
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -139,10 +141,11 @@ class syndatOPT:
         self._calculate_covariance = True
         self._explicit_covariance = False
         self._sampleTMP = True
-        # self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
-        self._save_raw_data = False
+        
+        # self._save_raw_data = False
+        # self._saveTMP = False
 
         self._force_zero_to_1 = True
 
@@ -172,11 +175,11 @@ class syndatOPT:
         self._sampleTMP = sampleTMP
 
     # @property
-    # def sampleTURP(self):
-    #     return self._sampleTURP
-    # @sampleTURP.setter
-    # def sampleTURP(self, sampleTURP):
-    #     self._sampleTURP = sampleTURP
+    # def saveTMP(self):
+    #     return self._saveTMP
+    # @saveTMP.setter
+    # def saveTMP(self, saveTMP):
+    #     self._saveTMP = saveTMP
 
     @property
     def sampleTNCS(self):

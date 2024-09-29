@@ -4,6 +4,7 @@ import pandas as pd
 from ATARI.syndat.general_functions import *
 from ATARI.theory.experimental import e_to_t 
 import ATARI.utils.hdf5 as h5io
+from ATARI.utils.atario import save_general_object
 
 from ATARI.ModelData.particle_pair import Particle_Pair
 from typing import Optional, List
@@ -11,7 +12,7 @@ from typing import Optional, List
 # from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOUT
 import os
-
+import h5py
 
 
 
@@ -52,7 +53,8 @@ class Syndat_Control:
                  model_correlations: list = [], 
                  sampleRES = True,
                  save_covariance = True,
-                 save_raw_data = False
+                 save_raw_data = False,
+                 save_true_model_parameters = False,
                  ):
         
         ### user supplied options
@@ -62,7 +64,10 @@ class Syndat_Control:
         self.sampleRES = sampleRES
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
+        self.save_true_model_parameters = save_true_model_parameters
 
+        if self.save_true_model_parameters:
+            self.true_model_parameters = []
 
     def get_sample(self,i):
         data = {}
@@ -92,7 +97,8 @@ class Syndat_Control:
                num_samples=1,
                pw_true_list: Optional[list[pd.DataFrame]] = None,
                save_samples_to_hdf5 = False,
-               hdf5_file = None
+               hdf5_file = None,
+               overwrite=False
                ):
 
         generate_pw_true_with_sammy = False
@@ -135,6 +141,7 @@ class Syndat_Control:
 
             ### generate raw datasets from samples model parameters
             gen_raw_data_list = []
+            true_model_parameters_list = []
             for i, syn_mod in enumerate(self.syndat_models):
                 true_parameters = {}
                 for each in sampled_parameter_correlations:
@@ -150,9 +157,10 @@ class Syndat_Control:
                                 else:
                                     pass
                         
-                raw_data = syn_mod.generate_raw_observables(pw_true_list[i], 
+                raw_data, true_model_parameters = syn_mod.generate_raw_observables(pw_true_list[i], 
                                                             true_parameters)
                 gen_raw_data_list.append(raw_data)
+                true_model_parameters_list.append(true_model_parameters)
 
 
             ### reduce raw data with reductive reduction model 
@@ -168,11 +176,12 @@ class Syndat_Control:
             # sample_dict = {}
             for i, syn_mod in enumerate(self.syndat_models):
 
-                if self.save_raw_data:
-                    out = syndatOUT(title = syn_mod.title,
-                                    par_true=par_true,
-                                    pw_reduced=reduced_data_list[i], 
-                                    pw_raw=raw_data_list[i])
+                if self.save_raw_data and self.save_true_model_parameters:
+                    out = syndatOUT(title = syn_mod.title,par_true=par_true,pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i],true_model_parameters=true_model_parameters_list)
+                elif self.save_raw_data:
+                    out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i])
+                elif self.save_true_model_parameters:
+                    out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], true_model_parameters=true_model_parameters_list)
                 else:
                     out = syndatOUT(title = syn_mod.title,
                                     par_true=par_true,
@@ -184,11 +193,22 @@ class Syndat_Control:
                 if save_samples_to_hdf5:
                     if hdf5_file is None:
                         raise ValueError("If save_samples_to_hdf5, please provide an hdf5 file.")
+                    # if overwrite:
+                    #     with h5py.File(hdf5_file,  "a") as f:
+                    #         sample_group = f'sample_{isample}'
+                    #         if sample_group in f:
+                    #             del f[f'sample_{isample}']
                     out.to_hdf5(hdf5_file, isample)
+                    if self.save_true_model_parameters:
+                        self.true_model_parameters.append(true_model_parameters_list)
                 else:
                     syn_mod.samples.append(out)
 
-        return
+        if self.save_true_model_parameters:
+            return self.true_model_parameters
+        else:
+            return
+        
     
 
 

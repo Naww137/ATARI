@@ -1,5 +1,7 @@
 import numpy as np
 import os
+import subprocess
+import time
 
 def get_windows(resonance_energies_start, resonances_per_window, data_overlap, external_resonance_buffer, total_data_range, data_overlap_fraction = None, minimum_step=5):
 
@@ -124,27 +126,6 @@ def get_window_dataframes(window_resonances, index_ranges, all_resonances):
         window_dataframes.append(reslad)
     return window_dataframes
 
-
-
-
-# # Function to set threading limits
-# def set_threading_limits(num_threads):
-#     os.environ['OMP_NUM_THREADS'] = str(num_threads)
-#     os.environ['OPENBLAS_NUM_THREADS'] = str(num_threads)
-#     os.environ['MKL_NUM_THREADS'] = str(num_threads)
-#     os.environ['VECLIB_MAXIMUM_THREADS'] = str(num_threads)
-#     os.environ['NUMEXPR_NUM_THREADS'] = str(num_threads)
-#     print(f"Threading limits set to {num_threads}")
-
-# def unset_threading_limits():
-#     os.environ.pop('OMP_NUM_THREADS', None)
-#     os.environ.pop('OPENBLAS_NUM_THREADS', None)
-#     os.environ.pop('MKL_NUM_THREADS', None)
-#     os.environ.pop('VECLIB_MAXIMUM_THREADS', None)
-#     os.environ.pop('NUMEXPR_NUM_THREADS', None)
-#     print("Threading limits unset")
-
-
 ### poor man's parallel over windows
 def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
     assert isinstance(fixed_resonance_indices, list)
@@ -168,3 +149,94 @@ def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
         f.write("""save_general_object(out, "out.pkl")\n""")
         
     return
+
+
+
+
+def write_submit_wait(basepath, parallel_processes, parallel_windows, total_windows):
+
+    with open(os.path.join(os.path.realpath(basepath), "jr.sh"), 'w') as f:
+        f.write("#!/bin/bash\n")
+        f.write("#PBS -V\n")
+        f.write("#PBS -q fill\n")
+        f.write(f"#PBS -l nodes=1:ppn={parallel_processes}\n")
+        f.write(f"#PBS -t 0-{total_windows}%{parallel_windows}\n\n")
+        f.write("cd ${PBS_O_WORKDIR}\n")
+        f.write("source ~/atarienv/bin/activate\n")
+        f.write("python3.9 window_${PBS_ARRAYID}/fit.py\n")
+    output = subprocess.run(["sh", "-c", f'ssh -tt necluster.ne.utk.edu "cd {os.path.realpath(basepath)} && qsub jr.sh "'], capture_output=True, text=True, timeout=10)
+
+    ### wait for all jobs to complete
+    jobID = output.stdout.split('[')[0]
+    while True:
+        windows_done = []
+        for i in range(total_windows):
+            # full_path = os.path.realpath(os.path.join(rto.sammy_runDIR, f"window_{imap[0]}_{imap[1]}"))
+            path_to_output = os.path.realpath(os.path.join(basepath, f"jr.sh.e{jobID}-{i}"))
+            if os.path.isfile(path_to_output):
+                windows_done.append(True)
+            else:
+                windows_done.append(False)
+        if np.all(windows_done):
+            break
+        else:
+            print(f"Window jobs are not done, waiting 60s")
+            print(windows_done)
+            time.sleep(60)
+
+    return 
+
+
+def get_windows_static(energy_range_total, 
+                       resonance_ladder, 
+                       window_size = 10,
+                       data_overlap_fraction = 0.25,
+                       external_resonance_buffer = 2,
+                       maxres_per_window = 50
+                       ):
+
+    data_overlap = window_size*data_overlap_fraction
+    assert data_overlap_fraction < 0.5, "Data overlap > 50% has not been tested"
+
+    Estart = float(min(energy_range_total))
+    Eend = Estart + float(window_size)
+    external_resonance_buffer = float(external_resonance_buffer)
+
+    data_ranges = []
+    data_ranges_overlap = []
+    resonance_dataframes = []
+    resonance_dataframes_overlap = []
+    maxres_bool = []
+    overlap_elim_indices = []
+    overlap_fixed_indices = []
+    while True:
+        
+        dr = np.array([Estart, Eend])
+        dro = np.array([Eend-data_overlap, Eend])
+        
+        rr = dr + np.array([-external_resonance_buffer, external_resonance_buffer])
+        mask = (resonance_ladder.E>rr[0]) & (resonance_ladder.E<rr[1])
+        rdf = resonance_ladder.loc[mask].copy()
+
+        rro = dro + np.array([-external_resonance_buffer, external_resonance_buffer])
+        masko = (resonance_ladder.E>rro[0]) & (resonance_ladder.E<rro[1])
+        rdfo = resonance_ladder.loc[masko].copy()
+
+        overlap_elim_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[(rdfo.E>dro[0]) & (rdfo.E<dro[1])])
+        overlap_fixed_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[~((rdfo.E>dro[0]) & (rdfo.E<dro[1]))])
+
+        maxres_bool.append(len(rdf)>maxres_per_window)
+        resonance_dataframes.append(rdf)
+        data_ranges.append(dr)
+        if Eend >= max(energy_range_total):
+            break
+        resonance_dataframes_overlap.append(rdfo)
+        data_ranges_overlap.append(dro)
+        
+        Estart += window_size-data_overlap
+        Eend = Estart + window_size
+
+    if np.any(maxres_bool):
+        print(f"Efficiency Warning: {np.count(maxres_bool)} windows have more than {maxres_per_window}, consider reducing window size parameters.")
+    
+    return data_ranges, data_ranges_overlap, resonance_dataframes, resonance_dataframes_overlap, overlap_fixed_indices

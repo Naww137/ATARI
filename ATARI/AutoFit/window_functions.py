@@ -240,3 +240,69 @@ def get_windows_static(energy_range_total,
         print(f"Efficiency Warning: {np.count(maxres_bool)} windows have more than {maxres_per_window}, consider reducing window size parameters.")
     
     return data_ranges, data_ranges_overlap, resonance_dataframes, resonance_dataframes_overlap, overlap_fixed_indices
+
+
+
+
+
+def get_windows_static2(energy_range_total, 
+                       resonance_ladder, 
+                       window_size = 10,
+                       data_overlap_size = 12.5,
+                       data_overlap_fraction = 0.25,
+                       external_resonance_buffer = 2,
+                       maxres_per_window = 50
+                       ):
+
+    a = float(window_size)
+    b = float(window_size*data_overlap_fraction)
+    c = float(external_resonance_buffer)
+    d = data_overlap_size
+
+    assert b+ 2*c < a-b-2*c
+    assert d > b+ 2*c
+    assert d < a-b-2*c
+
+    Estart = float(min(energy_range_total))
+    Eend = Estart + a
+    c_array = np.array([-c, c])
+
+    data_ranges = []
+    data_ranges_overlap = []
+    resonance_dataframes = []
+    resonance_dataframes_overlap = []
+    maxres_bool = []
+    overlap_elim_indices = []
+    overlap_fixed_indices = []
+    while True:
+        
+        dr = np.array([Estart, Eend])
+        Estarto = Eend-(d+b)/2
+        dro = np.array([Estarto, Estarto+d])
+
+        rr = dr + c_array
+        mask = (resonance_ladder.E>rr[0]) & (resonance_ladder.E<rr[1])
+        rdf = resonance_ladder.loc[mask].copy()
+
+        rro = dro + c_array
+        masko = (resonance_ladder.E>rro[0]) & (resonance_ladder.E<rro[1])
+        rdfo = resonance_ladder.loc[masko].copy()
+
+        overlap_elim_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[(rdfo.E>dro[0]) & (rdfo.E<dro[1])])
+        overlap_fixed_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[~((rdfo.E>dro[0]) & (rdfo.E<dro[1]))])
+
+        maxres_bool.append(len(rdf)>maxres_per_window)
+        resonance_dataframes.append(rdf)
+        data_ranges.append(dr)
+        if Eend >= max(energy_range_total):
+            break
+        resonance_dataframes_overlap.append(rdfo)
+        data_ranges_overlap.append(dro)
+        
+        Estart += window_size-b
+        Eend = Estart + window_size
+
+    if np.any(maxres_bool):
+        print(f"Efficiency Warning: {maxres_bool} windows have more than {maxres_per_window}, consider reducing window size parameters.")
+
+    return data_ranges, data_ranges_overlap, resonance_dataframes, resonance_dataframes_overlap, overlap_fixed_indices

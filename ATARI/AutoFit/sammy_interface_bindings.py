@@ -52,6 +52,9 @@ def Solver_factory(rto,
             raise ValueError("User specified idc_at_theory, but did not supply a measurement model")
 
     if solver == "YW":
+        if solver_options.PTLL or solver_options.WigLL:
+            raise ValueError('Cannot use Porter-Thomas or Wigner informed fitting with the SAMMY YW scheme.')
+
         sammyINP = sammy_classes.SammyInputDataYW(particle_pair, pd.DataFrame(), 
                                                   datasets=evaluation_data.datasets, 
                                                   experiments=evaluation_data.experimental_models, 

@@ -262,6 +262,9 @@ class SolverOPTs_EXT(SolverOPTs):
     elastic_net     : bool      = False
     elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
 
+    PTLL            : bool      = False # Porter-Thomas informed fitting
+    WigLL           : bool      = False # Wigner informed fitting
+
 @dataclass
 class SammyInputDataEXT:
     """
@@ -320,6 +323,9 @@ class SammyInputDataEXT:
 
     elastic_net     : bool      = False
     elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
+
+    PTLL            : bool      = False # Porter-Thomas informed fitting
+    WigLL           : bool      = False # Wigner informed fitting
     
 
 

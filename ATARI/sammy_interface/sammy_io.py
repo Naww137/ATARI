@@ -130,12 +130,12 @@ def read_ECSCM(file_path):
         _description_
     """
 
-    data = pd.read_csv(file_path, delim_whitespace=True, skiprows=3, header=None)
+    data = pd.read_csv(file_path, sep='\s+', skiprows=3, header=None)
     df_tdte = data.iloc[:,0:3]
     df_tdte.columns = ["theo", "theo_unc", "E"]
 
     # assert top rows == left columns
-    dftest = pd.read_csv(file_path, delim_whitespace=True, nrows=3, header=None)
+    dftest = pd.read_csv(file_path, sep='\s+', nrows=3, header=None)
     dftest=dftest.T
     dftest.columns = ["theo", "theo_unc", "E"]
     assert(np.all(dftest == df_tdte))

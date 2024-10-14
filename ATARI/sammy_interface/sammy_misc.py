@@ -90,7 +90,8 @@ def get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder):
     # try:
     for exp, meas in zip(sammyINP.experiments, sammyINP.measurement_models):
         if meas is None:
-            cov = {}
+            pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
+            cov = {"theory":pw_true}
         else:
             pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
             raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)

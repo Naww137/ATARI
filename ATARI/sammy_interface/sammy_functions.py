@@ -496,7 +496,7 @@ from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 def update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder):
     covariance_data_at_theory = get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder)
     for d, exp, cov in zip(sammyINP.datasets, sammyINP.experiments, covariance_data_at_theory):
-        if isinstance(cov, dict) and len(cov)>0:
+        if isinstance(cov, dict) and len(cov)>0 and "theory" not in cov.keys():
             write_idc(os.path.join(sammyRTO.sammy_runDIR, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
             # filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
 

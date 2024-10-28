@@ -57,8 +57,8 @@ class FitAndEliminateOPT:
         self._print_bool = True
 
         ### Resonance Statistics
-        self._Wigner_informed = False
-        self._PorterThomas_informed = False
+        self._Wigner_informed_variable_selection = False
+        self._PorterThomas_informed_variable_selection = False
 
         ### set kwargs
         for key, value in kwargs.items():
@@ -84,18 +84,18 @@ class FitAndEliminateOPT:
 
     ### Resonance Statistics
     @property
-    def Wigner_informed(self):
-        return self._Wigner_informed
-    @Wigner_informed.setter
-    def Wigner_informed(self, Wigner_informed):
-        self._Wigner_informed = Wigner_informed
+    def Wigner_informed_variable_selection(self):
+        return self._Wigner_informed_variable_selection
+    @Wigner_informed_variable_selection.setter
+    def Wigner_informed_variable_selection(self, Wigner_informed_variable_selection):
+        self._Wigner_informed_variable_selection = Wigner_informed_variable_selection
     
     @property
-    def PorterThomas_informed(self):
-        return self._PorterThomas_informed
-    @PorterThomas_informed.setter
-    def PorterThomas_informed(self, PorterThomas_informed):
-        self._PorterThomas_informed = PorterThomas_informed
+    def PorterThomas_informed_variable_selection(self):
+        return self._PorterThomas_informed_variable_selection
+    @PorterThomas_informed_variable_selection.setter
+    def PorterThomas_informed_variable_selection(self, PorterThomas_informed_variable_selection):
+        self._PorterThomas_informed_variable_selection = PorterThomas_informed_variable_selection
 
     ### Initial Fit Opts
     @property
@@ -491,7 +491,7 @@ class FitAndEliminate:
             best_model_chars = initial_ladder_chars
             base_chi2 = np.sum(initial_ladder_chars.chi2)
             base_obj = objective_func(base_chi2, initial_ladder_chars.par, self.particle_pair,
-                                      self.options.Wigner_informed, self.options.PorterThomas_informed)
+                                      self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             if (self.options.print_bool):
                 print()
@@ -593,10 +593,10 @@ class FitAndEliminate:
             cur_sol_chars_deep = posterior_deep_SO
             deep_chi2_prior = np.sum(cur_sol_chars_deep.chi2)
             deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair,
-                                            self.options.Wigner_informed, self.options.PorterThomas_informed)
+                                            self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
             deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair,
-                                      self.options.Wigner_informed, self.options.PorterThomas_informed)
+                                      self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             benefit_deep_obj = deep_obj - base_obj
 
             selected_ladder_chars = cur_sol_chars_deep
@@ -656,13 +656,26 @@ class FitAndEliminate:
 
             ### save model data, and continue or break while loop
             current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]
+            deep_obj_stopping_criteria = {}
+            for Wigner_informed_stopping_criteria in (False, True):
+                for PorterThomas_informed_stopping_criteria in (False, True):
+                    obj_stopping_criteria = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair,
+                                                           Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
+                    obj_type = 'chi2'
+                    if Wigner_informed_stopping_criteria:
+                        obj_type += '+Wig'
+                    if PorterThomas_informed_stopping_criteria:
+                        obj_type += '+PT'
+                    deep_obj_stopping_criteria[obj_type] = obj_stopping_criteria
+                    
             model_history[current_num_of_res_wo_sides] = {
                 'input_ladder' : ladder,
                 'selected_ladder_chars': selected_ladder_chars, # solution with min chi2 on this level
                 'any_model_passed_test': any_model_passed_test, # any model on this level of N-1 res..
                 'final_model_passed_test': final_model_passed_test,
                 'level_time': level_time,
-                'total_time': time.time() - start_time
+                'total_time': time.time() - start_time,
+                'objective_value_stopping_criteria': deep_obj_stopping_criteria,
             }
 
             ### Printout the history of chi2 - for all the elimination
@@ -763,7 +776,7 @@ class FitAndEliminate:
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
             prior_sum_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair,
-                                           self.options.Wigner_informed, self.options.PorterThomas_informed)
+                                           self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             prior_benefit_obj = prior_sum_obj - base_obj
             prior_benefit_obj_per_Ndata = prior_benefit_obj / self.solver_eliminate.Ndata
 
@@ -870,7 +883,7 @@ class FitAndEliminate:
             cur_sol_chars = posterior_interm_SO
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
             interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair,
-                                             self.options.Wigner_informed, self.options.PorterThomas_informed)
+                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             benefit_obj = interm_step_obj - base_obj
 

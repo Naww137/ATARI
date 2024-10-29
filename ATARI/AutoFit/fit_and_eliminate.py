@@ -490,7 +490,7 @@ class FitAndEliminate:
             
             best_model_chars = initial_ladder_chars
             base_chi2 = np.sum(initial_ladder_chars.chi2)
-            base_obj = objective_func(base_chi2, initial_ladder_chars.par, self.particle_pair,
+            base_obj = objective_func(base_chi2, initial_ladder_chars.par, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             if (self.options.print_bool):
@@ -592,10 +592,10 @@ class FitAndEliminate:
 
             cur_sol_chars_deep = posterior_deep_SO
             deep_chi2_prior = np.sum(cur_sol_chars_deep.chi2)
-            deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair,
+            deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
-            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair,
+            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             benefit_deep_obj = deep_obj - base_obj
 
@@ -775,7 +775,7 @@ class FitAndEliminate:
             prior_chars = self.evaluate_prior(prior_ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
-            prior_sum_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair,
+            prior_sum_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
                                            self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             prior_benefit_obj = prior_sum_obj - base_obj
             prior_benefit_obj_per_Ndata = prior_benefit_obj / self.solver_eliminate.Ndata
@@ -882,7 +882,7 @@ class FitAndEliminate:
             level_derivative_evaluations += derivative_evaluations
             cur_sol_chars = posterior_interm_SO
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
-            interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair,
+            interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair, fixed_resonances_indices,
                                              self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             benefit_obj = interm_step_obj - base_obj
@@ -1032,7 +1032,7 @@ class FitAndEliminate:
 
 
 from ATARI.theory.resonance_statistics import wigner_LL
-def objective_func(chi2, res_ladder, particle_pair:Particle_Pair,
+def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonance_indices, 
                    Wigner_informed=True, PorterThomas_informed=False):
     
     if Wigner_informed or PorterThomas_informed:
@@ -1047,7 +1047,11 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair,
         for J_ID, spingroup in spingroups_JID.items():
             partial_ladder = res_ladder.loc[res_ladder['J_ID'] == J_ID]
             E = partial_ladder['E'].to_numpy(dtype=float)
-            Gn = partial_ladder['Gn1'].to_numpy(dtype=float)
+
+            res_ladder_internal = res_ladder.drop(index=fixed_resonance_indices)
+            partial_ladder_internal = res_ladder_internal.loc[res_ladder_internal['J_ID'] == J_ID]
+            E_int = partial_ladder_internal['E'].to_numpy(dtype=float)
+            Gn_int = partial_ladder_internal['Gn1'].to_numpy(dtype=float) # Porter-Thomas distribution should only be used on the internal resonances
 
             if Wigner_informed:
                 mean_level_spacing = spingroup['<D>']
@@ -1058,7 +1062,7 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair,
                 if len(spingroup['Ls']) > 1:
                     raise NotImplementedError('Cannot do Porter-Thomas when more than one l quantum state shares the same Jpi.')
                 l = int(spingroup['Ls'][0])
-                gn2 = particle_pair.Gn_to_gn2(Gn, E, l)
+                gn2 = particle_pair.Gn_to_gn2(Gn_int, E_int, l)
                 log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - 0.5*np.log(2*np.pi*mean_neutron_width) # log of gaussian on gn
     else:
         log_likelihood = 0.0

@@ -38,8 +38,8 @@ class TestRunSammy(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             cls.pair,
             cls.resonance_ladder,
-            cls.exp_model.template,
-            cls.exp_model,
+            template = cls.exp_model.template,
+            experiment=cls.exp_model,
             energy_grid=cls.exp_model.energy_grid,
         )
 
@@ -60,8 +60,8 @@ class TestRunSammy(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             self.pair,
             self.resonance_ladder,
-            self.exp_model.template,
-            self.exp_model,
+            template =self.exp_model.template,
+            experiment=self.exp_model,
             energy_grid=self.exp_model.energy_grid,
         )
         self.assertRaises(ValueError, sammy_functions.run_sammy, sammyINP, self.rto)
@@ -79,8 +79,8 @@ class TestRunSammy(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             self.pair,
             resonance_ladder_fit,
-            self.exp_model.template,
-            self.exp_model,
+            template = self.exp_model.template,
+            experiment=self.exp_model,
             energy_grid=self.exp_model.energy_grid,
         )
         self.assertRaises(ValueError, sammy_functions.run_sammy, sammyINP, self.rto)
@@ -104,8 +104,8 @@ class TestRunSammy(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             self.pair,
             resonance_ladder_fit,
-            self.exp_model.template,
-            self.exp_model,
+            template = self.exp_model.template,
+            experiment=self.exp_model,
             experimental_data = self.data_df
         )
         
@@ -127,8 +127,8 @@ class TestRunSammy(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             self.pair,
             self.resonance_ladder,
-            self.exp_model.template,
-            self.exp_model,
+            template=self.exp_model.template,
+            experiment=self.exp_model,
             energy_grid= self.exp_model.energy_grid
         )
         sammyOUT = sammy_functions.run_sammy(sammyINP, self.rto)
@@ -180,8 +180,8 @@ class TestRunSammyYW(unittest.TestCase):
         sammyINP = sammy_classes.SammyInputData(
             cls.pair,
             cls.resonance_ladder,
-            cls.exp_model.template,
-            cls.exp_model,
+            template = cls.exp_model.template,
+            experiment=cls.exp_model,
             energy_grid=cls.exp_model.energy_grid,
         )
 

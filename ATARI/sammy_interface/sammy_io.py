@@ -4,19 +4,13 @@ import numpy as np
 import os
 import shutil
 from pathlib import Path
-# from ATARI.theory import scattering_params
 import pandas as pd
-# import subprocess
 from copy import copy
 
-# from ATARI.utils.atario import fill_resonance_ladder
 from ATARI.theory.scattering_params import FofE_recursive
-# from ATARI.utils.stats import chi2_val
 
-from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData, SammyInputDataYW
 import fortranformat as ff
 from typing import Optional, Union
-from ATARI.sammy_interface.sammy_classes import SammyInputData, SammyRunTimeOptions
 
 
 # module_dirname = os.path.dirname(__file__)
@@ -43,13 +37,14 @@ def readlst(filepath):
         DataFrame with headers.
     """
     if filepath.endswith('.LST') or filepath.endswith('.lst'):
-        df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes'])
         if df.index.equals(pd.RangeIndex(len(df))):
             pass
         else:
             df = pd.read_csv(filepath, sep='\s+', names=['E','exp_xs','exp_xs_unc','theo_xs','theo_xs_bayes','exp_trans','exp_trans_unc','theo_trans', 'theo_trans_bayes', 'other'])
+            
     else:
-        df = pd.read_csv(filepath, sep='\s+', names=['E','exp','exp_unc'])
+        df = pd.read_csv(filepath, sep = '\s+', names=['E','exp','exp_unc'])
     return df
 
 def readpar(filepath):
@@ -251,6 +246,79 @@ def readpds(pdsfilepath):
     return res_dict
 
 
+def read_idc(filepath):
+    """
+    Reads a formatted SAMMY.IDC file into the dictionary format used by ATARI.
+
+    Parameters
+    ----------
+    filepath : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    with open(filepath, 'r') as f:
+        in_partial_derivatives = False
+        in_uncertainties = False
+        in_correlations = False
+        E = []
+        stat_unc = []
+        derivatives = []
+        correlations = []
+        for line in f.readlines():
+            
+            if not line.strip():
+                in_partial_derivatives = False
+                in_uncertainties = False
+                in_correlations = False
+
+            if line.lower().startswith("nu"):
+                num_params = int(line.split()[-1])
+            
+            elif line.lower().startswith("free-forma"):
+                in_partial_derivatives = True
+
+            elif line.lower().startswith("uncertaint"):
+                in_uncertainties = True
+            
+            elif line.lower().startswith("correlatio"):
+                in_correlations = True
+
+            elif in_partial_derivatives:
+                splitline = line.split()
+                E.append(float(splitline[0]))
+                stat_unc.append(float(splitline[1]))
+                derivatives.append([float(x) for x in splitline[2:]])
+
+            elif in_uncertainties:
+                uncertainties = [float(e) for e in line.split()]
+
+            elif in_correlations:
+                correlations.append([float(x) for x in line.split()])
+
+    ### compile matrices
+    Corr = np.diag(np.ones_like(uncertainties))
+    for i in range(len(correlations)):
+        for j in range(len(correlations[i])):
+            Corr[i+1, j] = correlations[i][j]
+            Corr[j,i+1] = correlations[i][j]
+
+    Cov_sys = np.diag(uncertainties) @ Corr @ np.diag(uncertainties)
+    Jac_sys = pd.DataFrame(np.array(derivatives).T, columns = pd.Series(E, name="E"))
+    diag_stat = pd.DataFrame(np.array(stat_unc)**2, columns = ["var_stat"], index=pd.Series(E, name="E"))
+
+    cov_dat = {
+        "diag_stat" : diag_stat,
+        "Jac_sys"   : Jac_sys,
+        "Cov_sys"   : Cov_sys
+    }
+
+    return cov_dat
+
 # =============================================================================
 # Sammy Parameter File
 # =============================================================================
@@ -326,8 +394,13 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
     return df
 
 def check_sampar_inputs(df):
-    # check for same energy and same spin group
-    return 
+    # Small perurbation for duplicate resonances
+    duplicates = df.duplicated(subset=['E', 'J_ID'], keep=False)
+    if duplicates.any():
+        random_signs = np.sign(np.random.default_rng().uniform(-1, 1, size=duplicates.sum()))
+        random_mags = np.random.default_rng().uniform(5e-6, 5e-5, size=duplicates.sum())
+        df.loc[duplicates, 'E'] += random_signs*random_mags
+    return df
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -357,6 +430,8 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
         par_array = []
     else:
         df = fill_sammy_ladder(df, pair, vary_parm)
+        df = check_sampar_inputs(df)
+        assert np.sum(df.duplicated(subset=['E', 'J_ID'], keep=False)) == 0
         par_array = np.array(df[['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID']])
 
         if np.any([each is None for each in df.J_ID]):
@@ -371,8 +446,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
                 file.write(formatted_value)
             file.write('\n')
         file.write(f'\n{initial_parameter_uncertainty}\n')
-        
-    
+
     return
         
       
@@ -482,7 +556,6 @@ def write_idc(filepath, J, C, stat):
                 formatted_correlation = format_float(corr, width, sep=' ')
                 f.write(formatted_correlation)
             f.write("\n")
-            
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -555,10 +628,10 @@ def write_saminp(filepath   :   str,
     else:
         raise ValueError(f'The provided bayes_scheme, {bayes_scheme} does not exist.')
     
-    # Least Squares:
-    if use_least_squares:
-        alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
-        alphanumeric.append('REMEMBER ORIGINAL PArameter values')
+    # # Least Squares:
+    # if use_least_squares:
+    #     alphanumeric.append('USE LEAST SQUARES TO define prior parameter covariance matrix')
+    #     alphanumeric.append('REMEMBER ORIGINAL PArameter values')
 
     if use_IDC:
         alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")

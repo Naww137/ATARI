@@ -4,21 +4,9 @@ import os
 from uuid import uuid4
 
 from ATARI.sammy_interface import sammy_classes, sammy_functions
-from ATARI.utils.misc import fine_egrid
+from ATARI.utils.misc import fine_egrid, generate_sammy_rundir_uniq_name
 from ATARI.ModelData.experimental_model import Experimental_Model
 
-
-
-def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, addit_str: str = ''):
-
-    if not os.path.exists(path_to_sammy_temps):
-        os.mkdir(path_to_sammy_temps)
-
-    unique_string = str(uuid4())
-
-    sammy_rundirname = path_to_sammy_temps+'SAMMY_runDIR_'+addit_str+'_'+str(case_id)+'_'+unique_string+'/'
-
-    return sammy_rundirname
 
 
 def calc_theo_broad_xs_for_all_reaction(sammy_exe,
@@ -27,7 +15,8 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                         energy_range,
                                         temperature,
                                         template, 
-                                        reactions):
+                                        reactions,
+                                        df_column_key_extension = ''):
 
     runDIR = generate_sammy_rundir_uniq_name('./')
 
@@ -44,9 +33,10 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                       reaction='total',
                                       temp = (temperature,0),
                                       energy_grid = E,
-                                      energy_range = energy_range
+                                      energy_range = energy_range,
+                                      template=template
                                       )
-    exp_theo.template = template
+    # exp_theo.template = template
 
     sammyINP = sammy_classes.SammyInputData(
         particle_pair,
@@ -62,7 +52,7 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
         sammyOUT = sammy_functions.run_sammy(sammyINP, sammyRTO)
         if rxn == "capture" and resonance_ladder.empty: ### if no resonance parameters - sammy does not return a column for capture theo xs
             sammyOUT.pw["theo_xs"] = np.zeros(len(sammyOUT.pw))
-        df[rxn] = sammyOUT.pw.theo_xs
+        df[rxn+df_column_key_extension] = sammyOUT.pw.theo_xs
     
     return df
     
@@ -167,7 +157,7 @@ def calculate_fnorms(ResidualMatrixDict, reactions):
     for rxn in reactions:
         R = ResidualMatrixDict[rxn]
         Rf[rxn] = np.linalg.norm(R, ord='fro')/R.size
-    # ResidualMatrix_allrxns = np.concatenate([ResidualMatrixDict[rxn] for rxn in reactions])
-    # Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')/ResidualMatrix_allrxns.size
+    ResidualMatrix_allrxns = np.hstack([ResidualMatrixDict[rxn] for rxn in reactions])
+    Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')/ResidualMatrix_allrxns.size
 
-    return Rf
+    return Rf, ResidualMatrix_allrxns

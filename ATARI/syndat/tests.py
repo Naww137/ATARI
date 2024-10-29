@@ -2,19 +2,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import normaltest, chi2, norm, ks_1samp, norm
-from ATARI.syndat.control import syndatOPT, Syndat_Model
 from ATARI.ModelData.experimental_model import Experimental_Model
+from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.syndat.data_classes import syndatOPT
 
-
-def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000]):
+def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, energy_range = [10,3000], N = 10):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
         2. the normalized residuals (data-true)/(data_uncertainty) fall on a standard normal distribution
     """
 
-    energy_grid = np.sort(np.random.default_rng().uniform(min(energy_range),max(energy_range),10)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
-    df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.1,1,10)})
+    energy_grid = np.sort(np.random.default_rng().uniform(min(energy_range),max(energy_range), N)) #np.linspace(min(energy_range),max(energy_range),10) # energy below 10 has very low counts due to approximate open spectrum
+    df_true = pd.DataFrame({'E':energy_grid, 'true':np.random.default_rng().uniform(0.01,1, N)})
     df_true.sort_values('E', ascending=True, inplace=True)
 
     # reset syndat model samples, energy grid, and open neutron spectrum
@@ -74,12 +74,12 @@ def noise_distribution_test(syn: Syndat_Model, print_out=False, ipert=5000, ener
         print(f"Standard normal test: {norm_test_on_residual}")
         print(f"Chi2 ks test: {kstest_on_chi2}")
 
-    return mean_of_residual, norm_test_on_residual, kstest_on_chi2
+    return mean_of_residual, norm_test_on_residual, kstest_on_chi2, chi2_gofs
 
 
 
 
-def noise_distribution_test2(syn:Syndat_Model, df_true, print_out=False, ipert=5000):
+def noise_distribution_test2(syn:Syndat_Model, df_true, print_out=False, ipert=5000, return_figs=False, title = ''):
     """
     Tests the following for data sampling distributions from given measurement model:
         1. the mean of all data samples converges to the true value
@@ -116,23 +116,36 @@ def noise_distribution_test2(syn:Syndat_Model, df_true, print_out=False, ipert=5
     kstest_on_chi2 = ks_1samp(chi2_gofs, chi2_dist.cdf)
 
     if print_out:
-        x = np.linspace(-5,5)
-        plt.figure()
-        plt.hist(normres, bins=50, density=True)
-        plt.plot(x, norm.pdf(x))
-        plt.show()
+        fig, axes = plt.subplots(1,2, figsize=(10,4))
+        x = np.linspace(-5,5, 1000)
+        axes[0].hist(normres, bins=50, density=True, label="Samples", zorder=2)
+        axes[0].plot(x, norm.pdf(x), label="N(0,1)", zorder=2)
+        axes[0].set_xlabel("Normalized Residual")
+        axes[0].set_ylabel("Frequency")
+        axes[0].legend()
 
-        x = np.linspace(0,max(chi2_gofs)+10)
-        plt.figure()
-        plt.hist(chi2_gofs, bins=50, density=True)
-        plt.plot(x, chi2_dist.pdf(x))
-        plt.show()
+        x = np.linspace(0,max(chi2_gofs)+10, 1000)
+        axes[1].hist(chi2_gofs, bins=50, density=True, label="Samples", zorder=2)
+        axes[1].plot(x, chi2_dist.pdf(x), label=r"$\chi^2_{10}$ Distribution", zorder=2)
+        axes[1].set_xlabel(r"$\chi^2$ Statistic")
+        axes[1].set_ylabel("Frequency")
+        axes[1].legend()
+
+        fig.suptitle(f"Synthetic Data Model Verification for {title}")
+        # plt.show()
+        if return_figs:
+            pass
+        else:
+            plt.show()
 
         print(f"Mean of residual: {mean_of_residual}")
-        print(f"Standard normal test: {norm_test_on_residual}")
-        print(f"Chi2 ks test: {kstest_on_chi2}")
+        print(f"Standard normal test: {norm_test_on_residual.pvalue}")
+        print(f"Chi2 ks test: {kstest_on_chi2.pvalue}")
 
-    return mean_of_residual, norm_test_on_residual, kstest_on_chi2
+    if return_figs:
+        return fig, mean_of_residual, norm_test_on_residual, kstest_on_chi2
+    else:
+        return mean_of_residual, norm_test_on_residual, kstest_on_chi2
 
 
 

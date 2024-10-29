@@ -29,8 +29,8 @@ def SLBW(E, pair, resonance_ladder):
     if resonance_ladder.empty:
         
         # window potential scattering
-        lwave=0; Jpi=3.0
-        window_shift, window_penetration, window_phi, window_k = scattering_params.FofE_explicit(E, pair.ac, pair.M, pair.m, lwave)
+        L=0; Jpi=3.0
+        window_shift, window_penetration, window_phi, window_k = scattering_params.FofE_explicit(E, pair.ac, pair.M, pair.m, L)
         g = scattering_params.gstat(Jpi, pair.I, pair.i)
         potential_scattering = (4*np.pi*g/(window_k**2)) * np.sin(window_phi)**2
         # TODO: if resonance ladder is empty, need to calculate scattering phase shift for EACH JPI
@@ -39,10 +39,10 @@ def SLBW(E, pair, resonance_ladder):
         xs_tot = xs_scat + xs_cap
         return xs_tot, xs_scat, xs_cap
     
-    resonance_ladder = fill_resonance_ladder(resonance_ladder, pair)
+    # resonance_ladder = fill_resonance_ladder(resonance_ladder, pair)
         
     xs_cap = 0; xs_scat = 0
-    group_by_J = dict(tuple(resonance_ladder.groupby('J')))
+    group_by_J = dict(tuple(resonance_ladder.groupby('Jpi')))
 
     for Jpi in group_by_J:
         
@@ -50,8 +50,8 @@ def SLBW(E, pair, resonance_ladder):
         # assert J > 0 
         Jpi = abs(Jpi)
 
-        # orbital_angular_momentum = J_df.lwave.unique()
-        orbital_angular_momentum = np.unique(J_df.lwave.values[0]) # just takes the first level's l-wave vector, all should be the same in each group
+        # orbital_angular_momentum = J_df.>.unique()
+        orbital_angular_momentum = np.unique(J_df.L.values[0]) # just takes the first level's l-wave vector, all should be the same in each group
         assert len(orbital_angular_momentum) == 1, "Cannot handle different l-waves contributing to multichannel widths"
         
         # calculate functions of energy -> shift, penetrability, phase shift

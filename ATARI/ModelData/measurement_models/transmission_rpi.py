@@ -242,13 +242,13 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     """
     # calculate open count rates
     Cr, dCr = cts_to_ctr(open_df.ct, open_df.dct, open_df.bw, trigo) # cts_o/(bw*trig)
-    open_df.loc[:,'c'] = Cr; 
-    open_df.loc[:,'dc'] = dCr
+    open_df['c'] = Cr; 
+    open_df['dc'] = dCr
     
     # calculate sample in count rate from theoretical transmission, bkg, m,k, and open count rate
     [m1,m2,m3,m4] = alpha
     cr = (sample_df["true"]*(m3*Cr - m4*K*Bi - B0) + m2*k*Bi + b0)/m1
-    sample_df.loc[:,'c_true'] = cr
+    sample_df['c_true'] = cr
 
     # calculate expected sample in counts from count rate
     c = cr*open_df.bw*trigs
@@ -284,10 +284,10 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     assert(c.all() >= 0)
     dc = np.sqrt(c)
     
-    sample_df.loc[:,'cts'] = c
-    sample_df.loc[:,'dcts'] = dc
-    sample_df.loc[:,'cts_true'] = theo_c
-    sample_df.loc[:, 'bw'] = open_df.bw
+    sample_df['cts'] = c
+    sample_df['dcts'] = dc
+    sample_df['cts_true'] = theo_c
+    sample_df['bw'] = open_df.bw
 
     return sample_df, open_df
 
@@ -367,9 +367,8 @@ class transmission_rpi_parameters:
                 if isinstance(param_values, pd.DataFrame):
                     new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
                     df = deepcopy(param_values)
-                    df['ct'] = df['ct'].astype(float) # we are sampling counts as floats
-                    df.loc[:,'ct'] = new_c
-                    df.loc[:,'dct'] = np.sqrt(new_c)
+                    df['ct'] = new_c
+                    df['dct'] = np.sqrt(new_c)
                     sampled_params[param_name] = df
 
         return transmission_rpi_parameters(**sampled_params)
@@ -429,9 +428,11 @@ class Transmission_RPI:
     
     def truncate_energy_range(self, new_energy_range):
         if min(new_energy_range) < min(self.model_parameters.open_neutron_spectrum.E):
-            raise ValueError("new energy range is less than existing transmission_rpi.open_netron_spectrum energy")
+            # raise ValueError("new energy range is less than existing transmission_rpi.open_netron_spectrum energy")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing transmission_rpi.open_netron_spectrum energy {min(self.model_parameters.open_neutron_spectrum.E)}")
         if max(new_energy_range) > max(self.model_parameters.open_neutron_spectrum.E):
-            raise ValueError("new energy range is more than existing transmission_rpi.open_netron_spectrum energy")
+            # raise ValueError("new energy range is more than existing transmission_rpi.open_netron_spectrum energy")
+            print(f"WARNING: new energy max {max(new_energy_range)} is more than existing transmission_rpi.open_netron_spectrum energy {max(self.model_parameters.open_neutron_spectrum.E)}")
         self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[(self.model_parameters.open_neutron_spectrum.E.values < max(new_energy_range)) & (self.model_parameters.open_neutron_spectrum.E.values > min(new_energy_range))].copy()
         return
     
@@ -458,6 +459,8 @@ class Transmission_RPI:
         assert true_model_parameters.open_neutron_spectrum is not None
         if len(true_model_parameters.open_neutron_spectrum) != len(pw_true):
             raise ValueError("neutron spectrum and sample data are not of the same length, check energy domain")
+        if not np.all(np.isclose(pw_true.E.values, true_model_parameters.open_neutron_spectrum.E.values, rtol=1e-5)):
+            raise ValueError(f"neutron spectrum and sample data are not on the same grid, check energy domain, max difference = {np.max(abs(pw_true.E.values-true_model_parameters.open_neutron_spectrum.E.values))}")
         
         # gather monitor array
         monitor_array = [true_model_parameters.m1[0], true_model_parameters.m2[0], true_model_parameters.m3[0], true_model_parameters.m4[0]]
@@ -534,7 +537,7 @@ class Transmission_RPI:
 
         # gather monitor array and reduce data - again tof should be in microseconds
         monitor_array = [self.model_parameters.m1[0], self.model_parameters.m2[0], self.model_parameters.m3[0], self.model_parameters.m4[0]]
-        trans.loc[:,'exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof.values*1e-3,
+        trans['exp'], unc_data, rates = reduce_raw_count_data(raw_data.tof.values*1e-3,
                                                               raw_data.cts.values, 
                                                               self.model_parameters.open_neutron_spectrum.ct.values,
                                                               raw_data.dcts.values, 

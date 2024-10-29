@@ -490,7 +490,7 @@ class FitAndEliminate:
             
             best_model_chars = initial_ladder_chars
             base_chi2 = np.sum(initial_ladder_chars.chi2)
-            base_obj = objective_func(base_chi2, initial_ladder_chars.par, self.particle_pair, fixed_resonances_indices,
+            base_obj = objective_func(base_chi2, initial_ladder_chars.par, self.particle_pair, fixed_res_energies,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             if (self.options.print_bool):
@@ -592,10 +592,10 @@ class FitAndEliminate:
 
             cur_sol_chars_deep = posterior_deep_SO
             deep_chi2_prior = np.sum(cur_sol_chars_deep.chi2)
-            deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
+            deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_res_energies,
                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
-            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_res_energies,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             benefit_deep_obj = deep_obj - base_obj
 
@@ -659,7 +659,7 @@ class FitAndEliminate:
             deep_obj_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
-                    obj_stopping_criteria = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair,
+                    obj_stopping_criteria = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_res_energies,
                                                            Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
                     obj_type = 'chi2'
                     if Wigner_informed_stopping_criteria:
@@ -775,7 +775,8 @@ class FitAndEliminate:
             prior_chars = self.evaluate_prior(prior_ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
-            prior_sum_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
+            fixed_res_energies = fixed_resonances["E"].tolist()
+            prior_sum_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_res_energies,
                                            self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             prior_benefit_obj = prior_sum_obj - base_obj
             prior_benefit_obj_per_Ndata = prior_benefit_obj / self.solver_eliminate.Ndata
@@ -882,7 +883,8 @@ class FitAndEliminate:
             level_derivative_evaluations += derivative_evaluations
             cur_sol_chars = posterior_interm_SO
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
-            interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair, fixed_resonances_indices,
+            fixed_res_energies = fixed_resonances["E"].tolist()
+            interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair, fixed_res_energies,
                                              self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             benefit_obj = interm_step_obj - base_obj
@@ -1032,8 +1034,12 @@ class FitAndEliminate:
 
 
 from ATARI.theory.resonance_statistics import wigner_LL
-def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonance_indices, 
+def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_res_energies, 
                    Wigner_informed=True, PorterThomas_informed=False):
+    
+    # Getting internal ladder:
+    fixed_resonances_indices = res_ladder[res_ladder['E'].isin(fixed_res_energies)].index.tolist()
+    res_ladder_internal = res_ladder.drop(index=fixed_resonances_indices)
     
     if Wigner_informed or PorterThomas_informed:
         if particle_pair is None:
@@ -1048,7 +1054,6 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
             partial_ladder = res_ladder.loc[res_ladder['J_ID'] == J_ID]
             E = partial_ladder['E'].to_numpy(dtype=float)
 
-            res_ladder_internal = res_ladder.drop(index=fixed_resonance_indices)
             partial_ladder_internal = res_ladder_internal.loc[res_ladder_internal['J_ID'] == J_ID]
             E_int = partial_ladder_internal['E'].to_numpy(dtype=float)
             Gn_int = partial_ladder_internal['Gn1'].to_numpy(dtype=float) # Porter-Thomas distribution should only be used on the internal resonances

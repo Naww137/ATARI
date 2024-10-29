@@ -2,6 +2,7 @@
 
 import numpy as np
 import os
+import re
 import shutil
 import pandas as pd
 import subprocess
@@ -180,7 +181,15 @@ def get_ECSCM(sammyRTO, sammyINP):
     # update_input_files(sammy_INP, sammy_RTO)
     fill_runDIR_with_templates(exp.template, "sammy.inp", sammyRTO.sammy_runDIR)
     assert len(exp.energy_grid) <= 498, "ECSCM_experiment.energy grid > 498"
-    energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), len(exp.energy_grid)) # if more than 498 datapoints then I need a new reader!
+    
+    # energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), len(exp.energy_grid)) # if more than 498 datapoints then I need a new reader!
+    if hasattr(sammyINP, 'experimental_data'):
+      energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), len(exp.energy_grid))
+    elif hasattr(sammyINP, 'datasets') and sammyINP.datasets:
+        energy_grid = np.linspace(min(sammyINP.datasets[0].E), max(sammyINP.datasets[0].E), len(exp.energy_grid))
+    else:
+        raise AttributeError("No experimental data or datasets provided to construct energy grid")
+
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(
                 filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
@@ -770,6 +779,51 @@ def concat_external_resonance_ladder(internal_resonance_ladder, external_resonan
     return resonance_ladder, external_resonance_indices
 
 
+# Parse SAMMY.CCV
+def parse_compact_covariance(filepath):
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+        
+    # Read the first line after the description to extract standard deviations
+    raw_stdevs = lines[1].strip()
+    stdevs = [raw_stdevs[i:i+11].strip() for i in range(0, len(raw_stdevs), 11)]
+    
+    # Convert standard deviations from scientific notation to floats
+    stdevs = [float(s) for s in stdevs]
+
+    # Initialize a covariance matrix of zeros
+    n = len(stdevs)
+    cov_matrix = np.zeros((n, n))
+    
+    # Fill the diagonal with the variance (square of standard deviations)
+    cov_matrix[np.diag_indices(n)] = np.array(stdevs) ** 2
+    
+    # Process the remaining lines for correlations
+    correlation_matrix = []  # To store and optionally print correlations
+    for line in lines[2:]:
+        if line.strip():
+            row_index = int(line[0:5].strip()) - 1  # Convert to zero-based index
+            col_start = int(line[5:10].strip()) - 1  # Convert to zero-based index
+            correlation_data = line[11:].rstrip()  # Remove only trailing whitespace
+
+            # # Ensure the length of correlation_data is divisible by 3
+            # while len(correlation_data) % 3 != 0:
+            #     correlation_data = ' ' + correlation_data  # Prepend space if not divisible by 3
+
+            correlations = [correlation_data[i:i+3] for i in range(0, len(correlation_data), 3)]
+            correlations = [(int(c) if c.strip() else 0) / 100.0 for c in correlations]
+
+            correlation_matrix.append((row_index, col_start, correlations))
+            
+            for i, correlation in enumerate(correlations):
+                col_index = col_start + i
+                cov_value = correlation * stdevs[row_index] * stdevs[col_index]
+                cov_matrix[row_index, col_index] = cov_value
+                cov_matrix[col_index, row_index] = cov_value
+    
+    return cov_matrix
+
+
 def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
@@ -1095,20 +1149,36 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
         sammy_OUT.par_post = pd.DataFrame(columns=['E', 'Gg', 'Gn1', 'varyE', 'varyGg', 'varyGn1', 'J_ID'])
         
 
+    # Run ECSCM and copy files if get_ECSCM is True
+    if sammyRTO.get_ECSCM:
+        # Find and copy the highest index step_.par file to SAMMY.PAR
+        results_dir = os.path.join(sammyRTO.sammy_runDIR, "results")
+        step_par_files = [f for f in os.listdir(results_dir) if re.match(r"step\d+\.par", f)]
+        if step_par_files:
+            highest_step_file = max(step_par_files, key=lambda x: int(re.search(r"\d+", x).group()))
+            sammy_par_path = os.path.join(sammyRTO.sammy_runDIR, "SAMMY.PAR")
+            shutil.copyfile(os.path.join(results_dir, highest_step_file), sammy_par_path)
+            
+            # Add the required line to the end of SAMMY.PAR
+            with open(sammy_par_path, "a") as f:
+                f.write("COVARIANCE MATRIX IS IN BINARY FORM\n")
+
+        # Find and copy the highest index bayes_iter_.cov file to SAMMY.COV
+        iterate_dir = os.path.join(sammyRTO.sammy_runDIR, "iterate")
+        bayes_cov_files = [f for f in os.listdir(iterate_dir) if re.match(r"bayes_iter\d+\.cov", f)]
+        if bayes_cov_files:
+            highest_cov_file = max(bayes_cov_files, key=lambda x: int(re.search(r"\d+", x).group()))
+            shutil.copyfile(os.path.join(iterate_dir, highest_cov_file), os.path.join(sammyRTO.sammy_runDIR, "SAMMY.COV"))
+
+        # Run ECSCM process and add results to sammy_OUT
+        est_df, ecscm = get_ECSCM(sammyRTO, sammyINPyw)
+        sammy_OUT.ECSCM = ecscm
+        sammy_OUT.est_df = est_df
+
     if not sammyRTO.keep_runDIR and os.path.isdir(sammyRTO.sammy_runDIR):
         shutil.rmtree(sammyRTO.sammy_runDIR)
 
     return sammy_OUT
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -146,6 +146,7 @@ class SammyOutputData:
     derivatives: Optional[ndarray] = None
 
     ECSCM: Optional[DataFrame] = None 
+    RPCM: Optional[DataFrame] = None
     est_df: Optional[DataFrame] = None
     covariance_data_at_theory: Optional[dict] = None
     covariance_data_at_theory_post: Optional[dict] = None
@@ -206,6 +207,11 @@ class SammyInputDataYW:
     maxF:   float = 10
     
     initial_parameter_uncertainty: float = 1.0
+    
+    save_RPCM: bool = False
+    
+    ECSCM_experiment: Optional[Experimental_Model] = None
+
 
 
 

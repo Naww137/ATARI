@@ -1059,6 +1059,6 @@ class FitAndEliminate:
             new_ladder.reset_index(drop=True, inplace=True)  # Reindex the new ladder
         else:
             if self.options.print_bool: print(ladder)
-            raise ValueError(f'Invalid index {index_to_remove}')
+            raise ValueError(f'Invalid index {index_to_remove}\n\nladder:\n{ladder}')
         return new_ladder, removed_row
     

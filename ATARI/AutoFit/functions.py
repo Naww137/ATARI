@@ -150,6 +150,7 @@ def get_LL_by_parameter(ladder,
 
 
 
+
 def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None):
 
     ### setup spin groups
@@ -164,12 +165,9 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
                                                         particle_pair,
                                                         spin_groups,
                                                         num_Elam= initialFBopt.num_Elam,
-                                                        Elam_shift = 0,
+                                                        Elam_shift = initialFBopt.Elam_shift,
                                                         starting_Gg_multiplier = initialFBopt.starting_Gg_multiplier,
-                                                        starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier, 
-                                                        varyE = initialFBopt.fitpar1[0], 
-                                                        varyGg = initialFBopt.fitpar1[1], 
-                                                        varyGn1 = initialFBopt.fitpar1[2])
+                                                        starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier)
 
     ### setup external resonances
     if initialFBopt.external_resonances:
@@ -183,3 +181,54 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
     # initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
 
     return initial_resonance_ladder, external_resonance_ladder
+
+
+
+
+
+
+
+from ATARI.theory.resonance_statistics import wigner_LL
+from ATARI.ModelData.particle_pair import Particle_Pair
+
+def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonances_indices, 
+                   Wigner_informed=True, PorterThomas_informed=False):
+    
+    # Getting internal ladder:
+    # fixed_resonances_indices = res_ladder[res_ladder['E'].isin(fixed_res_energies)].index.tolist()
+    # res_ladder_internal = res_ladder.drop(index=fixed_resonances_indices)
+    res_ladder_internal = res_ladder
+    
+    if Wigner_informed or PorterThomas_informed:
+        if particle_pair is None:
+            raise ValueError('Particle Pair must be included if using resonance statistics.')
+    
+        spingroups_old = particle_pair.spin_groups
+        spingroups_JID = {}
+        for Jpi, spingroup in spingroups_old.items():
+            spingroups_JID[spingroup['J_ID']] = spingroup
+        log_likelihood = 0.0
+        for J_ID, spingroup in spingroups_JID.items():
+            partial_ladder = res_ladder.loc[res_ladder['J_ID'] == J_ID]
+            E = partial_ladder['E'].to_numpy(dtype=float)
+
+            partial_ladder_internal = res_ladder_internal.loc[res_ladder_internal['J_ID'] == J_ID]
+            E_int = partial_ladder_internal['E'].to_numpy(dtype=float)
+            Gn_int = partial_ladder_internal['Gn1'].to_numpy(dtype=float) # Porter-Thomas distribution should only be used on the internal resonances
+
+            if Wigner_informed:
+                mean_level_spacing = spingroup['<D>']
+                log_likelihood += wigner_LL(E, mean_level_spacing)
+
+            if PorterThomas_informed:
+                mean_neutron_width = spingroup['<gn2>']
+                if len(spingroup['Ls']) > 1:
+                    raise NotImplementedError('Cannot do Porter-Thomas when more than one l quantum state shares the same Jpi.')
+                l = int(spingroup['Ls'][0])
+                gn2 = particle_pair.Gn_to_gn2(Gn_int, E_int, l)
+                log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - 0.5*np.log(2*np.pi*mean_neutron_width) # log of gaussian on gn
+    else:
+        log_likelihood = 0.0
+
+    obj = chi2 - 2*log_likelihood
+    return obj

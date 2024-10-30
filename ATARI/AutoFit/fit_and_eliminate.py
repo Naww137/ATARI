@@ -24,7 +24,48 @@ class FitAndEliminateOPT:
 
     Attributes
     ----------
+    fitpar1: list = [0,0,1]
+        Boolean list for fit 1 that determines which parameters will be optimized (E, Gg, Gn1).
+    fitpar2: list = [1,1,1]
+        Boolean list for fit 2 that determines which parameters will be optimized (E, Gg, Gn1).
+    width_elimination: bool = False
+        Option to eliminate resonances during initial fitting stages based on neutron width.
+    Gn_threshold: Float = 1e-2
+        Neutron width threshold for width-based elimination if width_elimination=True.
+    decrease_chi2_threshold_for_width_elimination: bool = True
+        If width_elimination=True, decrease the chi2 threshold convergence criteria
+
+    fitpar_elim: list = [1,0,1]
+        Boolean list for elimination that determines which parameters will be optimized (E, Gg, Gn1).
+    chi2_allowed : float = 0
+        value of chi2 allowed difference when comparing 2 models
     
+    greedy_mode: bool = False
+        If set to True - eliminator will not test all models of current branch and select best of them - it will use first model of current branch that passed the test 
+    stop_at_chi2_thr: Bool
+        Boolean value which tells to stop if during search of a models there was 
+        no models that passed the chi2 test, if false - continue to delete resonances until we
+        will not have at least one resonance.
+
+    interm_fit_max_iter: int
+        allowed number of iterations for intermediate stage to perform YW fitting
+    interm_fit_step_thr: float,
+        chi2 step threshold used for YW fitting procedure in intermediate fitting stage
+
+    LevMarV0_priorpassed: float
+        Starting value of a fidge factor used for YW scheme if model passed the test without refitting priors tests
+    deep_fit_max_iter: int
+        allowed number of iterations for deep-fitting stage 
+    deep_fit_step_thr: float,
+        chi2 step threshold used for YW fitting procedure
+    start_fudge_for_deep_stage: float
+        Starting value of a fudge factor used for YW scheme
+    start_deep_fit_from: int
+        determines the number of resonances on a current level on a path from N->N-1 where deep fit start from (see default value)
+
+    stop_at_chi2_thr: bool = False
+        Boolean value which tells to stop if during search of a models there was no models that passed the chi2 test, if false - continue to delete resonances until we will not have at least one resonance.
+
     """
     def __init__(self, **kwargs):
 
@@ -33,24 +74,24 @@ class FitAndEliminateOPT:
         self._fitpar2 = [1,0,1]
         self._width_elimination = False
         self._Gn_threshold = 1e-2
-        self._decrease_chi2_threshold_for_width_elimination = True
+        self._decrease_chi2_threshold_for_width_elimination = False
 
         ### elimination options
         self._fitpar_elim = [1,0,1]
         self._chi2_allowed = kwargs.get('chi2_allowed', 0)
-        self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
-        self._greedy_mode = kwargs.get('greedy_mode', False) # by default False  - search all solutions
+        self._greedy_mode = kwargs.get('greedy_mode', False)
 
         self._interm_fit_max_iter = kwargs.get('interm_fit_max_iter', 20)
         self._interm_fit_step_thr = kwargs.get('interm_fit_step_thr', 0.01)
 
+        self._LevMarV0_priorpassed = kwargs.get('LevMarV0_priorpassed', 0.01)
         self._start_deep_fit_from = kwargs.get('start_deep_fit_from', np.inf) 
         self._deep_fit_max_iter = kwargs.get('deep_fit_max_iter', 20)
         self._deep_fit_step_thr = kwargs.get('deep_fit_step_thr', 0.01)
         self._start_fudge_for_deep_stage = kwargs.get('start_fudge_for_deep_stage', 0.1)
 
-        self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', False)              # by default does not stop
-        self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1])  # by default vary this vars on the final stage of the elim for current level
+        self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', False)             
+        self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) 
 
         ### Other
         self._print_bool = True

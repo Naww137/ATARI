@@ -192,7 +192,7 @@ from ATARI.theory.resonance_statistics import wigner_LL
 from ATARI.ModelData.particle_pair import Particle_Pair
 
 def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonances_indices, 
-                   Wigner_informed=True, PorterThomas_informed=False):
+                   Wigner_informed=True, PorterThomas_informed=False, Elimits = (0)):
     
     # Getting internal ladder:
     # fixed_resonances_indices = res_ladder[res_ladder['E'].isin(fixed_res_energies)].index.tolist()

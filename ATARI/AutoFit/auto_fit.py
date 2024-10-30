@@ -44,6 +44,12 @@ class AutoFitOPT:
     use_1std_rule                   : bool  = True
     final_fit_to_0_res              : bool  = False
 
+    ### Resonance Statistics
+    Wigner_informed_cross_validation        : bool = False
+    PorterThomas_informed_cross_validation  : bool = False
+    
+
+
 
 
 class AutoFit:
@@ -94,7 +100,7 @@ class AutoFit:
 
 
     def fit(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
-
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
         if len(resonance_ladder) == len(fixed_resonance_indices):
             assert np.all(resonance_ladder.index == fixed_resonance_indices)
@@ -103,7 +109,7 @@ class AutoFit:
             if self.options.save_elimination_history:
                 self.output.elimination_history = None
             solve_prior = Solver_factory(self.rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data)
-            sammyOUT = solve_prior.fit(resonance_ladder, [])
+            sammyOUT = solve_prior.fit(resonance_ladder)
             sammyOUT.pw_post = sammyOUT.pw; sammyOUT.par_post = sammyOUT.par; sammyOUT.chi2_post = sammyOUT.chi2; sammyOUT.chi2n_post = sammyOUT.chi2n
             self.output.final_samout = sammyOUT
             return self.output
@@ -139,10 +145,10 @@ class AutoFit:
         if self.options.print_bool:
             print(f"=============\nFitting to {Nres_target} Resonances\n=============")
             
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder, external_resonance_indices=fixed_resonance_indices)
+        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options, particle_pair=self.particle_pair)
+        initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonances_df=fixed_resonances)
+        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
 
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
@@ -201,6 +207,7 @@ class AutoFit:
 
     def get_cross_validation_score(self, input_arguement):
         evaluation_data_train, evaluation_data_test, resonance_ladder, fixed_resonance_indices = input_arguement
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(resonance_ladder, fixed_resonance_indices)
         
         # set RTO options if in parallel
         if self.options.parallel_CV:
@@ -217,21 +224,27 @@ class AutoFit:
         solver_test = Solver_factory(rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test)
 
         # fit and eliminate
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder,external_resonance_indices=fixed_resonance_indices)
+        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options, particle_pair=self.particle_pair)
+        initial_samout = fe.initial_fit(resonance_ladder,fixed_resonance_ladder=fixed_resonance_ladder)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonances_df=fixed_resonances)#, target_ires=len(fixed_resonances))
+        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances)#, target_ires=len(fixed_resonances))
 
         # get test and train scores
         test_scores, train_scores, ires = [], [], []
         for key, val in elimination_history.items():
+            res_ladder = val['selected_ladder_chars'].par_post
+            # Train
             N_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
-            train_scores.append(np.sum(val['selected_ladder_chars'].chi2_post)/N_train)
-
-            test_out = solver_test.fit(val['selected_ladder_chars'].par_post, [])
+            chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)
+            obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
+            train_scores.append(obj_train/N_train)
+            # Test
+            test_out = solver_test.fit(res_ladder)
             N_test = len(test_out.pw[0])
-
-            test_scores.append(np.sum(test_out.chi2)/N_test)
+            chi2_test = np.sum(test_out.chi2)
+            obj_test = objective_func(chi2_test, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
+            test_scores.append(obj_test/N_test)
+            # ires
             ires.append(key)
 
         return (test_scores, train_scores, ires)

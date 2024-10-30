@@ -507,7 +507,8 @@ class FitAndEliminate:
 
             if (self.options.greedy_mode):
                 initial_feature_bank = initial_feature_bank.sort_values(by='Gn1') # sort ladder by Gn - to del smallest res. first
-                initial_feature_bank.reset_index(drop=True, inplace=True)
+            
+            initial_feature_bank.reset_index(drop=True, inplace=True)
 
             ### Identify fixed resonances
             if (fixed_resonance_ladder.shape[0] > 0):

@@ -180,6 +180,6 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
             assert(np.all([each in external_resonance_ladder.keys() for each in initial_resonance_ladder.keys()]))
     else:
         external_resonance_ladder = pd.DataFrame()
-    initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
+    # initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
 
-    return initial_resonance_ladder, external_resonance_indices
+    return initial_resonance_ladder, external_resonance_ladder

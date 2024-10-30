@@ -432,14 +432,29 @@ class FitAndEliminate:
 
         input_ladder_chars.pw_post = input_ladder_chars.pw
         
-        model_history[ladder.shape[0]-fixed_res_df.shape[0]] = {
-                
+        input_obj_stopping_criteria = {}
+        input_ladder_chi2 = sum(input_ladder_chars.chi2)
+        fixed_res_energies = fixed_res_df["E"].tolist() # Extract energies from fixed_side_resonances
+        for Wigner_informed_stopping_criteria in (False, True):
+            for PorterThomas_informed_stopping_criteria in (False, True):
+                obj_stopping_criteria = objective_func(input_ladder_chi2, input_ladder_chars.par, self.particle_pair, fixed_res_energies,
+                                                        Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
+                obj_type = 'chi2'
+                if Wigner_informed_stopping_criteria:
+                    obj_type += '+Wig'
+                if PorterThomas_informed_stopping_criteria:
+                    obj_type += '+PT'
+                input_obj_stopping_criteria[obj_type] = obj_stopping_criteria
+
+        input_num_res = ladder.shape[0]-fixed_res_df.shape[0]
+        model_history[input_num_res] = {
                 'input_ladder' : ladder,
                 'selected_ladder_chars': input_ladder_chars, # solution with min chi2 on this level
                 'any_model_passed_test': True, # any model on this level of N-1 res..
                 'final_model_passed_test': True,
                 'level_time': 0,
-                'total_time': time.time() - start_time
+                'total_time': time.time() - start_time,
+                'objective_value_stopping_criteria': input_obj_stopping_criteria,
             }
         
         if (self.options.print_bool): 
@@ -474,6 +489,7 @@ class FitAndEliminate:
                     print('Indexes of fixed resonances for current level:')
                     print(fixed_resonances_indices)
             else:
+                fixed_res_energies = []
                 fixed_resonances = pd.DataFrame()
                 fixed_resonances_indices=[]
 
@@ -655,7 +671,6 @@ class FitAndEliminate:
                 print()
 
             ### save model data, and continue or break while loop
-            current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]
             deep_obj_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
@@ -668,6 +683,7 @@ class FitAndEliminate:
                         obj_type += '+PT'
                     deep_obj_stopping_criteria[obj_type] = obj_stopping_criteria
                     
+            current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_res_df.shape[0]
             model_history[current_num_of_res_wo_sides] = {
                 'input_ladder' : ladder,
                 'selected_ladder_chars': selected_ladder_chars, # solution with min chi2 on this level

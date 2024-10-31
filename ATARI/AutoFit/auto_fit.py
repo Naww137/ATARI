@@ -233,14 +233,14 @@ class AutoFit:
         test_scores, train_scores, ires = [], [], []
         for key, val in elimination_history.items():
             res_ladder = val['selected_ladder_chars'].par_post
-            # Train
+            test_out = solver_test.fit(res_ladder)
+            N_test = len(test_out.pw[0])
             N_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
+            # Train
             chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)/N_train*(N_train+N_test)
             obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
             train_scores.append(obj_train)
             # Test
-            test_out = solver_test.fit(res_ladder)
-            N_test = len(test_out.pw[0])
             chi2_test = np.sum(test_out.chi2)/N_test*(N_train+N_test)
             obj_test = objective_func(chi2_test, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
             test_scores.append(obj_test)

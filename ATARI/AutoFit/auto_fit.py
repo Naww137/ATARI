@@ -99,8 +99,8 @@ class AutoFit:
         self.output = AutoFitOUT()
 
 
-    def fit(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
-        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(resonance_ladder, fixed_resonance_indices)
+    def fit(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
         if len(resonance_ladder) == len(fixed_resonance_indices):
             assert np.all(resonance_ladder.index == fixed_resonance_indices)
@@ -117,7 +117,7 @@ class AutoFit:
         ### Run CV
         if self.options.print_bool:
             print("=============\nRunning Cross Validation\n=============")
-        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
+        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
         try:
             save_ires = np.array(save_ires)
             test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
@@ -159,7 +159,7 @@ class AutoFit:
         return self.output
 
 
-    def cross_validation(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
+    def cross_validation(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
 
         ### Split CV data
         if True: #measurement_wise
@@ -182,7 +182,7 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
+            multi_input = [(train, test, total_resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 results = pool.map(self.get_cross_validation_score, multi_input)
             ## Pull results
@@ -196,7 +196,7 @@ class AutoFit:
         else:
             save_test_scores, save_train_scores, save_ires = [], [], []
             for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
-                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, resonance_ladder, fixed_resonance_indices))
+                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices))
                 save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
 
         # if save:
@@ -206,8 +206,8 @@ class AutoFit:
     
 
     def get_cross_validation_score(self, input_arguement):
-        evaluation_data_train, evaluation_data_test, resonance_ladder, fixed_resonance_indices = input_arguement
-        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(resonance_ladder, fixed_resonance_indices)
+        evaluation_data_train, evaluation_data_test, total_resonance_ladder, fixed_resonance_indices = input_arguement
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         
         # set RTO options if in parallel
         if self.options.parallel_CV:

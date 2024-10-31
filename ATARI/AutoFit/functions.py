@@ -6,7 +6,7 @@ from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.atario import add_Gw_from_gw
 
 
-def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, starting_Gg_multiplier, starting_Gn1_multiplier):
+def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function):
 
     if len(res_par_avg["Ls"]) > 1:
             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
@@ -19,12 +19,26 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, startin
     max_Elam = max(energy_range) + Gt99_min_max[0]/10e3
     min_Elam = min(energy_range) - Gt99_min_max[1]/10e3
 
+    # get energies and spin info
+    if do_dE_function:
+        x_start = min_Elam; x_end = max_Elam
+        d_start = 0.8; d_end = 2.0
+        Er = [x_start]
+        x = x_start
+        while x < x_end:
+            t = (x - x_start) / (x_end - x_start)
+            d = d_start + t * (d_end - d_start)
+            x += d
+            Er.append(x)
+        Er = np.array(Er)
+        num_Er = len(Er)
+    else:
+        Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+
     # get widths
     gg2 = np.repeat(res_par_avg["<gg2>"], num_Er)*starting_Gg_multiplier
     gn2 = np.repeat(res_par_avg['quantiles']["gn01"], num_Er)*starting_Gn1_multiplier
     
-    # get energies and spin info
-    Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
     J_ID = np.repeat(res_par_avg["J_ID"], num_Er)
     Jpi = np.repeat(res_par_avg['Jpi'], num_Er)
     Ls = np.repeat(res_par_avg['Ls'], num_Er)
@@ -62,7 +76,8 @@ def get_starting_feature_bank(energy_range,
                             starting_Gn1_multiplier = 1, 
                             varyE = 0,
                             varyGg = 0,
-                            varyGn1 = 1
+                            varyGn1 = 1,
+                            do_dE_function = False
                             ):
     # setup energy grid
     if num_Elam is None:
@@ -72,7 +87,7 @@ def get_starting_feature_bank(energy_range,
 
     Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
     for sg in spin_groups:
-        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier)
+        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function)
         Er.append(Er_1); gg2.append(gg2_1); gn2.append(gn2_1); J_ID.append(J_ID_1); Jpi.append(Jpi_1); L.append(L_1)
     Er = np.concatenate(Er)
     gg2 = np.concatenate(gg2)
@@ -151,7 +166,7 @@ def get_LL_by_parameter(ladder,
 
 
 
-def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None):
+def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None, do_dE_function=False):
 
     ### setup spin groups
     if initialFBopt.fit_all_spin_groups:
@@ -167,7 +182,8 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
                                                         num_Elam= initialFBopt.num_Elam,
                                                         Elam_shift = initialFBopt.Elam_shift,
                                                         starting_Gg_multiplier = initialFBopt.starting_Gg_multiplier,
-                                                        starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier)
+                                                        starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier,
+                                                        do_dE_function = do_dE_function)
 
     ### setup external resonances
     if initialFBopt.external_resonances:

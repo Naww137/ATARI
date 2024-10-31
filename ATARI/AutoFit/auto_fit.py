@@ -103,13 +103,13 @@ class AutoFit:
         resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
         if len(total_resonance_ladder) == len(fixed_resonance_indices):
-            assert np.all(resonance_ladder.index == fixed_resonance_indices)
+            assert np.all(total_resonance_ladder.index == fixed_resonance_indices)
             if self.options.print_bool:
                 print(f"=============\nResonance ladder is all fixed\n=============")
             if self.options.save_elimination_history:
                 self.output.elimination_history = None
             solve_prior = Solver_factory(self.rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data)
-            sammyOUT = solve_prior.fit(resonance_ladder)
+            sammyOUT = solve_prior.fit(total_resonance_ladder)
             sammyOUT.pw_post = sammyOUT.pw; sammyOUT.par_post = sammyOUT.par; sammyOUT.chi2_post = sammyOUT.chi2; sammyOUT.chi2n_post = sammyOUT.chi2n
             self.output.final_samout = sammyOUT
             return self.output

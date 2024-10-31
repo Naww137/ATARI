@@ -257,8 +257,6 @@ def sample_true_neutron_spectrum(spectrum_df, cycles=35, mon_unc=0.0160*2):
 
 
 
-
-
 def regroup(tof, c, grouping_factors, compression_points):
 
     if len(compression_points) != 0:

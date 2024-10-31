@@ -10,9 +10,10 @@ from ATARI.theory.scattering_params import FofE_recursive
 
 from ATARI.sammy_interface import sammy_functions, sammy_io
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputData, SammyOutputData
-from ATARI.sammy_interface.convert_u_p_params import convert_deriv_du2dp
+from ATARI.sammy_interface.convert_u_p_params import convert_deriv_du2dp, get_Pu_vec_from_reslad
 
-def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_theo_trans:bool=False, u_or_p='u'):
+
+def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_theo:bool=False, u_or_p='u'):
     """
     Gets derivatives from SAMMY.
 
@@ -22,8 +23,8 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
         The SAMMY input data object.
     sammyRTO : SammyRunTimeOptions
         The SAMMY runtime options object.
-    find_theo_trans : bool
-        If true, SAMMY finds the theoretical transmission and uncertainty. Default is False.
+    get_theo : bool
+        If true, SAMMY finds the theory value and uncertainty with an additional sammy call. Default is False.
     u_or_p : 'u' or 'p'
         Decides between using SAMMY defined u-parameters or p-parameters.
 
@@ -44,7 +45,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
                  sammyINP.initial_parameter_uncertainty,
                  os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PAR'))
     # making templates:
-    sammy_io.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
+    sammy_io.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
     # making sammy input file:
     sammy_io.write_saminp(
                         filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
@@ -67,11 +68,27 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
                                        sammyRTO, 
                                        use_RPCM=False, 
                                        use_IDC=False)
-    # Executing sammy and reading outputs:
-    # if sammyRTO.recursive == True:
-    #     raise NotImplementedError('Recursive SAMMY has not been implemented.')
+    # runsammy
     lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO)
     derivs_dict = sammy_functions.readpds(os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PDS'))
+
+    ### sort derivatives based on resonance_ladder order
+    pu_reslad = get_Pu_vec_from_reslad(sammyINP.resonance_ladder,sammyINP.particle_pair)
+    pu_derivs = np.array(derivs_dict["U"]).reshape(-1,3)
+    ider = []
+    for row in pu_reslad.reshape(-1,3):
+        for i, drow in enumerate(pu_derivs):
+            if np.all(np.isclose(row,drow, atol=1e-3)):
+                ider.extend([i*3,i*3+1,i*3+2])
+                break                                           # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
+    assert(len(ider) == len(sammyINP.resonance_ladder)*3)
+    if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-3)):
+        maxdiff = np.max( abs(np.array(derivs_dict["U"])[ider] - pu_reslad))
+        print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {maxdiff}")
+    
+    derivs_dict["PARTIAL_DERIVATIVES"] = derivs_dict["PARTIAL_DERIVATIVES"][:, ider]
+
+    # convert to p if necessary
     if   u_or_p == 'p':
         derivs_dict['PARTIAL_DERIVATIVES'] = convert_deriv_du2dp(derivs_dict['PARTIAL_DERIVATIVES'], sammyINP.resonance_ladder)[0]
     elif u_or_p == 'u':
@@ -79,35 +96,20 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, find_
     else:
         raise ValueError('"u_or_p" can only be "u" or "p".')
     
-    if find_theo_trans: # if we also need the theoretical value, run sammy again and get theoretical value
-        sammy_functions.fill_runDIR_with_templates(sammyINP.template, "sammy.inp", sammyRTO.sammy_runDIR)
-        sammy_functions.write_saminp(
-                                    filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
-                                    bayes       =   False,
-                                    iterations  =   sammyRTO.iterations,
-                                    formalism   =   sammyINP.particle_pair.formalism,
-                                    isotope     =   sammyINP.particle_pair.isotope,
-                                    M           =   sammyINP.particle_pair.M,
-                                    ac          =   sammyINP.particle_pair.ac*10,
-                                    reaction    =   sammyINP.experiment.reaction,
-                                    energy_range=   sammyINP.experiment.energy_range,
-                                    temp        =   sammyINP.experiment.temp,
-                                    FP          =   sammyINP.experiment.FP,
-                                    n           =   sammyINP.experiment.n,
-                                    use_IDC=False,
-                                    derivatives=False,
-                                    )
-        sammy_functions.write_shell_script(sammyINP, 
-                                        sammyRTO, 
-                                        use_RPCM=False, 
-                                        use_IDC=False)
-        lst_df, par_df, chi2, chi2n = sammy_functions.execute_sammy(sammyRTO)
+    ### assert that the data read into derivs dict is the same as in lst out
+    if sammyINP.experiment.reaction == "transmission":
+        assert(np.isclose(np.sum((lst_df.exp_trans - np.array(derivs_dict["DATA"]))**2), 0, atol=1e-8))
+        lst_df.theo_trans = np.array(derivs_dict["THEORY"])
+    elif sammyINP.experiment.reaction == "capture":
+        assert(np.isclose(np.sum((lst_df.exp_xs - np.array(derivs_dict["DATA"]))**2), 0, atol=1e-8))
+        lst_df.theo_xs = np.array(derivs_dict["THEORY"])
+
+    ### Collect sammy outputs and remove run directory if specified:
     sammy_OUT = SammyOutputData(pw=lst_df, 
                                 par=par_df,
                                 chi2=[chi2],
                                 chi2n=[chi2n],
                                 derivatives=derivs_dict['PARTIAL_DERIVATIVES'])
-    # Removing run directory if specified:
     if not sammyRTO.keep_runDIR:
         shutil.rmtree(sammyRTO.sammy_runDIR)
     return sammy_OUT
@@ -147,7 +149,8 @@ def find_interpolation_array(particle_pair, exp_model_T, sammyRTO:SammyRunTimeOp
                     exp_model_T.energy_grid = E_grid
                     sammyINP = SammyInputData(particle_pair,
                                               particle_pair.resonance_ladder,
-                                              os.path.realpath('template_T.inp'),
+                                            #   os.path.realpath('template_T.inp'),
+                                                exp_model_T.template,
                                               exp_model_T,
                                               energy_grid=exp_model_T.energy_grid)
                     sammy_out = get_derivatives(sammyINP, sammyRTO, find_theo_trans=True, u_or_p=u_or_p)

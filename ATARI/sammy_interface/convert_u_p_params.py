@@ -54,6 +54,26 @@ def g22u(g2):
 def du_dg2(g2):
     return 0.5 / np.sqrt(1e3 * abs(g2))
 
+
+# Conversion from a resonance ladder
+def get_Pu_vec_from_reslad(resonance_ladder, particle_pair):
+
+    E  = resonance_ladder['E'].to_numpy()
+    Gg = resonance_ladder['Gg'].to_numpy()
+    Gn = resonance_ladder['Gn1'].to_numpy()
+    J_ID = resonance_ladder['J_ID'].to_numpy(dtype=int)
+
+    L = np.zeros((len(particle_pair.spin_groups),), dtype=int)
+    for jpi, mean_params in particle_pair.spin_groups.items():
+        jid = mean_params['J_ID']
+        L[jid-1] = mean_params['Ls'][0]
+
+    ue = p2u_E(E)
+    ug = p2u_g(Gg)
+    un = p2u_n(Gn, E, L[J_ID-1], particle_pair)
+    return np.column_stack((ue, ug, un)).reshape(-1,)
+
+
 def convert_deriv_du2dp(df_du: np.array, 
                         ladder_df: pd.DataFrame):
     """

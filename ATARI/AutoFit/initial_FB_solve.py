@@ -4,8 +4,7 @@ from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
 import pandas as pd
 from copy import copy
-
-
+from ATARI.AutoFit import sammy_interface_bindings
 
 
 class InitialFBOPT:
@@ -78,43 +77,51 @@ class InitialFBOPT:
         Factor of Q01 neutron width used in initial feature bank.
     """
     def __init__(self, **kwargs):
-        self._external_resonances = True
 
+        ### IFB settings
+        self._external_resonances = True
+        self._fit_all_spin_groups = True
+        self._spin_group_keys = []
+        self._num_Elam = None
+        self._Elam_shift = 0
+        self._starting_Gg_multiplier = 1
+        self._starting_Gn1_multiplier = 50
+        # self._off_diag_covariance = False
+
+        ### Procedural settings
+        self._fitpar1 = [0,0,1]
+        self._fitpar2 = [1,1,1]
         self._width_elimination = True
         self._Gn_threshold = 1e-2
         self._decrease_chi2_threshold_for_width_elimination = True
 
-        self._max_steps = 50
-        self._iterations = 2
-        self._step_threshold = 0.001
-        self._step_threshold_lag = 1
+        # ### Solver 
+        # self._solver_options = None
+        # self._solver = "YW"
 
-        self._LevMar = True
-        self._LevMarV = 1.5
-        self._LevMarVd = 5
-
-        self._initial_parameter_uncertainty = 0.05
-
-        self._batch_fitpar = False
-        self._batch_fitpar_ifit = 10
-        self._steps_per_batch = 2
-        self._batch_fitpar_random = False
-
-        self._fitpar1 = [0,0,1]
-        self._fitpar2 = [1,1,1]
-        self._fit_all_spin_groups = True
-        self._spin_group_keys = []
-
-        self._num_Elam = None
-        self._starting_Gg_multiplier = 1
-        self._starting_Gn1_multiplier = 50
-
-
-
+        ### set kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
-    
 
+        # if self.solver_options is None:
+        #     if self.solver == "YW":
+        #         self.solver_options = sammy_classes.SolverOPTs_YW(
+        #                                             max_steps = 50,
+        #                                             iterations = 3,
+        #                                             step_threshold=0.001,
+        #                                             LevMar=True, LevMarV=1.5,LevMarVd=5,
+        #                                             maxF=2.0, minF=1e-5,
+        #                                             initial_parameter_uncertainty=0.05)
+        #     elif self.solver == "EXT":
+        #         self.solver_options = sammy_classes.SolverOPTs_EXT(
+        #                                             max_steps = 50,
+        #                                             step_threshold=0.001,
+        #                                             LevMar=True, LevMarV=1.5,LevMarVd=5,
+        #                                             maxF=1e-5, minF=1e-8,
+        #                                             alpha=1e-6, gaus_newton=True)
+
+
+    ### define repr
     def __repr__(self):
         string=''
         for prop in dir(self):
@@ -122,6 +129,29 @@ class InitialFBOPT:
                 string += f"{prop}: {getattr(self, prop)}\n"
         return string
     
+
+    ### Getters and setters for options
+
+    # @property
+    # def solver(self):
+    #     return self._solver
+    # @solver.setter
+    # def solver(self, solver):
+    #     if solver == "YW":
+    #         pass
+    #     elif solver == "EXT":
+    #         pass
+    #     else:
+    #         raise ValueError(f"Solver string {solver} not recognized")
+    #     self._solver = solver
+    
+    # @property
+    # def solver_options(self):
+    #     return self._solver_options
+    # @solver_options.setter
+    # def solver_options(self, solver_options):
+    #     self._solver_options = solver_options
+
     @property
     def width_elimination(self):
         return self._width_elimination
@@ -151,92 +181,6 @@ class InitialFBOPT:
         self._external_resonances = external_resonances
 
     @property
-    def max_steps(self):
-        return self._max_steps
-    @max_steps.setter
-    def max_steps(self, max_steps):
-        self._max_steps = max_steps
-
-    @property
-    def iterations(self):
-        return self._iterations
-    @iterations.setter
-    def iterations(self, iterations):
-        # if iterations < 1:
-        #     raise ValueError("iterations must be at least 1")
-        self._iterations = iterations
-
-    @property
-    def step_threshold(self):
-        return self._step_threshold
-    @step_threshold.setter
-    def step_threshold(self, step_threshold):
-        self._step_threshold = step_threshold
-    
-    @property
-    def step_threshold_lag(self):
-        return self._step_threshold_lag
-    @step_threshold_lag.setter
-    def step_threshold_lag(self, step_threshold_lag):
-        self._step_threshold_lag = step_threshold_lag
-
-    @property
-    def LevMar(self):
-        return self._LevMar
-    @LevMar.setter
-    def LevMar(self, LevMar):
-        self._LevMar = LevMar
-    
-    @property
-    def LevMarV(self):
-        return self._LevMarV
-    @LevMarV.setter
-    def LevMarV(self, LevMarV):
-        self._LevMarV = LevMarV
-
-    @property
-    def LevMarVd(self):
-        return self._LevMarVd
-    @LevMarVd.setter
-    def LevMarVd(self, LevMarVd):
-        self._LevMarVd = LevMarVd
-
-    @property
-    def initial_parameter_uncertainty(self):
-        return self._initial_parameter_uncertainty
-    @initial_parameter_uncertainty.setter
-    def initial_parameter_uncertainty(self, initial_parameter_uncertainty):
-        self._initial_parameter_uncertainty = initial_parameter_uncertainty
-
-    @property
-    def batch_fitpar(self):
-        return self._batch_fitpar
-    @batch_fitpar.setter
-    def batch_fitpar(self, batch_fitpar):
-        self._batch_fitpar = batch_fitpar
-
-    @property
-    def batch_fitpar_ifit(self):
-        return self._batch_fitpar_ifit
-    @batch_fitpar_ifit.setter
-    def batch_fitpar_ifit(self, batch_fitpar_ifit):
-        self._batch_fitpar_ifit = batch_fitpar_ifit
-
-    @property
-    def steps_per_batch(self):
-        return self._steps_per_batch
-    @steps_per_batch.setter
-    def steps_per_batch(self, steps_per_batch):
-        self._steps_per_batch = steps_per_batch
-
-    @property
-    def batch_fitpar_random(self):
-        return self._batch_fitpar_random
-    @batch_fitpar_random.setter
-    def batch_fitpar_random(self, batch_fitpar_random):
-        self._batch_fitpar_random = batch_fitpar_random
-
-    @property
     def fitpar2(self):
         return self._fitpar2
     @fitpar2.setter
@@ -264,13 +208,20 @@ class InitialFBOPT:
     def spin_group_keys(self, spin_group_keys):
         self._spin_group_keys = [float(each) for each in spin_group_keys]
 
-
     @property
     def num_Elam(self):
         return self._num_Elam
     @num_Elam.setter
     def num_Elam(self, num_Elam):
         self._num_Elam = num_Elam
+
+    @property
+    def Elam_shift(self):
+        """Shift in energy for all res. beginning from left border of the window (used for each spin group) """
+        return self._Elam_shift
+    @Elam_shift.setter
+    def Elam_shift(self, Elam_shift):
+        self._Elam_shift = Elam_shift
 
     @property
     def starting_Gg_multiplier(self):
@@ -285,9 +236,6 @@ class InitialFBOPT:
     @starting_Gn1_multiplier.setter
     def starting_Gn1_multiplier(self, starting_Gn1_multiplier):
         self._starting_Gn1_multiplier = starting_Gn1_multiplier
-
-
-
 
 
 
@@ -332,96 +280,36 @@ class InitialFBOUT:
 
 
 
-
 class InitialFB:
 
     def __init__(self,
-                 options: InitialFBOPT):
+                 solver: sammy_interface_bindings.Solver,
+                 options: InitialFBOPT,
+                 ):
         
+        self.solver = solver
         self.options = options
-        # if options.Fit:
-            # self.fit()
-
-
 
     def fit(self,
             particle_pair,
             energy_range,
-            datasets,
-            experiments,
-            covariance_data,
-            sammyRTO,
-            external_resonance_ladder = pd.DataFrame()#,
+            # datasets,
+            # experiments,
+            # covariance_data,
+            # sammyRTO,
+            external_resonance_ladder = None,
             # internal_resonance_ladder = None,
+            # experiments_no_pup = None,
+            # cap_norm_unc=0.0
             ):
-        
-        rto = copy(sammyRTO)
-        assert rto.bayes == True
 
-        ### setup spin groups
-        if self.options.fit_all_spin_groups:
-            spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
-        else:
-            assert len(self.options.spin_group_keys)>0
-            spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in self.options.spin_group_keys]
-        
-        ### generate intial_feature bank
-        initial_resonance_ladder = get_starting_feature_bank(energy_range,
-                                                            particle_pair,
-                                                            spin_groups,
-                                                            num_Elam= self.options.num_Elam,
-                                                            starting_Gg_multiplier = self.options.starting_Gg_multiplier,
-                                                            starting_Gn1_multiplier = self.options.starting_Gn1_multiplier, 
-                                                            varyE = self.options.fitpar1[0], 
-                                                            varyGg = self.options.fitpar1[1], 
-                                                            varyGn1 = self.options.fitpar1[2])
-    
-        ### setup external resonances
-        if self.options.external_resonances:
-            if external_resonance_ladder.empty:
-                external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_range, particle_pair)
-            else:
-                pass
-        else:
-            external_resonance_ladder = pd.DataFrame()
-        initial_resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(initial_resonance_ladder, external_resonance_ladder)
-
-        ### setup sammy inp
-        sammyINPyw = sammy_classes.SammyInputDataYW(
-            particle_pair = particle_pair,
-            resonance_ladder = initial_resonance_ladder,  
-
-            datasets= datasets,
-            experiments = experiments,
-            experimental_covariance= covariance_data, 
-            
-            max_steps = self.options.max_steps,
-            iterations = self.options.iterations,
-            step_threshold = self.options.step_threshold,
-            step_threshold_lag = self.options.step_threshold_lag,
-
-            LevMar = self.options.LevMar,
-            LevMarV = self.options.LevMarV,
-            LevMarVd = self.options.LevMarVd,
-
-            batch_fitpar = self.options.batch_fitpar,
-            batch_fitpar_ifit = self.options.batch_fitpar_ifit,
-            steps_per_batch = self.options.steps_per_batch,
-            batch_fitpar_random = self.options.batch_fitpar_random,
-
-            external_resonance_indices = external_resonance_indices,
-
-            minF = 1e-5,
-            maxF = 2.0,
-            initial_parameter_uncertainty = self.options.initial_parameter_uncertainty,
-            
-            autoelim_threshold = None,
-            LS = False,
-            )
+        initial_resonance_ladder, external_resonance_indices = get_initial_resonance_ladder(self.options, particle_pair, energy_range, external_resonance_ladder=external_resonance_ladder)
 
         ### Fit 1 on Gn only
         print("========================================\n\tFIT 1\n========================================")
-        outs_fit_1 = self.fit_and_eliminate(rto, sammyINPyw, external_resonance_indices)
+        print(f"Options to vary: {self.options.fitpar1}")
+
+        outs_fit_1 = self.fit_and_eliminate(initial_resonance_ladder, external_resonance_indices)
         # if save:
         #     self.outs_fit_Gn = outs_fit_Gn
         reslad_1 = copy(outs_fit_1[-1].par_post)
@@ -429,15 +317,16 @@ class InitialFB:
 
         ### Fit 2 on E and optionally Gg
         print("========================================\n\tFIT 2\n========================================")
+        print(f"Options to vary: {self.options.fitpar2}")
+
         internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(reslad_1, external_resonance_indices)
         internal_resonance_ladder = update_vary_resonance_ladder(internal_resonance_ladder, 
                                                                  varyE = self.options.fitpar2[0],
                                                                  varyGg = self.options.fitpar2[1],
                                                                  varyGn1 = self.options.fitpar2[2])
         reslad_1, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder, external_resonance_ladder)
-        sammyINPyw.resonance_ladder = reslad_1
 
-        outs_fit_2 = self.fit_and_eliminate(rto,sammyINPyw,external_resonance_indices)
+        outs_fit_2 = self.fit_and_eliminate(reslad_1, external_resonance_indices)
         
         return InitialFBOUT(outs_fit_1, outs_fit_2, external_resonance_indices)
     
@@ -445,14 +334,10 @@ class InitialFB:
 
 
 
-    def fit_and_eliminate(self, 
-               rto,
-               sammyINPyw,
-               external_resonance_indices
-               ):
+    def fit_and_eliminate(self, resonance_ladder, external_resonance_indices):
         
-        print(f"Initial solve from {len(sammyINPyw.resonance_ladder)-len(external_resonance_indices)} resonance features\n")
-        sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
+        print(f"Initial solve from {len(resonance_ladder)-len(external_resonance_indices)} resonance features\n")
+        sammyOUT_fit = self.solver.fit(resonance_ladder, external_resonance_indices)
         outs = [sammyOUT_fit]
 
         if self.options.width_elimination:
@@ -467,25 +352,15 @@ class InitialFB:
                     raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
                     if self.options.decrease_chi2_threshold_for_width_elimination:
-                        sammyINPyw.step_threshold *= 0.1
-                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neuton width")
+                        self.solver.sammyINP.step_threshold *= 0.1
+                    print(f"\n----------------------------------------\nEliminated {round(fraction_eliminated*100, 2)}% of resonance features based on neutron width")
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
-                    sammyINPyw.resonance_ladder = resonance_ladder
-                    sammyOUT_fit = sammy_functions.run_sammy_YW(sammyINPyw, rto)
+                    sammyOUT_fit = self.solver.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
             print(f"\nComplete after no neutron width features below threshold\n")
 
         return outs
     
-
-    def fit_E_Gn(self,
-                 rto,
-                 sammyINPyw):
-        
-
-        return
-
-
 
     # def report(self, string):
     #     if self.report_to_file:

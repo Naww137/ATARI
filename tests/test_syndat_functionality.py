@@ -7,8 +7,9 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
 from ATARI.ModelData.measurement_models.capture_yield_rpi import Capture_Yield_RPI
 
-from ATARI.syndat.control import syndatOPT, Syndat_Control
+from ATARI.syndat.control import Syndat_Control
 from ATARI.syndat.syndat_model import Syndat_Model
+from ATARI.syndat.data_classes import syndatOUT, syndatOPT
 from ATARI.syndat.tests import noise_distribution_test2, noise_distribution_test, no_sampling_returns_true_test
 # from ATARI.syndat.general_functions import approximate_neutron_spectrum_Li6det
 import unittest
@@ -323,7 +324,7 @@ class TestSyndatControl(unittest.TestCase):
         return
     
 
-    def test_save_samples_to_hdf5(self):
+    def test_samples_to_from_hdf5(self):
                 
         df_true_1 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
         df_true_2 = pd.DataFrame({'E': self.exp_model.energy_grid, 'tof':self.exp_model.tof_grid,'true': np.random.default_rng().uniform(0.1,1.0,len(self.exp_model.energy_grid)) })
@@ -373,8 +374,21 @@ class TestSyndatControl(unittest.TestCase):
             self.assertIsInstance(cov_data['diag_stat'], pd.DataFrame)
             self.assertIsInstance(cov_data['CovT'], pd.DataFrame)
 
-        if os.path.isfile(save_file):
-            os.remove(save_file)
+
+        # test building syndat out object from hdf5
+        for isample in range(3):
+            out_list = [syndatOUT.from_hdf5(save_file, isample, title) for title in ["1", "2", "3"]]
+            self.assertTrue(len(out_list) == len(self.syndat_models))
+            for each in out_list:
+                self.assertIsInstance(each, syndatOUT)
+                self.assertIsInstance(each.pw_reduced, pd.DataFrame)
+                self.assertIsInstance(each.par_true, pd.DataFrame)
+                self.assertIsInstance(each.title, str)
+                self.assertIsInstance(each.covariance_data, dict)
+                self.assertIsInstance(each.pw_raw, type(None))
+
+        # if os.path.isfile(save_file):
+        #     os.remove(save_file)
 
 
 # # class TestSyndatWithSammy(unittest.TestCase):

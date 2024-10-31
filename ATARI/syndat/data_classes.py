@@ -12,6 +12,8 @@ class syndatOUT:
         self._pw_raw = None
         self._covariance_data = {}
 
+        self._true_model_parameters = None
+
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -59,7 +61,7 @@ class syndatOUT:
         if sample_group in h5f:
             if 'par_true' in h5f[sample_group]:
                 check_par_true = True
-            if self.title in h5f[sample_group]:
+            if f'exp_dat_{self.title}' in h5f[sample_group]:
                 raise ValueError(f"Dataset titled {self.title} already exists in {sample_group}")
         h5f.close()
         
@@ -73,6 +75,27 @@ class syndatOUT:
         h5io.write_pw_reduced(filepath, isample, self.title, self.pw_reduced, cov_data=self.covariance_data)
         h5io.write_par(filepath, isample, self.par_true, "true")
 
+
+    @staticmethod
+    def from_hdf5(filepath, isample, title):  # Could make this also title, the loop over title outside of this dataclass
+        # sample_group = f'sample_{isample}'
+        ### check existing samples
+        # h5f = h5py.File(filepath, "r")
+        # if sample_group in h5f:
+        #     keys = h5f[sample_group].keys()
+        #     titles = ['_'.join(each.split('_')[2:]) for each in keys if each not in ['par_true']]
+        # h5f.close()
+
+        par_true = h5io.read_par(filepath, isample, 'true')
+        pw_reduced_df, cov_data = h5io.read_pw_reduced(filepath, isample, title)
+        syndat_out = syndatOUT(title = title, par_true = par_true, pw_reduced = pw_reduced_df, pw_raw = None, covariance_data = cov_data)
+        # syndat_out_list = []
+        # for title in titles:
+        #     pw_reduced_df, cov_data = h5io.read_pw_reduced(filepath, isample, title)
+        #     syndat_out = syndatOUT(title = title, par_true = par_true, pw_reduced = pw_reduced_df, pw_raw = None, covariance_data = cov_data)
+        #     syndat_out_list.append(syndat_out)
+            
+        return syndat_out
 
 
 
@@ -118,10 +141,11 @@ class syndatOPT:
         self._calculate_covariance = True
         self._explicit_covariance = False
         self._sampleTMP = True
-        # self._sampleTURP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
-        self._save_raw_data = False
+        
+        # self._save_raw_data = False
+        # self._saveTMP = False
 
         self._force_zero_to_1 = True
 
@@ -151,11 +175,11 @@ class syndatOPT:
         self._sampleTMP = sampleTMP
 
     # @property
-    # def sampleTURP(self):
-    #     return self._sampleTURP
-    # @sampleTURP.setter
-    # def sampleTURP(self, sampleTURP):
-    #     self._sampleTURP = sampleTURP
+    # def saveTMP(self):
+    #     return self._saveTMP
+    # @saveTMP.setter
+    # def saveTMP(self, saveTMP):
+    #     self._saveTMP = saveTMP
 
     @property
     def sampleTNCS(self):

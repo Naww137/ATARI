@@ -164,10 +164,11 @@ class capture_yield_rpi_parameters:
                     sampled_params[param_name] = (sample, 0.0)
                 if isinstance(param_values, pd.DataFrame):
                     new_c = np.random.poisson(param_values.ct)#, scale=param_values.dc)
+                    new_c[new_c==0] = 1
                     df = deepcopy(param_values)
                     df['ct'] = df['ct'].astype(float) # we are sampling counts as floats
-                    df.loc[:,'ct'] = new_c
-                    df.loc[:,'dct'] = np.sqrt(new_c)
+                    df['ct'] = new_c
+                    df['dct'] = np.sqrt(new_c)
                     sampled_params[param_name] = df
 
         return capture_yield_rpi_parameters(**sampled_params)
@@ -211,17 +212,29 @@ class Capture_Yield_RPI:
 
     def truncate_energy_range(self, new_energy_range):
         if min(new_energy_range) < min(self.model_parameters.background_spectrum_bg.E):
-            raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bg energy")
+            # raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bg energy")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing capture_yield_rpi.background_spectrum_bg energy {min(self.model_parameters.background_spectrum_bg.E)}")
+
         if max(new_energy_range) > max(self.model_parameters.background_spectrum_bg.E):
-            raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bg energy")
+            # raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bg energy")
+            print(f"WARNING: new energy max {max(new_energy_range)} is more than existing capture_yield_rpi.background_spectrum_bg energy {max(self.model_parameters.background_spectrum_bg.E)}")
+
         if min(new_energy_range) < min(self.model_parameters.incident_neutron_spectrum_f.E):
-            raise ValueError("new energy range is less than existing transmission_rpi.incident_neutron_spectrum_f energy")
+            # raise ValueError("new energy range is less than existing transmission_rpi.incident_neutron_spectrum_f energy")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing capture_yield_rpi.incident_neutron_spectrum_f energy {min(self.model_parameters.incident_neutron_spectrum_f.E)}")
+
         if max(new_energy_range) > max(self.model_parameters.incident_neutron_spectrum_f.E):
-            raise ValueError("new energy range is more than existing transmission_rpi.incident_neutron_spectrum_f energy")
+            # raise ValueError("new energy range is more than existing transmission_rpi.incident_neutron_spectrum_f energy")
+            print(f"WARNING: new energy max {max(new_energy_range)} is more than existing capture_yield_rpi.incident_neutron_spectrum_f energy {max(self.model_parameters.incident_neutron_spectrum_f.E)}")
+
         if min(new_energy_range) < min(self.model_parameters.background_spectrum_bf.E):
-            raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bf energy")
+            # raise ValueError("new energy range is less than existing transmission_rpi.background_spectrum_bf energy")
+            print(f"WARNING: new energy min {min(new_energy_range)} is less than existing capture_yield_rpi.background_spectrum_bf energy {min(self.model_parameters.background_spectrum_bf.E)}")
+
         if max(new_energy_range) > max(self.model_parameters.background_spectrum_bf.E):
-            raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bf energy")
+            # raise ValueError("new energy range is more than existing transmission_rpi.background_spectrum_bf energy")
+            print(f"WARNING: new energy max {max(new_energy_range)} is more than existing capture_yield_rpi.background_spectrum_bf energy {max(self.model_parameters.background_spectrum_bf.E)}")
+
         self.model_parameters.background_spectrum_bg =      self.model_parameters.background_spectrum_bg.loc[(self.model_parameters.background_spectrum_bg.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bg.E.values > min(new_energy_range))].copy()
         self.model_parameters.incident_neutron_spectrum_f = self.model_parameters.incident_neutron_spectrum_f.loc[(self.model_parameters.incident_neutron_spectrum_f.E.values < max(new_energy_range)) & (self.model_parameters.incident_neutron_spectrum_f.E.values > min(new_energy_range))].copy()
         self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[(self.model_parameters.background_spectrum_bf.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bf.E.values > min(new_energy_range))].copy()

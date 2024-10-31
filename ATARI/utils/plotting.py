@@ -17,6 +17,7 @@ def plot_reduced_data_T(datasets,
                       true_pars = pd.DataFrame(), 
                       prior_pars = pd.DataFrame(),
                       fit_pars = pd.DataFrame(),
+                      plot_datasets_true: bool = False,
                       title: str = '',
                       show_spingroups: bool = True,
                       xlim = None, 
@@ -24,39 +25,38 @@ def plot_reduced_data_T(datasets,
                       ):
 
     colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    alphas =[1.0, 0.75, 0.5, 0.25]
     fig = plt.figure(figsize=fig_size)
 
     for i, exp in enumerate(experiments):
         if exp.reaction == "transmission":
             model_key = "theo_trans"
         elif exp.reaction == "capture":
-            raise ValueError("Passed capture experiment to plot T")
+            print("Passed capture experiment to plot T, skipping")
+            continue
 
-        plt.errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
-                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+        plt.errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0, #f'{colors[i]}'
+                                                fmt='.', color='k', alpha=alphas[i], linewidth=0.25, markersize=3, capsize=1.0, label=exp.title) #exp.title
         
         if len(fits) != 0:
             if (len(fits_chi2) != 0):
                 fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
             else:
                 fit_label = f'{f_model_name} {exp.title}'
-            plt.plot(fits[i].E, fits[i][model_key], color='k', zorder=1, lw=1.5, label=fit_label) # colors[i]
-        
-        # if len(priors) != 0:
-        #     if (len(priors_chi2) != 0):
-        #         prior_label = f'{pr_model_name} {exp.title} ({priors_chi2[i]})'
-        #     else:
-        #         prior_label = f'{pr_model_name} {exp.title}'
+            plt.plot(fits[i].E, fits[i][model_key], color='b', alpha=alphas[i], zorder=1, lw=1.5)#, label=fit_label) # colors[i]
 
-        #     plt.plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5, label=prior_label)
+        if len(priors) != 0:
+            if (len(priors_chi2) != 0):
+                prior_label = f'{pr_model_name} {exp.title} ({priors_chi2[i]})'
+            else:
+                prior_label = f'{pr_model_name} {exp.title}'
+
+            plt.plot(priors[i].E, priors[i][model_key], '--', color='r',alpha=alphas[i], zorder=0, lw=1.5)#, label=prior_label)
         
-        # if len(true) != 0:
-        #     if (len(true_chi2) != 0):
-        #         true_label = f'{t_model_name} {exp.title} ({true_chi2[i]})'
-        #     else:
-        #         true_label = f'{t_model_name} {exp.title}'
-                
-        #     plt.plot(true[i].E, true[i][model_key], '-', color='green', zorder=1, alpha=0.5, lw=1.5, label=true_label)
+        if plot_datasets_true:
+            plt.plot(datasets[i].E, datasets[i]['true'], '-', color='r', zorder=5, alpha=1.0, lw=1.5, label="true")
+            # plt.plot(datasets[i].E, datasets[i]['true'], '-', color='b', zorder=5, alpha=1.0, lw=1.5, label="fit")
+            # plt.fill_between(datasets[i].E, datasets[i]['true']-datasets[i]['true']*0.05, datasets[i]['true']+datasets[i]['true']*0.05, color='b', zorder=6, alpha=0.25, lw=1.5, label="unc")
 
 
     # Set the y-axis limits with additional space for text and capture ymax before changing
@@ -129,15 +129,19 @@ def plot_reduced_data_T(datasets,
         add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(fits_chi2),3))
     
     # end additional info if present
-    plt.title(add_title, fontsize=10)
+    # plt.title(add_title, fontsize=10)
     
     # ### make it pretty
-    plt.ylabel("T")
+    plt.ylabel("Transmission")
     plt.xlabel("Energy (eV)")
-    plt.xscale('log')
+    # plt.xscale('log')
     plt.xlim(xlim)
     plt.ylim([-0.1,ymax])
-    plt.legend(fontsize='small', loc='lower right')
+    # plt.legend(fontsize='small', loc='lower right')
+    lines = ax.get_lines()
+    legend2 = ax.legend([lines[i] for i in [3,4,15]], ["Fit","Prior", r"$E_{\lambda}$"], loc="lower left")
+    ax.add_artist(legend2)
+    ax.legend(loc='lower right')
 
     fig.tight_layout()
 
@@ -274,7 +278,7 @@ def plot_reduced_data_Y(datasets,
     plt.xscale('log')
     plt.xlim(xlim)
     plt.ylim([-0.1,ymax])
-    plt.legend(fontsize='small', loc='lower right')
+    plt.legend(fontsize='small', loc='upper right')
 
     fig.tight_layout()
 
@@ -298,6 +302,7 @@ def plot_reduced_data_TY(datasets   :  list,
                       ):
 
     colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    alphas = [1.0, 0.75, 1.0,0.75, 0.5]
     fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
 
     for i, exp in enumerate(experiments):
@@ -311,14 +316,14 @@ def plot_reduced_data_TY(datasets   :  list,
             raise ValueError()
 
         axes[iax].errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
-                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+                                                fmt='.', color='k', alpha=alphas[i], linewidth=1.0, markersize=4, capsize=1, label=exp.title)#f'{colors[i]}'
         
         if len(fits) != 0:
             if (len(fits_chi2) != 0):
                 fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
             else:
                 fit_label = f'{f_model_name} {exp.title}'
-            axes[iax].plot(fits[i].E, fits[i][model_key], color='k', zorder=1, lw=1.5, label=fit_label) # colors[i]
+            axes[iax].plot(fits[i].E, fits[i][model_key], zorder=1, lw=1.5, color='b',alpha=alphas[i])#colors[i]) #marker='.') #color='k', label=fit_label,
         
         if len(priors) != 0:
             if (len(priors_chi2) != 0):
@@ -326,7 +331,7 @@ def plot_reduced_data_TY(datasets   :  list,
             else:
                 prior_label = f'{pr_model_name} {exp.title}'
 
-            axes[iax].plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5, label=prior_label)
+            axes[iax].plot(priors[i].E, priors[i][model_key], '--', color='r', zorder=0, lw=1.5, alpha=alphas[i])#, label=prior_label)
         
         if len(true) != 0:
             if (len(true_chi2) != 0):
@@ -405,39 +410,46 @@ def plot_reduced_data_TY(datasets   :  list,
         axes[1].axvline(x=res.E, color='orange', linestyle='--', linewidth=0.5, alpha=0.5)
 
         
-    axes[0].set_ylabel("T")
-    axes[1].set_ylabel(r"$Y_{\gamma}$")
+    axes[0].set_ylabel("Transmission")
+    axes[1].set_ylabel("Capture Yield")
 
     # set title
     fig.suptitle(title, fontsize=14)
     
     # additional info if present
-    add_title = ''
-    if (true_pars.shape[0]>0):
-        add_title+=''+r'$N_{'+f'{t_model_name}'+'}$ = '+str(true_pars.shape[0])
+    # # add_title = ''
+    # # if (true_pars.shape[0]>0):
+    # #     add_title+=''+r'$N_{'+f'{t_model_name}'+'}$ = '+str(true_pars.shape[0])
         
-    if (len(true_chi2)>0):
-        add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(true_chi2),3))
+    # # if (len(true_chi2)>0):
+    # #     add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(true_chi2),3))
 
-    if (prior_pars.shape[0]>0):
-        add_title+=', '+r'$N_{'+f'{pr_model_name}'+'}$ = '+str(prior_pars.shape[0])
-    if (len(priors_chi2)>0):
-        add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(priors_chi2),3))
+    # # if (prior_pars.shape[0]>0):
+    # #     add_title+=', '+r'$N_{'+f'{pr_model_name}'+'}$ = '+str(prior_pars.shape[0])
+    # # if (len(priors_chi2)>0):
+    # #     add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(priors_chi2),3))
 
-    if (fit_pars.shape[0]>0):
-        add_title+=', '+r'$N_{'+f'{f_model_name}'+'}$ = '+str(fit_pars.shape[0])
-    if (len(fits_chi2)>0):
-        add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(fits_chi2),3))
+    # # if (fit_pars.shape[0]>0):
+    # #     add_title+=', '+r'$N_{'+f'{f_model_name}'+'}$ = '+str(fit_pars.shape[0])
+    # # if (len(fits_chi2)>0):
+    # #     add_title+=', $\sum_{ds}\chi^2$ = '+str(np.round(np.sum(fits_chi2),3))
     
-    # end additional info if present
-    axes[0].set_title(add_title, fontsize=10)
+    # # end additional info if present
+    # axes[0].set_title(add_title, fontsize=10)
     
     # ### make it pretty
     for ax in axes:
         ax.set_xscale('log')
         ax.set_ylim([-0.2,1.2])
         ax.set_xlim(xlim)
-        ax.legend(fontsize='small', loc='lower right')
+        # ax.legend(fontsize='small', loc='lower right')
+    
+    # lines = axes[1].get_lines()
+    # legend2 = axes[1].legend([lines[i] for i in [3,4,10]], ["Fit","Prior", r"$E_{\lambda}$"], loc="upper center")
+    # axes[1].add_artist(legend2)
+    axes[0].legend(loc='lower right')
+    # axes[1].legend(loc='upper right')
+
 
     fig.supxlabel('Energy (eV)')
     fig.tight_layout()
@@ -472,7 +484,7 @@ def plot_datafits(datasets, experiments,
             raise ValueError()
 
         axes[iax].errorbar(datasets[i].E, datasets[i].exp, yerr=datasets[i].exp_unc, zorder=0,
-                                                fmt='.', color=f'{colors[i]}', alpha=0.5, linewidth=1.0, markersize=4, capsize=1, label=exp.title)
+                                                fmt='.', color=f'{colors[i]}', alpha=1.0, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
         
         if len(fits) != 0:
             if (len(fits_chi2) != 0):
@@ -601,3 +613,257 @@ def plot_datafits(datasets, experiments,
     fig.tight_layout()
 
     return fig
+
+
+
+
+def plot_datafits_compiled(experimental_dataframes, 
+                           experiments, 
+                            model_names = [],
+                            model_pars = [],
+                            title: str = '',
+                            show_spingroups: bool = True,
+                            fig_size : tuple = (6,4)
+                            ):
+
+    colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
+
+    for i, exp in enumerate(experiments):
+        if exp.reaction == "transmission":
+            iax = 0
+        elif exp.reaction == "capture":
+            iax = 1
+        else:
+            raise ValueError()
+
+        axes[iax].errorbar(experimental_dataframes[i].E, experimental_dataframes[i].exp, yerr=experimental_dataframes[i].exp_unc, zorder=0,
+                                                fmt='.', color='k', alpha=0.75, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
+        
+        for imod, mod in enumerate(model_names):
+            # fit_label = f'{f_model_name} {exp.title} ({fits_chi2[i]})'
+            model_key = f"theo_{mod}"
+            if i == len(experiments)-1:
+                axes[iax].plot(experimental_dataframes[i].E, experimental_dataframes[i][model_key], color=colors[imod], zorder=1, lw=1.5, label=mod) # colors[i]
+            else:
+                axes[iax].plot(experimental_dataframes[i].E, experimental_dataframes[i][model_key], color=colors[imod], zorder=1, lw=1.5)#, label=mod) # colors[i]
+        
+    # Set the y-axis limits with additional space for text and capture ymax before changing
+    
+    y_top_padding = 0.1 
+    x_offset = 0.05
+
+    ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+    for ax in axes:
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + y_top_padding)
+
+
+        
+    axes[0].set_ylabel("T")
+    axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+    # set title
+    fig.suptitle(title, fontsize=14)
+    
+    # end additional info if present
+    # axes[0].set_title(add_title, fontsize=10)
+    
+
+    # ### make it pretty
+    for ax in axes:
+        # ax.set_xlim([200,250])
+        ax.set_ylim([-0.1,1.1])
+        ax.legend(fontsize='small', loc='lower right')
+
+    fig.supxlabel('Energy (eV)')
+    fig.tight_layout()
+
+    return fig
+
+
+
+
+def plot_sammy_pw(sammy_pw_lists, experiments, 
+                priors=[],
+                pars = pd.DataFrame(), 
+                # prior_pars = pd.DataFrame(),
+                # fit_pars = pd.DataFrame(),
+                title: str = '',
+                show_spingroups: bool = True,
+                fig_size : tuple = (6,4)
+                ):
+
+    colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+    fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
+
+    for i, exp in enumerate(experiments):
+        if exp.reaction == "transmission":
+            model_key = "theo_trans"
+            exp_key = "exp_trans"
+            iax = 0
+        elif exp.reaction == "capture":
+            model_key = "theo_xs"
+            exp_key = "exp_xs"
+            iax = 1
+        else:
+            raise ValueError()
+
+        axes[iax].errorbar(sammy_pw_lists[i].E, sammy_pw_lists[i][exp_key], yerr=sammy_pw_lists[i][f"{exp_key}_unc"], zorder=0,
+                                                fmt='.', color=f'{colors[i]}', alpha=1.0, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
+        
+        axes[iax].plot(sammy_pw_lists[i].E, sammy_pw_lists[i][f"{model_key}"], color='red', zorder=1, lw=1.5) #, label=fit_label) # colors[i]
+
+        if len(priors) != 0:
+            axes[iax].plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5) #, label=prior_label)
+    
+    y_top_padding = 0.1 
+    x_offset = 0.05
+
+    ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+    for ax in axes:
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax + y_top_padding)
+
+    font_size = 8
+    y_text_shift = 0.01  # Adjust as needed, related to font size
+    y_text_positions = [ymax_values[0], ymax_values[1]]
+
+    # show vertical lines for energies
+    
+    # fits
+    for index, res in pars.iterrows():
+        res_E = res.E
+        # Add vertical lines at the resonance energies to both subplots
+        axes[0].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+        axes[1].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+
+        if (show_spingroups):
+            # add txt with
+            sp_gr_txt = np.round(int(res.J_ID),0)
+            
+            y_text_position = ymax  # Position the text at the top of the original y-axis limit
+            x_text_position = res_E + x_offset
+            
+            # Show the text to the right of the line
+            for i, ax in enumerate(axes):
+                y_text_position = ymax_values[i]  # Use original ymax for text position
+                #ax.text(x_text_position, y_text_position, str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=8)
+
+                ax.text(res_E, y_text_positions[i], str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=font_size)
+                y_text_positions[i] -= y_text_shift
+
+
+    axes[0].set_ylabel("T")
+    axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+    # set title
+    fig.suptitle(title, fontsize=14)
+    
+    # # end additional info if present
+    # axes[0].set_title(add_title, fontsize=10)
+    
+
+    # ### make it pretty
+    for ax in axes:
+        # ax.set_xlim([200,250])
+        ax.set_ylim([-0.1,1.1])
+        ax.legend(fontsize='small', loc='lower right')
+
+    fig.supxlabel('Energy (eV)')
+    fig.tight_layout()
+
+    return fig
+
+
+# def plot_theo(sammy_pw_lists, experiments, 
+#             priors=[],
+#             pars = pd.DataFrame(), 
+#             # prior_pars = pd.DataFrame(),
+#             # fit_pars = pd.DataFrame(),
+#             title: str = '',
+#             show_spingroups: bool = True,
+#             fig_size : tuple = (6,4)
+#                 ):
+
+#     colors = ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+#     fig, axes = plt.subplots(2,1, figsize=fig_size, sharex=True)
+
+#     for i, exp in enumerate(experiments):
+#         if exp.reaction == "transmission":
+#             model_key = "theo_trans"
+#             exp_key = "exp_trans"
+#             iax = 0
+#         elif exp.reaction == "capture":
+#             model_key = "theo_xs"
+#             exp_key = "exp_xs"
+#             iax = 1
+#         else:
+#             raise ValueError()
+
+#         axes[iax].errorbar(sammy_pw_lists[i].E, sammy_pw_lists[i][exp_key], yerr=sammy_pw_lists[i][f"{exp_key}_unc"], zorder=0,
+#                                                 fmt='.', color=f'{colors[i]}', alpha=1.0, linewidth=1.0, markersize=1, capsize=1, label=exp.title)
+        
+#         axes[iax].plot(sammy_pw_lists[i].E, sammy_pw_lists[i][f"{model_key}"], color='red', zorder=1, lw=1.5) #, label=fit_label) # colors[i]
+
+#         if len(priors) != 0:
+#             axes[iax].plot(priors[i].E, priors[i][model_key], '--', color='orange', zorder=0, lw=1.5) #, label=prior_label)
+    
+#     y_top_padding = 0.1 
+#     x_offset = 0.05
+
+#     ymax_values = [ax.get_ylim()[1] for ax in axes]  # Store original ymax values for each axis
+#     for ax in axes:
+#         ymin, ymax = ax.get_ylim()
+#         ax.set_ylim(ymin, ymax + y_top_padding)
+
+#     font_size = 8
+#     y_text_shift = 0.01  # Adjust as needed, related to font size
+#     y_text_positions = [ymax_values[0], ymax_values[1]]
+
+#     # show vertical lines for energies
+    
+#     # fits
+#     for index, res in pars.iterrows():
+#         res_E = res.E
+#         # Add vertical lines at the resonance energies to both subplots
+#         axes[0].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+#         axes[1].axvline(x=res_E, color='red', linestyle='--', linewidth=0.5, alpha=0.3)
+
+#         if (show_spingroups):
+#             # add txt with
+#             sp_gr_txt = np.round(int(res.J_ID),0)
+            
+#             y_text_position = ymax  # Position the text at the top of the original y-axis limit
+#             x_text_position = res_E + x_offset
+            
+#             # Show the text to the right of the line
+#             for i, ax in enumerate(axes):
+#                 y_text_position = ymax_values[i]  # Use original ymax for text position
+#                 #ax.text(x_text_position, y_text_position, str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=8)
+
+#                 ax.text(res_E, y_text_positions[i], str(sp_gr_txt), color='red', verticalalignment='bottom', fontsize=font_size)
+#                 y_text_positions[i] -= y_text_shift
+
+
+#     axes[0].set_ylabel("T")
+#     axes[1].set_ylabel(r"$Y_{\gamma}$")
+
+#     # set title
+#     fig.suptitle(title, fontsize=14)
+    
+#     # # end additional info if present
+#     # axes[0].set_title(add_title, fontsize=10)
+    
+
+#     # ### make it pretty
+#     for ax in axes:
+#         # ax.set_xlim([200,250])
+#         ax.set_ylim([-0.1,1.1])
+#         ax.legend(fontsize='small', loc='lower right')
+
+#     fig.supxlabel('Energy (eV)')
+#     fig.tight_layout()
+
+
+    

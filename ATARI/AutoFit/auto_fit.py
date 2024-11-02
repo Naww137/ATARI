@@ -16,6 +16,7 @@ class CrossValidationOUT:
     ires                : Optional[np.ndarray]  = None
     train_scores        : Optional[np.ndarray]  = None
     test_scores         : Optional[np.ndarray]  = None
+    elimination_histories : Optional[list[dict]] = None
 
 
 @dataclass
@@ -181,20 +182,36 @@ class AutoFit:
                 results = pool.map(self.get_cross_validation_score, multi_input)
             ## Pull results
             assert len(results) == kfolds
-            save_test_scores, save_train_scores, save_ires = [], [], []
+            save_test_scores, save_train_scores, save_ires, save_elim_hist = [], [], [], []
             for k in range(kfolds):
-                test_scores, train_scores, ires = results[k]
+                if self.options.save_CV_elimination_history:
+                    test_scores, train_scores, ires, elim_hist = results[k]
+                    save_elim_hist.append(elim_hist)
+                else:
+                    test_scores, train_scores, ires = results[k]
                 save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
 
         ### get CVE score in serial
         else:
-            save_test_scores, save_train_scores, save_ires = [], [], []
+            save_test_scores, save_train_scores, save_ires, save_elim_hist = [], [], [], []
             for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
-                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, resonance_ladder, fixed_resonance_indices))
+                results = self.get_cross_validation_score((train, test, resonance_ladder, fixed_resonance_indices))
+                
+                if self.options.save_CV_elimination_history:
+                    test_scores, train_scores, ires, elim_hist = results
+                    save_elim_hist.append(elim_hist)
+                else:
+                    test_scores, train_scores, ires = results
+
                 save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
 
-        # if save:
-        self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
+        
+        if self.options.save_CV_elimination_history:
+            self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores), elimination_histories=save_elim_hist)
+        else:
+            self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
+
+
 
         return save_test_scores, save_train_scores, save_ires, kfolds
     
@@ -234,4 +251,7 @@ class AutoFit:
             test_scores.append(np.sum(test_out.chi2)/N_test)
             ires.append(key)
 
-        return (test_scores, train_scores, ires)
+        if self.options.save_CV_elimination_history:
+            return (test_scores, train_scores, ires, elimination_history)
+        else:
+            return (test_scores, train_scores, ires)

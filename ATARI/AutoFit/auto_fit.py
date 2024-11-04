@@ -42,6 +42,7 @@ class AutoFitOPT:
     # other
     print_bool                      : bool  = True
     use_1std_rule                   : bool  = True
+    use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
 
     ### Resonance Statistics
@@ -120,7 +121,10 @@ class AutoFit:
         save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
         try:
             save_ires = np.array(save_ires)
-            test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
+            if self.options.use_MAD:
+                test = np.median(save_test_scores, axis=0);             test_std = 1.4826*np.median(np.abs(save_test_scores - test), axis=0)
+            else:
+                test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
         except:
             raise ValueError("Not all folds resulted in the same number of resonances - change greediness or update code")
         

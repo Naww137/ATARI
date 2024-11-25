@@ -73,6 +73,7 @@ def add_synthetic_data_samples(
             h5f.close()
 
         for i in isamples_new:
+            
             for exp in exp_titles:
                 syndat_out = syndatOUT.from_hdf5(syndat_sample_filepath, i, exp)
                 # filter parameter, pw_reduced, and covariance data frames
@@ -148,7 +149,7 @@ def add_model_fit(performance_test_filepath,
                 pw_reduced_df["E"] = pw_reduced_df["E"].round(6)
                 df["E"] = df["E"].round(6)
                 pw_reduced_df = pw_reduced_df.merge(df, on='E', how='outer', validate='1:1') # if overwrite, remove based on suffix
-                pw_reduced_df.to_hdf(performance_test_filepath, key=f"{sample_key}/exp_dat_{exp}/pw_reduced")
+                pw_reduced_df.to_hdf(performance_test_filepath, f"{sample_key}/exp_dat_{exp}/pw_reduced")
         else:
             print(f"Model {model_title} for sample {isample} exists already, overwrite set to False")
 
@@ -157,7 +158,7 @@ def add_model_fit(performance_test_filepath,
         h5io.write_par(performance_test_filepath, isample, par_df, model_title)
         for exp, df in exp_df_dict.items():
             df.rename(columns={df.keys()[1]: model_title}, inplace=True)
-            df.to_hdf(performance_test_filepath, key=f"{sample_key}/exp_dat_{exp}/pw_reduced")
+            df.to_hdf(performance_test_filepath, f"{sample_key}/exp_dat_{exp}/pw_reduced")
     
 
 
@@ -216,10 +217,10 @@ def add_fine_grid_doppler_only(performance_test_filepath,
                 if theo_df.empty:
                     print(theo_df, pw_df)
                     raise ValueError("theoretical dataframe did not merge properly")
-                theo_df.to_hdf(performance_test_filepath, key=f"sample_{isample}/theo_pw")
+                theo_df.to_hdf(performance_test_filepath, f"sample_{isample}/theo_pw")
 
         else:
             par_df = h5io.read_par(performance_test_filepath, isample, model_title)
             pw_df = fnorm.calc_theo_broad_xs_for_all_reaction(sammy_exe, particle_pair,  par_df,  energy_range, temperature, template,  reactions)
             pw_df.rename(columns=mapper, inplace=True)
-            pw_df.to_hdf(performance_test_filepath, key=f"sample_{isample}/theo_pw")
+            pw_df.to_hdf(performance_test_filepath, f"sample_{isample}/theo_pw")

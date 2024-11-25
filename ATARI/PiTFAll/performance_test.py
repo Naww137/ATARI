@@ -3,14 +3,13 @@ import h5py
 from ATARI.syndat.data_classes import syndatOUT
 from ATARI.PiTFAll import fnorm
 import ATARI.utils.hdf5 as h5io
-import ATARI.utils.plotting as myplot
 
 
 class PerformanceTest:
 
     def __init__(self, 
                  filepath, 
-                #  energy_region,
+                 energy_region,
                  syndat_sample_filepath = None
                  ):
         
@@ -21,7 +20,7 @@ class PerformanceTest:
             h5f.close()
             
         self.filepath = filepath
-        # self.energy_region = energy_region
+        self.energy_region = energy_region
         self.loaded_data = {}
 
         if syndat_sample_filepath is not None:

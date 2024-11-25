@@ -127,11 +127,10 @@ def get_window_dataframes(window_resonances, index_ranges, all_resonances):
     return window_dataframes
 
 ### poor man's parallel over windows
-def write_fitpy(basepath, threads=1, fixed_resonance_indices=[], main=False):
+def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
     assert isinstance(fixed_resonance_indices, list)
 
     with open(os.path.join(basepath, "fit.py"), 'w') as f:
-        
         f.write("""import os\n""")
         
         f.write(f"""os.environ['OMP_NUM_THREADS'] = str({threads})\n""")
@@ -143,17 +142,11 @@ def write_fitpy(basepath, threads=1, fixed_resonance_indices=[], main=False):
         f.write("""from ATARI.utils.atario import load_general_object, save_general_object\n""")
         f.write("""import pandas as pd\n""")
         f.write("""os.chdir(os.path.dirname(__file__))\n""")
-
         f.write("""autofit = load_general_object("autofit.pkl")\n""")
         f.write("""data = load_general_object("eval_data.pkl")\n""")
         f.write("""df = pd.read_csv("df.csv", index_col=0)\n""")
-        if main:
-            f.write("""if __name__ == "__main__":\n""")
-            f.write(f"""\tout = autofit.fit(data, df, fixed_resonance_indices={fixed_resonance_indices})\n""")
-            f.write("""\tsave_general_object(out, "out.pkl")\n""")
-        else:
-            f.write(f"""out = autofit.fit(data, df, fixed_resonance_indices={fixed_resonance_indices})\n""")
-            f.write("""save_general_object(out, "out.pkl")\n""")
+        f.write(f"""out = autofit.fit(data, df, fixed_resonance_indices={fixed_resonance_indices})\n""")
+        f.write("""save_general_object(out, "out.pkl")\n""")
         
     return
 

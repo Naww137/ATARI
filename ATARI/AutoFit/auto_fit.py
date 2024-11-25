@@ -126,7 +126,7 @@ class AutoFit:
             if self.options.use_MAD:
                 test = np.median(save_test_scores, axis=0);             test_std = 1.4826*np.median(np.abs(save_test_scores - test), axis=0)
             else:
-                test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
+                test = np.mean(np.array(save_test_scores)/np.array(save_Ntest), axis=0);     test_std = np.std(np.array(save_test_scores)/np.array(save_Ntest), axis=0, ddof=1)/np.sqrt(kfolds)
                 # test = np.sum(save_test_scores, axis=0)/np.sum(save_Ntest, axis=0)
                 # test_std = np.sqrt( np.sum((save_test_scores/save_Ntest-test)**2*save_Ntest, axis=0)/np.sum(save_Ntest, axis=0) )
 

@@ -23,6 +23,10 @@ class SpacingDistributionBase:
         self.lvl_dens = float(lvl_dens)
         for key, value in kwargs.items():
             setattr(self, key, value)
+    @property
+    def mean_lvl_spacing(self):
+        'The mean level spacing.'
+        return 1.0/self.lvl_dens
 
     # Probability Distributions:
     def _f0(self, x):

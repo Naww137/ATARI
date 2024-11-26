@@ -91,7 +91,9 @@ class RunMaster:
         self.level_spacing_dists = np.array(level_spacing_dists)
         self.lvl_dens = np.array([lvl_spacing_dist.lvl_dens for lvl_spacing_dist in level_spacing_dists] + [false_dens])
 
-        self.L = len(E) # Number of resonances
+        self._ladder_checks(E, energy_range, level_spacing_dists)
+
+        self.L = len(self.E) # Number of resonances
         self.G = len(self.lvl_dens) - 1 # number of spingroups (not including false group)
 
         if prior is None:
@@ -107,6 +109,32 @@ class RunMaster:
         self.merge = merge
 
         self._prepare_encore_pipe(err)
+
+    def _ladder_checks(self, E, energy_range:tuple, level_spacing_dists:Tuple[SpacingDistributionBase]):
+        """
+        Checks if there are any unreasonable traits in the provided resonance and distribution
+        data.
+
+        Parameters
+        ----------
+        E                    : array-like of float
+            Resonance energies for the ladder.
+        energy_range         : (float, float)
+            The ladder energy boundaries.
+        level_spacing_dists  : ndarray[SpacingDistribution]
+            The level-spacing distributions object.
+        """
+        
+        if any((E <= energy_range[0])) or any((E >= energy_range[1])):
+            raise ValueError('Energies not strictly inside the provided window energy range.')
+        dE_max = max(np.diff(E))
+        
+        # Check if there is an unreasonably large gap in the resonance data:
+        for level_spacing_dist in level_spacing_dists:
+            if level_spacing_dist.sf(dE_max) > 1e-6: # one in a million chance of occuring
+                break
+        else:
+            raise ValueError('There is a large gap in the provided resonances that is improbable under resonance statistics.')
 
     def _prepare_encore_pipe(self, err:float):
         """
@@ -519,7 +547,7 @@ class RunMaster:
             for g, distribution in enumerate(level_spacing_dists):
                 prior[:,g] = distribution.lvl_dens
             prior[:,G] = false_dens
-            prior /= np.sum(prior, axis=1)
+            prior /= np.sum(prior, axis=1, keepdims=True)
 
         iMax = np.zeros((L+2, 2, G), 'i4')
         level_spacing_probs = np.zeros((L+2, L+2, G), 'f8')

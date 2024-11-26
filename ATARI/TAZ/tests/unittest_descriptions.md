@@ -40,3 +40,6 @@
 
 ### Test Mean Parameter Estimation
 - Test that the value and uncertainty for each mean parameter is statistically valid. (NOT IMPLEMENTED YET)
+
+### Test Empirical False Width Distribution
+- ???

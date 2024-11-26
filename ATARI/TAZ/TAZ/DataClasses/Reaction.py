@@ -15,7 +15,7 @@ information that is independent of individual resonances, such as the target and
 particles, spingroup combinations, mean level densities, mean partial widths, etc.
 """
 
-def spingroupParameter(mean_parameters, num_groups:int, dtype:type=float):
+def spingroupParameter(mean_parameters, name:str, num_groups:int, dtype:type=float):
     """
     Correctly formats the spingroup-based parameters.
 
@@ -34,10 +34,7 @@ def spingroupParameter(mean_parameters, num_groups:int, dtype:type=float):
         The reformatted spingroup-based parameters.
     """
 
-    if (not hasattr(mean_parameters, '__iter__')) \
-        or (np.array(mean_parameters).size != num_groups):
-        from inspect import stack
-        name = stack()[1][0].f_locals[mean_parameters]
+    if (not hasattr(mean_parameters, '__iter__')) or (np.array(mean_parameters).size != num_groups):
         raise TypeError(f'"{name}" must be an array with length equal to the number of spingroups, {num_groups}.')
     return np.array(mean_parameters, dtype=dtype).reshape(num_groups,)
 
@@ -158,39 +155,39 @@ class Reaction:
         if lvl_dens is not None and MLS is not None:
             raise ValueError('Cannot have both mean level spacing and level densities.')
         elif lvl_dens is not None:
-            self.lvl_dens = spingroupParameter(lvl_dens, self.num_groups, dtype=float)
+            self.lvl_dens = spingroupParameter(lvl_dens, 'lvl_dens', self.num_groups, dtype=float)
         elif MLS is not None:
-            self.lvl_dens = 1.0 / spingroupParameter(MLS, self.num_groups, dtype=float)
+            self.lvl_dens = 1.0 / spingroupParameter(MLS, 'MLS', self.num_groups, dtype=float)
         else:
             self.lvl_dens = None
 
         # Brody Parameter:
         if brody_param is not None:
             if hasattr(brody_param, '__iter__'):
-                self.brody_param = spingroupParameter(brody_param, self.num_groups, dtype=float)
+                self.brody_param = spingroupParameter(brody_param, 'brody_param', self.num_groups, dtype=float)
             else:
                 self.brody_param = float(brody_param) * np.ones((self.num_groups,))
         else:
             self.brody_param = np.ones((self.num_groups,))
 
         # Mean Neutron Widths:
-        if gn2m is not None:    self.gn2m = spingroupParameter(gn2m, self.num_groups, dtype=float)
+        if gn2m is not None:    self.gn2m = spingroupParameter(gn2m, 'gn2m', self.num_groups, dtype=float)
         else:                   self.gn2m = None
 
         # Neutron Channel Degrees of Freedom:
-        if nDOF is not None:    self.nDOF = spingroupParameter(nDOF, self.num_groups, dtype=int)
+        if nDOF is not None:    self.nDOF = spingroupParameter(nDOF, 'nDOF', self.num_groups, dtype=int)
         else:                   self.nDOF = np.ones((self.num_groups,), dtype=int)
 
         # Mean Gamma Widths:
-        if gg2m is not None:    self.gg2m = spingroupParameter(gg2m, self.num_groups, dtype=float)
+        if gg2m is not None:    self.gg2m = spingroupParameter(gg2m, 'gg2m', self.num_groups, dtype=float)
         else:                   self.gg2m = None
 
         # Gamma Channel Degrees of Freedom:
-        if gDOF is not None:    self.gDOF = spingroupParameter(gDOF, self.num_groups, dtype=int)
+        if gDOF is not None:    self.gDOF = spingroupParameter(gDOF, 'gDOF', self.num_groups, dtype=int)
         else:                   self.gDOF = self.DEFAULT_GDOF * np.ones((self.num_groups,), dtype=int)
 
         # J_ID for ATARI spingroups:
-        if nDOF is not None:    self.J_ID = spingroupParameter(J_ID, self.num_groups, dtype=int)
+        if J_ID is not None:    self.J_ID = spingroupParameter(J_ID, 'J_ID', self.num_groups, dtype=int)
         else:                   self.J_ID = np.arange(1, self.num_groups+1)
 
         # Truncation Width:
@@ -203,7 +200,7 @@ class Reaction:
 
         # Missing Fraction:
         if MissFrac is not None:
-            self.MissFrac = spingroupParameter(MissFrac, self.num_groups, dtype=float) # FIXME: MAKE THIS AS A FUNCTION OF ENERGY!
+            self.MissFrac = spingroupParameter(MissFrac, 'MissFrac', self.num_groups, dtype=float) # FIXME: MAKE THIS AS A FUNCTION OF ENERGY!
         elif self.Gn_trunc_provided:
             def _miss_frac(gn2m, df, l, E):
                 gn2_trunc = self.Gn_to_gn2(Gn_trunc, E, l)

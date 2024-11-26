@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../TAZ')
+from ATARI.ModelData.particle import Particle, Neutron
 import TAZ
 from TAZ.analysis import correlate_probabilities
 
@@ -27,8 +28,8 @@ class TestBayesSampler2SG(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB = (1e-5,1000)
@@ -95,8 +96,8 @@ class TestBayesSampler1or2SG(unittest.TestCase):
         2-spingroup Encore algorithms when the one spingroup is very infrequent (i.e. low
         level-density).
         """
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
         EB = (1e-5,1000)
         false_dens = 1 / 6.0
         lvl_dens_tot = 1 / 4.0
@@ -166,8 +167,8 @@ class TestBayesSamplerNoFalse(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB = (1e-5,1000)

@@ -15,7 +15,8 @@ Proposed methods for mean-level spacing estimation:
     1. Bethe formula for level-densities.
     2. Ladder size over number of levels.
     3. Linear regression on the cumulative level function.
-  / 4. Fitting Wigner distribution.
+  / 4. Fitting Wigner PDF.
+  / 5. Fitting Wigner CDF.
 
 Methods for mean width estimation:
     1. Mean of reduced widths.

@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../TAZ')
-from ATARI.TAZ.Theory import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, semicircle_dist
+from TAZ.Theory import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, semicircle_dist
 
 import numpy as np
 from scipy.integrate import quad

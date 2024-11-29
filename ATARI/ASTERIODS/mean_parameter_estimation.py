@@ -1,7 +1,10 @@
+from typing import List
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.stats import rv_continuous
 
-from ATARI.theory.distributions import porter_thomas_dist
+from ATARI.theory.distributions import porter_thomas_dist, fraction_missing_gn2
+from ATARI.TAZ.TAZ.DataClasses.Spingroups import HalfInt
 
 __doc__ = """
 This module compiles mean parameter estimation methods.
@@ -9,9 +12,6 @@ This module compiles mean parameter estimation methods.
 
 
 """
-Here is a list of proposed methods for mean parameter estimation. Any method with a "/" before it
-means that it has not been fully implemented.
-
 Proposed methods for mean-level spacing estimation:
     1. Bethe formula for level-densities.
     2. Ladder size over number of levels.
@@ -24,13 +24,10 @@ Methods for mean width estimation:
     2. Porter-Thomas CDF regression.
   / 3. Porter-Thomas PDF regression.
 
-Methods for missing fraction estimation:
+Methods for false/missing density estimation:
     1. Porter-Thomas CDF regression.
   / 2. Missing level-spacing distribution regression.
   / 3. Delta-3 statistic missing fraction estimation.
-
-False level-spacing estimation:
-  / 1. Fitting probability determination.
 """
 
 
@@ -38,24 +35,24 @@ False level-spacing estimation:
 #    Mean Level-Spacing Estimation:
 # =================================================================================================
 
-def MeanSpacingBethe(J:float, A:int, E:float, E0:float=0.0):
+def mean_spacing_Bethe(J:HalfInt, A:int, E:float, E0:float=0.0):
     """
     Finds the mean level-spacing using the Bethe formula.
 
-    Parameters:
+    Parameters
     ----------
-    J  :: half-int
+    J  : HalfInt
         Total angular momentum.
-    A  :: int
+    A  : int
         Atomic mass number.
-    E  :: float
+    E  : float
         The energy to find the mean level-spacing.
-    E0 :: float
+    E0 : float
         Threshold energy for the reaction channel.
 
-    Returns:
+    Returns
     -------
-    mean_lvl_spacing :: float
+    mean_lvl_spacing : float
         The mean level-spacing.
     """
 
@@ -65,21 +62,21 @@ def MeanSpacingBethe(J:float, A:int, E:float, E0:float=0.0):
     c = np.exp(2*np.sqrt(a*(E-E0))) / (12 * np.sqrt(2*s2c) * (a*(E-E0)**5)**(1/4))
     return c * fJ
 
-def MeanSpacingAveraging(E):
+def mean_spacing_averaging(E):
     """
     Finds the mean level-spacing by taking the average of the level-spacings. Also returns the
     standard deviation of the mean level-spacing.
 
-    Parameters:
+    Parameters
     ----------
-    E :: ndarray[float]
+    E : ndarray[float]
         Resonance energies.
 
-    Returns:
+    Returns
     -------
-    mean_lvl_spacing     :: float
+    mean_lvl_spacing     : float
         The mean level-spacing of the given energies.
-    mean_lvl_spacing_std :: float
+    mean_lvl_spacing_std : float
         The standard deviation of the mean level-spacing for the given energies.
     """
 
@@ -91,21 +88,21 @@ def MeanSpacingAveraging(E):
     mean_lvl_spacing_std = np.sqrt( np.mean((lvl_spacings - mean_lvl_spacing)**2) / (N-1) )
     return mean_lvl_spacing, mean_lvl_spacing_std
 
-def MeanSpacingRegression(E, EB:tuple):
+def mean_spacing_regression(E, EB:tuple):
     """
     Finds the mean level-spacing of the given energies by taking the slope of the empirical CDF
     of the energy level distribution.
 
-    Parameters:
+    Parameters
     ----------
-    E  :: ndarray[float]
+    E  : ndarray[float]
         Resonance energies.
-    EB :: tuple[float]
+    EB : tuple[float]
         Resonance ladder boundaries.
     
-    Returns:
+    Returns
     -------
-    mean_lvl_spacing     :: float
+    mean_lvl_spacing     : float
         The mean level-spacing of the given energies.
     """
     
@@ -128,75 +125,101 @@ def MeanSpacingRegression(E, EB:tuple):
 #    Mean Partial Widths:
 # =================================================================================================
 
-def MeanWidthAveraging(widths):
+def mean_width_averaging(widths):
     """
     Finds the mean partial widths by taking the average of the widths. Also returns the standard
     deviation of the mean partial widths.
 
-    Parameters:
+    Parameters
     ----------
-    widths :: ndarray[float]
+    widths : ndarray[float]
         Resonance partial widths.
 
-    Returns:
+    Returns
     -------
-    mean_width     :: float
+    mean_width     : float
         The mean width of the given the partial widths.
-    mean_width_std :: float
+    mean_width_std : float
         The standard deviation of the mean width given the partial widths.
     """
 
-    mean_width = np.mean(widths)
+    mean_width = np.mean(abs(np.array(widths)))
     mean_width_std = np.sqrt( np.mean((widths - mean_width)**2) / (len(widths)-1) )
     return mean_width, mean_width_std
 
-def MeanWidthCDFRegression(widths, dof:int=1, thres:float=0.0):
+def mean_width_CDF_regression(widths, dof:int=1, thres:float=0.0):
     """
     Finds the mean partial widths by performing a regression on the Porter-Thomas CDF distribution.
     A truncation on the widths can be provided.
 
-    Parameters:
+    Parameters
     ----------
-    widths :: ndarray[float]
+    widths : ndarray[float]
         Resonance partial widths.
-    dof    :: int
+    dof    : int
         Porter-Thomas degrees of freedom. Default = 1.
-    thres  :: float
+    thres  : float
         Truncates all widths below this value. Default = 0.0.
 
-    Returns:
+    Returns
     -------
-    mean_width       :: float
+    mean_width       : float
         The mean width of the given the partial widths.
-    mean_width_std   :: float
+    mean_width_std   : float
         The standard deviation of the mean width given the partial widths.
-    frac_missing     :: float
+    frac_missing     : float
         The fraction of missing resonances, estimated using Porter-Thomas distribution.
-    frac_missing_std :: float
+    frac_missing_std : float
         The standard deviation on the number of missing resonances, estimated using Porter-Thomas
         distribution.
     """
+
+    widths = np.sort(abs(np.array(widths)))
     num_found_widths = len(widths)
-    widths = widths[widths >= thres]
-    num_thres_widths = len(widths)
-    X = np.linspace(0, 20*np.max(widths), 10_000)
-    Y = np.searchsorted(widths, X) / num_thres_widths
-    func = lambda G, g2m: porter_thomas_dist.cdf(G, mean=g2m, df=dof, thres=thres)
-    mean_width, mean_width_cov = curve_fit(func, X, Y, bounds=(0, np.max(widths)))
-    mean_width_std = np.sqrt(mean_width_cov)
-    frac_below_thres = porter_thomas_dist.cdf(thres, mean=mean_width, df=dof, thres=thres)
-    num_pred_widths = num_thres_widths / (1-frac_below_thres)
+    widths_trunc = widths[widths >= thres]
+    num_trunc_widths = len(widths_trunc)
+    bounds = (0.0, 2*np.max(widths))
+    X = np.linspace(*bounds, 100_000)
+    Y = np.searchsorted(widths_trunc, X) / num_trunc_widths
+    func = lambda g2, g2m: porter_thomas_dist(mean=g2m, df=dof, trunc=thres).cdf(g2)
+    mean_width, mean_width_cov = curve_fit(func, X, Y, bounds=(0.0, np.inf))
+    np.set_printoptions(threshold=np.inf)
+    # FIXME: the standard deviation of the mean of the widths is under-estimated!
+    mean_width_std = np.sqrt(mean_width_cov[0,0])
+    # FIXME: the fraction missing is incorrect!
+    frac_below_thres = fraction_missing_gn2(thres, mean_width, dof)
+    num_pred_widths = num_trunc_widths / (1-frac_below_thres)
     frac_missing = num_found_widths / num_pred_widths
-    frac_missing_std = None # FIXME: find the standard deviation on the fraction of missing resonances
-    return mean_width, mean_width_std, \
+    frac_missing_std = None # FIXME: find the standard deviation on the fraction of missing resonances!
+    return mean_width[0], mean_width_std, \
            frac_missing, frac_missing_std
 
 # =================================================================================================
-#    Missing Fraction Estimation:
+#    False/Missing Level-Density Estimation:
 # =================================================================================================
 
-# ...
+def estimate_false_missing_density_from_spacing(num_res:int, lvl_dens_exp:float, ladder_size:float):
+    """
+    ...
+    """
 
-# =================================================================================================
-#    False Level-Density Estimation:
-# =================================================================================================
+    num_res_exp = lvl_dens_exp * ladder_size
+    frac_false_minus_missing = (num_res - num_res_exp) / num_res
+    lvl_dens_false_minus_missing = frac_false_minus_missing * lvl_dens_exp
+    return lvl_dens_false_minus_missing
+
+def estimate_false_missing_density_from_widths(widths, level_densities_exp:List[float], width_dists:List[rv_continuous], trunc:float):
+    """
+    ...
+    """
+
+    level_dens_tot = sum(level_densities_exp)
+    widths = abs(np.array(widths, dtype=float))
+    widths_above_trunc = widths[widths >= trunc]
+    frac_widths_above_trunc = len(widths_above_trunc)/len(widths)
+    frac_widths_above_trunc_true = 0.0
+    for level_density, width_dist in zip(level_densities_exp, width_dists):
+        frac_widths_above_trunc_true += (level_density/level_dens_tot) * width_dist.isf(trunc)
+    frac_false_minus_missing = frac_widths_above_trunc/frac_widths_above_trunc_true
+    level_dens_false_minus_missing = frac_false_minus_missing * level_dens_tot
+    return level_dens_false_minus_missing

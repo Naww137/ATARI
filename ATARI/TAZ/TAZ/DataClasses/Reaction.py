@@ -5,8 +5,11 @@ from functools import partial
 
 import warnings
 
-from TAZ import Theory
-from TAZ.DataClasses import Spingroup
+from ATARI.theory import distributions
+from ATARI.theory import level_spacing_distributions
+from ATARI.TAZ.TAZ.Theory import Samplers, RMatrix
+from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+
 from ATARI.ModelData.particle import Particle, Neutron
 
 __doc__ = """
@@ -204,7 +207,7 @@ class Reaction:
         elif self.Gn_trunc_provided:
             def _miss_frac(gn2m, df, l, E):
                 gn2_trunc = self.Gn_to_gn2(Gn_trunc, E, l)
-                frac_missing = Theory.fraction_missing_gn2(gn2_trunc, gn2m, df)
+                frac_missing = distributions.fraction_missing_gn2(gn2_trunc, gn2m, df)
                 return frac_missing
             missing_fracs = []
             for gn2m, df, l in zip(self.gn2m, self.nDOF, self.L):
@@ -255,9 +258,9 @@ class Reaction:
         P : float, array-like
             The penetration factor.
         """
-        k = Theory.k_wavenumber(self.targ.mass, E, self.proj.mass)
-        rho = Theory.rho(k, self.ac)
-        P = Theory.penetration_factor(rho, l)
+        k = RMatrix.k_wavenumber(self.targ.mass, E, self.proj.mass)
+        rho = RMatrix.rho(k, self.ac)
+        P = RMatrix.penetration_factor(rho, l)
         return P
     def gn2_to_Gn(self, gn2, E, l:int):
         """
@@ -278,7 +281,7 @@ class Reaction:
             Partial neutron widths.
         """
         P = self.penetration_factor(E, l)
-        Gn = Theory.g2_to_G(gn2, P)
+        Gn = RMatrix.g2_to_G(gn2, P)
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):
         """
@@ -299,14 +302,14 @@ class Reaction:
             Reduced neutron widths.
         """
         P = self.penetration_factor(E, l)
-        gn2 = Theory.G_to_g2(Gn, P)
+        gn2 = RMatrix.G_to_g2(Gn, P)
         return gn2
     @property
     def Gnm(self):
         'Mean Partial Neutron Widths'
         def _Gnm_func(l, gn2m, E):
             P = self.penetration_factor(E, l)
-            return Theory.g2_to_G(gn2m, P)
+            return RMatrix.g2_to_G(gn2m, P)
         Gnm_funcs = []
         for l, gn2m in zip(self.L, self.gn2m):
             Gnm_func = partial(_Gnm_func, l, gn2m)
@@ -328,7 +331,7 @@ class Reaction:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        Gg = Theory.g2_to_G(gg2, P)
+        Gg = RMatrix.g2_to_G(gg2, P)
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -345,13 +348,13 @@ class Reaction:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        gg2 = Theory.G_to_g2(Gg, P)
+        gg2 = RMatrix.G_to_g2(Gg, P)
         return gg2
     @property
     def Ggm(self):
         'Mean Partial Gamma (Capture) Widths'
         P = 1.0 # penetrability is 1 for capture widths
-        return Theory.g2_to_G(self.gg2m, P)
+        return RMatrix.g2_to_G(self.gg2m, P)
     
     def __repr__(self):
         txt = ''
@@ -434,12 +437,12 @@ class Reaction:
         for g in range(self.num_groups):
             # Energy sampling:
             brody_param = self.brody_param[g] if self.brody_param is not None else None
-            E_group  = Theory.SampleEnergies(self.EB, self.lvl_dens[g], w=brody_param, ensemble=ensemble, rng=rng)
+            E_group  = Samplers.SampleEnergies(self.EB, self.lvl_dens[g], w=brody_param, ensemble=ensemble, rng=rng)
             
             # Width sampling:
             len_group = len(E_group)
-            Gn_group = Theory.SampleNeutronWidth(E_group, Gnms[g], self.nDOF[g], rng=rng)
-            Gg_group = Theory.SampleGammaWidth(len_group, Ggms[g], self.gDOF[g], rng=rng)
+            Gn_group = Samplers.SampleNeutronWidth(E_group, Gnms[g], self.nDOF[g], rng=rng)
+            Gg_group = Samplers.SampleGammaWidth(len_group, Ggms[g], self.gDOF[g], rng=rng)
             
             # Append to group:
             E          = np.concatenate((E         , E_group ))
@@ -450,7 +453,7 @@ class Reaction:
         # False Resonances:
         if self.false_dens != 0.0:
             # Energy sampling:
-            E_false = Theory.SampleEnergies(self.EB, self.false_dens, ensemble='Poisson')
+            E_false = Samplers.SampleEnergies(self.EB, self.false_dens, ensemble='Poisson')
             
             # False width sampling:
             # False widths are sampled by taking the level-density-weighted average of each spingroup's width distributions.
@@ -458,8 +461,8 @@ class Reaction:
             Gn_false_group = np.zeros((num_false,self.num_groups))
             Gg_false_group = np.zeros((num_false,self.num_groups))
             for g in range(self.num_groups):
-                Gn_false_group[:,g] = Theory.SampleNeutronWidth(E_false, Gnms[g], self.nDOF[g], rng=rng)
-                Gg_false_group[:,g] = Theory.SampleGammaWidth(num_false, Ggms[g], self.gDOF[g], rng=rng)
+                Gn_false_group[:,g] = Samplers.SampleNeutronWidth(E_false, Gnms[g], self.nDOF[g], rng=rng)
+                Gg_false_group[:,g] = Samplers.SampleGammaWidth(num_false, Ggms[g], self.gDOF[g], rng=rng)
             idx = np.arange(num_false)
             group_idx = rng.choice(self.num_groups, size=(num_false,), p=self.lvl_dens/np.sum(self.lvl_dens))
             Gn_false = Gn_false_group[idx,group_idx]
@@ -523,22 +526,22 @@ class Reaction:
         distributions = []
         if   dist_type == 'Wigner':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.WignerGen(lvl_dens=self.lvl_dens[g])
+                distribution = level_spacing_distributions.WignerGen(lvl_dens=self.lvl_dens[g])
                 distributions.append(distribution)
         elif dist_type == 'Brody':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.BrodyGen(lvl_dens=self.lvl_dens[g], w=self.brody_param[g])
+                distribution = level_spacing_distributions.BrodyGen(lvl_dens=self.lvl_dens[g], w=self.brody_param[g])
                 distributions.append(distribution)
         elif dist_type == 'Missing':
             for g in range(self.num_groups):
                 # if type(self.MissFrac[g]) != float:
                 #     raise NotImplementedError('Missing Level-spacing generator only works with constant float MissFrac at this time.')
                 lvl_dens_obs = self.lvl_dens[g]*(1-self.MissFrac[g])
-                distribution = Theory.LevelSpacingDists.MissingGen(lvl_dens=lvl_dens_obs, pM=self.MissFrac[g], err=err)
+                distribution = level_spacing_distributions.MissingGen(lvl_dens=lvl_dens_obs, pM=self.MissFrac[g], err=err)
                 distributions.append(distribution)
         elif dist_type == 'Poisson':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.PoissonGen(lvl_dens=self.lvl_dens[g])
+                distribution = level_spacing_distributions.PoissonGen(lvl_dens=self.lvl_dens[g])
                 distributions.append(distribution)
         else:
             raise NotImplementedError(f'The distribution type, "{dist_type}", has not been implemented yet.')
@@ -597,12 +600,12 @@ class Reaction:
                     fit = self.distributions(dist_type)[g].cdf
         elif quantity == 'neutron width':
             if not cdf: # PDF
-                fit = Theory.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).pdf
+                fit = distributions.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).pdf
             else: # CDF
-                fit = Theory.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).cdf
+                fit = distributions.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).cdf
         elif quantity in ('gamma width', 'capture width'):
             if not cdf: # PDF
-                fit = Theory.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).pdf
+                fit = distributions.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).pdf
             else: # CDF
-                fit = Theory.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).cdf
+                fit = distributions.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).cdf
         return fit

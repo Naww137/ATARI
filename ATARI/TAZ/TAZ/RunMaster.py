@@ -2,8 +2,8 @@ from typing import Tuple, List
 import numpy as np
 from pandas import Series
 
-from TAZ.Encore import Encore
-from TAZ.Theory import SpacingDistributionBase, merge
+from ATARI.theory.level_spacing_distributions import SpacingDistributionBase, merge
+from ATARI.TAZ.TAZ.Encore import Encore
 
 import warnings
 
@@ -85,7 +85,9 @@ class RunMaster:
             raise ValueError('energy_range[0] must be strictly less than energy_range[1].')
         
         if isinstance(E, Series):
-            E = E.to_numpy()
+            E = E.to_numpy(dtype=float)
+        elif not isinstance(E, np.ndarray):
+            E = np.array(E, dtype=float)
         self.E  = np.sort(E)
         self.energy_range = tuple(energy_range)
         self.level_spacing_dists = np.array(level_spacing_dists)
@@ -126,7 +128,12 @@ class RunMaster:
         """
         
         if any((E <= energy_range[0])) or any((E >= energy_range[1])):
-            raise ValueError('Energies not strictly inside the provided window energy range.')
+            raise ValueError(f"""
+Energies not strictly inside the provided window energy range:
+Energy Range = {energy_range}
+Minimum energy = {min(E)}
+Maximum energy = {max(E)}
+""")
         dE_max = max(np.diff(E))
         
         # Check if there is an unreasonably large gap in the resonance data:

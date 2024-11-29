@@ -67,7 +67,7 @@ class __LevelSpacingRatioDistribution(rv_continuous):
     def _pdf(self, x, beta:int):
         beta = beta[0]
         if   beta == 1:     C_beta = 27/8
-        elif beta == 2:     C_beta = 81*sqrt(3)/(4*pi)
+        elif beta == 2:     C_beta =  81*sqrt(3)/(4*pi)
         elif beta == 4:     C_beta = 729*sqrt(3)/(4*pi)
         else:               raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
         gamma = 1+(3/2)*beta
@@ -139,28 +139,77 @@ class __PorterThomasDistribution(rv_continuous):
     def _pdf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.zeros(x.shape)
-        y[x >  trunc] = chi2.pdf(x[x >  trunc], df=df, scale=mean/df) / norm
-        y[(x < 0) & (df == 1)] = 0
+        y = np.zeros_like(x)
+        x_trunc     =    x[x > trunc]
+        df_trunc    =   df[x > trunc]
+        scale_trunc = mean[x > trunc] / df_trunc
+        norm_trunc  = norm[x > trunc]
+        y[x > trunc] = chi2.pdf(x_trunc, df=df_trunc, scale=scale_trunc) / norm_trunc
         return y
     def _cdf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.zeros(x.shape)
-        y[x >  trunc] = 1 + (chi2.cdf(x, df=df, scale=mean/df)-1) / norm
+        y = np.zeros_like(x)
+        x_trunc     =    x[x > trunc]
+        df_trunc    =   df[x > trunc]
+        scale_trunc = mean[x > trunc] / df_trunc
+        norm_trunc  = norm[x > trunc]
+        y[x > trunc] = 1 + (chi2.cdf(x_trunc, df=df_trunc, scale=scale_trunc) - 1) / norm_trunc
         return y
     def _sf(self, x, mean:float, df:int, trunc:float):
         x = abs(x)
         norm = chi2.sf(trunc, df=df, scale=mean/df)
-        y = np.ones(x.shape)
-        y[x >  trunc] = chi2.sf(x, df=df, scale=mean/df) / norm
+        y = np.ones_like(x)
+        x_trunc     =    x[x > trunc]
+        df_trunc    =   df[x > trunc]
+        scale_trunc = mean[x > trunc] / df_trunc
+        norm_trunc  = norm[x > trunc]
+        y[x > trunc] = chi2.sf(x_trunc, df=df_trunc, scale=scale_trunc) / norm_trunc
         return y
     def _ppf(self, q, mean:float, df:int, trunc:float):
+        # Getting the sign:
+        sign = np.ones_like(q)
+        sign[q < 0.5] = -1
+        q = 2.0 * abs(q - 0.5)
+        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = (q - 1) * norm + 1
-        return chi2.ppf(qp, df=df, scale=mean/df)
+        x = chi2.ppf(qp, df=df, scale=mean/df)
+        return sign * x
     def _isf(self, q, mean:float, df:int, trunc:float):
+        # Getting the sign:
+        sign = np.ones_like(q)
+        sign[q < 0.5] = -1
+        q = 2.0 * abs(q - 0.5)
+        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = q * norm
-        return chi2.isf(qp, df=df, scale=mean/df)
-porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', a=-np.inf, b=np.inf, shapes='mean, df, trunc')
+        x = chi2.isf(qp, df=df, scale=mean/df)
+        return sign * x
+porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', shapes='mean, df, trunc')
+
+# =================================================================================================
+#    More Width Distribution Functions:
+# =================================================================================================
+
+def fraction_missing_gn2(gn2_trunc:float, gn2m:float=1.0, dof:int=1):
+    """
+    Gives the fraction of missing resonances due to the truncation in reduced neutron width.
+
+    Parameters
+    ----------
+    trunc : float
+        The lower limit on the reduced neutron width.
+    gn2m  : float
+        The mean reduced neutron width. Default = 1.0.
+    dof   : int
+        The number of degrees of freedom for the chi-squared distribution.
+
+    Returns
+    -------
+    fraction_missing : float
+        The fraction of missing resonances within the spingroup.
+    """
+    # fraction_missing = gammainc(dof/2, dof*gn2_trunc/(2*gn2m))
+    fraction_missing = porter_thomas_dist(mean=gn2m, df=dof, trunc=0.0).cdf(gn2_trunc)
+    return fraction_missing

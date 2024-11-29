@@ -1,7 +1,9 @@
-import sys
-sys.path.append('../TAZ')
-import TAZ
 from ATARI.ModelData.particle import Particle, Neutron
+
+from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.TAZ.PTBayes import PTBayes, PTMaxLogLikelihoods
+from ATARI.TAZ.TAZ.RunMaster import RunMaster
 
 from copy import copy
 import numpy as np
@@ -41,22 +43,20 @@ class TestBayesMaxLogLikelihoods(unittest.TestCase):
         cls.l          = [  0,   0]
         cls.j          = [3.0, 4.0]
 
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_poisson(self):
         """
-        Test that WigMaxLikelihoods returns the spingroups with the maximum prior probabilities
-        when provided Poisson level-spacing distributions. This is because Poisson distributions
-        have the unique property of providing no addition information beyond frequency.
+        Test that WigMaxLikelihoods returns the spingroups with the maximum prior probabilities when provided Poisson level-spacing distributions. This is because Poisson distributions have the unique property of providing no addition information beyond frequency.
         """
-        prior, log_likelihood_prior = TAZ.PTBayes(self.res_ladder, self.reaction)
-        best_spingroup_ladders_prior, best_log_likelihoods_prior = TAZ.PTMaxLogLikelihoods(prior, self.num_best)
+        prior, log_likelihood_prior = PTBayes(self.res_ladder, self.reaction)
+        best_spingroup_ladders_prior, best_log_likelihoods_prior = PTMaxLogLikelihoods(prior, self.num_best)
 
         distributions = self.reaction.distributions(dist_type='Poisson')
-        best_spingroup_ladders_posterior, best_log_likelihoods_posterior = TAZ.RunMaster.WigMaxLikelihoods(E=self.E, energy_range=self.EB, level_spacing_dists=distributions, false_dens=self.false_dens, num_best=self.num_best, err=self.err, prior=prior)
+        best_spingroup_ladders_posterior, best_log_likelihoods_posterior = RunMaster.WigMaxLikelihoods(E=self.E, energy_range=self.EB, level_spacing_dists=distributions, false_dens=self.false_dens, num_best=self.num_best, err=self.err, prior=prior)
         best_spingroup_ladders_posterior = np.array(best_spingroup_ladders_posterior, dtype=np.int8)
 
         self.assertTrue(np.all(best_spingroup_ladders_posterior == best_spingroup_ladders_prior), """
@@ -93,19 +93,18 @@ class TestBayesMaxLogLikelihoodsSymmetric(unittest.TestCase):
         cls.l          = [  0,   0]
         cls.j          = [3.0, 4.0]
 
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_symmetry_no_false(self):
         """
-        Test that WigMaxLikelihoods returns the spingroups follow a symmetry principle when the
-        mean parameters are the same between spingroups.
+        Test that WigMaxLikelihoods returns the spingroups follow a symmetry principle when the mean parameters are the same between spingroups.
         """
-        prior, log_likelihood_prior = TAZ.PTBayes(self.res_ladder, self.reaction)
+        prior, log_likelihood_prior = PTBayes(self.res_ladder, self.reaction)
         distributions = self.reaction.distributions(dist_type='Wigner')
-        best_spingroup_ladders, best_log_likelihoods = TAZ.RunMaster.WigMaxLikelihoods(E=self.E, energy_range=self.EB, level_spacing_dists=distributions, num_best=self.num_best, err=self.err, prior=prior)
+        best_spingroup_ladders, best_log_likelihoods = RunMaster.WigMaxLikelihoods(E=self.E, energy_range=self.EB, level_spacing_dists=distributions, num_best=self.num_best, err=self.err, prior=prior)
 
         for i in range(self.num_best//2):
             self.assertTrue(np.all(best_spingroup_ladders[2*i] + best_spingroup_ladders[2*i+1] == 1), """

@@ -46,8 +46,7 @@ def chi2_test(dist, data, num_bins:int,
 
 def chi2_uniform_test(data, num_bins:int):
     """
-    Performs a Pearson's Chi-squared test on the data, assuming that the underlying distribution
-    is uniform.
+    Performs a Pearson's Chi-squared test on the data, assuming that the underlying distribution is uniform.
     """
 
     obs_counts, bin_edges = np.histogram(data, num_bins)

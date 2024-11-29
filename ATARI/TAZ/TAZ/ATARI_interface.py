@@ -3,8 +3,8 @@ import numpy as np
 from numpy import ndarray
 from pandas import DataFrame
 
-from TAZ import Spingroup
-from TAZ import Reaction
+from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file is used to interface between ATARI and TAZ Dataclasses.

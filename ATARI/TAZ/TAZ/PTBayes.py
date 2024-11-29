@@ -3,8 +3,8 @@ from pandas import DataFrame
 import numpy as np
 from numpy import newaxis as NA
 
-from TAZ.Theory import porter_thomas_dist
-from TAZ import Reaction
+from ATARI.theory.distributions import porter_thomas_dist
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This module contains Bayes' update for the probabilistic distribution on the neutron widths (and
@@ -82,7 +82,7 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
     posterior /= total_probability[:,NA]
 
     # Log likelihood:
-    log_likelihood = np.sum(np.log(total_probability))
+    log_likelihood = sum(np.log(total_probability))
 
     return posterior, log_likelihood
 

@@ -1,6 +1,4 @@
-import sys
-sys.path.append('../TAZ')
-from TAZ.Theory import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, semicircle_dist
+from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, semicircle_dist
 
 import numpy as np
 from scipy.integrate import quad
@@ -12,8 +10,7 @@ import unittest
 
 class TestDistributions(unittest.TestCase):
     """
-    This class tests if all distributions satisfy expected qualities, such as being normalized,
-    having the expected mean or median, etc.
+    This class tests if all distributions satisfy expected qualities, such as being normalized, having the expected mean or median, etc.
     """
 
     places = 7

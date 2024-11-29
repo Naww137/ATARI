@@ -1,8 +1,9 @@
-import sys
-sys.path.append('../TAZ')
-import TAZ
 from ATARI.ModelData.particle import Particle, Neutron
-from TAZ import analysis
+
+from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.TAZ import analysis
 
 import numpy as np
 
@@ -47,18 +48,17 @@ class TestPTBayes(unittest.TestCase):
         cls.l     = [0, 0, 1, 1]
         cls.j     = [3.0, 4.0, 3.0, 4.0]
 
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
         cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
 
     def test_probability_frequency(self):
         """
-        Here, we intend to verify that PTBayes returns probabilities that match the fraction
-        of resonances with said probability within statistical error.
+        Here, we intend to verify that PTBayes returns probabilities that average to the expected fraction of resonances within statistical error.
         """
 
         # self.skipTest('Not implemented yet')
-        probabilities, log_likelihood = TAZ.PTBayes(self.res_ladder, self.reaction, gamma_width_on=False)
+        probabilities, log_likelihood = PTBayes(self.res_ladder, self.reaction, gamma_width_on=False)
 
         Qs = analysis.correlate_probabilities(probabilities, self.true_assignments)
         for g, Q in enumerate(Qs):
@@ -68,7 +68,7 @@ PTBayes probabilities do not match the frequency of correct sampling to within {
 Lowest probability density = {np.min(Q):.5f}.
 """)
             
-        probabilities, log_likelihood = TAZ.PTBayes(self.res_ladder, self.reaction, gamma_width_on=True)
+        probabilities, log_likelihood = PTBayes(self.res_ladder, self.reaction, gamma_width_on=True)
 
         Qs = analysis.correlate_probabilities(probabilities, self.true_assignments)
         for g, Q in enumerate(Qs):

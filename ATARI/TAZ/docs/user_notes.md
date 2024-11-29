@@ -30,3 +30,4 @@ Potential New Features
 - BS approximation fix.
 - Checks for resonance structures that break resonance statistics (unprobable widths, etc.)
 - Highly verbose comments with the spin assignment codes.
+- Remove redundant features between ATARI and TAZ.

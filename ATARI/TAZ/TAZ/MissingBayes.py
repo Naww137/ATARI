@@ -3,7 +3,7 @@ import numpy as np
 from pandas import DataFrame
 from copy import copy
 
-from TAZ import Reaction
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file contains all information regarding the MissingBayes methods, which calculates probability

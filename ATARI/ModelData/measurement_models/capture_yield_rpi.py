@@ -166,7 +166,6 @@ class capture_yield_rpi_parameters:
                     new_c = np.random.poisson(param_values.ct)#, scale=param_values.dc)
                     new_c[new_c==0] = 1
                     df = deepcopy(param_values)
-                    df['ct'] = df['ct'].astype(float) # we are sampling counts as floats
                     df['ct'] = new_c
                     df['dct'] = np.sqrt(new_c)
                     sampled_params[param_name] = df

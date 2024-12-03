@@ -16,6 +16,8 @@ class CrossValidationOUT:
     ires                : Optional[np.ndarray]  = None
     train_scores        : Optional[np.ndarray]  = None
     test_scores         : Optional[np.ndarray]  = None
+    Ntest               : Optional[np.ndarray]  = None
+    Ntrain              : Optional[np.ndarray]  = None
 
 
 @dataclass
@@ -42,7 +44,14 @@ class AutoFitOPT:
     # other
     print_bool                      : bool  = True
     use_1std_rule                   : bool  = True
+    use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
+
+    ### Resonance Statistics
+    Wigner_informed_cross_validation        : bool = False
+    PorterThomas_informed_cross_validation  : bool = False
+    
+
 
 
 
@@ -93,17 +102,17 @@ class AutoFit:
         self.output = AutoFitOUT()
 
 
-    def fit(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
-
+    def fit(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
-        if len(resonance_ladder) == len(fixed_resonance_indices):
-            assert np.all(resonance_ladder.index == fixed_resonance_indices)
+        if len(total_resonance_ladder) == len(fixed_resonance_indices):
+            assert np.all(total_resonance_ladder.index == fixed_resonance_indices)
             if self.options.print_bool:
                 print(f"=============\nResonance ladder is all fixed\n=============")
             if self.options.save_elimination_history:
                 self.output.elimination_history = None
             solve_prior = Solver_factory(self.rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data)
-            sammyOUT = solve_prior.fit(resonance_ladder, [])
+            sammyOUT = solve_prior.fit(total_resonance_ladder)
             sammyOUT.pw_post = sammyOUT.pw; sammyOUT.par_post = sammyOUT.par; sammyOUT.chi2_post = sammyOUT.chi2; sammyOUT.chi2n_post = sammyOUT.chi2n
             self.output.final_samout = sammyOUT
             return self.output
@@ -111,10 +120,16 @@ class AutoFit:
         ### Run CV
         if self.options.print_bool:
             print("=============\nRunning Cross Validation\n=============")
-        save_test_scores, save_train_scores, save_ires, kfolds = self.cross_validation(evaluation_data, resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
+        save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
         try:
             save_ires = np.array(save_ires)
-            test = np.mean(np.array(save_test_scores), axis=0);     test_std = np.std(np.array(save_test_scores), axis=0, ddof=1)/np.sqrt(kfolds)
+            if self.options.use_MAD:
+                test = np.median(np.array(save_test_scores)/np.array(save_Ntest), axis=0);             test_std = 1.4826*np.median(np.abs(np.array(save_test_scores)/np.array(save_Ntest) - test), axis=0)
+            else:
+                test = np.mean(np.array(save_test_scores)/np.array(save_Ntest), axis=0);     test_std = np.std(np.array(save_test_scores)/np.array(save_Ntest), axis=0, ddof=1)/np.sqrt(kfolds)
+                # test = np.sum(save_test_scores, axis=0)/np.sum(save_Ntest, axis=0)
+                # test_std = np.sqrt( np.sum((save_test_scores/save_Ntest-test)**2*save_Ntest, axis=0)/np.sum(save_Ntest, axis=0) )
+
         except:
             raise ValueError("Not all folds resulted in the same number of resonances - change greediness or update code")
         
@@ -139,10 +154,10 @@ class AutoFit:
         if self.options.print_bool:
             print(f"=============\nFitting to {Nres_target} Resonances\n=============")
             
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder, external_resonance_indices=fixed_resonance_indices)
+        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options, particle_pair=self.particle_pair)
+        initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonances_df=fixed_resonances)
+        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
 
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
@@ -153,7 +168,7 @@ class AutoFit:
         return self.output
 
 
-    def cross_validation(self, evaluation_data, resonance_ladder, fixed_resonance_indices=[]):
+    def cross_validation(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
 
         ### Split CV data
         if True: #measurement_wise
@@ -176,31 +191,33 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
+            multi_input = [(train, test, total_resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 results = pool.map(self.get_cross_validation_score, multi_input)
             ## Pull results
             assert len(results) == kfolds
-            save_test_scores, save_train_scores, save_ires = [], [], []
+            save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain = [], [], [], [], []
             for k in range(kfolds):
-                test_scores, train_scores, ires = results[k]
-                save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
+                test_scores, train_scores, ires, Ntest, Ntrain = results[k]
+                save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires); save_Ntest.append(Ntest); save_Ntrain.append(Ntrain)
 
         ### get CVE score in serial
         else:
-            save_test_scores, save_train_scores, save_ires = [], [], []
+            save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain = [], [], [], [], []
             for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
-                test_scores, train_scores, ires = self.get_cross_validation_score((train, test, resonance_ladder, fixed_resonance_indices))
-                save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires)
+                test_scores, train_scores, ires, Ntest, Ntrain = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices))
+                save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires); save_Ntest.append(Ntest); save_Ntrain.append(Ntrain)
 
         # if save:
-        self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
+        save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain = np.array(save_test_scores), np.array(save_train_scores), np.array(save_ires), np.array(save_Ntest), np.array(save_Ntrain)
+        self.output.cross_validation_output = CrossValidationOUT(ires=save_ires, test_scores=save_test_scores, train_scores=save_train_scores, Ntest=save_Ntest, Ntrain=save_Ntrain)
 
-        return save_test_scores, save_train_scores, save_ires, kfolds
+        return save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain, kfolds
     
 
     def get_cross_validation_score(self, input_arguement):
-        evaluation_data_train, evaluation_data_test, resonance_ladder, fixed_resonance_indices = input_arguement
+        evaluation_data_train, evaluation_data_test, total_resonance_ladder, fixed_resonance_indices = input_arguement
+        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         
         # set RTO options if in parallel
         if self.options.parallel_CV:
@@ -217,21 +234,27 @@ class AutoFit:
         solver_test = Solver_factory(rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test)
 
         # fit and eliminate
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options)
-        initial_samout = fe.initial_fit(resonance_ladder,external_resonance_indices=fixed_resonance_indices)
+        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options, particle_pair=self.particle_pair)
+        initial_samout = fe.initial_fit(resonance_ladder,fixed_resonance_ladder=fixed_resonance_ladder)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonances_df=fixed_resonances)#, target_ires=len(fixed_resonances))
+        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances)#, target_ires=len(fixed_resonances))
 
         # get test and train scores
-        test_scores, train_scores, ires = [], [], []
+        test_scores, train_scores, ires, Ntrain, Ntest = [], [], [], [], []
         for key, val in elimination_history.items():
-            N_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
-            train_scores.append(np.sum(val['selected_ladder_chars'].chi2_post)/N_train)
-
-            test_out = solver_test.fit(val['selected_ladder_chars'].par_post, [])
-            N_test = len(test_out.pw[0])
-
-            test_scores.append(np.sum(test_out.chi2)/N_test)
+            res_ladder = val['selected_ladder_chars'].par_post
+            test_out = solver_test.fit(res_ladder)
+            Ntest.append(len(test_out.pw[0]))
+            Ntrain.append(np.sum([len(each) for each in val['selected_ladder_chars'].pw_post]))
+            # Train
+            chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)#/Ntrain*(Ntrain+Ntest)
+            obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
+            train_scores.append(obj_train)
+            # Test
+            chi2_test = np.sum(test_out.chi2)#/Ntest*(Ntrain+Ntest)
+            obj_test = objective_func(chi2_test, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
+            test_scores.append(obj_test)
+            # ires
             ires.append(key)
 
-        return (test_scores, train_scores, ires)
+        return (test_scores, train_scores, ires, Ntest, Ntrain)

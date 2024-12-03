@@ -28,6 +28,10 @@ Known Bugs and Issues
 Potential New Features
 ======================
 - BS approximation fix.
+
+Things To Do
+============
 - Checks for resonance structures that break resonance statistics (unprobable widths, etc.)
 - Highly verbose comments with the spin assignment codes.
 - Remove redundant features between ATARI and TAZ.
+- Move unit tests from TAZ to ATARI.

@@ -1,7 +1,5 @@
-from typing import List
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.stats import rv_continuous
 
 from ATARI.theory.distributions import porter_thomas_dist, fraction_missing_gn2
 from ATARI.TAZ.TAZ.DataClasses.Spingroups import HalfInt
@@ -12,7 +10,7 @@ This module compiles mean parameter estimation methods.
 
 
 """
-Proposed methods for mean-level spacing estimation:
+Methods for mean-level spacing estimation:
     1. Bethe formula for level-densities.
     2. Ladder size over number of levels.
     3. Linear regression on the cumulative level function.
@@ -193,33 +191,3 @@ def mean_width_CDF_regression(widths, dof:int=1, thres:float=0.0):
     frac_missing_std = None # FIXME: find the standard deviation on the fraction of missing resonances!
     return mean_width[0], mean_width_std, \
            frac_missing, frac_missing_std
-
-# =================================================================================================
-#    False/Missing Level-Density Estimation:
-# =================================================================================================
-
-def estimate_false_missing_density_from_spacing(num_res:int, lvl_dens_exp:float, ladder_size:float):
-    """
-    ...
-    """
-
-    num_res_exp = lvl_dens_exp * ladder_size
-    frac_false_minus_missing = (num_res - num_res_exp) / num_res
-    lvl_dens_false_minus_missing = frac_false_minus_missing * lvl_dens_exp
-    return lvl_dens_false_minus_missing
-
-def estimate_false_missing_density_from_widths(widths, level_densities_exp:List[float], width_dists:List[rv_continuous], trunc:float):
-    """
-    ...
-    """
-
-    level_dens_tot = sum(level_densities_exp)
-    widths = abs(np.array(widths, dtype=float))
-    widths_above_trunc = widths[widths >= trunc]
-    frac_widths_above_trunc = len(widths_above_trunc)/len(widths)
-    frac_widths_above_trunc_true = 0.0
-    for level_density, width_dist in zip(level_densities_exp, width_dists):
-        frac_widths_above_trunc_true += (level_density/level_dens_tot) * width_dist.isf(trunc)
-    frac_false_minus_missing = frac_widths_above_trunc/frac_widths_above_trunc_true
-    level_dens_false_minus_missing = frac_false_minus_missing * level_dens_tot
-    return level_dens_false_minus_missing

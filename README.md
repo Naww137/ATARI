@@ -8,14 +8,14 @@ Quick Installation
 ==================
 ATARI can be installed quickly using pip:
 
-:code:`pip install --upgrade git+https://github.com/Naww137/ATARI.git`
+```pip install --upgrade git+https://github.com/Naww137/ATARI.git```
 
 Installing from a cloned directory
 ==================================
 To clone ATARI, first migrate to the desired directly. Use the following command to clone the
 ATARI directory:
 
-:code:`git clone https://github.com/Naww137/ATARI.git`
+`git clone https://github.com/Naww137/ATARI.git`
 
 Migrate to the `ATARI` directory and run :code:`pip install .`. Alternatively, if you plan to make
 changes to the code, run :code:`pip install -e .`. Note that the :code:`-e` option may not work on

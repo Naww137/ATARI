@@ -21,11 +21,6 @@ Methods for mean width estimation:
     1. Mean of reduced widths.
     2. Porter-Thomas CDF regression.
   / 3. Porter-Thomas PDF regression.
-
-Methods for false/missing density estimation:
-    1. Porter-Thomas CDF regression.
-  / 2. Missing level-spacing distribution regression.
-  / 3. Delta-3 statistic missing fraction estimation.
 """
 
 

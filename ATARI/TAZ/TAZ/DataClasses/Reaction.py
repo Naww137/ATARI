@@ -7,10 +7,11 @@ import warnings
 
 from ATARI.theory import distributions
 from ATARI.theory import level_spacing_distributions
-from ATARI.TAZ.TAZ.Theory import Samplers, RMatrix
+from ATARI.TAZ.TAZ.Theory import Samplers
 from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
 
 from ATARI.ModelData.particle import Particle, Neutron
+from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
 
 __doc__ = """
 This file keeps the "Reaction" class. The "Reaction" class contains all relevent
@@ -258,10 +259,8 @@ class Reaction:
         P : float, array-like
             The penetration factor.
         """
-        k = RMatrix.k_wavenumber(self.targ.mass, E, self.proj.mass)
-        rho = RMatrix.rho(k, self.ac)
-        P = RMatrix.penetration_factor(rho, l)
-        return P
+        S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.targ.mass, self.proj.mass, l)
+        return P[-1,:]
     def gn2_to_Gn(self, gn2, E, l:int):
         """
         Converts reduced neutron widths to partial neutron widths.
@@ -281,7 +280,7 @@ class Reaction:
             Partial neutron widths.
         """
         P = self.penetration_factor(E, l)
-        Gn = RMatrix.g2_to_G(gn2, P)
+        Gn = g2_to_G(gn2, P)
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):
         """
@@ -302,14 +301,14 @@ class Reaction:
             Reduced neutron widths.
         """
         P = self.penetration_factor(E, l)
-        gn2 = RMatrix.G_to_g2(Gn, P)
+        gn2 = G_to_g2(Gn, P)
         return gn2
     @property
     def Gnm(self):
         'Mean Partial Neutron Widths'
         def _Gnm_func(l, gn2m, E):
             P = self.penetration_factor(E, l)
-            return RMatrix.g2_to_G(gn2m, P)
+            return g2_to_G(gn2m, P)
         Gnm_funcs = []
         for l, gn2m in zip(self.L, self.gn2m):
             Gnm_func = partial(_Gnm_func, l, gn2m)
@@ -331,7 +330,7 @@ class Reaction:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        Gg = RMatrix.g2_to_G(gg2, P)
+        Gg = g2_to_G(gg2, P)
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -348,13 +347,13 @@ class Reaction:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        gg2 = RMatrix.G_to_g2(Gg, P)
+        gg2 = G_to_g2(Gg, P)
         return gg2
     @property
     def Ggm(self):
         'Mean Partial Gamma (Capture) Widths'
         P = 1.0 # penetrability is 1 for capture widths
-        return RMatrix.g2_to_G(self.gg2m, P)
+        return g2_to_G(self.gg2m, P)
     
     def __repr__(self):
         txt = ''

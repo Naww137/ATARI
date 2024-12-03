@@ -1,3 +1,4 @@
+from typing import Callable
 from math import sqrt
 import numpy as np
 from numpy.random import Generator
@@ -17,7 +18,7 @@ energies.
 #    Partial Width Sampling:
 # =================================================================================================
 
-def SampleNeutronWidth(E, Gnm, dof:int,
+def SampleNeutronWidth(E, Gnm:Callable, dof:int,
                        rng:Generator=None, seed:int=None):
     """
     Samples neutron widths according to the chi-squared distribution.

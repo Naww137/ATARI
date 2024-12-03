@@ -1,8 +1,14 @@
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.spingroups import Spingroup
+<<<<<<< HEAD
 from ATARI.TAZ.DataClasses.Reaction import Reaction
 from ATARI.TAZ.PTBayes import PTBayes
 from ATARI.TAZ import analysis
+=======
+from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.TAZ import analysis
+>>>>>>> e150fd7d (Moved Spingroup class from TAZ/DataClasses to ATARI/ModelData. The "Reaction" class will need to be combined with ATARI at some point. I will likely rename this to `MeanParameterBank` or something.)
 
 import numpy as np
 

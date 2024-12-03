@@ -2,6 +2,7 @@ from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.spingroups import Spingroup
 from ATARI.TAZ.DataClasses.Reaction import Reaction
 from ATARI.TAZ.Theory.Samplers import SampleEnergies
+from ATARI.ModelData.spingroups import Spingroup
 from ATARI.ASTERIODS.mean_parameter_estimation import mean_spacing_averaging, mean_width_averaging, mean_width_CDF_regression
 
 import numpy as np

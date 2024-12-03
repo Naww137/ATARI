@@ -167,21 +167,11 @@ class __PorterThomasDistribution(rv_continuous):
         y[x > trunc] = chi2.sf(x_trunc, df=df_trunc, scale=scale_trunc) / norm_trunc
         return y
     def _ppf(self, q, mean:float, df:int, trunc:float):
-        # Getting the sign:
-        sign = np.ones_like(q)
-        sign[q < 0.5] = -1
-        q = 2.0 * abs(q - 0.5)
-        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = (q - 1) * norm + 1
         x = chi2.ppf(qp, df=df, scale=mean/df)
         return x
     def _isf(self, q, mean:float, df:int, trunc:float):
-        # Getting the sign:
-        sign = np.ones_like(q)
-        sign[q < 0.5] = -1
-        q = 2.0 * abs(q - 0.5)
-        # Calculating the value:
         norm = chi2.sf(trunc, df=df, scale=mean/df)
         qp = q * norm
         x = chi2.isf(qp, df=df, scale=mean/df)

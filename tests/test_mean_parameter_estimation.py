@@ -1,12 +1,10 @@
-import numpy as np
-
 from ATARI.ModelData.particle import Particle, Neutron
-
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+from ATARI.ModelData.spingroups import Spingroup
 from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 from ATARI.TAZ.TAZ.Theory.Samplers import SampleEnergies
-
 from ATARI.ASTERIODS.mean_parameter_estimation import mean_spacing_averaging, mean_width_averaging, mean_width_CDF_regression
+
+import numpy as np
 
 import warnings
 warnings.filterwarnings('error', category=RuntimeWarning)

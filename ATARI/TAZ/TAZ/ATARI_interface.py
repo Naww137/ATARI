@@ -3,14 +3,16 @@ import numpy as np
 from numpy import ndarray
 from pandas import DataFrame
 
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
+from ATARI.ModelData.particle_pair import Particle_Pair
+from ATARI.ModelData.spingroups import Spingroup
+
 from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file is used to interface between ATARI and TAZ Dataclasses.
 """
 
-def ATARI_to_TAZ(particle_pair, **kwargs):
+def ATARI_to_TAZ(particle_pair:Particle_Pair, **kwargs):
     """
     Converts an ATARI Particle_Pair object to a TAZ Reaction object.
 
@@ -30,6 +32,9 @@ def ATARI_to_TAZ(particle_pair, **kwargs):
     spingroup_IDs: ndarray of int
         TAZ spingroup IDs (which may be different than J_IDs).
     """
+
+    if not isinstance(particle_pair, Particle_Pair):
+        raise TypeError('"particle_pair" is not of type Particle_Pair.')
 
     energy_bounds = (min(particle_pair.energy_range), max(particle_pair.energy_range))
     

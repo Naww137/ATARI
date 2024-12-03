@@ -1,9 +1,8 @@
 from ATARI.ModelData.particle import Particle, Neutron
+from ATARI.ModelData.spingroups import Spingroup
 from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist
 from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_delta_3_predict
 from ATARI.theory.level_spacing_distributions import WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen, merge
-
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
 from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
 
 from ATARI.TAZ.tests.utils import chi2_test, chi2_uniform_test

@@ -1,7 +1,6 @@
 import sys
 sys.path.append('../ATARI')
 from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_delta_3_predict
-from ATARI.theory.scattering_params import FofE_explicit
 from ATARI.ModelData.particle import Neutron, Ta181
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist
@@ -58,8 +57,8 @@ class TestResonanceGeneration(unittest.TestCase):
 
         cls.part_pair.map_quantum_numbers(print_out=False)
         cls.mean_level_spacing = 9.0030 # eV
-        cls.mean_neutron_width = 452.56615 ; cls.gn2_dof = 1    # eV
-        cls.mean_gamma_width   = 32.0      ; cls.gg2_dof = 1000 # eV
+        cls.mean_neutron_width = 452.56615 ; cls.gn2_dof = 1    # meV
+        cls.mean_gamma_width   = 32.0      ; cls.gg2_dof = 200 # meV
 
         cls.L = 0
         cls.part_pair.add_spin_group(Jpi='3.0',
@@ -95,7 +94,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 
         NUM_BINS = 40
         Gg = self.res_ladder['Gg']
-        gg2 = Gg / 2.0
+        gg2 = self.part_pair.Gg_to_gg2(Gg)
         dist = porter_thomas_dist(mean=self.mean_gamma_width, df=self.gg2_dof, trunc=0.0)
         chi2_bar, p = chi2_test(dist, abs(gg2), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
@@ -119,11 +118,10 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 
         NUM_BINS = 40
         E  = np.array(self.res_ladder['E'])
-        P = FofE_explicit(E, self.part_pair.ac, self.part_pair.M, self.part_pair.m, self.L)[1]
         Gn = np.array(self.res_ladder['Gn1'])
-        gn2 = Gn / (2.0*P)
+        gn2 = self.part_pair.Gn_to_gn2(Gn, E, self.L)
         dist = porter_thomas_dist(mean=self.mean_neutron_width, df=self.gn2_dof, trunc=0.0)
-        chi2_bar, p = chi2_test(dist, abs(gn2), NUM_BINS)
+        chi2_bar, p = chi2_test(dist, abs(np.array(gn2)), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
 The neutron widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}

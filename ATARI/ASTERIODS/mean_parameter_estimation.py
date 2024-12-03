@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 from ATARI.theory.distributions import porter_thomas_dist, fraction_missing_gn2
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import HalfInt
+from ATARI.ModelData.spingroups import HalfInt
 
 __doc__ = """
 This module compiles mean parameter estimation methods.

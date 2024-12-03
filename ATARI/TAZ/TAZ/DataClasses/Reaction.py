@@ -5,10 +5,10 @@ from functools import partial
 
 import warnings
 
+from ATARI.ModelData.spingroups import Spingroup
 from ATARI.theory import distributions
 from ATARI.theory import level_spacing_distributions
 from ATARI.TAZ.TAZ.Theory import Samplers
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
 
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G

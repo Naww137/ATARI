@@ -1,5 +1,5 @@
 import unittest
-from tests import test_resonance_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario
+from unittests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation
 
 __doc__ = """
 This file runs all of the unit tests from the "tests" directory.
@@ -15,7 +15,9 @@ if __name__ == '__main__':
 
     ### general ATARI test suites
     parameter_distribution_test_suite = loader.loadTestsFromModule(test_resonance_distributions)
+    level_spacing_distribution_test_suite = loader.loadTestsFromModule(test_level_spacing_distributions)
     resonance_generator_test_suite = loader.loadTestsFromModule(test_res_generator)
+    test_mean_parameter_estimation_test_suite = loader.loadTestsFromModule(test_mean_parameter_estimation)
     
     # TODO: add theory_module_test_suite
     syndat_test_suite = loader.loadTestsFromModule(test_syndat_functionality)
@@ -32,8 +34,14 @@ if __name__ == '__main__':
     print("Running parameter distribution test suite")
     result = runner.run(parameter_distribution_test_suite)
 
+    print("Running level-spacing distribution test suite")
+    result = runner.run(level_spacing_distribution_test_suite)
+
     print("Running resonance generator test suite")
     result = runner.run(resonance_generator_test_suite)
+
+    print("Running mean parameter estimation test suite")
+    result = runner.run(test_mean_parameter_estimation_test_suite)
 
     print("Running Syndat test suite")
     result = runner.run(syndat_test_suite)

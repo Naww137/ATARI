@@ -3,9 +3,12 @@ AI/ML Tool for Automated Resonance Identification
 
 This is the repository for scripts, documents, and other resources relevant to the ATARI project, a part of Noah Walton's PhD research at the University of Tennessee. 
 If you use this software, please cite the code using the citation link in the right hand pannel of this GitHub page and the appropriate journal publication detailing the methodology. 
-The methodology for generating synthetic neturon time-of-flight data can be found `here <https://doi.org/10.1016/j.cpc.2023.108927>`.
-The methodology for automated resonance fitting can be found `here <arXiv:2402.14122>`.
-The initial demonstration for validating the automated fitting tool with the synthetic data approach can be found `here <https://doi.org/10.1016/j.anucene.2024.111081>`.
+
+The methodology for generating synthetic neturon time-of-flight data can be found [here](https://doi.org/10.1016/j.cpc.2023.108927).
+
+The methodology for automated resonance fitting can be found [here](https://doi.org/10.48550/arXiv.2402.14122).
+
+The initial demonstration for validating the automated fitting tool with the synthetic data approach can be found [here](https://doi.org/10.1016/j.anucene.2024.111081).
 
 
 Installing Dependencies
@@ -15,7 +18,7 @@ install these dependencies, run the following line.
 
 `pip install -r requirements.txt`
 
-Most of ATARI's capabilities requires `SAMMY <https://code.ornl.gov/RNSD/SAMMY>`_ to be installed.
+Most of ATARI's capabilities requires [SAMMY](https://code.ornl.gov/RNSD/SAMMY) to be installed.
 SAMMY is open source and can be coupled to ATARI simply by providing a path to the local SAMMY
 executable after build/install of SAMMY. This is done for each script that is run.
 

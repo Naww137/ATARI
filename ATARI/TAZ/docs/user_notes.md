@@ -34,8 +34,8 @@ Things To Do
 - Checks for resonance structures that break resonance statistics (unprobable widths, etc.)
 - Highly verbose comments with the spin assignment codes.
 <<<<<<< HEAD
+<<<<<<< HEAD
 - Remove redundant features between ATARI and TAZ.
 - Move unit tests from TAZ to ATARI.
-=======
 - Remove redundant features between ATARI and TAZ.
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.)
+- Move unit tests from TAZ to ATARI.

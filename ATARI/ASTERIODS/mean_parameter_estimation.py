@@ -1,7 +1,5 @@
-from typing import List
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.stats import rv_continuous
 
 from ATARI.theory.distributions import porter_thomas_dist
 from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2

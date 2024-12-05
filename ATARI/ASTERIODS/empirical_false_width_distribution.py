@@ -5,7 +5,7 @@ from scipy.stats import rv_continuous, gaussian_kde
 from copy import copy
 
 from ATARI.theory.distributions import porter_thomas_dist
-from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file contains tools for estimating the distribution of false widths.
@@ -207,9 +207,9 @@ def empirical_false_distribution(Gn, E_eval:float,
     # Calculating probabilities for widths given true:
     P_Gn_gvn_T = np.zeros_like(Gn, dtype=float)
     P_SG_gvn_T = np.array(reaction.lvl_dens) / np.sum(reaction.lvl_dens)
-    P_W_gvn_SG_pdf = porter_thomas_dist.pdf
     for p_SG_gvn_T, Gnm, nDOF in zip(P_SG_gvn_T, reaction.Gnm, reaction.nDOF):
-        P_Gn_gvn_T += p_SG_gvn_T * P_W_gvn_SG_pdf(Gn, mean=Gnm(E_eval), df=nDOF, trunc=0.0)
+        P_W_gvn_SG_pdf = porter_thomas_dist(mean=Gnm(np.array([E_eval])), df=nDOF, trunc=0.0).pdf
+        P_Gn_gvn_T += p_SG_gvn_T * P_W_gvn_SG_pdf(Gn)
 
     # Arbitrary guess for the false distribution to start.
     # We guess the false distribution is the same as the true distribution
@@ -220,27 +220,37 @@ def empirical_false_distribution(Gn, E_eval:float,
     for iter in range(1000):
         P_F_gvn_Gn_prev = P_F_gvn_Gn
         P_Gn_gvn_F_func = _fitting_false_width_dist(Gn, weights=P_F_gvn_Gn_prev, trunc=trunc) # estimating false distribution
-        P_Gn_gvn_F = P_Gn_gvn_F_func.pdf(Gn)
+        P_Gn_gvn_F = P_Gn_gvn_F_func(Gn)
         P_F_gvn_Gn = (P_F*P_Gn_gvn_F)/(P_F*P_Gn_gvn_F + P_T*P_Gn_gvn_T)
         if all(abs(P_F_gvn_Gn - P_F_gvn_Gn_prev) < err_thres):
             break
     else:
         raise RuntimeError('The false distribution never converged.')
-    return P_Gn_gvn_F_func, P_F_gvn_Gn
+    
+    # Making the final false width distribution function a rv_continuous object for flexible applications:
+    class __FalseDistribution(rv_continuous):
+        def _pdf(self, x):
+            return P_Gn_gvn_F_func(x)
+    false_distribution = __FalseDistribution(name='false neutron width distribution', a=0.0, b=np.inf)
+
+    # Returning results:
+    return false_distribution, P_F_gvn_Gn
 
 def _fitting_false_width_dist(Gn, weights, trunc:float=np.inf):
     """
     ...
     """
 
+    Gn = abs(Gn)
+    
     # If widths are beyond truncation threshold, set likelihood to zero:
     weights = copy(weights)
-    weights[abs(Gn) > trunc] = 0.0
-    # Make the distribution symmetric:
-    Gn_sym      = np.concatenate((Gn, -Gn))
-    weights_sym = np.concatenate((weights, weights))
+    weights[Gn > trunc] = 0.0
+    
     # Returning the false width distribution:
-    false_width_dist = gaussian_kde(Gn_sym, weights=weights_sym)
+    false_width_dist_log = gaussian_kde(np.log(Gn), weights=weights)
+    false_width_dist_log.set_bandwidth(bw_method='silverman')
+    false_width_dist = lambda x: false_width_dist_log.evaluate(np.log(x)) / x
     return false_width_dist
 
 # NOTE: Energy-Dependent Version Below

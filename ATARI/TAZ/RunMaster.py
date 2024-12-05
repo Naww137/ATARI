@@ -3,7 +3,7 @@ import numpy as np
 from pandas import Series
 
 from ATARI.theory.level_spacing_distributions import SpacingDistributionBase, merge
-from ATARI.TAZ.TAZ.Encore import Encore
+from ATARI.TAZ.Encore import Encore
 
 import warnings
 

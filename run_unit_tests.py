@@ -1,5 +1,5 @@
 import unittest
-from unittests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation
+from tests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation
 
 __doc__ = """
 This file runs all of the unit tests from the "tests" directory.

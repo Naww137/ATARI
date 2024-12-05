@@ -1,10 +1,10 @@
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.spingroups import Spingroup
-from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
-from ATARI.TAZ.TAZ.PTBayes import PTBayes
-from ATARI.TAZ.TAZ.RunMaster import RunMaster
+from ATARI.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.RunMaster import RunMaster
 
-from utils import chi2_test
+from ATARI.TAZ.tests.utils import chi2_test
 
 import numpy as np
 

@@ -4,7 +4,7 @@ import numpy as np
 from numpy import newaxis as NA
 
 from ATARI.theory.distributions import porter_thomas_dist
-from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This module contains Bayes' update for the probabilistic distribution on the neutron widths (and

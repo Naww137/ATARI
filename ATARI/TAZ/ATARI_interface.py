@@ -6,7 +6,7 @@ from pandas import DataFrame
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.spingroups import Spingroup
 
-from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file is used to interface between ATARI and TAZ Dataclasses.

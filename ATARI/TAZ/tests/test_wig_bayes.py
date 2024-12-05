@@ -1,9 +1,9 @@
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.spingroups import Spingroup
-from ATARI.TAZ.TAZ.DataClasses.Reaction import Reaction
-from ATARI.TAZ.TAZ.RunMaster import RunMaster
-from ATARI.TAZ.TAZ.PTBayes import PTBayes
-from ATARI.TAZ.TAZ.analysis import correlate_probabilities
+from ATARI.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.RunMaster import RunMaster
+from ATARI.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.analysis import correlate_probabilities
 
 import numpy as np
 

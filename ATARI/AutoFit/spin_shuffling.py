@@ -8,10 +8,10 @@ from ATARI.sammy_interface.sammy_functions import run_sammy_YW
 from ATARI.AutoFit.functions import objective_func
 from ATARI.AutoFit.sammy_interface_bindings import Solver
 
-from ATARI.TAZ.TAZ.RunMaster import RunMaster
-from ATARI.TAZ.TAZ.PTBayes import PTBayes
-from ATARI.TAZ.TAZ.ATARI_interface import ATARI_to_TAZ, ATARI_to_TAZ_resonances
-from ATARI.TAZ.TAZ.empirical_false_width_distribution import estimate_false_missing_fraction_from_spacing, empirical_false_distribution
+from ATARI.TAZ.RunMaster import RunMaster
+from ATARI.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
+from ATARI.ASTERIODS.empirical_false_width_distribution import estimate_false_missing_density_from_spacing, empirical_false_distribution
 
 def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair):
     """
@@ -40,11 +40,11 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     if false_resonances:
         lvl_dens_exp = sum(reaction_TAZ.lvl_dens_all)
         ladder_size = reaction_TAZ.EB[1] - reaction_TAZ.EB[0]
-        false_frac = estimate_false_missing_fraction_from_spacing(num_res, lvl_dens_exp, ladder_size)
-        false_dens = (false_frac * num_res) / ladder_size
+        false_dens = estimate_false_missing_density_from_spacing(num_res, lvl_dens_exp, ladder_size)
+        false_width_dist, _ = empirical_false_distribution(respar['Gn1'], false_frac, )
     else:
         false_dens = 0.0
-    false_width_dist, _ = empirical_false_distribution(respar['Gn1'], false_frac, )
+        false_width_dist = None
     prior, log_likelihood_prior = PTBayes(respar, reaction_TAZ, false_width_dist=false_width_dist.pdf)
     run_master = RunMaster(respar['E'], reaction_TAZ.EB, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
     spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)

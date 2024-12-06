@@ -13,7 +13,7 @@ post-processor for Encore.
 
 class Encore:
     """
-    A class spingroup classification. This class has many features:
+    A class for spingroup classification. This class has many features:
 
     1. WigBayes: spingroup probabilities for each resonance, given the resonance ladder and mean
     parameters.

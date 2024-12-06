@@ -236,10 +236,3 @@ def g2_to_G(g2, penetrability):
 
     G = 2 * penetrability * g2
     return G
-
-
-# NOTE: Duplicate, unused:
-def reduced_width_square_2_partial_width(E, ac, M, m, reduced_widths_square, orbital_angular_momentum):
-    S, P, psi, k = FofE_recursive(np.array(E), ac, M, m, orbital_angular_momentum)
-    partial_widths = 2*P*reduced_widths_square 
-    return partial_widths

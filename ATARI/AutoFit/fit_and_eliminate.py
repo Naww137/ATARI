@@ -639,8 +639,8 @@ class FitAndEliminate:
             deep_chi2_prior = np.sum(cur_sol_chars_deep.chi2)
             deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-            deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
-            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+            deep_chi2_post = np.sum(cur_sol_chars_deep.chi2_post)
+            deep_obj = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             benefit_deep_obj = deep_obj - base_obj
 
@@ -703,7 +703,7 @@ class FitAndEliminate:
             deep_obj_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
-                    obj_stopping_criteria = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
+                    obj_stopping_criteria = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                                            Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
                     obj_type = 'chi2'
                     if Wigner_informed_stopping_criteria:

@@ -19,26 +19,31 @@ Methods for false/missing density estimation:
   / 4. Delta-3 statistic missing fraction estimation.
 """
 
-# def estimate_false_missing_fraction_from_widths(widths, width_dist:rv_continuous, trunc:float):
-#     """
-#     ...
-#     """
+# =================================================================================================
+#    Calculating Fraction of Widths Below Threshold:
+# =================================================================================================
 
-#     widths = abs(np.array(widths, dtype=float))
-#     widths_above_trunc = widths[widths >= trunc]
-#     frac_widths_above_trunc = len(widths_above_trunc)/len(widths)
-#     frac_widths_above_trunc_true = width_dist.isf(trunc)
-#     frac_false_minus_missing = frac_widths_above_trunc/frac_widths_above_trunc_true
-#     return frac_false_minus_missing
+def fraction_below_threshold_gn2(gn2_thres:float, gn2m:float=1.0, dof:int=1):
+    """
+    Finds the fraction of widths below a truncation threshold in reduced neutron width.
 
-# def estimate_false_missing_fraction_from_spacing(num_res:int, lvl_dens_exp:float, ladder_size:float):
-#     """
-#     ...
-#     """
+    Parameters
+    ----------
+    gn2_thres : float
+        The lower limit on the reduced neutron width.
+    gn2m : float
+        The mean reduced neutron width. Default = 1.0.
+    dof : int
+        The number of degrees of freedom for the chi-squared distribution.
 
-#     num_res_exp = lvl_dens_exp * ladder_size
-#     frac_false_minus_missing = (num_res - num_res_exp) / num_res
-#     return frac_false_minus_missing
+    Returns
+    -------
+    fraction_below_thres : float
+        The fraction of resonances with widths below the threshold within the spingroup.
+    """
+    # fraction_below_thres = gammainc(dof/2, dof*gn2_thres/(2*gn2m))
+    fraction_below_thres = porter_thomas_dist(mean=gn2m, df=dof, trunc=0.0).cdf(gn2_thres)
+    return fraction_below_thres
 
 # =================================================================================================
 #    False/Missing Level-Density Estimation:
@@ -150,58 +155,47 @@ def estimate_false_missing_density_from_spacing(num_res:int, window_E_bounds:Tup
 #    Empirical False Width Distribution:
 # =================================================================================================
 
-# def empirical_false_distribution(widths, prob_false:float, true_dist:rv_continuous, trunc:float=np.inf, err_thres:float=1e-5):
-#     """
-#     ...
-#     """
-
-#     widths = np.array(widths, dtype=float)
-#     P_F = prob_false
-#     P_T = 1.0 - P_F
-
-#     P_W_gvn_T = true_dist.pdf(widths)
-
-#     # Arbitrary guess for the false distribution to start.
-#     # We guess the false distribution is the same as the true distribution
-#     # which results in an uninformed false probability.
-#     P_F_gvn_W = P_F*np.ones_like(widths)
-
-#     # Iterating over false distribution estimation until convergence
-#     for it in range(1000):
-#         P_F_gvn_W_prev = P_F_gvn_W
-#         P_W_gvn_F_func = limited_gaussian_kde(widths, weights=P_F_gvn_W_prev, trunc=trunc) # estimating false distribution
-#         P_W_gvn_F = P_W_gvn_F_func.pdf(widths)
-#         P_F_gvn_W = (P_F*P_W_gvn_F)/(P_F*P_W_gvn_F + P_T*P_W_gvn_T)
-#         if all(abs(P_F_gvn_W - P_F_gvn_W_prev) < err_thres):
-#             break
-#     else:
-#         raise RuntimeError('The false distribution never converged.')
-#     return P_W_gvn_F_func, P_F_gvn_W
-
-# def limited_gaussian_kde(widths, weights, trunc:float=np.inf):
-#     """
-#     ...
-#     """
-
-#     # if trunc != np.inf:
-#     #     raise NotImplementedError('Limited distribution fitting has not been implemented yet.')
-
-#     weights = copy(weights)
-#     weights[abs(widths) > trunc] = 0.0
-#     widths_sym  = np.concatenate((widths, -widths))
-#     weights_sym = np.concatenate((weights, weights))
-#     distribution = gaussian_kde(widths_sym, weights=weights_sym)
-#     return distribution
-
-def empirical_false_distribution(Gn, E_eval:float,
-                                 prob_false_prior:float, reaction:Reaction,
-                                 trunc:float=np.inf, err_thres:float=1e-5):
+def empirical_false_distribution(Gn, E_eval:float, reaction:Reaction,
+                                 trunc:float=np.inf, err_tol:float=1e-5):
     """
-    ...
+    Finds a false-resonance neutron width distribution from observed widths that are thought to
+    follow expected Porter-Thomas width distributions for each spingroup.
+    
+    The false width distribution is calculated by initially guessing false probabilities for each
+    width and iterating through the following three steps until convergence:
+     1. Estimate the false width distribution using Gaussian kernel density estimation with widths
+        weighted by their probability of being attributed to false resonances.
+     2. Using the false width distribution, evaluate the likelihood of each width comming from
+        false resonances.
+     3. Calculate the estimated probability of each width being attributed to a false resonance
+        using Bayes' equations.
+
+    Parameters
+    ----------
+    Gn : ndarray[float]
+        The observed partial neutron widths.
+    E_eval : float
+        The approximate resonance energy that the provided resonance widths are attributed to.
+        This would normally be the center of the window.
+    reaction : Reaction
+        The Reaction object containing necessary information about mean neutron widths, degrees of
+        freedom, and level densities.
+    trunc : float
+        A threshold, above which all resonances are considered to be true. The default is np.inf
+        (no threshold).
+    err_thres : float
+        Tolerance for the convergence of the false width distribution. Default is 1e-5.
+
+    Returns
+    -------
+    false_distribution : rv_continuous
+        The false width probability distribution object.
+    P_F_gvn_Gn : ndarray[float]
+        The probability for each width to be attributed to a false resonance.
     """
 
     Gn = np.array(Gn, dtype=float)
-    P_F = prob_false_prior
+    P_F = reaction.false_dens / sum(reaction.lvl_dens_all)
     P_T = 1.0 - P_F
 
     # Calculating probabilities for widths given true:
@@ -222,10 +216,10 @@ def empirical_false_distribution(Gn, E_eval:float,
         P_Gn_gvn_F_func = _fitting_false_width_dist(Gn, weights=P_F_gvn_Gn_prev, trunc=trunc) # estimating false distribution
         P_Gn_gvn_F = P_Gn_gvn_F_func(Gn)
         P_F_gvn_Gn = (P_F*P_Gn_gvn_F)/(P_F*P_Gn_gvn_F + P_T*P_Gn_gvn_T)
-        if all(abs(P_F_gvn_Gn - P_F_gvn_Gn_prev) < err_thres):
+        if all(abs(P_F_gvn_Gn - P_F_gvn_Gn_prev) < err_tol):
             break
     else:
-        raise RuntimeError('The false distribution never converged.')
+        raise RuntimeError('The false width distribution never converged.')
     
     # Making the final false width distribution function a rv_continuous object for flexible applications:
     class __FalseDistribution(rv_continuous):
@@ -238,19 +232,40 @@ def empirical_false_distribution(Gn, E_eval:float,
 
 def _fitting_false_width_dist(Gn, weights, trunc:float=np.inf):
     """
-    ...
+    Estimates the false-resonance neutron width distribution from a set of widths and associated
+    weights. The PDF is found using Gaussian kernel density estimation on the logarithm of the
+    neutron widths so that the kernel density estimation is appropriately sensitive to the
+    low-value widths.
+
+    Parameters
+    ----------
+    Gn : ndarray[float]
+        The observed partial neutron widths.
+    weights : ndarray[float]
+        The weights for each width in the kernel density estimation.
+    trunc : float
+        A threshold, above which all resonances are considered to be true. The default is np.inf
+        (no threshold).
+
+    Returns
+    -------
+    false_width_dist : function
+        The false-resonance neutron width distribution.
     """
 
-    Gn = abs(Gn)
+    Gn = abs(Gn) # we assume the distribution is symmetric and sign does not matter
     
     # If widths are beyond truncation threshold, set likelihood to zero:
     weights = copy(weights)
     weights[Gn > trunc] = 0.0
     
-    # Returning the false width distribution:
+    # Finding the false width distribution in log-space:
     false_width_dist_log = gaussian_kde(np.log(Gn), weights=weights)
     false_width_dist_log.set_bandwidth(bw_method='silverman')
+    # Converting from log-space to lin-space:
+    # f(x)*dx = g(ln(x))*d(ln(x)) --> f(x) = g(ln(x)) / x
     false_width_dist = lambda x: false_width_dist_log.evaluate(np.log(x)) / x
+
     return false_width_dist
 
 # NOTE: Energy-Dependent Version Below

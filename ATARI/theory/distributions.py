@@ -177,29 +177,3 @@ class __PorterThomasDistribution(rv_continuous):
         x = chi2.isf(qp, df=df, scale=mean/df)
         return x
 porter_thomas_dist = __PorterThomasDistribution(name='Porter-Thomas distribution', shapes='mean, df, trunc')
-
-# =================================================================================================
-#    More Width Distribution Functions:
-# =================================================================================================
-
-def fraction_missing_gn2(gn2_trunc:float, gn2m:float=1.0, dof:int=1):
-    """
-    Gives the fraction of missing resonances due to the truncation in reduced neutron width.
-
-    Parameters
-    ----------
-    trunc : float
-        The lower limit on the reduced neutron width.
-    gn2m  : float
-        The mean reduced neutron width. Default = 1.0.
-    dof   : int
-        The number of degrees of freedom for the chi-squared distribution.
-
-    Returns
-    -------
-    fraction_missing : float
-        The fraction of missing resonances within the spingroup.
-    """
-    # fraction_missing = gammainc(dof/2, dof*gn2_trunc/(2*gn2m))
-    fraction_missing = porter_thomas_dist(mean=gn2m, df=dof, trunc=0.0).cdf(gn2_trunc)
-    return fraction_missing

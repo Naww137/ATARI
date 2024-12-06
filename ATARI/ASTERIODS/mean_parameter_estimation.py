@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.optimize import curve_fit
 
-from ATARI.theory.distributions import porter_thomas_dist, fraction_missing_gn2
+from ATARI.theory.distributions import porter_thomas_dist
+from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
 from ATARI.ModelData.spingroups import HalfInt
 
 __doc__ = """
@@ -180,7 +181,7 @@ def mean_width_CDF_regression(widths, dof:int=1, thres:float=0.0):
     # FIXME: the standard deviation of the mean of the widths is under-estimated!
     mean_width_std = np.sqrt(mean_width_cov[0,0])
     # FIXME: the fraction missing is incorrect!
-    frac_below_thres = fraction_missing_gn2(thres, mean_width, dof)
+    frac_below_thres = fraction_below_threshold_gn2(thres, mean_width, dof)
     num_pred_widths = num_trunc_widths / (1-frac_below_thres)
     frac_missing = num_found_widths / num_pred_widths
     frac_missing_std = None # FIXME: find the standard deviation on the fraction of missing resonances!

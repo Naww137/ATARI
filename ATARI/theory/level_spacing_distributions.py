@@ -7,7 +7,7 @@ from numpy import newaxis as NA
 from scipy.special import gamma, gammaincc, gammainccinv, erfc, erfcx, erfcinv
 from scipy.integrate import quad
 from scipy.optimize import brentq
-from scipy.stats import norm
+from scipy.stats import norm, rv_continuous
 
 # =================================================================================================
 #    Spacing Distribution Class:
@@ -117,7 +117,6 @@ class SpacingDistributionBase:
     def r2(self, x):
         'Ratio of f1/f2.'
         x = np.array(x)
-        r = np.zeros_like(x)
         return self._r2(self.lvl_dens * x)
     def iF0(self, q):
         'Inverse of the survival function of the "f0" probability density function.'
@@ -159,6 +158,22 @@ class SpacingDistributionBase:
     
     def __call__(self, x):
         return self.pdf(x)
+    
+    def to_rv_continuous(self):
+        'Creates an rv_continuous object'
+        class __SpacingDistribution_rv_continuous(rv_continuous):
+            def _pdf(self2, x):
+                return self.pdf(x)
+            def _cdf(self2, x):
+                return self.cdf(x)
+            def _sf(self2, x):
+                return self.sf(x)
+            def _ppf(self2, x):
+                return self.ppf(x)
+            def _isf(self2, x):
+                return self.isf(x)
+        spacing_distribution_rv_continous = __SpacingDistribution_rv_continuous(a=0.0, b=np.inf)
+        return spacing_distribution_rv_continous
     
 # =================================================================================================
 #    Poisson Distribution:

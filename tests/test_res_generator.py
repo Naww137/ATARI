@@ -1,5 +1,3 @@
-import sys
-sys.path.append('../ATARI')
 from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_delta_3_predict
 from ATARI.ModelData.particle import Neutron, Ta181
 from ATARI.ModelData.particle_pair import Particle_Pair

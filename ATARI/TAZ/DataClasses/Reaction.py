@@ -9,6 +9,7 @@ from ATARI.ModelData.spingroups import Spingroup
 from ATARI.theory import distributions
 from ATARI.theory import level_spacing_distributions
 from ATARI.TAZ.Theory import Samplers
+from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
 
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
@@ -208,7 +209,7 @@ class Reaction:
         elif self.Gn_trunc_provided:
             def _miss_frac(gn2m, df, l, E):
                 gn2_trunc = self.Gn_to_gn2(Gn_trunc, E, l)
-                frac_missing = distributions.fraction_missing_gn2(gn2_trunc, gn2m, df)
+                frac_missing = fraction_below_threshold_gn2(gn2_trunc, gn2m, df)
                 return frac_missing
             missing_fracs = []
             for gn2m, df, l in zip(self.gn2m, self.nDOF, self.L):

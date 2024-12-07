@@ -244,8 +244,8 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
                     raise NotImplementedError('Cannot do Porter-Thomas when more than one l quantum state shares the same Jpi.')
                 l = int(spingroup['Ls'][0])
                 gn2 = particle_pair.Gn_to_gn2(Gn_int, E_int, l)
-                log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - len(gn2)*0.5*np.log(2*np.pi*mean_neutron_width)
-                log_likelihood -= 0 - len(gn2)*0.5*np.log(2*np.pi*mean_neutron_width) # to account for virtual resonances
+                log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width)
+                log_likelihood -= 0 - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width) # to account for virtual resonances
     else:
         log_likelihood = 0.0
 

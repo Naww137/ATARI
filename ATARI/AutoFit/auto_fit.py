@@ -3,7 +3,7 @@ from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
 from ATARI.AutoFit.fit_and_eliminate import FitAndEliminate, FitAndEliminateOPT, FitAndEliminateOUT
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SolverOPTs, Particle_Pair, SammyOutputData
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 import multiprocessing
 import os
@@ -159,6 +159,7 @@ class AutoFit:
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
         elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
 
+        self.output.Nres_target = Nres_selected # The number of resonances in the model
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
         self.output.final_samout = elimination_history[Nres_selected]['selected_ladder_chars']
@@ -183,6 +184,7 @@ class AutoFit:
 
         ### Could have option to save folds here
 
+        #################
         ### get CVE score in parallel
         if self.options.parallel_CV:
             ## Setup
@@ -208,11 +210,125 @@ class AutoFit:
                 test_scores, train_scores, ires, Ntest, Ntrain = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices))
                 save_test_scores.append(test_scores); save_train_scores.append(train_scores); save_ires.append(ires); save_Ntest.append(Ntest); save_Ntrain.append(Ntrain)
 
-        # if save:
-        save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain = np.array(save_test_scores), np.array(save_train_scores), np.array(save_ires), np.array(save_Ntest), np.array(save_Ntrain)
-        self.output.cross_validation_output = CrossValidationOUT(ires=save_ires, test_scores=save_test_scores, train_scores=save_train_scores, Ntest=save_Ntest, Ntrain=save_Ntrain)
+        # # if save:
+        # self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
 
-        return save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain, kfolds
+        # return save_test_scores, save_train_scores, save_ires, kfolds
+
+        #################
+        # data = {'save_test_scores':save_test_scores,
+        #         'save_train_scores':save_train_scores,
+        #         'save_ires':save_ires,
+        #         'kfolds':kfolds}
+        # import pickle
+        # from uuid import uuid4
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{uuid4()}.pkl', 'wb') as f:
+        #     pickle.dump(data, f)
+
+        #################
+        # import pickle
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{"c890f9c8-e2bb-4733-a632-5a08c4529a92"}.pkl', 'rb') as f:
+        #     data = pickle.load(f)
+        # save_test_scores = data['save_test_scores']
+        # save_train_scores = data['save_train_scores']
+        # save_ires = data['save_ires']
+        # kfolds = data['kfolds']
+
+        # print('\nsave_ires:')
+        # print(save_ires)
+        # print('\nsave_test_scores:')
+        # print(save_test_scores)
+        # print('\nsave_train_scores:')
+        # print(save_train_scores)
+        # print()
+
+        #################
+        # Remove ires not common to all cases:
+        min_ires = 0
+        save_ires_updated         = []
+        save_test_scores_updated  = []
+        save_train_scores_updated = []
+        for save_ires_case in save_ires:
+            if min_ires > save_ires_case[0]:
+                min_ires = save_ires_case[0]
+        for save_ires_case, save_test_scores_case, save_train_scores_case in zip(save_ires, save_test_scores, save_train_scores):
+            save_ires_updated_case = np.arange(min_ires, -1, -1, dtype=int)
+            save_ires_updated.append(save_ires_updated_case)
+            save_test_scores_updated.append([save_test_scores_el for save_ires_el, save_test_scores_el in zip(save_ires_case, save_test_scores_case) if save_ires_el in save_ires_updated_case])
+            save_train_scores_updated.append([save_train_scores_el for save_ires_el, save_train_scores_el in zip(save_ires_case, save_train_scores_case) if save_ires_el in save_ires_updated_case])
+
+        # print('\nsave_ires_updated:')
+        # print(save_ires_updated)
+        # print('\nsave_test_scores_updated:')
+        # print(save_test_scores_updated)
+        # print('\nsave_train_scores_updated:')
+        # print(save_train_scores_updated)
+        # print()
+
+        # # if save:
+        # self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
+
+        # return save_test_scores, save_train_scores, save_ires, kfolds
+
+        #################
+        # data = {'save_test_scores':save_test_scores,
+        #         'save_train_scores':save_train_scores,
+        #         'save_ires':save_ires,
+        #         'kfolds':kfolds}
+        # import pickle
+        # from uuid import uuid4
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{uuid4()}.pkl', 'wb') as f:
+        #     pickle.dump(data, f)
+
+        #################
+        # import pickle
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{"c890f9c8-e2bb-4733-a632-5a08c4529a92"}.pkl', 'rb') as f:
+        #     data = pickle.load(f)
+        # save_test_scores = data['save_test_scores']
+        # save_train_scores = data['save_train_scores']
+        # save_ires = data['save_ires']
+        # kfolds = data['kfolds']
+
+        # print('\nsave_ires:')
+        # print(save_ires)
+        # print('\nsave_test_scores:')
+        # print(save_test_scores)
+        # print('\nsave_train_scores:')
+        # print(save_train_scores)
+        # print()
+
+        #################
+        # Remove ires not common to all cases:
+        min_ires = 0
+        save_ires_updated         = []
+        save_test_scores_updated  = []
+        save_train_scores_updated = []
+        save_Ntest_updated        = []
+        save_Ntrain_updated       = []
+        for save_ires_case in save_ires:
+            if min_ires > save_ires_case[0]:
+                min_ires = save_ires_case[0]
+        for save_ires_case, save_test_scores_case, save_train_scores_case, save_Ntest_case, save_Ntrain_case in zip(save_ires, save_test_scores, save_train_scores, save_Ntest, save_Ntrain):
+            save_ires_updated_case = np.arange(min_ires, -1, -1, dtype=int)
+            save_ires_updated.append(save_ires_updated_case)
+            save_test_scores_updated.append([save_test_scores_el for save_ires_el, save_test_scores_el in zip(save_ires_case, save_test_scores_case) if save_ires_el in save_ires_updated_case])
+            save_train_scores_updated.append([save_train_scores_el for save_ires_el, save_train_scores_el in zip(save_ires_case, save_train_scores_case) if save_ires_el in save_ires_updated_case])
+            save_Ntest_updated.append([save_Ntest_el for save_ires_el, save_Ntest_el in zip(save_ires_case, save_Ntest_case) if save_ires_el in save_ires_updated_case])
+            save_Ntrain_updated.append([save_Ntrain_el for save_ires_el, save_Ntrain_el in zip(save_ires_case, save_Ntrain_case) if save_ires_el in save_ires_updated_case])
+
+        # print('\nsave_ires_updated:')
+        # print(save_ires_updated)
+        # print('\nsave_test_scores_updated:')
+        # print(save_test_scores_updated)
+        # print('\nsave_train_scores_updated:')
+        # print(save_train_scores_updated)
+        # print()
+
+        # if save:
+        save_test_scores_updated, save_train_scores_updated, save_ires_updated, save_Ntest_updated, save_Ntrain_updated = np.array(save_test_scores_updated, dtype=float), np.array(save_train_scores_updated, dtype=float), np.array(save_ires_updated, dtype=int), np.array(save_Ntest_updated), np.array(save_Ntrain_updated)
+        self.output.cross_validation_output = CrossValidationOUT(ires=save_ires_updated, test_scores=save_test_scores_updated, train_scores=save_train_scores_updated, Ntest=save_Ntest_updated, Ntrain=save_Ntrain_updated)
+
+        return save_test_scores_updated, save_train_scores_updated, save_ires_updated, save_Ntest_updated, save_Ntrain_updated, kfolds
     
 
     def get_cross_validation_score(self, input_arguement):

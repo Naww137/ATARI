@@ -9,7 +9,7 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 # # from ATARI.sammy_interface.sammy_functions import run_sammy_YW
 from ATARI.AutoFit.functions import objective_func
 from ATARI.AutoFit.sammy_interface_bindings import Solver
-from ATARI.AutoFit.functions import separate_external_resonance_ladder
+# from ATARI.AutoFit.functions import separate_external_resonance_ladder
 
 from ATARI.TAZ.RunMaster import RunMaster
 from ATARI.TAZ.PTBayes import PTBayes
@@ -51,7 +51,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     # J_IDs = [spingroup['J_ID'] for spingroup in particle_pair.spin_groups.values()]
     # respar, _ = ATARI_to_TAZ_resonances(respar, J_IDs)
     reaction_TAZ.false_dens = false_dens
-    prior, log_likelihood_prior = PTBayes(respar_window, reaction_TAZ, false_width_dist=false_width_pdf)
+    prior, log_likelihood_prior = PTBayes(respar_window, reaction_TAZ, false_width_dist=false_width_dist)
     print('Porter-Thomas Prior:')
     print(prior)
     print()

@@ -47,7 +47,7 @@ class AutoFitOPT:
     use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
 
-    ### Resonance Statistics
+    # Resonance Statistics
     Wigner_informed_cross_validation        : bool = False
     PorterThomas_informed_cross_validation  : bool = False
     

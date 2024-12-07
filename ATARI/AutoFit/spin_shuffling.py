@@ -5,8 +5,8 @@ from copy import copy
 from scipy.stats import rv_continuous
 
 from ATARI.ModelData.particle_pair import Particle_Pair
-from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyOutputData
-from ATARI.sammy_interface.sammy_functions import run_sammy_YW
+# from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyOutputData
+# from ATARI.sammy_interface.sammy_functions import run_sammy_YW
 from ATARI.AutoFit.functions import objective_func
 from ATARI.AutoFit.sammy_interface_bindings import Solver
 
@@ -14,7 +14,7 @@ from ATARI.TAZ.RunMaster import RunMaster
 from ATARI.TAZ.PTBayes import PTBayes
 from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
 
-def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair):
+def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair, num_spingroups:int):
     """
     ...
     """
@@ -24,6 +24,7 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:
         respar_post.loc[spingroups == TAZ_spin_id, 'J_ID'] = spingroup_params['J_ID']
         respar_post.loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls']
         respar_post.loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
+    respar_post = respar_post.loc[spingroups != num_spingroups] # removing false resonances
     return respar_post
 
 def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
@@ -35,8 +36,9 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     """
 
     respar = copy(respar.sort_values(by=['E'], ignore_index=True, inplace=False))
-    num_res = len(respar)
+    # num_res = len(respar)
     reaction_TAZ, _, spingroup_IDs_TAZ = ATARI_to_TAZ(particle_pair)
+    num_spingroups = reaction_TAZ.num_groups
     # J_IDs = [spingroup['J_ID'] for spingroup in particle_pair.spin_groups.values()]
     # respar, _ = ATARI_to_TAZ_resonances(respar, J_IDs)
     prior, log_likelihood_prior = PTBayes(respar, reaction_TAZ, false_width_dist=false_width_dist.pdf)
@@ -45,7 +47,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     shuffle_respars = []
     for shuffle_id in range(num_shuffles):
         spin_shuffle = spin_shuffles[shuffle_id,:]
-        shuffle_respar = assign_spingroups(respar, spin_shuffle)
+        shuffle_respar = assign_spingroups(respar, spin_shuffle, particle_pair, num_spingroups)
         shuffle_respars.append(shuffle_respar)
     return shuffle_respars
 

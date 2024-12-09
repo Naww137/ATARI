@@ -234,80 +234,17 @@ class AutoFit:
         # save_ires = data['save_ires']
         # kfolds = data['kfolds']
 
-        # print('\nsave_ires:')
-        # print(save_ires)
-        # print('\nsave_test_scores:')
-        # print(save_test_scores)
-        # print('\nsave_train_scores:')
-        # print(save_train_scores)
-        # print()
-
         #################
         # Remove ires not common to all cases:
-        min_ires = 0
-        save_ires_updated         = []
-        save_test_scores_updated  = []
-        save_train_scores_updated = []
-        for save_ires_case in save_ires:
-            if min_ires > save_ires_case[0]:
-                min_ires = save_ires_case[0]
-        for save_ires_case, save_test_scores_case, save_train_scores_case in zip(save_ires, save_test_scores, save_train_scores):
-            save_ires_updated_case = np.arange(min_ires, -1, -1, dtype=int)
-            save_ires_updated.append(save_ires_updated_case)
-            save_test_scores_updated.append([save_test_scores_el for save_ires_el, save_test_scores_el in zip(save_ires_case, save_test_scores_case) if save_ires_el in save_ires_updated_case])
-            save_train_scores_updated.append([save_train_scores_el for save_ires_el, save_train_scores_el in zip(save_ires_case, save_train_scores_case) if save_ires_el in save_ires_updated_case])
-
-        # print('\nsave_ires_updated:')
-        # print(save_ires_updated)
-        # print('\nsave_test_scores_updated:')
-        # print(save_test_scores_updated)
-        # print('\nsave_train_scores_updated:')
-        # print(save_train_scores_updated)
-        # print()
-
-        # # if save:
-        # self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
-
-        # return save_test_scores, save_train_scores, save_ires, kfolds
-
-        #################
-        # data = {'save_test_scores':save_test_scores,
-        #         'save_train_scores':save_train_scores,
-        #         'save_ires':save_ires,
-        #         'kfolds':kfolds}
-        # import pickle
-        # from uuid import uuid4
-        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{uuid4()}.pkl', 'wb') as f:
-        #     pickle.dump(data, f)
-
-        #################
-        # import pickle
-        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{"c890f9c8-e2bb-4733-a632-5a08c4529a92"}.pkl', 'rb') as f:
-        #     data = pickle.load(f)
-        # save_test_scores = data['save_test_scores']
-        # save_train_scores = data['save_train_scores']
-        # save_ires = data['save_ires']
-        # kfolds = data['kfolds']
-
-        # print('\nsave_ires:')
-        # print(save_ires)
-        # print('\nsave_test_scores:')
-        # print(save_test_scores)
-        # print('\nsave_train_scores:')
-        # print(save_train_scores)
-        # print()
-
-        #################
-        # Remove ires not common to all cases:
-        min_ires = 0
+        min_ires = len(total_resonance_ladder)
         save_ires_updated         = []
         save_test_scores_updated  = []
         save_train_scores_updated = []
         save_Ntest_updated        = []
         save_Ntrain_updated       = []
         for save_ires_case in save_ires:
-            if min_ires > save_ires_case[0]:
-                min_ires = save_ires_case[0]
+            if min_ires > max(save_ires_case):
+                min_ires = max(save_ires_case)
         for save_ires_case, save_test_scores_case, save_train_scores_case, save_Ntest_case, save_Ntrain_case in zip(save_ires, save_test_scores, save_train_scores, save_Ntest, save_Ntrain):
             save_ires_updated_case = np.arange(min_ires, -1, -1, dtype=int)
             save_ires_updated.append(save_ires_updated_case)

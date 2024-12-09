@@ -5,8 +5,8 @@ from copy import copy
 from scipy.stats import rv_continuous
 
 from ATARI.ModelData.particle_pair import Particle_Pair
-# # from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyOutputData
-# # from ATARI.sammy_interface.sammy_functions import run_sammy_YW
+# from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyOutputData
+# from ATARI.sammy_interface.sammy_functions import run_sammy_YW
 from ATARI.AutoFit.functions import objective_func
 from ATARI.AutoFit.sammy_interface_bindings import Solver
 # from ATARI.AutoFit.functions import separate_external_resonance_ladder
@@ -15,16 +15,24 @@ from ATARI.TAZ.RunMaster import RunMaster
 from ATARI.TAZ.PTBayes import PTBayes
 from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
 
-def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
+def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, width_signs:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
     """
     ...
     """
 
     respar_post = copy(respar)
+    respar_post.loc[respar_mask_in_window, 'Gn1'] *= width_signs # also shuffle sign of resonance widths
     for TAZ_spin_id, (Jpi, spingroup_params) in enumerate(particle_pair.spin_groups.items()):
-        respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'J_ID'] = spingroup_params['J_ID']
-        respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
-        respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
+
+        # Finally, assign the value to the relevant rows in the original DataFrame
+        selected_rows = respar_post.loc[respar_mask_in_window]
+        selected_index = selected_rows.loc[spingroups == TAZ_spin_id].index
+        respar_post.loc[selected_index, 'J_ID'] = spingroup_params['J_ID']
+        respar_post.loc[selected_index, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
+        respar_post.loc[selected_index, 'Jpi' ] = Jpi
+        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'J_ID'] = spingroup_params['J_ID']
+        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
+        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
     respar_post = respar_post.loc[spingroups != num_spingroups] # removing false resonances
     return respar_post
 
@@ -66,13 +74,12 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling width sign
     
     print('Spin Shuffles:')
-    print(spin_shuffles.T)
 
     shuffled_respars = []
     for shuffle_id in range(num_shuffles):
         spin_shuffle = spin_shuffles[:,shuffle_id]
-        shuffled_respar = assign_spingroups(respar=respar, spingroups=spin_shuffle, particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window)
-        shuffled_respar.loc[respar_mask_in_window, 'Gn1'] *= width_signs[:,shuffle_id] # also shuffle sign of resonance widths
+        print(f'{shuffle_id}: {spin_shuffle.tolist()}')
+        shuffled_respar = assign_spingroups(respar=respar, spingroups=spin_shuffle, width_signs=width_signs[:,shuffle_id], particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
         for shuffled_respar_previous_case in shuffled_respars: # if this case was already added to the list, there is no point in retesting this case
             if shuffled_respar.equals(shuffled_respar_previous_case):
                 break
@@ -86,6 +93,7 @@ def minimize_spingroup_shuffling(respar:pd.DataFrame, solver:Solver,
                                  false_dens:float=0.0, false_width_dist:Union[rv_continuous,None]=None,
                                  model_selection:str='chi2',
                                  external_resonance_indices = [],
+                                 target_Nres:int = None,
                                  rng:np.random.Generator=None, seed:int=None):
     """
     ...
@@ -105,13 +113,38 @@ def minimize_spingroup_shuffling(respar:pd.DataFrame, solver:Solver,
         PT_informed  = True
     else:
         raise ValueError(f'Unknown model selection criteria, "{model_selection}".')
-
+    
     particle_pair = solver.sammyINP.particle_pair
-    shuffled_respars = shuffle_spingroups(respar=respar, particle_pair=particle_pair,
-                                          num_shuffles=num_shuffles,
-                                          window_E_bounds=window_E_bounds,
-                                          false_dens=false_dens, false_width_dist=false_width_dist,
-                                          rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
+    
+    if target_Nres is None:
+        shuffled_respars = shuffle_spingroups(respar=respar, particle_pair=particle_pair,
+                                              num_shuffles=num_shuffles,
+                                              window_E_bounds=window_E_bounds,
+                                              false_dens=false_dens, false_width_dist=false_width_dist,
+                                              rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
+    else:
+        num_shuffles_TAZ = 10*num_shuffles # FIXME: THIS VALUE IS ARBITRARY! MAKE IT REASONABLY CONSERVATIVE!
+        for rej in range(10):
+            shuffled_respars = shuffle_spingroups(respar=respar, particle_pair=particle_pair,
+                                              num_shuffles=num_shuffles_TAZ,
+                                              window_E_bounds=window_E_bounds,
+                                              false_dens=false_dens, false_width_dist=false_width_dist,
+                                              rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
+            shuffled_respars_filtered = []
+            for shuffled_respar in shuffled_respars:
+                respar_mask_in_window = (shuffled_respar['E'] > window_E_bounds[0]) & (shuffled_respar['E'] < window_E_bounds[1])
+                shuffled_respar_in_window = shuffled_respar.loc[respar_mask_in_window]
+                num_res = len(shuffled_respar_in_window)
+                print(num_res, target_Nres, len(respar))
+                if num_res == target_Nres:
+                    shuffled_respars_filtered.append(shuffled_respar)
+            if len(shuffled_respars_filtered) >= num_shuffles:
+                shuffled_respars = shuffled_respars_filtered[:num_shuffles]
+                break
+            else:
+                print(f'Number of shuffles with correct target number of resonances was {len(shuffled_respars_filtered)} which is less than the number of shuffles, {num_shuffles}. Trying again.')
+        else:
+            raise RuntimeError(f'The samples of shuffled respars were rejected {10} times!')
     
     spin_shuffle_cases = []
     for shuffled_respar in shuffled_respars:

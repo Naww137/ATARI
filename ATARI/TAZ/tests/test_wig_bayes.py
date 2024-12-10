@@ -217,7 +217,7 @@ class TestBayesSamplerNoFalseSmall(unittest.TestCase):
         Projectile = Neutron
 
         # Mean Parameters
-        cls.EB = (200,220)
+        cls.EB = (185,235)
         cls.false_dens = 0.0
         cls.lvl_dens  = [1/9.0, 1/8.0]
         cls.gn2m  = [44.11355, 33.38697]

@@ -259,6 +259,9 @@ Maximum energy = {max(E)}
                 iMax[0,0]    = j
                 iMax[:j+1,1] = 0
                 break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[0,0] = j
+            iMax[:,1] = 0
 
         # Intermediate cases:
         for i in range(L-1):
@@ -278,6 +281,12 @@ Maximum energy = {max(E)}
                 iMax[-1,1] = j
                 iMax[j:,0] = L+1
                 break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[-1,1] = j
+            iMax[ :,0] = L+1
+
+        if np.any(iMax == -1):
+            raise RuntimeError('"iMax" should be filled, but there are undefined iMax elements.')
 
         return iMax
     

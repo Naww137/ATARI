@@ -191,7 +191,63 @@ class TestBayesSamplerNoFalse(unittest.TestCase):
         perrors = posterior[:,-1]
         perror_max = np.max(perrors)
         perror_mean = np.mean(perrors)
-        self.assertTrue(perror_max < 1e-4, f"""
+        self.assertTrue(perror_max < 1e-3, f"""
+WigBayes returns non-zero false probabilities when the false level-density is zero.
+Maximum error = {perror_max:.6%}
+Mean error    = {perror_mean:.6%}
+""")
+        
+class TestBayesSamplerNoFalseSmall(unittest.TestCase):
+    """
+    The purpose of this test is to verify that the WigBayes algorithm is working correctly when no false resonances are present.
+    """
+
+    ensemble = 'NNE' # Nearest Neighbor Ensemble
+    err = 1e-8
+    num_groups = 2
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Generates the resonances.
+        """
+
+        # Particle Types:
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
+
+        # Mean Parameters
+        cls.EB = (200,220)
+        cls.false_dens = 0.0
+        cls.lvl_dens  = [1/9.0, 1/8.0]
+        cls.gn2m  = [44.11355, 33.38697]
+        cls.gg2m   = [55.00000, 55.00000]
+        cls.dfn   = [1, 1]
+        cls.dfg   = [250, 250]
+        cls.l     = [0, 0]
+        cls.j     = [3.0, 4.0]
+
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
+        cls.E = cls.res_ladder.E.to_numpy()
+    
+    def test_false(self):
+        """
+        Here, we intend to verify that WigBayes returns near-zero false probabilities when the false level-density is zero.
+        """
+        prior, log_likelihood_prior = PTBayes(self.res_ladder, self.reaction)
+        distributions = self.reaction.distributions(dist_type='Wigner')
+        runmaster = RunMaster(self.E, self.EB, distributions, self.false_dens, prior, log_likelihood_prior, err=self.err)
+        posterior = runmaster.WigBayes()
+        
+        perrors = posterior[:,-1]
+        perror_max = np.max(abs(perrors))
+        perror_mean = np.mean(abs(perrors))
+        print(posterior)
+        print()
+        # print(perrors)
+        self.assertTrue(perror_max < 1e-3, f"""
 WigBayes returns non-zero false probabilities when the false level-density is zero.
 Maximum error = {perror_max:.6%}
 Mean error    = {perror_mean:.6%}

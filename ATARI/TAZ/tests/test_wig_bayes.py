@@ -244,9 +244,6 @@ class TestBayesSamplerNoFalseSmall(unittest.TestCase):
         perrors = posterior[:,-1]
         perror_max = np.max(abs(perrors))
         perror_mean = np.mean(abs(perrors))
-        print(posterior)
-        print()
-        # print(perrors)
         self.assertTrue(perror_max < 1e-3, f"""
 WigBayes returns non-zero false probabilities when the false level-density is zero.
 Maximum error = {perror_max:.6%}

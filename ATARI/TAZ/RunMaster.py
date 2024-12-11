@@ -256,21 +256,21 @@ Maximum energy = {max(E)}
         # Lower boundary cases:
         for j in range(L):
             if E[j] - energy_range[0] >= xMax_f1:
-                iMax[0,0]    = j
-                iMax[:j+1,1] = 0
+                iMax[0,0]    = j+1
+                iMax[:j+2,1] = 0
                 break
         else: # case where the level-spacing limit is larger than the window size
-            iMax[0,0] = j
+            iMax[0,0] = j+1
             iMax[:,1] = 0
 
         # Upper boundary cases:
         for j in range(L-1,-1,-1):
             if energy_range[1] - E[j] >= xMax_f1:
-                iMax[-1,1] = j
-                iMax[j:,0] = L+1
+                iMax[-1,1] = j+1
+                iMax[j+1:,0] = L+1
                 break
         else: # case where the level-spacing limit is larger than the window size
-            iMax[-1,1] = j
+            iMax[-1,1] = j+1
             iMax[ :,0] = L+1
 
         # Intermediate cases:

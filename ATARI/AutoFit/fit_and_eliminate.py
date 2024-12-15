@@ -54,10 +54,12 @@ class FitAndEliminateOPT:
 
         ### Other
         self._print_bool = True
+        self._save_RPCM = False
 
         ### set kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
+        
 
 
     ### define repr

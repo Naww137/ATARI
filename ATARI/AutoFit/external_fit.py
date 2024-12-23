@@ -5,6 +5,7 @@ from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
 from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   get_Pu_vec_from_reslad
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from ATARI.sammy_interface import sammy_classes
 
 
@@ -592,6 +593,7 @@ def get_chi2(D, Vinv, pw_lists, experiments):
             key = "theo_xs"
         Ts.append(pw[key].values)
     T = np.concatenate(Ts)
+    print(D.shape, T.shape, Vinv.shape)
     return (D-T).T @ Vinv @ (D-T)
 
 
@@ -599,7 +601,10 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     
     rto_temp = deepcopy(sammyRTO)
     rto_temp.bayes = False
-    N = np.sum([len(each) for each in sammyINP.datasets])
+    if sammyINP.V_is_inv and not sammyINP.idc_at_theory:
+        N = len(sammyINP.D)
+    else:
+        N = np.sum([len(each) for each in sammyINP.datasets])
 
     empty = False
     if sammyINP.resonance_ladder.empty:
@@ -625,6 +630,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
         chi2 = get_chi2(D, sammyINP.Vinv, sammyOUT.pw, sammyINP.experiments_no_pup)
         sammyOUT.chi2 = chi2
         sammyOUT.chi2n = chi2/np.sum([len(each) for each in sammyOUT.pw])
+        covs = None
     else:
         Ds, covs = get_Ds_Vs(sammyINP.datasets, 
             sammyINP.experimental_covariance, 

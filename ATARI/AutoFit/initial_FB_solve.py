@@ -22,8 +22,10 @@ class InitialFBOPT:
         If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
     width_elimination: bool = True
         Option to eliminate resonances during fitting stages based on neutron width.
-    Gn_threshold: Float = 1e-2
+    width_elimination_Gn_threshold: float = 1e-2
         Neutron width threshold for width-based elimination
+    width_elimination_Nres_threshold: int = None
+        Number of resonances, below which width-based elimination stops.
     decrease_chi2_threshold_for_width_elimination: bool = True
         If running width elimination, decrease the chi2 threshold convergence criteria
 
@@ -92,7 +94,8 @@ class InitialFBOPT:
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,1,1]
         self._width_elimination = True
-        self._Gn_threshold = 1e-2
+        self._width_elimination_Gn_threshold = 1e-2
+        self._width_elimination_Nres_threshold = None
         self._decrease_chi2_threshold_for_width_elimination = True
 
         # ### Solver 
@@ -160,11 +163,18 @@ class InitialFBOPT:
         self._width_elimination = width_elimination
 
     @property
-    def Gn_threshold(self):
-        return self._Gn_threshold
-    @Gn_threshold.setter
-    def Gn_threshold(self, Gn_threshold):
-        self._Gn_threshold = Gn_threshold
+    def width_elimination_Gn_threshold(self):
+        return self._width_elimination_Gn_threshold
+    @width_elimination_Gn_threshold.setter
+    def width_elimination_Gn_threshold(self, width_elimination_Gn_threshold):
+        self._width_elimination_Gn_threshold = width_elimination_Gn_threshold
+
+    @property
+    def width_elimination_Nres_threshold(self):
+        return self._width_elimination_Nres_threshold
+    @width_elimination_Gn_threshold.setter
+    def width_elimination_Nres_threshold(self, width_elimination_Nres_threshold):
+        self._width_elimination_Nres_threshold = width_elimination_Nres_threshold
 
     @property
     def decrease_chi2_threshold_for_width_elimination(self):
@@ -341,13 +351,12 @@ class InitialFB:
         outs = [sammyOUT_fit]
 
         if self.options.width_elimination:
-            eliminating = True
-            while eliminating:
+            for it in range(10_000):
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
-                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
-                    eliminating = False
+                    break # no longer eliminating after not eliminating any more resonances
                 elif fraction_eliminated == 100.0:
                     raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
@@ -357,6 +366,11 @@ class InitialFB:
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyOUT_fit = self.solver.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
+                if (self.options.width_elimination_Nres_threshold is not None) \
+                    and (len(internal_resonance_ladder_reduced) <= self.options.width_elimination_Nres_threshold):
+                    break # no longer eliminating after going below the threshold number of resonances
+            else:
+                raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')
             print(f"\nComplete after no neutron width features below threshold\n")
 
         return outs

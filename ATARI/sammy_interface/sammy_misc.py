@@ -9,6 +9,7 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.sammy_interface import sammy_classes
 from ATARI.sammy_interface.sammy_functions import run_sammy
+from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
 
 
 def generate_true_experiment(particle_pair: Optional[Particle_Pair],
@@ -92,6 +93,7 @@ def get_idc_at_theory(sammyINP, sammyRTO, resonance_ladder):
         if meas is None:
             pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
             cov = {"theory":pw_true}
+            # add_normalization_uncertainty_to_covariance(var)
         else:
             pw_true = generate_true_experiment(particle_pair=sammyINP.particle_pair, sammyRTO=rto_theo, generate_pw_true_with_sammy=True, generative_experimental_model=exp)
             raw_data = meas.generate_raw_data(pw_true, meas.model_parameters, options)

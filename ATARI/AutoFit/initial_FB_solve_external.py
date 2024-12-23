@@ -23,8 +23,10 @@ class InitialFBOPT:
         If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
     width_elimination: bool = True
         Option to eliminate resonances during fitting stages based on neutron width.
-    Gn_threshold: Float = 1e-2
+    width_elimination_Gn_threshold: float = 1e-2
         Neutron width threshold for width-based elimination
+    width_elimination_Nres_threshold: int = None
+        Number of resonances, below which width-based elimination stops.
     decrease_chi2_threshold_for_width_elimination: bool = True
         If running width elimination, decrease the chi2 threshold convergence criteria
 
@@ -80,7 +82,8 @@ class InitialFBOPT:
     def __init__(self, **kwargs):
         self.external_resonances = True
         self.width_elimination = True
-        self.Gn_threshold = 1e-2
+        self.width_elimination_Gn_threshold = 1e-2
+        self.width_elimination_Nres_threshold = None
         self.fitpar1 = [0,0,1]
         self.fitpar2 = [1,1,1]
         self.fit_all_spin_groups = True
@@ -261,13 +264,12 @@ class InitialFB:
         outs = [samout]
 
         if self.options.width_elimination:
-            eliminating = True
-            while eliminating:
+            for it in range(10_000):
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(saved_res_lads[-1], external_resonance_indices)
-                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
-                    eliminating = False
+                    break # no longer eliminating after not eliminating any more resonances
                 elif fraction_eliminated == 100.0:
                     raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
@@ -281,6 +283,11 @@ class InitialFB:
                                                                                                         elastic_net = self.options.elastic_net, elastic_net_parameters =self.options.elastic_net_parameters)
                     samout = sammy_classes.SammyOutputData(saved_pw_lists[0], saved_res_lads[0], chi2_log[0], obj_log[0],saved_pw_lists[-1], saved_res_lads[-1],chi2_log[-1], obj_log[-1])
                     outs.append(samout)
+                if (self.options.width_elimination_Nres_threshold is not None) \
+                    and (len(internal_resonance_ladder_reduced) <= self.options.width_elimination_Nres_threshold):
+                    break # no longer eliminating after going below the threshold number of resonances
+            else:
+                raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')
                     
             print(f"\nComplete after no neutron width features below threshold\n")
 

@@ -235,7 +235,8 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
             if Wigner_informed:
                 mean_level_spacing = spingroup['<D>']
                 log_likelihood += wigner_LL(E, mean_level_spacing)
-                wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances
+                # wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances (old and incorrect implementation)
+                wigner_correction_factor = (len(E) - 1) * np.log(np.sqrt(np.pi/(2*np.e)) / mean_level_spacing) # to account for virtual resonances (new implementation at mode of Wigner distribution)
                 log_likelihood -= wigner_correction_factor
 
             if PorterThomas_informed:

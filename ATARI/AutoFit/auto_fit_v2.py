@@ -134,7 +134,7 @@ class AutoFit2:
 
 
     def fit(self, evaluation_data:Evaluation_Data, total_resonance_ladder:pd.DataFrame, fixed_resonance_indices:list=[]):
-        resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
+        initial_resonance_ladder, initial_fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
         if len(total_resonance_ladder) == len(fixed_resonance_indices):
             assert np.all(total_resonance_ladder.index == fixed_resonance_indices)
@@ -156,9 +156,9 @@ class AutoFit2:
         ### Find the maximum expected number of resonances
         window_size = max([np.max(data['E'].to_numpy()) for data in evaluation_data.datasets]) \
                     - min([np.min(data['E'].to_numpy()) for data in evaluation_data.datasets])
-        Nres_internal_upper_limit = find_max_num_resonances(self.particle_pair, window_size, tol=1e-2)
-        if (self.fit_and_elim_options.width_elimination) and (self.fit_and_elim_options.width_elimination_Nres_threshold is None):
-            self.fit_and_elim_options.width_elimination_Nres_threshold = Nres_internal_upper_limit
+        self.Nres_internal_upper_limit = find_max_num_resonances(self.particle_pair, window_size, tol=1e-2)
+        if self.fit_and_elim_options.width_elimination_Nres_threshold is None:
+            self.fit_and_elim_options.width_elimination_Nres_threshold = self.Nres_internal_upper_limit
         
         ### Final solve to target Nres with all data 
         rto_fit = deepcopy(self.sammyRTO)
@@ -170,9 +170,9 @@ class AutoFit2:
             print(f"=============\nRunning Full Elimination\n=============")
             
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options, particle_pair=self.particle_pair)
-        initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
+        initial_samout = fe.initial_fit(initial_resonance_ladder, fixed_resonance_ladder=initial_fixed_resonance_ladder)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_internal_upper_limit, fixed_resonance_ladder=fixed_resonances) # FIXME: REPLACE "Nres_internal_upper_limit" WITH 0 AFTER DEBUGGING!
+        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=0, fixed_resonance_ladder=fixed_resonances) # FIXME: REPLACE "Nres_internal_upper_limit" WITH 0 AFTER DEBUGGING!
 
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
@@ -180,9 +180,12 @@ class AutoFit2:
         ### Run CV
         if self.options.print_bool:
             print("=============\nRunning Cross Validation\n=============")
-        overfit_samout = elimination_history[Nres_internal_upper_limit]['selected_ladder_chars']
+        overfit_samout = elimination_history[self.Nres_internal_upper_limit]['selected_ladder_chars']
         self.output.whitening_model = overfit_samout
-        folds_data = self.cross_validation(evaluation_data, sammy_out_theo=overfit_samout, Nres_internal_upper_limit=Nres_internal_upper_limit, total_resonance_ladder=total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
+        folds_data = self.cross_validation(evaluation_data, sammy_out_theo=overfit_samout,
+                                           total_resonance_ladder=total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
+        
+        ### Scoring CV
         CV_test_scores, CV_train_scores = find_CV_scores(folds_data, use_MAD=self.options.use_MAD)
         
         ### Get cardinality from CV results
@@ -199,7 +202,7 @@ class AutoFit2:
         return self.output
 
 
-    def cross_validation(self, evaluation_data:Evaluation_Data, sammy_out_theo:SammyOutputData, Nres_internal_upper_limit:int, total_resonance_ladder:pd.DataFrame, fixed_resonance_indices:list=[]):
+    def cross_validation(self, evaluation_data:Evaluation_Data, sammy_out_theo:SammyOutputData, total_resonance_ladder:pd.DataFrame, fixed_resonance_indices:list=[]):
 
         ### Updating covariance data
         # FIXME: ALSO CONSIDER CASE FOR CAPTURE USING add_normalization_uncertainty_to_covariance
@@ -252,19 +255,19 @@ class AutoFit2:
         # save_test_scores, save_train_scores, save_ires, save_Ntest, save_Ntrain = np.array(save_test_scores), np.array(save_train_scores), np.array(save_ires), np.array(save_Ntest), np.array(save_Ntrain)
         # self.output.cross_validation_output = CrossValidationOUT(ires=save_ires, test_scores=save_test_scores, train_scores=save_train_scores, Ntest=save_Ntest, Ntrain=save_Ntrain)
 
-        # Finding the number of resonances cases run that are common to all models:
-        Nres_start = len(total_resonance_ladder)
-        Nres_all = []
-        for Nres in range(Nres_start):
-            for fold_results in folds_results:
-                if Nres not in fold_results.keys():
-                    break
-            else:
-                Nres_all.append(Nres)
+        # # Finding the number of resonances cases run that are common to all models:
+        # Nres_start = len(total_resonance_ladder)
+        # Nres_all = []
+        # for Nres in range(Nres_start):
+        #     for fold_results in folds_results:
+        #         if Nres not in fold_results.keys():
+        #             break
+        #     else:
+        #         Nres_all.append(Nres)
 
         # Reformatting the data:
         folds_data = {}
-        for Nres in range(Nres_internal_upper_limit):
+        for Nres in range(self.Nres_internal_upper_limit):
             chi2_test_values   = []
             obj_test_values    = []
             ndata_test_values  = []
@@ -307,7 +310,7 @@ class AutoFit2:
             rto_train.bayes       = True;   rto_test.bayes       = False
             fit_and_elim_options.print_bool = False
 
-        # create solvers
+        # Create solvers:
         solver_options_CV_initial = get_parent_solver_options(self.solver_options_initial)
         solver_options_CV_initial.idc_at_theory = False
         solver_options_CV_eliminate = get_parent_solver_options(self.solver_options_eliminate)
@@ -322,15 +325,22 @@ class AutoFit2:
         solver_test    = Solver_factory(rto_test,  'EXT', solver_options_CV_eliminate, self.particle_pair, evaluation_data, 
                                         cap_norm_unc=self.cap_norm_unc, remove_V=False, V_is_inv=True, Vinv=Vis_test,  D=Ds)
 
-        # fit and eliminate
+        # Fit and eliminate:
         fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options, particle_pair=self.particle_pair)
         initial_samout = fe.initial_fit(resonance_ladder,fixed_resonance_ladder=fixed_resonance_ladder)
+        print('INIT FIT:')
+        print(initial_samout.par_post)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances)#, target_ires=len(fixed_resonances))
+        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances, target_ires=0)#, target_ires=len(fixed_resonances))
 
-        # get test and train scores
+        # Get test and train scores:
         fold_results = {}
-        for ires, elim_hist_case in elimination_history.items():
+        print()
+        print(f'FOLD NRES = {elimination_history.keys()}')
+        print(f'NRES UPPER LIMIT = {self.Nres_internal_upper_limit}')
+        print()
+        for ires in range(self.Nres_internal_upper_limit):
+            elim_hist_case = elimination_history[ires]
             res_ladder = elim_hist_case['selected_ladder_chars'].par_post
             test_out = solver_test.fit(res_ladder)
             Ndata_test = len(test_out.pw[0])

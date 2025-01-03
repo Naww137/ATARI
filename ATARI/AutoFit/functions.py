@@ -59,10 +59,15 @@ def update_vary_resonance_ladder(resonance_ladder, varyE=0, varyGg=0, varyGn1=0)
     return return_resonance_ladder
 
 
-def eliminate_small_Gn(resonance_ladder, Gn_threshold):
-    fraction_eliminated = np.count_nonzero(resonance_ladder.Gn1<Gn_threshold)/len(resonance_ladder)
-    return_resonance_ladder = copy(resonance_ladder)
-    return_resonance_ladder = return_resonance_ladder[return_resonance_ladder.Gn1>Gn_threshold]
+def eliminate_small_Gn(resonance_ladder, Gn_threshold, Nres_elimination_thres):
+    num_res_left = np.count_nonzero(abs(resonance_ladder.Gn1) >= Gn_threshold)
+    if num_res_left < Nres_elimination_thres: # FIXME: TEST THIS!!!
+        return_resonance_ladder = resonance_ladder.loc[resonance_ladder['Gn1'].abs().nlargest(Nres_elimination_thres).index]
+        fraction_eliminated = Nres_elimination_thres / len(resonance_ladder)
+    else:
+        fraction_eliminated = np.count_nonzero(abs(resonance_ladder.Gn1)<Gn_threshold)/len(resonance_ladder)
+        return_resonance_ladder = copy(resonance_ladder)
+        return_resonance_ladder = return_resonance_ladder[abs(return_resonance_ladder.Gn1)>Gn_threshold]
     return_resonance_ladder.reset_index(inplace=True, drop=True)
     return return_resonance_ladder, fraction_eliminated
 

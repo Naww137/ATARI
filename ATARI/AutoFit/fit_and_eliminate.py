@@ -381,7 +381,7 @@ class FitAndEliminate:
         if self.options.width_elimination:
             for it in range(10_000):
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
-                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold, self.options.width_elimination_Nres_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
                     break # no longer eliminating after not eliminating any more resonances
@@ -396,7 +396,7 @@ class FitAndEliminate:
                     sammyOUT_fit = self.solver_initial.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
                 if (self.options.width_elimination_Nres_threshold is not None) \
-                    and (len(internal_resonance_ladder_reduced) <= self.options.width_elimination_Nres_threshold):
+                    and (len(internal_resonance_ladder) == self.options.width_elimination_Nres_threshold):
                     break # no longer eliminating after going below the threshold number of resonances
             else:
                 raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')

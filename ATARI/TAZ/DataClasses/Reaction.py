@@ -5,9 +5,14 @@ from functools import partial
 
 import warnings
 
-from TAZ import Theory
-from TAZ.DataClasses import Spingroup
+from ATARI.ModelData.spingroups import Spingroup
+from ATARI.theory import distributions
+from ATARI.theory import level_spacing_distributions
+from ATARI.TAZ.Theory import Samplers
+from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
+
 from ATARI.ModelData.particle import Particle, Neutron
+from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
 
 __doc__ = """
 This file keeps the "Reaction" class. The "Reaction" class contains all relevent
@@ -15,7 +20,7 @@ information that is independent of individual resonances, such as the target and
 particles, spingroup combinations, mean level densities, mean partial widths, etc.
 """
 
-def spingroupParameter(mean_parameters, num_groups:int, dtype:type=float):
+def spingroupParameter(mean_parameters, name:str, num_groups:int, dtype:type=float):
     """
     Correctly formats the spingroup-based parameters.
 
@@ -34,10 +39,7 @@ def spingroupParameter(mean_parameters, num_groups:int, dtype:type=float):
         The reformatted spingroup-based parameters.
     """
 
-    if (not hasattr(mean_parameters, '__iter__')) \
-        or (np.array(mean_parameters).size != num_groups):
-        from inspect import stack
-        name = stack()[1][0].f_locals[mean_parameters]
+    if (not hasattr(mean_parameters, '__iter__')) or (np.array(mean_parameters).size != num_groups):
         raise TypeError(f'"{name}" must be an array with length equal to the number of spingroups, {num_groups}.')
     return np.array(mean_parameters, dtype=dtype).reshape(num_groups,)
 
@@ -158,39 +160,39 @@ class Reaction:
         if lvl_dens is not None and MLS is not None:
             raise ValueError('Cannot have both mean level spacing and level densities.')
         elif lvl_dens is not None:
-            self.lvl_dens = spingroupParameter(lvl_dens, self.num_groups, dtype=float)
+            self.lvl_dens = spingroupParameter(lvl_dens, 'lvl_dens', self.num_groups, dtype=float)
         elif MLS is not None:
-            self.lvl_dens = 1.0 / spingroupParameter(MLS, self.num_groups, dtype=float)
+            self.lvl_dens = 1.0 / spingroupParameter(MLS, 'MLS', self.num_groups, dtype=float)
         else:
             self.lvl_dens = None
 
         # Brody Parameter:
         if brody_param is not None:
             if hasattr(brody_param, '__iter__'):
-                self.brody_param = spingroupParameter(brody_param, self.num_groups, dtype=float)
+                self.brody_param = spingroupParameter(brody_param, 'brody_param', self.num_groups, dtype=float)
             else:
                 self.brody_param = float(brody_param) * np.ones((self.num_groups,))
         else:
             self.brody_param = np.ones((self.num_groups,))
 
         # Mean Neutron Widths:
-        if gn2m is not None:    self.gn2m = spingroupParameter(gn2m, self.num_groups, dtype=float)
+        if gn2m is not None:    self.gn2m = spingroupParameter(gn2m, 'gn2m', self.num_groups, dtype=float)
         else:                   self.gn2m = None
 
         # Neutron Channel Degrees of Freedom:
-        if nDOF is not None:    self.nDOF = spingroupParameter(nDOF, self.num_groups, dtype=int)
+        if nDOF is not None:    self.nDOF = spingroupParameter(nDOF, 'nDOF', self.num_groups, dtype=int)
         else:                   self.nDOF = np.ones((self.num_groups,), dtype=int)
 
         # Mean Gamma Widths:
-        if gg2m is not None:    self.gg2m = spingroupParameter(gg2m, self.num_groups, dtype=float)
+        if gg2m is not None:    self.gg2m = spingroupParameter(gg2m, 'gg2m', self.num_groups, dtype=float)
         else:                   self.gg2m = None
 
         # Gamma Channel Degrees of Freedom:
-        if gDOF is not None:    self.gDOF = spingroupParameter(gDOF, self.num_groups, dtype=int)
+        if gDOF is not None:    self.gDOF = spingroupParameter(gDOF, 'gDOF', self.num_groups, dtype=int)
         else:                   self.gDOF = self.DEFAULT_GDOF * np.ones((self.num_groups,), dtype=int)
 
         # J_ID for ATARI spingroups:
-        if nDOF is not None:    self.J_ID = spingroupParameter(J_ID, self.num_groups, dtype=int)
+        if J_ID is not None:    self.J_ID = spingroupParameter(J_ID, 'J_ID', self.num_groups, dtype=int)
         else:                   self.J_ID = np.arange(1, self.num_groups+1)
 
         # Truncation Width:
@@ -203,11 +205,11 @@ class Reaction:
 
         # Missing Fraction:
         if MissFrac is not None:
-            self.MissFrac = spingroupParameter(MissFrac, self.num_groups, dtype=float) # FIXME: MAKE THIS AS A FUNCTION OF ENERGY!
+            self.MissFrac = spingroupParameter(MissFrac, 'MissFrac', self.num_groups, dtype=float) # FIXME: MAKE THIS AS A FUNCTION OF ENERGY!
         elif self.Gn_trunc_provided:
             def _miss_frac(gn2m, df, l, E):
                 gn2_trunc = self.Gn_to_gn2(Gn_trunc, E, l)
-                frac_missing = Theory.fraction_missing_gn2(gn2_trunc, gn2m, df)
+                frac_missing = fraction_below_threshold_gn2(gn2_trunc, gn2m, df)
                 return frac_missing
             missing_fracs = []
             for gn2m, df, l in zip(self.gn2m, self.nDOF, self.L):
@@ -258,10 +260,8 @@ class Reaction:
         P : float, array-like
             The penetration factor.
         """
-        k = Theory.k_wavenumber(self.targ.mass, E, self.proj.mass)
-        rho = Theory.rho(k, self.ac)
-        P = Theory.penetration_factor(rho, l)
-        return P
+        S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.targ.mass, self.proj.mass, l)
+        return P[-1,:]
     def gn2_to_Gn(self, gn2, E, l:int):
         """
         Converts reduced neutron widths to partial neutron widths.
@@ -281,7 +281,7 @@ class Reaction:
             Partial neutron widths.
         """
         P = self.penetration_factor(E, l)
-        Gn = Theory.g2_to_G(gn2, P)
+        Gn = g2_to_G(gn2, P)
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):
         """
@@ -302,14 +302,14 @@ class Reaction:
             Reduced neutron widths.
         """
         P = self.penetration_factor(E, l)
-        gn2 = Theory.G_to_g2(Gn, P)
+        gn2 = G_to_g2(Gn, P)
         return gn2
     @property
     def Gnm(self):
         'Mean Partial Neutron Widths'
         def _Gnm_func(l, gn2m, E):
             P = self.penetration_factor(E, l)
-            return Theory.g2_to_G(gn2m, P)
+            return g2_to_G(gn2m, P)
         Gnm_funcs = []
         for l, gn2m in zip(self.L, self.gn2m):
             Gnm_func = partial(_Gnm_func, l, gn2m)
@@ -331,7 +331,7 @@ class Reaction:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        Gg = Theory.g2_to_G(gg2, P)
+        Gg = g2_to_G(gg2, P)
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -348,13 +348,13 @@ class Reaction:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        gg2 = Theory.G_to_g2(Gg, P)
+        gg2 = G_to_g2(Gg, P)
         return gg2
     @property
     def Ggm(self):
         'Mean Partial Gamma (Capture) Widths'
         P = 1.0 # penetrability is 1 for capture widths
-        return Theory.g2_to_G(self.gg2m, P)
+        return g2_to_G(self.gg2m, P)
     
     def __repr__(self):
         txt = ''
@@ -437,12 +437,12 @@ class Reaction:
         for g in range(self.num_groups):
             # Energy sampling:
             brody_param = self.brody_param[g] if self.brody_param is not None else None
-            E_group  = Theory.SampleEnergies(self.EB, self.lvl_dens[g], w=brody_param, ensemble=ensemble, rng=rng)
+            E_group  = Samplers.SampleEnergies(self.EB, self.lvl_dens[g], w=brody_param, ensemble=ensemble, rng=rng)
             
             # Width sampling:
             len_group = len(E_group)
-            Gn_group = Theory.SampleNeutronWidth(E_group, Gnms[g], self.nDOF[g], rng=rng)
-            Gg_group = Theory.SampleGammaWidth(len_group, Ggms[g], self.gDOF[g], rng=rng)
+            Gn_group = Samplers.SampleNeutronWidth(E_group, Gnms[g], self.nDOF[g], rng=rng)
+            Gg_group = Samplers.SampleGammaWidth(len_group, Ggms[g], self.gDOF[g], rng=rng)
             
             # Append to group:
             E          = np.concatenate((E         , E_group ))
@@ -453,7 +453,7 @@ class Reaction:
         # False Resonances:
         if self.false_dens != 0.0:
             # Energy sampling:
-            E_false = Theory.SampleEnergies(self.EB, self.false_dens, ensemble='Poisson')
+            E_false = Samplers.SampleEnergies(self.EB, self.false_dens, ensemble='Poisson')
             
             # False width sampling:
             # False widths are sampled by taking the level-density-weighted average of each spingroup's width distributions.
@@ -461,8 +461,8 @@ class Reaction:
             Gn_false_group = np.zeros((num_false,self.num_groups))
             Gg_false_group = np.zeros((num_false,self.num_groups))
             for g in range(self.num_groups):
-                Gn_false_group[:,g] = Theory.SampleNeutronWidth(E_false, Gnms[g], self.nDOF[g], rng=rng)
-                Gg_false_group[:,g] = Theory.SampleGammaWidth(num_false, Ggms[g], self.gDOF[g], rng=rng)
+                Gn_false_group[:,g] = Samplers.SampleNeutronWidth(E_false, Gnms[g], self.nDOF[g], rng=rng)
+                Gg_false_group[:,g] = Samplers.SampleGammaWidth(num_false, Ggms[g], self.gDOF[g], rng=rng)
             idx = np.arange(num_false)
             group_idx = rng.choice(self.num_groups, size=(num_false,), p=self.lvl_dens/np.sum(self.lvl_dens))
             Gn_false = Gn_false_group[idx,group_idx]
@@ -526,22 +526,22 @@ class Reaction:
         distributions = []
         if   dist_type == 'Wigner':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.WignerGen(lvl_dens=self.lvl_dens[g])
+                distribution = level_spacing_distributions.WignerGen(lvl_dens=self.lvl_dens[g])
                 distributions.append(distribution)
         elif dist_type == 'Brody':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.BrodyGen(lvl_dens=self.lvl_dens[g], w=self.brody_param[g])
+                distribution = level_spacing_distributions.BrodyGen(lvl_dens=self.lvl_dens[g], w=self.brody_param[g])
                 distributions.append(distribution)
         elif dist_type == 'Missing':
             for g in range(self.num_groups):
                 # if type(self.MissFrac[g]) != float:
                 #     raise NotImplementedError('Missing Level-spacing generator only works with constant float MissFrac at this time.')
                 lvl_dens_obs = self.lvl_dens[g]*(1-self.MissFrac[g])
-                distribution = Theory.LevelSpacingDists.MissingGen(lvl_dens=lvl_dens_obs, pM=self.MissFrac[g], err=err)
+                distribution = level_spacing_distributions.MissingGen(lvl_dens=lvl_dens_obs, pM=self.MissFrac[g], err=err)
                 distributions.append(distribution)
         elif dist_type == 'Poisson':
             for g in range(self.num_groups):
-                distribution = Theory.LevelSpacingDists.PoissonGen(lvl_dens=self.lvl_dens[g])
+                distribution = level_spacing_distributions.PoissonGen(lvl_dens=self.lvl_dens[g])
                 distributions.append(distribution)
         else:
             raise NotImplementedError(f'The distribution type, "{dist_type}", has not been implemented yet.')
@@ -600,12 +600,12 @@ class Reaction:
                     fit = self.distributions(dist_type)[g].cdf
         elif quantity == 'neutron width':
             if not cdf: # PDF
-                fit = Theory.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).pdf
+                fit = distributions.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).pdf
             else: # CDF
-                fit = Theory.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).cdf
+                fit = distributions.porter_thomas_dist(mean=self.gn2m[g], df=self.nDOF[g], trunc=0.0).cdf
         elif quantity in ('gamma width', 'capture width'):
             if not cdf: # PDF
-                fit = Theory.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).pdf
+                fit = distributions.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).pdf
             else: # CDF
-                fit = Theory.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).cdf
+                fit = distributions.porter_thomas_dist(mean=self.gg2m[g], df=self.gDOF[g], trunc=0.0).cdf
         return fit

@@ -144,7 +144,7 @@ class syndatOPT:
         self._sampleTNCS = True
         self._smoothTNCS = False
         
-        # self._save_raw_data = False
+        self._save_raw_data = False
         # self._saveTMP = False
 
         self._force_zero_to_1 = True

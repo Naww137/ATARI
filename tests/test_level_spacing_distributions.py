@@ -1,6 +1,4 @@
-import sys
-sys.path.append('../TAZ')
-from TAZ.Theory import PoissonGen, WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen, merge
+from ATARI.theory.level_spacing_distributions import PoissonGen, WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen, merge
 
 import numpy as np
 from scipy.integrate import quad
@@ -16,8 +14,7 @@ This file verifies the level-spacing distribution classes and the merging functi
 
 class TestSpacingDistributions(unittest.TestCase):
     """
-    Here, we intend to verify that all of the level-spacing distribution quantities are correct
-    and return expected quantities.
+    Here, we intend to verify that all of the level-spacing distribution quantities are correct and return expected quantities.
     """
 
     places = 7
@@ -287,8 +284,7 @@ class TestMerger(unittest.TestCase):
 
     def test_poisson(self):
         """
-        Tests the merge function with Poisson distribution. This should return another Poisson
-        distribution with a known level-spacing.
+        Tests the merge function with Poisson distribution. This should return another Poisson distribution with a known level-spacing.
         """
 
         X = np.logspace(-4, 4, 100)

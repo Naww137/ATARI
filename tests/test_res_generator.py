@@ -1,15 +1,13 @@
-import sys
-sys.path.append('../ATARI')
 from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_delta_3_predict
-from ATARI.theory.scattering_params import FofE_explicit
 from ATARI.ModelData.particle import Neutron, Ta181
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist
 
+from utils import chi2_test, chi2_uniform_test
+
 import numpy as np
 import pandas as pd
 from scipy.stats import chisquare
-# from scipy.stats import chi2 as chi2_dist
 
 import unittest
 
@@ -18,21 +16,6 @@ This file tests resonance sampling using level-spacing distributions (Wigner dis
 level-spacing ratio distributions, Dyson-Mehta Delta-3 statistic, and reduced width distributions
 (Porter-Thomas distribution).
 """
-
-def chi2_test(dist, data, num_bins:int):
-    """
-    Performs a Pearson's Chi-squared test with the provided distribution and data.
-    """
-
-    data_len = len(data)
-    quantiles = np.linspace(0.0, 1.0, num_bins+1)
-    with np.errstate(divide='ignore'):
-        edges = dist.ppf(quantiles)
-    obs_counts, edges = np.histogram(data, edges)
-    exp_counts = (data_len / num_bins) * np.ones((num_bins,))
-    chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-    chi2_bar = chi2 / num_bins
-    return chi2_bar, p
         
 class TestResonanceGeneration(unittest.TestCase):
     E0 = 200 # eV
@@ -58,8 +41,8 @@ class TestResonanceGeneration(unittest.TestCase):
 
         cls.part_pair.map_quantum_numbers(print_out=False)
         cls.mean_level_spacing = 9.0030 # eV
-        cls.mean_neutron_width = 452.56615 ; cls.gn2_dof = 1    # eV
-        cls.mean_gamma_width   = 32.0      ; cls.gg2_dof = 1000 # eV
+        cls.mean_neutron_width = 452.56615 ; cls.gn2_dof = 1    # meV
+        cls.mean_gamma_width   = 32.0      ; cls.gg2_dof = 200 # meV
 
         cls.L = 0
         cls.part_pair.add_spin_group(Jpi='3.0',
@@ -82,11 +65,7 @@ class TestResonanceGeneration(unittest.TestCase):
         E = np.array(self.res_ladder['E'])
         lvl_spacing = np.diff(E)
         dist = wigner_dist(scale=self.mean_level_spacing, beta=1)
-        chi2_bar, p = chi2_test(dist, lvl_spacing, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The NNE level-spacings do not follow Wigner distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, lvl_spacing, NUM_BINS, self, 0.001, f'{self.ensemble} level spacing', 'Wigner distribution', 'p')
         
     def test_gamma_widths(self):
         """
@@ -95,13 +74,9 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 
         NUM_BINS = 40
         Gg = self.res_ladder['Gg']
-        gg2 = Gg / 2.0
+        gg2 = self.part_pair.Gg_to_gg2(Gg)
         dist = porter_thomas_dist(mean=self.mean_gamma_width, df=self.gg2_dof, trunc=0.0)
-        chi2_bar, p = chi2_test(dist, abs(gg2), NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The gamma (capture) widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, abs(gg2), NUM_BINS, self, 0.001, 'gamma widths', 'Porter-Thomas distribution', 'p')
         
         obs_counts = np.bincount(np.array(gg2>=0, dtype=int), minlength=2)
         exp_counts = np.array([0.5, 0.5]) * len(gg2)
@@ -119,15 +94,10 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
 
         NUM_BINS = 40
         E  = np.array(self.res_ladder['E'])
-        P = FofE_explicit(E, self.part_pair.ac, self.part_pair.M, self.part_pair.m, self.L)[1]
         Gn = np.array(self.res_ladder['Gn1'])
-        gn2 = Gn / (2.0*P)
+        gn2 = self.part_pair.Gn_to_gn2(Gn, E, self.L)
         dist = porter_thomas_dist(mean=self.mean_neutron_width, df=self.gn2_dof, trunc=0.0)
-        chi2_bar, p = chi2_test(dist, abs(gn2), NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The neutron widths do not follow the expected Porter-Thomas distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, abs(gn2), NUM_BINS, self, 0.001, 'neutron widths', 'Porter-Thomas distribution', 'p')
         
         obs_counts = np.bincount(np.array(gn2>=0, dtype=int), minlength=2)
         exp_counts = np.array([0.5, 0.5]) * len(gn2)
@@ -201,12 +171,7 @@ Predicted ∆3  = {D3_pred:.5f}
         """
 
         NUM_BINS = 40
-        E = np.array(self.res_ladder['E'])
-        num_ergs = len(E)
-        obs_counts, bin_edges = np.histogram(E, NUM_BINS)
-        exp_counts = (num_ergs/NUM_BINS) * np.ones((NUM_BINS,))
-        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-        chi2_bar = chi2 / NUM_BINS
+        chi2_bar, p = chi2_uniform_test(np.array(self.res_ladder['E']), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
 The {self.ensemble} energies do not follow a uniform density curve according to the null hypothesis.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
@@ -221,11 +186,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         E = np.array(self.res_ladder['E'])
         lvl_spacing = np.diff(E)
         dist = wigner_dist(scale=self.mean_level_spacing, beta=self.beta)
-        chi2_bar, p = chi2_test(dist, lvl_spacing, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacings do not follow Wigner distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, lvl_spacing, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', 'Wigner distribution', 'p')
 
     def test_level_spacing_ratio(self):
         """
@@ -237,11 +198,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         lvl_spacing = np.diff(E)
         ratio = lvl_spacing[1:] / lvl_spacing[:-1]
         dist = lvl_spacing_ratio_dist(beta=self.beta)
-        chi2_bar, p = chi2_test(dist, ratio, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacing ratios do not follow the expected curve according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, ratio, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', None, 'p')
         
 class TestGUESampler(unittest.TestCase):
 
@@ -290,12 +247,7 @@ class TestGUESampler(unittest.TestCase):
         """
 
         NUM_BINS = 40
-        E = np.array(self.res_ladder['E'])
-        num_ergs = len(E)
-        obs_counts, bin_edges = np.histogram(E, NUM_BINS)
-        exp_counts = (num_ergs/NUM_BINS) * np.ones((NUM_BINS,))
-        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-        chi2_bar = chi2 / NUM_BINS
+        chi2_bar, p = chi2_uniform_test(np.array(self.res_ladder['E']), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
 The {self.ensemble} energies do not follow a uniform density curve according to the null hypothesis.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
@@ -310,11 +262,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         E = np.array(self.res_ladder['E'])
         lvl_spacing = np.diff(E)
         dist = wigner_dist(scale=self.mean_level_spacing, beta=self.beta)
-        chi2_bar, p = chi2_test(dist, lvl_spacing, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacings do not follow Wigner distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, lvl_spacing, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', 'Wigner distribution', 'p')
 
     def test_level_spacing_ratio(self):
         """
@@ -326,11 +274,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         lvl_spacing = np.diff(E)
         ratio = lvl_spacing[1:] / lvl_spacing[:-1]
         dist = lvl_spacing_ratio_dist(beta=self.beta)
-        chi2_bar, p = chi2_test(dist, ratio, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacing ratios do not follow the expected curve according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, ratio, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', None, 'p')
         
 class TestGSESampler(unittest.TestCase):
 
@@ -379,12 +323,7 @@ class TestGSESampler(unittest.TestCase):
         """
 
         NUM_BINS = 40
-        E = np.array(self.res_ladder['E'])
-        num_ergs = len(E)
-        obs_counts, bin_edges = np.histogram(E, NUM_BINS)
-        exp_counts = (num_ergs/NUM_BINS) * np.ones((NUM_BINS,))
-        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-        chi2_bar = chi2 / NUM_BINS
+        chi2_bar, p = chi2_uniform_test(np.array(self.res_ladder['E']), NUM_BINS)
         self.assertGreater(p, 0.001, f"""
 The {self.ensemble} energies do not follow a uniform density curve according to the null hypothesis.
 Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
@@ -399,11 +338,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         E = np.array(self.res_ladder['E'])
         lvl_spacing = np.diff(E)
         dist = wigner_dist(scale=self.mean_level_spacing, beta=self.beta)
-        chi2_bar, p = chi2_test(dist, lvl_spacing, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacings do not follow Wigner distribution according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, lvl_spacing, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', 'Wigner distribution', 'p')
 
     def test_level_spacing_ratio(self):
         """
@@ -415,11 +350,7 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         lvl_spacing = np.diff(E)
         ratio = lvl_spacing[1:] / lvl_spacing[:-1]
         dist = lvl_spacing_ratio_dist(beta=self.beta)
-        chi2_bar, p = chi2_test(dist, ratio, NUM_BINS)
-        self.assertGreater(p, 0.001, f"""
-The {self.ensemble} level-spacing ratios do not follow the expected curve according to the null hypothesis.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+        chi2_test(dist, ratio, NUM_BINS, self, 0.001, f'{self.ensemble} level spacings', None, 'p')
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,21 +1,24 @@
+from typing import Callable
 from math import sqrt
 import numpy as np
 from numpy.random import Generator
 from scipy.linalg import eigvalsh_tridiagonal
 
-from TAZ.Theory.LevelSpacingDists import WignerGen, BrodyGen
-from TAZ.Theory.distributions import porter_thomas_dist, semicircle_dist
+from ATARI.theory.level_spacing_distributions import WignerGen, BrodyGen
+from ATARI.theory.distributions import porter_thomas_dist, semicircle_dist
 
 __doc__ = """
 This module contains samplers for the neutron widths, gamma (capture) widths, and resonance
 energies.
 """
 
+# NOTE: THIS FUNCTION IS SOMEWHAT REDUNDANT WITH ATARI SYNDAT!
+
 # =================================================================================================
 #    Partial Width Sampling:
 # =================================================================================================
 
-def SampleNeutronWidth(E, Gnm, dof:int,
+def SampleNeutronWidth(E, Gnm:Callable, dof:int,
                        rng:Generator=None, seed:int=None):
     """
     Samples neutron widths according to the chi-squared distribution.

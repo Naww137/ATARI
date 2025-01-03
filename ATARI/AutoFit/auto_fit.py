@@ -57,7 +57,7 @@ class AutoFitOPT:
     use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
 
-    ### Resonance Statistics
+    # Resonance Statistics
     Wigner_informed_cross_validation        : bool = False
     PorterThomas_informed_cross_validation  : bool = False
     
@@ -151,6 +151,7 @@ class AutoFit:
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
         elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
 
+        self.output.Nres_target = Nres_selected # The number of resonances in the model
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
         self.output.final_samout = elimination_history[Nres_selected]['selected_ladder_chars']
@@ -175,6 +176,7 @@ class AutoFit:
 
         ### Could have option to save folds here
 
+        #################
         ### get CVE score in parallel
         if self.options.parallel_CV:
             ## Setup
@@ -194,6 +196,38 @@ class AutoFit:
             for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
                 fold_results = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices))
                 folds_results.append(fold_results)
+
+        # # if save:
+        # self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
+
+        # return save_test_scores, save_train_scores, save_ires, kfolds
+
+        #################
+        # data = {'save_test_scores':save_test_scores,
+        #         'save_train_scores':save_train_scores,
+        #         'save_ires':save_ires,
+        #         'kfolds':kfolds}
+        # import pickle
+        # from uuid import uuid4
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{uuid4()}.pkl', 'wb') as f:
+        #     pickle.dump(data, f)
+
+        #################
+        # import pickle
+        # with open(f'/home/wfritsc1/ATARI/ATARI/ATARI/AutoFit/temp/save_progress_{"c890f9c8-e2bb-4733-a632-5a08c4529a92"}.pkl', 'rb') as f:
+        #     data = pickle.load(f)
+        # save_test_scores = data['save_test_scores']
+        # save_train_scores = data['save_train_scores']
+        # save_ires = data['save_ires']
+        # kfolds = data['kfolds']
+
+        # print('\nsave_ires_updated:')
+        # print(save_ires_updated)
+        # print('\nsave_test_scores_updated:')
+        # print(save_test_scores_updated)
+        # print('\nsave_train_scores_updated:')
+        # print(save_train_scores_updated)
+        # print()
 
         # if save:
         self.output.cross_validation_output = folds_results

@@ -1,9 +1,11 @@
-import sys
-sys.path.append('../TAZ')
-import TAZ
-from TAZ.Theory import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist, deltaMehta3, deltaMehtaPredict
-from TAZ.Theory import WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen
-from utils import chi2_test, chi2_uniform_test
+from ATARI.ModelData.particle import Particle, Neutron
+from ATARI.ModelData.spingroups import Spingroup
+from ATARI.theory.distributions import wigner_dist, lvl_spacing_ratio_dist, porter_thomas_dist
+from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_delta_3_predict
+from ATARI.theory.level_spacing_distributions import WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen, merge
+from ATARI.TAZ.DataClasses.Reaction import Reaction
+
+from tests.utils import chi2_test, chi2_uniform_test
 
 import numpy as np
 from scipy.integrate import cumulative_trapezoid as cumtrapz
@@ -31,8 +33,8 @@ class TestResonanceGeneration(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -45,8 +47,8 @@ class TestResonanceGeneration(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
         cls.res_ladder = cls.reaction.sample('NNE')[0]
 
     def test_wigner(self):
@@ -100,8 +102,8 @@ class TestGOESampler(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -114,8 +116,8 @@ class TestGOESampler(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
@@ -124,8 +126,8 @@ class TestGOESampler(unittest.TestCase):
         Tests if the resonance ladder's Dyson-Mehta ∆3 statistic aligns with the prediction.
         """
 
-        D3_calc = deltaMehta3(self.E, self.EB)
-        D3_pred = deltaMehtaPredict(len(self.E), 'GOE')
+        D3_calc = dyson_mehta_delta_3(self.E, self.EB)
+        D3_pred = dyson_mehta_delta_3_predict(len(self.E), 'GOE')
 
         perc_err = (D3_calc-D3_pred)/D3_pred
         self.assertLess(perc_err, 0.4, f"""
@@ -189,8 +191,8 @@ class TestGUESampler(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -203,8 +205,8 @@ class TestGUESampler(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
         cls.E = cls.res_ladder.E.to_numpy()
     
@@ -253,8 +255,8 @@ class TestGSESampler(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -267,8 +269,8 @@ class TestGSESampler(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
         cls.E = cls.res_ladder.E.to_numpy()
     
@@ -316,8 +318,8 @@ class TestBrodySampler(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -331,8 +333,8 @@ class TestBrodySampler(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile,
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile,
                                     MLS=cls.mls,
                                     gn2m=cls.gn2m, nDOF=cls.dfn,
                                     gg2m=cls.gg2m, gDOF=cls.dfg,
@@ -365,8 +367,8 @@ class TestMissingSampler(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB   = (1e-5,5000)
@@ -380,8 +382,8 @@ class TestMissingSampler(unittest.TestCase):
         cls.j    = [3.0]
 
         # 2 Spingroup Case:
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile,
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile,
                                     MLS=cls.mls,
                                     gn2m=cls.gn2m, nDOF=cls.dfn,
                                     gg2m=cls.gg2m, gDOF=cls.dfg,
@@ -417,8 +419,8 @@ class TestMerger(unittest.TestCase):
 
         bins = np.linspace(0, xMax, num_bins+1)
 
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         EB = (1e-5,2e5)
         lvl_dens  = [1.3, 0.5]
@@ -429,8 +431,8 @@ class TestMerger(unittest.TestCase):
         l     = [0, 0]
         j     = [3.0, 4.0]
 
-        SGs = TAZ.Spingroup.zip(l, j)
-        reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=lvl_dens, gn2m=gn2m, nDOF=dfn, gg2m=gg2m, gDOF=dfg, spingroups=SGs, EB=EB)
+        SGs = Spingroup.zip(l, j)
+        reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=lvl_dens, gn2m=gn2m, nDOF=dfn, gg2m=gg2m, gDOF=dfg, spingroups=SGs, EB=EB)
         res_ladder = reaction.sample(self.ensemble)[0]
         E = res_ladder.E.to_numpy()
         level_spacings = np.diff(E)
@@ -438,7 +440,7 @@ class TestMerger(unittest.TestCase):
 
         X = np.linspace(0.0, xMax, 10_000)
         level_spacing_dists = reaction.distributions('Wigner')
-        merged_dist = TAZ.Theory.merge(*level_spacing_dists)
+        merged_dist = merge(*level_spacing_dists)
         Y = merged_dist.pdf(X)
         I = cumtrapz(Y, X, initial=0.0)
         Ibins = np.interp(bins, X, I)

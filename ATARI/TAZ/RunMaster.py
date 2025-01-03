@@ -2,8 +2,8 @@ from typing import Tuple, List
 import numpy as np
 from pandas import Series
 
-from TAZ.Encore import Encore
-from TAZ.Theory import SpacingDistributionBase, merge
+from ATARI.theory.level_spacing_distributions import SpacingDistributionBase, merge
+from ATARI.TAZ.Encore import Encore
 
 import warnings
 
@@ -85,13 +85,17 @@ class RunMaster:
             raise ValueError('energy_range[0] must be strictly less than energy_range[1].')
         
         if isinstance(E, Series):
-            E = E.to_numpy()
+            E = E.to_numpy(dtype=float)
+        elif not isinstance(E, np.ndarray):
+            E = np.array(E, dtype=float)
         self.E  = np.sort(E)
         self.energy_range = tuple(energy_range)
         self.level_spacing_dists = np.array(level_spacing_dists)
         self.lvl_dens = np.array([lvl_spacing_dist.lvl_dens for lvl_spacing_dist in level_spacing_dists] + [false_dens])
 
-        self.L = len(E) # Number of resonances
+        self._ladder_checks(E, energy_range, level_spacing_dists)
+
+        self.L = len(self.E) # Number of resonances
         self.G = len(self.lvl_dens) - 1 # number of spingroups (not including false group)
 
         if prior is None:
@@ -107,6 +111,37 @@ class RunMaster:
         self.merge = merge
 
         self._prepare_encore_pipe(err)
+
+    def _ladder_checks(self, E, energy_range:tuple, level_spacing_dists:Tuple[SpacingDistributionBase]):
+        """
+        Checks if there are any unreasonable traits in the provided resonance and distribution
+        data.
+
+        Parameters
+        ----------
+        E                    : array-like of float
+            Resonance energies for the ladder.
+        energy_range         : (float, float)
+            The ladder energy boundaries.
+        level_spacing_dists  : ndarray[SpacingDistribution]
+            The level-spacing distributions object.
+        """
+        
+        if any((E <= energy_range[0])) or any((E >= energy_range[1])):
+            raise ValueError(f"""
+Energies not strictly inside the provided window energy range:
+Energy Range = {energy_range}
+Minimum energy = {min(E)}
+Maximum energy = {max(E)}
+""")
+        dE_max = max(np.diff(E))
+        
+        # Check if there is an unreasonably large gap in the resonance data:
+        for level_spacing_dist in level_spacing_dists:
+            if level_spacing_dist.sf(dE_max) > 1e-6: # one in a million chance of occuring
+                break
+        else:
+            raise ValueError('There is a large gap in the provided resonances that is improbable under resonance statistics.')
 
     def _prepare_encore_pipe(self, err:float):
         """
@@ -224,18 +259,9 @@ class RunMaster:
                 iMax[0,0]    = j
                 iMax[:j+1,1] = 0
                 break
-
-        # Intermediate cases:
-        for i in range(L-1):
-            for j in range(iMax[i,0]+1,L):
-                if E[j] - E[i] >= xMax_f0:
-                    iMax[i+1,0] = j
-                    iMax[iMax[i-1,0]:j+1,1] = i+1
-                    break
-            else:
-                iMax[i:,0] = L+1
-                iMax[iMax[i-1,0]:,1] = i+1
-                break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[0,0] = j
+            iMax[:,1] = 0
 
         # Upper boundary cases:
         for j in range(L-1,-1,-1):
@@ -243,6 +269,40 @@ class RunMaster:
                 iMax[-1,1] = j
                 iMax[j:,0] = L+1
                 break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[-1,1] = j
+            iMax[ :,0] = L+1
+
+        # Intermediate cases:
+        j = 1
+        for i in range(L):
+            while True:
+                if E[j] - E[i] >= xMax_f0:
+                    iMax[i+1,0] = j+1
+                    break
+                else:
+                    j += 1
+                    if j == L:
+                        iMax[i+1:,0] = L+1
+                        break
+            if j == L:
+                break
+        j = L-2
+        for i in range(L-1,-1,-1):
+            while True:
+                if E[i] - E[j] >= xMax_f0:
+                    iMax[i+1,1] = j+1
+                    break
+                else:
+                    j -= 1
+                    if j == -1:
+                        iMax[:i+2,1] = 0
+                        break
+            if j == -1:
+                break
+
+        if np.any(iMax == -1):
+            raise RuntimeError('"iMax" should be filled, but there are undefined iMax elements.')
 
         return iMax
     
@@ -519,7 +579,7 @@ class RunMaster:
             for g, distribution in enumerate(level_spacing_dists):
                 prior[:,g] = distribution.lvl_dens
             prior[:,G] = false_dens
-            prior /= np.sum(prior, axis=1)
+            prior /= np.sum(prior, axis=1, keepdims=True)
 
         iMax = np.zeros((L+2, 2, G), 'i4')
         level_spacing_probs = np.zeros((L+2, L+2, G), 'f8')

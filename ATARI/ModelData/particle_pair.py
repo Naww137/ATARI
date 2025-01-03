@@ -288,8 +288,8 @@ class Particle_Pair:
         P : float, array-like
             The penetration factor.
         """
-        S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.M, self.m, l)
-        return P
+        S, P, psi, k = FofE_recursive(np.array(E, dtype=float), self.ac, self.M, self.m, l)
+        return P[l]
     def gn2_to_Gn(self, gn2, E, l:int):
         """
         Converts reduced neutron widths to partial neutron widths.
@@ -308,8 +308,8 @@ class Particle_Pair:
         Gn : float, array-like
             Partial neutron widths.
         """
-        P = self.penetration_factor(np.array(E), l)
-        Gn = g2_to_G(np.array(gn2), P)
+        P = self.penetration_factor(np.array(E, dtype=float), l)
+        Gn = g2_to_G(gn2, P)
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):
         """
@@ -329,8 +329,8 @@ class Particle_Pair:
         gn2 : float, array-like
             Reduced neutron widths.
         """
-        P = self.penetration_factor(np.array(E), l)
-        gn2 = G_to_g2(np.array(Gn), P)
+        P = self.penetration_factor(np.array(E, dtype=float), l)
+        gn2 = G_to_g2(Gn, P)
         return gn2
     def gg2_to_Gg(self, gg2):
         """
@@ -347,7 +347,7 @@ class Particle_Pair:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        Gg = g2_to_G(np.array(gg2), P)
+        Gg = g2_to_G(gg2, P)
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -364,7 +364,7 @@ class Particle_Pair:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        gg2 = G_to_g2(np.array(Gg), P)
+        gg2 = G_to_g2(np.array(Gg, dtype=float), P)
         return gg2
 
     def map_quantum_numbers(self, print_out):
@@ -521,9 +521,8 @@ class Particle_Pair:
                 raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
             else:
                 L = Jinfo["Ls"][0]
-            _, P_array, _, _ = FofE_recursive(levels, self.ac, self.M, self.m, L)
-            Gg_samples = 2*gg2_samples
-            Gn1_samples = 2*P_array[0]*gn2_samples
+            Gg_samples = self.gg2_to_Gg(gg2_samples)
+            Gn1_samples = self.gn2_to_Gn(gn2_samples, levels, L)
             zeros = np.zeros(len(levels)) #"varyE", "varyGg", "varyGn1", #zeros, zeros, zeros,
             E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples,  [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],
                                      index=['E', 'Gg', 'Gn1',  'J_ID', 'gg2', 'gn2', 'Jpi', 'L',])

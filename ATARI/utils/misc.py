@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import pandas as pd
 from copy import copy
+from uuid import uuid4
 
 def fine_egrid(energy, ppeV=100):
     """
@@ -54,11 +55,13 @@ def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, 
     if not os.path.exists(path_to_sammy_temps):
         os.mkdir(path_to_sammy_temps)
 
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    # Combine timestamp and random characters
-    unique_string = timestamp
+    # timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    # # Combine timestamp and random characters
+    # unique_string = timestamp
 
-    sammy_rundirname = path_to_sammy_temps+'SAMMY_runDIR_'+addit_str+'_'+str(case_id)+'_'+unique_string+'/'
+    unique_string = uuid4()
+
+    sammy_rundirname = path_to_sammy_temps+'SAMMY_runDIR_'+addit_str+'_'+str(case_id)+'_'+str(unique_string)+'/'
 
     return sammy_rundirname
 

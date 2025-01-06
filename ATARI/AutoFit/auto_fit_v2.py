@@ -57,6 +57,7 @@ class AutoFitOUT:
     Nres_target                 : Optional[int]                      = None
     whitening_model             : Optional[SammyOutputData]          = None
     fit_and_eliminate_output    : Optional[FitAndEliminateOUT]       = None
+    CV_elimination_history      : Optional[List[FitAndEliminateOUT]] = None
     cross_validation_output     : Optional[List[CrossValidationOUT]] = None
     total_time                  : Optional[float]                    = None
 
@@ -215,6 +216,10 @@ class AutoFit2:
         evaluation_data_CV = deepcopy(evaluation_data)
         evaluation_data_CV.covariance_data = covariance_data_at_theory
 
+        if self.options.print_bool:
+            print("COVARIANCES FOR SPLITTING:")
+            [print(cov) for cov in covariance_data_at_theory]
+
         ### Splitting data for cross validation
         Ds, Vis_train_folds, Vis_test_folds, folds_weights = split_correlated_datasets_into_folds(evaluation_data=evaluation_data_CV, cap_norm_unc=self.cap_norm_unc, K_folds=self.options.K_folds)
         if self.options.print_bool:
@@ -229,6 +234,9 @@ class AutoFit2:
         #                                            experimental_models_no_pup=evaluation_data.experimental_models_no_pup)
 
         ### Could have option to save folds here
+
+        if self.options.save_CV_elimination_history:
+            self.output.CV_elimination_history = []
 
         ### get CVE score in parallel
         if self.options.parallel_CV:
@@ -332,6 +340,8 @@ class AutoFit2:
         print(initial_samout.par_post)
         internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
         elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances, target_ires=0)#, target_ires=len(fixed_resonances))
+        if self.options.save_CV_elimination_history:
+            self.output.CV_elimination_history.append(elimination_history)
 
         # Get test and train scores:
         fold_results = {}

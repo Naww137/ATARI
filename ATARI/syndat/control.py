@@ -177,7 +177,7 @@ class Syndat_Control:
             for i, syn_mod in enumerate(self.syndat_models):
 
                 if self.save_raw_data and self.save_true_model_parameters:
-                    out = syndatOUT(title = syn_mod.title,par_true=par_true,pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i],true_model_parameters=true_model_parameters_list)
+                    out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i], true_model_parameters=true_model_parameters_list)
                 elif self.save_raw_data:
                     out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i])
                 elif self.save_true_model_parameters:

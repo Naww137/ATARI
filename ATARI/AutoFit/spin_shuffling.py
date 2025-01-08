@@ -24,6 +24,7 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_
     respar_post.loc[respar_mask_in_window, 'Gn1'] *= neutron_width_signs # shuffle sign of neutron widths
     respar_post.loc[respar_mask_in_window, 'Gg' ] *= capture_width_signs # shuffle sign of capture widths
     for TAZ_spin_id, (Jpi, spingroup_params) in enumerate(particle_pair.spin_groups.items()):
+<<<<<<< HEAD
 
         # Finally, assign the value to the relevant rows in the original DataFrame
         selected_rows = respar_post.loc[respar_mask_in_window]
@@ -38,6 +39,11 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_
     selected_index = selected_rows.loc[spingroups == num_spingroups].index
     respar_post.drop(selected_index, inplace=True)
     # respar_post = respar_post.loc[spingroups != num_spingroups] # removing false resonances
+=======
+        respar_post.loc[spingroups == TAZ_spin_id, 'J_ID'] = spingroup_params['J_ID']
+        respar_post.loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0]
+        respar_post.loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
+>>>>>>> 0cbc7e71 (Spin shuffling updates.)
     return respar_post
 
 def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
@@ -62,16 +68,45 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     num_spingroups = reaction_TAZ.num_groups
     # J_IDs = [spingroup['J_ID'] for spingroup in particle_pair.spin_groups.values()]
     # respar, _ = ATARI_to_TAZ_resonances(respar, J_IDs)
+<<<<<<< HEAD
     reaction_TAZ.false_dens = false_dens
     prior, log_likelihood_prior = PTBayes(respar_window, reaction_TAZ, false_width_dist=false_width_dist)
+=======
+    if false_resonances:
+        lvl_dens_exp = sum(reaction_TAZ.lvl_dens_all)
+        ladder_size = reaction_TAZ.EB[1] - reaction_TAZ.EB[0]
+        false_frac = estimate_false_missing_fraction_from_spacing(num_res, lvl_dens_exp, ladder_size)
+        false_dens = (false_frac * num_res) / ladder_size
+        false_width_dist, _ = empirical_false_distribution(respar['Gn1'], false_frac, ) # FIXME!
+        false_width_pdf = false_width_dist.pdf
+    else:
+        false_dens = 0.0
+        false_width_pdf = None
+    reaction_TAZ.false_dens = false_dens
+    prior, log_likelihood_prior = PTBayes(respar, reaction_TAZ, false_width_dist=false_width_pdf)
+>>>>>>> 0cbc7e71 (Spin shuffling updates.)
     print('Porter-Thomas Prior:')
     print(prior)
     print()
     print('Reaction:')
     print(reaction_TAZ)
+<<<<<<< HEAD
     print()
     print('Resonance Parameters:')
     print(respar)
+=======
+
+    run_master = RunMaster(respar['E'], reaction_TAZ.EB, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
+    spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)
+    print('Spin Shuffles:')
+    print(spin_shuffles)
+    shuffle_respars = []
+    for shuffle_id in range(num_shuffles):
+        spin_shuffle = spin_shuffles[shuffle_id,:]
+        shuffle_respar = assign_spingroups(respar=respar, spingroups=spin_shuffle, particle_pair=particle_pair)
+        shuffle_respars.append(shuffle_respar)
+    return shuffle_respars
+>>>>>>> 0cbc7e71 (Spin shuffling updates.)
 
     run_master = RunMaster(E=respar_window['E'], energy_range=window_E_bounds, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
     spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)
@@ -115,6 +150,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
     else:
         raise ValueError(f'Unknown model selection criteria, "{model_selection}".')
     
+<<<<<<< HEAD
     particle_pair = solver.sammyINP.particle_pair
 
     # Check if there is enough resonances to generate the desired number of shuffles:
@@ -132,6 +168,15 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                             window_E_bounds=window_E_bounds,
                                             false_dens=false_dens, false_width_dist=false_width_dist,
                                             rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
+=======
+    spin_shuffle_cases = []
+    for shuffled_respar in shuffled_respars:
+        shuffled_respar['Gn1'] *= np.random.choice([-1, 1], size=(len(shuffled_respar))) # also shuffle sign of resonance widths
+        sammy_out = solver.fit(shuffled_respar, external_resonance_indices=external_resonance_indices)
+        chi2 = sum(sammy_out.chi2_post)
+        obj_value = objective_func(chi2=chi2, res_ladder=sammy_out.par_post, particle_pair=particle_pair, fixed_resonances_indices=[],
+                                   Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
+>>>>>>> 0cbc7e71 (Spin shuffling updates.)
         
         # Only accept shuffles that have the desired size:
         for shuffled_respar in shuffled_respars:

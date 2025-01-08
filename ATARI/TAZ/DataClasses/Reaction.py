@@ -5,18 +5,11 @@ from functools import partial
 
 import warnings
 
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
 from ATARI.ModelData.spingroups import Spingroup
 from ATARI.theory import distributions
 from ATARI.theory import level_spacing_distributions
 from ATARI.TAZ.Theory import Samplers
 from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
-=======
-from ATARI.theory import distributions
-from ATARI.theory import level_spacing_distributions
-from ATARI.TAZ.TAZ.Theory import Samplers, RMatrix
-from ATARI.TAZ.TAZ.DataClasses.Spingroups import Spingroup
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
 
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
@@ -216,11 +209,7 @@ class Reaction:
         elif self.Gn_trunc_provided:
             def _miss_frac(gn2m, df, l, E):
                 gn2_trunc = self.Gn_to_gn2(Gn_trunc, E, l)
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
                 frac_missing = fraction_below_threshold_gn2(gn2_trunc, gn2m, df)
-=======
-                frac_missing = distributions.fraction_missing_gn2(gn2_trunc, gn2m, df)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
                 return frac_missing
             missing_fracs = []
             for gn2m, df, l in zip(self.gn2m, self.nDOF, self.L):
@@ -271,15 +260,9 @@ class Reaction:
         P : float, array-like
             The penetration factor.
         """
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.targ.mass, self.proj.mass, l)
         return P[-1,:]
-=======
-        k = RMatrix.k_wavenumber(self.targ.mass, E, self.proj.mass)
-        rho = RMatrix.rho(k, self.ac)
-        P = RMatrix.penetration_factor(rho, l)
-        return P
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
+
     def gn2_to_Gn(self, gn2, E, l:int):
         """
         Converts reduced neutron widths to partial neutron widths.
@@ -299,11 +282,7 @@ class Reaction:
             Partial neutron widths.
         """
         P = self.penetration_factor(E, l)
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         Gn = g2_to_G(gn2, P)
-=======
-        Gn = RMatrix.g2_to_G(gn2, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):
         """
@@ -324,22 +303,14 @@ class Reaction:
             Reduced neutron widths.
         """
         P = self.penetration_factor(E, l)
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         gn2 = G_to_g2(Gn, P)
-=======
-        gn2 = RMatrix.G_to_g2(Gn, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
         return gn2
     @property
     def Gnm(self):
         'Mean Partial Neutron Widths'
         def _Gnm_func(l, gn2m, E):
             P = self.penetration_factor(E, l)
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
             return g2_to_G(gn2m, P)
-=======
-            return RMatrix.g2_to_G(gn2m, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
         Gnm_funcs = []
         for l, gn2m in zip(self.L, self.gn2m):
             Gnm_func = partial(_Gnm_func, l, gn2m)
@@ -361,11 +332,7 @@ class Reaction:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         Gg = g2_to_G(gg2, P)
-=======
-        Gg = RMatrix.g2_to_G(gg2, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -382,21 +349,13 @@ class Reaction:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         gg2 = G_to_g2(Gg, P)
-=======
-        gg2 = RMatrix.G_to_g2(Gg, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
         return gg2
     @property
     def Ggm(self):
         'Mean Partial Gamma (Capture) Widths'
         P = 1.0 # penetrability is 1 for capture widths
-<<<<<<< HEAD:ATARI/TAZ/DataClasses/Reaction.py
         return g2_to_G(self.gg2m, P)
-=======
-        return RMatrix.g2_to_G(self.gg2m, P)
->>>>>>> 4c7f6fb1 (Updated unit tests and TAZ file paths.):ATARI/TAZ/TAZ/DataClasses/Reaction.py
     
     def __repr__(self):
         txt = ''

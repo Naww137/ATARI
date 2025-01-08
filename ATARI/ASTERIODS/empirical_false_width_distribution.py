@@ -11,6 +11,14 @@ __doc__ = """
 This file contains tools for estimating the distribution of false widths.
 """
 
+"""
+Methods for false/missing density estimation:
+    1. Level density estimation.
+  / 2. Porter-Thomas CDF regression.
+  / 3. Missing level-spacing distribution regression.
+  / 4. Delta-3 statistic missing fraction estimation.
+"""
+
 # def estimate_false_missing_fraction_from_widths(widths, width_dist:rv_continuous, trunc:float):
 #     """
 #     ...

@@ -57,14 +57,18 @@ def ATARI_to_TAZ(particle_pair:Particle_Pair, **kwargs):
             gDOF.append(mean_param_dict['g_dof'])
             J_ID.append(mean_param_dict['J_ID'])
 
-    # Resonances:
-    resonances = particle_pair.resonance_ladder.sort_values(by=['E'], ignore_index=True)
-    res_J_IDs = resonances['J_ID'].to_numpy()
+    if particle_pair.resonance_ladder is None:
+        resonances    = None
+        spingroup_IDs = None
+    else:
+        # Resonances:
+        resonances = particle_pair.resonance_ladder.sort_values(by=['E'], ignore_index=True)
+        res_J_IDs = resonances['J_ID'].to_numpy()
     
-    # Spingroup IDs:
-    spingroup_IDs = np.empty_like(res_J_IDs, dtype=int)
-    for TAZ_ID, jid in enumerate(J_ID):
-        spingroup_IDs[res_J_IDs == jid] = TAZ_ID
+        # Spingroup IDs:
+        spingroup_IDs = np.empty_like(res_J_IDs, dtype=int)
+        for TAZ_ID, jid in enumerate(J_ID):
+            spingroup_IDs[res_J_IDs == jid] = TAZ_ID
 
     reaction_params = {
         'targ'       : particle_pair.target,

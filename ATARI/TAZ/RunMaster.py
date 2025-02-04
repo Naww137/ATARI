@@ -83,6 +83,8 @@ class RunMaster:
             raise ValueError('"energy_range" must be a tuple with two elements: an lower and upper bound on the resonance ladder energies.')
         if energy_range[0] >= energy_range[1]:
             raise ValueError('energy_range[0] must be strictly less than energy_range[1].')
+        if len(E) == 0:
+            raise ValueError('The resonance ladder is empty.')
         
         if isinstance(E, Series):
             E = E.to_numpy(dtype=float)
@@ -134,7 +136,7 @@ Energy Range = {energy_range}
 Minimum energy = {min(E)}
 Maximum energy = {max(E)}
 """)
-        dE_max = max(np.diff(E))
+        dE_max = max(np.diff(np.concatenate(([energy_range[0]], E, [energy_range[1]]), dtype=float)))
         
         # Check if there is an unreasonably large gap in the resonance data:
         for level_spacing_dist in level_spacing_dists:
@@ -253,24 +255,21 @@ Maximum energy = {max(E)}
         elif np.isinf(xMax_f1):     raise RuntimeError('xMax_f1 was found to be infinite.')
         elif np.isnan(xMax_f1):     raise RuntimeError('xMax_f1 was found to be NaN.')
 
+        # The 1 resonance edge case:
+        if L == 1:
+            iMax[:,0] = 2
+            iMax[:,1] = 0
+            return iMax
+
         # Lower boundary cases:
         for j in range(L):
             if E[j] - energy_range[0] >= xMax_f1:
                 iMax[0,0]    = j
                 iMax[:j+1,1] = 0
                 break
-
-        # Intermediate cases:
-        for i in range(L-1):
-            for j in range(iMax[i,0]+1,L):
-                if E[j] - E[i] >= xMax_f0:
-                    iMax[i+1,0] = j
-                    iMax[iMax[i-1,0]:j+1,1] = i+1
-                    break
-            else:
-                iMax[i:,0] = L+1
-                iMax[iMax[i-1,0]:,1] = i+1
-                break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[0,0] = j
+            iMax[:,1] = 0
 
         # Upper boundary cases:
         for j in range(L-1,-1,-1):
@@ -278,6 +277,40 @@ Maximum energy = {max(E)}
                 iMax[-1,1] = j
                 iMax[j:,0] = L+1
                 break
+        else: # case where the level-spacing limit is larger than the window size
+            iMax[-1,1] = j
+            iMax[ :,0] = L+1
+
+        # Intermediate cases:
+        j = 1
+        for i in range(L):
+            while True:
+                if E[j] - E[i] >= xMax_f0:
+                    iMax[i+1,0] = j+1
+                    break
+                else:
+                    j += 1
+                    if j == L:
+                        iMax[i+1:,0] = L+1
+                        break
+            if j == L:
+                break
+        j = L-2
+        for i in range(L-1,-1,-1):
+            while True:
+                if E[i] - E[j] >= xMax_f0:
+                    iMax[i+1,1] = j+1
+                    break
+                else:
+                    j -= 1
+                    if j == -1:
+                        iMax[:i+2,1] = 0
+                        break
+            if j == -1:
+                break
+
+        if np.any(iMax == -1):
+            raise RuntimeError('"iMax" should be filled, but there are undefined iMax elements.')
 
         return iMax
     
@@ -332,13 +365,15 @@ Maximum energy = {max(E)}
         else:
             level_spacing_probs[0,1:-1]  = distribution.f1(E - energy_range[0], prior)
             level_spacing_probs[1:-1,-1] = distribution.f1(energy_range[1] - E, prior)
+        # Double Boundary Distribution:
+        level_spacing_probs[0,-1] = distribution.f2(energy_range[1]-energy_range[0])
 
         # Error checking:
         if (level_spacing_probs == np.nan).any():   raise RuntimeError('Level-spacing probabilities have "NaN" values.')
         if (level_spacing_probs == np.inf).any():   raise RuntimeError('Level-spacing probabilities have "Inf" values.')
         if (level_spacing_probs <  0.0).any():      raise RuntimeError('Level-spacing probabilities have negative values.')
 
-        # The normalization factor is duplicated in the prior. One must be removed: FIXME!!!!!
+        # The normalization factor is duplicated in the prior. One must be removed
         level_spacing_probs /= distribution.lvl_dens
         return level_spacing_probs
     

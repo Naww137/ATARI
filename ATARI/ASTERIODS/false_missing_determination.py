@@ -5,7 +5,7 @@ from scipy.stats import rv_continuous, gaussian_kde
 from copy import copy
 
 from ATARI.theory.distributions import porter_thomas_dist
-from ATARI.TAZ.DataClasses.Reaction import Reaction
+# from ATARI.TAZ.DataClasses.Reaction import Reaction
 
 __doc__ = """
 This file contains tools for estimating the distribution of false widths.
@@ -155,7 +155,7 @@ def estimate_false_missing_density_from_spacing(num_res:int, window_E_bounds:Tup
 #    Empirical False Width Distribution:
 # =================================================================================================
 
-def empirical_false_distribution(Gn, E_eval:float, reaction:Reaction,
+def empirical_false_distribution(Gn, E_eval:float, reaction,
                                  trunc:float=np.inf, err_tol:float=1e-5):
     """
     Finds a false-resonance neutron width distribution from observed widths that are thought to

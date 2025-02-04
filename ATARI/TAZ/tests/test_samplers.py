@@ -5,7 +5,7 @@ from ATARI.theory.resonance_statistics import dyson_mehta_delta_3, dyson_mehta_d
 from ATARI.theory.level_spacing_distributions import WignerGen, BrodyGen, MissingGen, HighOrderSpacingGen, merge
 from ATARI.TAZ.DataClasses.Reaction import Reaction
 
-from tests.utils import chi2_test, chi2_uniform_test
+from ATARI.TAZ.tests.utils import chi2_test, chi2_uniform_test
 
 import numpy as np
 from scipy.integrate import cumulative_trapezoid as cumtrapz

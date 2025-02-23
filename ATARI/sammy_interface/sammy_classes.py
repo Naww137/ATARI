@@ -71,6 +71,7 @@ class SammyRunTimeOptions:
         self.sammy_runDIR =  "sammy_runDIR"
         self.keep_runDIR = False
         self.Print =  False
+        self.is_Docker = False
         
         self.derivatives = False
         self.bayes = False

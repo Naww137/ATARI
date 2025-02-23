@@ -22,6 +22,7 @@ from ATARI.sammy_interface.sammy_io import *
 
 
 def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions, use_RPCM=False, use_IDC=False):
+
     with open(os.path.join(sammy_RTO.sammy_runDIR, 'pipe.sh'), 'w') as f:
         # f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
         f.write(f'{sammy_RTO.path_to_SAMMY_exe}<<EOF\nsammy.inp\nSAMMY.PAR\nsammy.dat\n')
@@ -64,8 +65,21 @@ echo "$chi2_string $chi2_stringn"
 
 
 def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
+    if sammy_RTO.is_Docker:
+        command = [
+                    "docker", "run", 
+                    "--rm",
+                    "-v", f"{os.path.abspath(sammy_RTO.sammy_runDIR)}:/app",
+                    "sammy:latest",
+                    "/bin/bash",
+                    "-c",
+                    "cd /app && ./pipe.sh"
+                ]
+    else:
+        command = ["sh", "-c", f"./pipe.sh"]
+
     runsammy_process = subprocess.run(
-                                ["sh", "-c", f"./pipe.sh"], 
+                                command, 
                                 cwd=os.path.realpath(sammy_RTO.sammy_runDIR),
                                 capture_output=True, text=True, timeout=60*30
                                 )
@@ -168,8 +182,6 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
 # run sammy with NV or IQ scheme
 # ################################################ ###############################################
 
-
-
 def get_ECSCM(sammyRTO, sammyINP):
     if sammyINP.ECSCM_experiment is None:
         print("No specific ECSCM experiment class was given, using the same experiment model as used to fit")
@@ -206,8 +218,7 @@ def get_ECSCM(sammyRTO, sammyINP):
     return df, cov
     
 
-
-
+ 
 
 def execute_sammy(sammy_RTO:SammyRunTimeOptions):
     chi2, chi2n = runsammy_shellpipe(sammy_RTO)

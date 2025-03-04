@@ -10,7 +10,8 @@ from scipy.special import erf, erfc, expm1, gamma
 class __WignerDistribution(rv_continuous):
     'Wigner Distribution'
     def _pdf(self, x, beta:int):
-        beta = beta[0]
+        if np.iterable(beta):
+            beta = beta[0]
         if   beta == 1:
             coef1 = pi/4
             coef2 = pi/2
@@ -24,7 +25,8 @@ class __WignerDistribution(rv_continuous):
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
         return coef2 * x**beta * np.exp(-coef1*x**2)
     def _cdf(self, x, beta:int):
-        beta = beta[0]
+        if np.iterable(beta):
+            beta = beta[0]
         if   beta == 1:
             coef = pi/4
             return -expm1(-coef*x**2)
@@ -37,7 +39,8 @@ class __WignerDistribution(rv_continuous):
         else:
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
     def _sf(self, x, beta:int):
-        beta = beta[0]
+        if np.iterable(beta):
+            beta = beta[0]
         if   beta == 1:
             coef = pi/4
             return np.exp(-coef*x**2)
@@ -50,7 +53,8 @@ class __WignerDistribution(rv_continuous):
         else:
             raise ValueError(f'beta = {beta} does not exist. Choose beta = 1, 2, or 4.')
     # def _ppf(self, q, beta:int):
-    #     beta = beta[0]
+    #     if np.iterable(beta):
+    #         beta = beta[0]
     #     if beta == 1:
     #         coef = pi/4
     #         return np.sqrt(-np.log(1-q)/coef)

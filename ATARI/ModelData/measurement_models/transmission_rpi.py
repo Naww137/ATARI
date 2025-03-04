@@ -435,6 +435,10 @@ class Transmission_RPI:
             print(f"WARNING: new energy max {max(new_energy_range)} is more than existing transmission_rpi.open_netron_spectrum energy {max(self.model_parameters.open_neutron_spectrum.E)}")
         self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[(self.model_parameters.open_neutron_spectrum.E.values < max(new_energy_range)) & (self.model_parameters.open_neutron_spectrum.E.values > min(new_energy_range))].copy()
         return
+
+    def select_data_points(self, indices):
+        self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[indices].copy()
+        return
     
 
     def approximate_unknown_data(self, exp_model, smooth, check_trig = False, overwrite = False):

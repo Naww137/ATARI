@@ -60,14 +60,18 @@ def update_vary_resonance_ladder(resonance_ladder, varyE=0, varyGg=0, varyGn1=0)
 
 
 def eliminate_small_Gn(resonance_ladder, Gn_threshold, Nres_elimination_thres):
+    if Nres_elimination_thres is None:
+        Nres_elimination_thres = 0
     num_res_left = np.count_nonzero(abs(resonance_ladder.Gn1) >= Gn_threshold)
-    if num_res_left < Nres_elimination_thres: # FIXME: TEST THIS!!!
+    if num_res_left < Nres_elimination_thres:
+        fraction_eliminated = 1.0 - Nres_elimination_thres / len(resonance_ladder)
         return_resonance_ladder = resonance_ladder.loc[resonance_ladder['Gn1'].abs().nlargest(Nres_elimination_thres).index]
-        fraction_eliminated = Nres_elimination_thres / len(resonance_ladder)
+        assert len(return_resonance_ladder) == Nres_elimination_thres
     else:
-        fraction_eliminated = np.count_nonzero(abs(resonance_ladder.Gn1)<Gn_threshold)/len(resonance_ladder)
+        fraction_eliminated = 1.0 - num_res_left / len(resonance_ladder)
         return_resonance_ladder = copy(resonance_ladder)
-        return_resonance_ladder = return_resonance_ladder[abs(return_resonance_ladder.Gn1)>Gn_threshold]
+        return_resonance_ladder = return_resonance_ladder[abs(return_resonance_ladder.Gn1) >= Gn_threshold]
+    assert len(return_resonance_ladder) >= Nres_elimination_thres
     return_resonance_ladder.reset_index(inplace=True, drop=True)
     return return_resonance_ladder, fraction_eliminated
 
@@ -175,7 +179,7 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
 
     ### setup spin groups
     if initialFBopt.fit_all_spin_groups:
-        spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
+        spin_groups = [each[1] for each in particle_pair.spin_groups.items()]
     else:
         assert len(initialFBopt.spin_group_keys)>0
         spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in initialFBopt.spin_group_keys]
@@ -194,6 +198,7 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
     if initialFBopt.external_resonances:
         # external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
         if external_resonance_ladder is None:
+            # spin_groups = [each[1] for each in particle_pair.spin_groups.items()] # FIXME: THIS IS A TEMPORARY FIX!!!!!!!!!!!!!!!!!!!!
             external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
         else:
             assert(np.all([each in external_resonance_ladder.keys() for each in initial_resonance_ladder.keys()]))
@@ -250,7 +255,7 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
                     raise NotImplementedError('Cannot do Porter-Thomas when more than one l quantum state shares the same Jpi.')
                 l = int(spingroup['Ls'][0])
                 gn2 = particle_pair.Gn_to_gn2(Gn_int, E_int, l)
-                log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width)
+                log_likelihood += -np.sum(np.abs(gn2))/(2*mean_neutron_width) - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width)
                 log_likelihood -= 0 - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width) # to account for virtual resonances
     else:
         log_likelihood = 0.0

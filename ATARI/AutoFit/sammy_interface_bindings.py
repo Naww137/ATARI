@@ -7,7 +7,7 @@ from ATARI.sammy_interface import sammy_functions
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SammyInputDataYW, SammyInputDataEXT, SammyOutputData, SolverOPTs
 from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.utils.datacontainers import Evaluation_Data
-from ATARI.AutoFit.external_fit_cole import run_sammy_EXT # FIXME: THIS IS A TEMPORARY CHANGE FOR TESTING!
+from ATARI.AutoFit.external_fit import run_sammy_EXT
 from ATARI.sammy_interface.sammy_functions import get_idc_at_theory
 
 # def filter_kwargs_for_class(cls, **kwargs):
@@ -47,6 +47,10 @@ class Solver:
     def Ndata(self) -> int:
         return sum([len(each) for each in self.sammyINP.datasets])
 
+    @property
+    def cap_norm_unc(self) -> float:
+        return self.sammyINP.cap_norm_unc
+
     # def get_smaller_energy_range()
     
 
@@ -72,7 +76,8 @@ def Solver_factory(rto,
                                     experiments=evaluation_data.experimental_models, 
                                     experiments_no_pup=evaluation_data.experimental_models_no_pup, 
                                     experimental_covariance=evaluation_data.covariance_data, 
-                                    external_resonance_indices = [], 
+                                    external_resonance_indices = [],
+                                    cap_norm_unc=cap_norm_unc, 
                                     measurement_models = evaluation_data.measurement_models,
                                     **filter_public_attributes(solver_options))
         fit_func = sammy_functions.run_sammy_YW
@@ -92,7 +97,7 @@ def Solver_factory(rto,
                                      remove_V = remove_V,
                                      V_is_inv = V_is_inv,
                                      Vinv = Vinv,
-                                     D = D, 
+                                     D = D,
                                      measurement_models = evaluation_data.measurement_models,
                                      **filter_public_attributes(solver_options))
         fit_func = run_sammy_EXT

@@ -178,6 +178,7 @@ class SammyInputDataYW:
     experimental_covariance: list[Union[dict, str]] #= None
 
     experiments_no_pup: Optional[list[Experimental_Model]] = None
+    cap_norm_unc: float = 0.0
 
     idc_at_theory : bool = False
     measurement_models : Optional[list] = None
@@ -265,6 +266,9 @@ class SolverOPTs_EXT(SolverOPTs):
     elastic_net     : bool      = False
     elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
 
+    Porter_Thomas_fitting : bool = False
+    Wigner_fitting        : bool = False
+
 @dataclass
 class SammyInputDataEXT:
     """
@@ -306,7 +310,7 @@ class SammyInputDataEXT:
     maxF            : float     = 1e-2
 
     alpha           : float     = 1e-3
-    solution_mode   : str      = "LMa"
+    solution_mode   : str       = "LMa"
     
     minibatch       : bool      = False
     batch_size      : int       = 10
@@ -324,5 +328,6 @@ class SammyInputDataEXT:
     elastic_net     : bool      = False
     elastic_net_parameters: dict = field(default_factory=lambda: {"lambda":1, "gamma":0, "alpha":0.7})
     
-
+    Porter_Thomas_fitting : bool = False
+    Wigner_fitting        : bool = False
 

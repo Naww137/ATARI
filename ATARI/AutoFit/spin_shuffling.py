@@ -53,10 +53,12 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     if rng is None:
         rng = np.random.default_rng(seed)
 
-    respar = copy(respar.sort_values(by=['E'], ignore_index=True, inplace=False))
+    sort_indices = respar['E'].argsort()
+    unsort_indices = np.argsort(sort_indices.values)
+    respar_sorted = respar.iloc[sort_indices].reset_index(drop=True)
     # Neglecting external resonances:
-    respar_mask_in_window = (respar['E'] > window_E_bounds[0]) & (respar['E'] < window_E_bounds[1])
-    respar_window = respar.loc[respar_mask_in_window]
+    respar_mask_in_window = (respar_sorted['E'] > window_E_bounds[0]) & (respar_sorted['E'] < window_E_bounds[1])
+    respar_window = respar_sorted.loc[respar_mask_in_window]
 
     # num_res = len(respar_window)
     reaction_TAZ, _, spingroup_IDs_TAZ = ATARI_to_TAZ(particle_pair)
@@ -72,7 +74,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     print(reaction_TAZ)
     print()
     print('Resonance Parameters:')
-    print(respar)
+    print(respar_sorted)
 
     run_master = RunMaster(E=respar_window['E'], energy_range=window_E_bounds, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
     spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)
@@ -85,7 +87,8 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     for shuffle_id in range(num_shuffles):
         spin_shuffle = spin_shuffles[:,shuffle_id]
         print(f'{shuffle_id}: {spin_shuffle.tolist()} | {neutron_width_signs[:,shuffle_id].tolist()} | {capture_width_signs[:,shuffle_id].tolist()}')
-        shuffled_respar = assign_spingroups(respar=respar, spingroups=spin_shuffle, neutron_width_signs=neutron_width_signs[:,shuffle_id], capture_width_signs=capture_width_signs[:,shuffle_id], particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
+        shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, neutron_width_signs=neutron_width_signs[:,shuffle_id], capture_width_signs=capture_width_signs[:,shuffle_id], particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
+        shuffled_respar = shuffled_respar.iloc[unsort_indices].reset_index(drop=True) # unsorting resonance parameters (so that fixed resonance indices are consistent)
         shuffled_respars.append(shuffled_respar)
     return shuffled_respars
 
@@ -96,7 +99,8 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                  model_selection:str='chi2',
                                  fixed_resonance_indices = [],
                                  target_Nres:int=None, unique_cases_only:bool=False,
-                                 rng:np.random.Generator=None, seed:int=None):
+                                 rng:np.random.Generator=None, seed:int=None,
+                                 verbose:bool=False):
     """
     ...
     """
@@ -121,12 +125,24 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
     # Check if there is enough resonances to generate the desired number of shuffles:
     respar_prior_mask_in_window = (respar_prior['E'] > window_E_bounds[0]) & (respar_prior['E'] < window_E_bounds[1])
     num_res_prior = len(respar_prior[respar_prior_mask_in_window])
-    if unique_cases_only and (num_shuffles > 8**num_res_prior):
+    if unique_cases_only and (num_shuffles > len(particle_pair.spin_groups)**num_res_prior):
         raise RuntimeError(f'With {num_res_prior} resonances in the prior window, there are not enough unique cases to generate {num_shuffles} shuffles.')
+    
+    # Special case with no resonances:
+    if num_res_prior == 0:
+        sammy_out = solver.fit(respar_prior, external_resonance_indices=fixed_resonance_indices)
+        chi2 = np.sum(sammy_out.chi2)
+        obj_value = objective_func(chi2=chi2, res_ladder=sammy_out.par, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
+                                    Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
+        spin_shuffle_cases = [{'sammy_out': sammy_out,
+                               'obj_value': obj_value}]*num_shuffles
+        return spin_shuffle_cases
 
     # Running shuffling algorithm:
     num_shuffles_per_attempt = num_shuffles # FIXME: THIS VALUE IS ARBITRARY! MAKE IT REASONABLY CONSERVATIVE! THIS COULD BE DONE BETTER!
     shuffled_respars_filtered = []
+    if verbose:
+        print('Shuffling Spingroups')
     for attempt in range(1000):
         shuffled_respars = shuffle_spingroups(respar=respar_prior, particle_pair=particle_pair,
                                             num_shuffles=num_shuffles_per_attempt,
@@ -161,9 +177,14 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             shuffled_respars = shuffled_respars_filtered[:num_shuffles]
             break
         else:
-            print(f'Number of shuffles with correct target number of resonances was {len(shuffled_respars_filtered)} which is less than the number of shuffles, {num_shuffles}. Trying again.')
+            if verbose:
+                print(f'Attempt {attempt}: number of shuffles with correct target number of resonances was {len(shuffled_respars_filtered)} which is less than the number of shuffles, {num_shuffles}. Trying again.')
     else:
         raise RuntimeError(f'Not enough shuffles were accepted: {len(shuffled_respars_filtered)} accepted, but {num_shuffles} requested.')
+    
+    if verbose:
+        print(f'Accepted shuffles on attempt {attempt}.')
+        print('Optimizing fit on spin shuffles')
 
     spin_shuffle_cases = []
     shuffled_respars_already_listed = []
@@ -180,7 +201,10 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             # Else, optimize and add to the list:
             shuffled_respars_already_listed.append(shuffled_respar)
             sammy_out = solver.fit(shuffled_respar, external_resonance_indices=fixed_resonance_indices)
-            chi2 = sum(sammy_out.chi2_post)
+            if len(shuffled_respar) == len(fixed_resonance_indices): # FIXME: DOES THIS WORK?
+                chi2 = np.sum(sammy_out.chi2)
+            else:
+                chi2 = np.sum(sammy_out.chi2_post)
             obj_value = objective_func(chi2=chi2, res_ladder=sammy_out.par_post, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
                                     Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
             

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from copy import copy
 from ATARI.AutoFit import sammy_interface_bindings
+from ATARI.AutoFit.spin_shuffling import minimize_spingroup_shuffling
 from ATARI.ModelData.particle_pair import Particle_Pair
 import time
 from ATARI.AutoFit import elim_addit_funcs
@@ -95,6 +96,11 @@ class FitAndEliminateOPT:
 
         self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', False)             
         self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) 
+
+        self._spin_shuffle = kwargs.get('spin_shuffle', False)
+        self.shuffle_selection_criteria = kwargs.get('shuffle_selection_criteria', 'chi2+Wig+PT')
+        self._num_shuffles = kwargs.get('num_shuffles', 5)
+        self._E_window_spin = kwargs.get('E_window_spin', None)
 
         ### Other
         self._print_bool = True
@@ -203,15 +209,45 @@ class FitAndEliminateOPT:
     def final_stage_vary_pars(self):
         return self._final_stage_vary_pars 
     @final_stage_vary_pars.setter
-    def final_stage_vary_pars(self, final_stage_vary_pars ):
+    def final_stage_vary_pars(self, final_stage_vary_pars):
         self._final_stage_vary_pars = final_stage_vary_pars 
+
+    @property
+    def spin_shuffle(self):
+        return self._spin_shuffle
+    @spin_shuffle.setter
+    def spin_shuffle(self, spin_shuffle):
+        self._spin_shuffle = bool(spin_shuffle)
+
+    @property
+    def num_shuffles(self):
+        return self._num_shuffles
+    @num_shuffles.setter
+    def num_shuffles(self, num_shuffles):
+        self._num_shuffles = int(num_shuffles)
+
+    @property
+    def E_window_spin(self):
+        return self._E_window_spin
+    @E_window_spin.setter
+    def E_window_spin(self, E_window_spin):
+        self._E_window_spin = E_window_spin
+
+    @property
+    def shuffle_selection_criteria(self):
+        return self._shuffle_selection_criteria
+    @shuffle_selection_criteria.setter
+    def shuffle_selection_criteria(self, shuffle_selection_criteria):
+        if shuffle_selection_criteria not in ('chi2', 'chi2+Wig', 'chi2+PT', 'chi2+Wig+PT'):
+            raise ValueError(f"'shuffle_selection_criteria' must be one of 'chi2', 'chi2+Wig', 'chi2+PT', or 'chi2+Wig+PT', not {shuffle_selection_criteria}.")
+        self._shuffle_selection_criteria = shuffle_selection_criteria
 
     @property
     def greedy_mode(self):
         return self._greedy_mode
     @greedy_mode.setter
     def greedy_mode(self, greedy_mode):
-        self._greedy_mode = greedy_mode
+        self._greedy_mode = bool(greedy_mode)
 
     @property 
     def start_deep_fit_from(self):
@@ -396,7 +432,7 @@ class FitAndEliminate:
                     sammyOUT_fit = self.solver_initial.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
                 if (self.options.width_elimination_Nres_threshold is not None) \
-                    and (len(internal_resonance_ladder) == self.options.width_elimination_Nres_threshold):
+                    and (len(internal_resonance_ladder_reduced) == self.options.width_elimination_Nres_threshold):
                     break # no longer eliminating after going below the threshold number of resonances
             else:
                 raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')
@@ -645,7 +681,6 @@ class FitAndEliminate:
                     posterior_deep_SO.chi2_post  = posterior_deep_SO.chi2
                     posterior_deep_SO.chi2n_post = posterior_deep_SO.chi2n
                     posterior_deep_SO.pw_post    = posterior_deep_SO.pw
-
                 else:
                     pass
 
@@ -654,11 +689,15 @@ class FitAndEliminate:
             deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             deep_chi2_post = np.sum(cur_sol_chars_deep.chi2_post)
-            deep_obj = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+            deep_obj_post = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-            benefit_deep_obj = deep_obj - base_obj
+            benefit_deep_obj = deep_obj_post - base_obj
 
             selected_ladder_chars = cur_sol_chars_deep
+            selected_ladder_chi2_prior = deep_chi2_prior
+            selected_ladder_chi2_post  = deep_chi2_post
+            selected_ladder_obj_prior  = deep_obj_prior
+            selected_ladder_obj_post   = deep_obj_post
             
             ### printout
             if (self.options.print_bool):
@@ -668,7 +707,7 @@ class FitAndEliminate:
                 print('Deep fitting decision about model selection:')
                 print()
                 print(f'\t objective value before: {deep_obj_prior}')
-                print(f'\t objective value after: {deep_obj}')
+                print(f'\t objective value after: {deep_obj_post}')
                 print()
 
             # checking if final model passed the test
@@ -713,18 +752,34 @@ class FitAndEliminate:
                 print('*'*40)
                 print()
 
+            if self.options.spin_shuffle:
+                spin_shuffle_cases = minimize_spingroup_shuffling(selected_ladder_chars.par_post, self.solver_eliminate, self.options.num_shuffles,
+                                                                  self.options.E_window_spin, model_selection=self.options.shuffle_selection_criteria,
+                                                                  fixed_resonance_indices=fixed_resonances_indices)
+                
+                best_shuffle_obj = selected_ladder_obj_post
+                best_shuffle_samout = copy(selected_ladder_chars)
+                for spin_shuffle_case in spin_shuffle_cases:
+                    if spin_shuffle_case['obj_value'] < best_shuffle_obj:
+                        best_shuffle_obj = spin_shuffle_case['obj_value']
+                        best_shuffle_samout = spin_shuffle_case['sammy_out']
+                selected_ladder_chars = best_shuffle_samout
+                selected_ladder_chi2_post = np.sum(selected_ladder_chars.chi2_post)
+                selected_ladder_obj_post = objective_func(selected_ladder_chi2_post, best_shuffle_samout.par_post, self.particle_pair, fixed_resonances_indices,
+                                                          self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
+
             ### save model data, and continue or break while loop
-            deep_obj_stopping_criteria = {}
+            selected_ladder_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
-                    obj_stopping_criteria = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+                    obj_stopping_criteria = objective_func(selected_ladder_chi2_post, selected_ladder_chars.par_post, self.particle_pair, fixed_resonances_indices,
                                                            Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
                     obj_type = 'chi2'
                     if Wigner_informed_stopping_criteria:
                         obj_type += '+Wig'
                     if PorterThomas_informed_stopping_criteria:
                         obj_type += '+PT'
-                    deep_obj_stopping_criteria[obj_type] = obj_stopping_criteria
+                    selected_ladder_stopping_criteria[obj_type] = obj_stopping_criteria
                     
             current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_resonance_ladder.shape[0]
             model_history[current_num_of_res_wo_sides] = {
@@ -734,19 +789,22 @@ class FitAndEliminate:
                 'final_model_passed_test': final_model_passed_test,
                 'level_time': level_time,
                 'total_time': time.time() - start_time,
-                'objective_value_stopping_criteria': deep_obj_stopping_criteria,
+                'objective_value_stopping_criteria': selected_ladder_stopping_criteria,
             }
 
             ### Printout the history of chi2 - for all the elimination
-            all_curr_levels = []
-            all_curr_chi2 = []
+            all_curr_levels    = []
+            all_curr_chi2      = []
             all_curr_chi2_stat = []
             for hist_level in model_history.keys():
                 curr_sol_chars = model_history[hist_level]['selected_ladder_chars']
                 cur_N_dat = np.sum([df.shape[0] for df in curr_sol_chars.pw])
                 cur_N_par = 3 * curr_sol_chars.par_post.shape[0]
                 cur_sum_chi2 = np.sum(curr_sol_chars.chi2_post)
-                cur_sum_chi2_stat = cur_sum_chi2 / (cur_N_dat - cur_N_par)
+                if cur_N_dat > cur_N_par:
+                    cur_sum_chi2_stat = cur_sum_chi2 / (cur_N_dat - cur_N_par)
+                else:
+                    cur_sum_chi2_stat = np.nan
                 all_curr_levels.append(hist_level)
                 all_curr_chi2.append(cur_sum_chi2)
                 all_curr_chi2_stat.append(cur_sum_chi2_stat)

@@ -239,6 +239,12 @@ class Capture_Yield_RPI:
         self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[(self.model_parameters.background_spectrum_bf.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bf.E.values > min(new_energy_range))].copy()
         return
 
+    def select_data_points(self, indices):
+        self.model_parameters.background_spectrum_bg =      self.model_parameters.background_spectrum_bg.loc[indices].copy()
+        self.model_parameters.incident_neutron_spectrum_f = self.model_parameters.incident_neutron_spectrum_f.loc[indices].copy()
+        self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[indices].copy()
+        return
+
 
     def approximate_unknown_data(self, exp_model, smooth, check_trig=False, overwrite=False, nominal=25):
         
@@ -408,7 +414,7 @@ class Capture_Yield_RPI:
 
         else:
             diag_tot = unc_data
-            Yg.loc[:,'exp_unc'] = diag_tot
+            Yg.loc[:,'exp_unc'] = unc_data
             covariance_data = {}
 
         ## fix for zero gamma counts

@@ -596,13 +596,13 @@ class Particle_Pair:
                 resonance_ladder['gn2'] = np.nan
                 for l in resonance_ladder['L'].unique():
                     sub_ladder = resonance_ladder[resonance_ladder['L'] == l]
-                    gn2 = self.Gn_to_gn2(sub_ladder['Gn1'], sub_ladder['E'], int(l)).reshape(-1,)
+                    gn2 = np.array(self.Gn_to_gn2(sub_ladder['Gn1'], sub_ladder['E'], int(l))).reshape(-1,)
                     resonance_ladder.loc[resonance_ladder['L'] == l, 'gn2'] = gn2
             elif ('Gn1' not in resonance_ladder) and ('gn2' in resonance_ladder):
                 resonance_ladder['Gn1'] = np.nan
                 for l in resonance_ladder['L'].unique():
                     sub_ladder = resonance_ladder[resonance_ladder['L'] == l]
-                    Gn1 = self.gn2_to_Gn(sub_ladder['gn2'], sub_ladder['E'], int(l)).reshape(-1,)
+                    Gn1 = np.array(self.gn2_to_Gn(sub_ladder['gn2'], sub_ladder['E'], int(l))).reshape(-1,)
                     resonance_ladder.loc[resonance_ladder['L'] == l, 'Gn1'] = Gn1
 
         if true_ladder:

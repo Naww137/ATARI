@@ -408,7 +408,7 @@ class Capture_Yield_RPI:
 
         else:
             diag_tot = unc_data
-            Yg.loc[:,'exp_unc'] = diag_tot
+            Yg.loc[:,'exp_unc'] = unc_data
             covariance_data = {}
 
         ## fix for zero gamma counts

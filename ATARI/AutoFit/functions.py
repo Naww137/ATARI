@@ -6,7 +6,7 @@ from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.atario import add_Gw_from_gw
 
 
-def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function):
+def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starting_Gg_multiplier, starting_Gn1_multiplier):
 
     if len(res_par_avg["Ls"]) > 1:
             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
@@ -20,20 +20,17 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, startin
     min_Elam = min(energy_range) - Gt99_min_max[1]/10e3
 
     # get energies and spin info
-    if do_dE_function:
-        x_start = min_Elam; x_end = max_Elam
-        d_start = 0.8; d_end = 2.0
-        Er = [x_start]
-        x = x_start
-        while x < x_end:
-            t = (x - x_start) / (x_end - x_start)
-            d = d_start + t * (d_end - d_start)
-            x += d
-            Er.append(x)
-        Er = np.array(Er)
-        num_Er = len(Er)
-    else:
-        Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+    x_start = min_Elam; x_end = max_Elam
+    x = x_start
+    Er = []
+    while x < x_end:
+        Er.append(x)
+        if callable(spacing):
+            x += spacing(x)
+        else:
+            x += spacing
+    Er = np.array(Er)
+    num_Er = len(Er)
 
     # get widths
     gg2 = np.repeat(res_par_avg["<gg2>"], num_Er)*starting_Gg_multiplier
@@ -86,17 +83,20 @@ def get_starting_feature_bank(energy_range,
                             varyE = 0,
                             varyGg = 0,
                             varyGn1 = 1,
-                            do_dE_function = False
+                            ifb_spacing = None,
                             ):
     # setup energy grid
-    if num_Elam is None:
-        num_Elam = int((np.max(energy_range)-np.min(energy_range)) * 1.25)
-    elif num_Elam/(np.max(energy_range)-np.min(energy_range)) < 1.25:
-        print("WARNING: User supplied a feature bank energy grid of <1 per eV, problem may not be convex")
+    if ifb_spacing is None:
+        if num_Elam is None:
+            ifb_spacing = 0.8 # eV
+        else:
+            ifb_spacing = (np.max(energy_range)-np.min(energy_range)) / num_Elam
+            if num_Elam/(np.max(energy_range)-np.min(energy_range)) < 1.25:
+                print("WARNING: User supplied a feature bank energy grid of <1 per eV, problem may not be convex")
 
     Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
     for sg in spin_groups:
-        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function)
+        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
         Er.append(Er_1); gg2.append(gg2_1); gn2.append(gn2_1); J_ID.append(J_ID_1); Jpi.append(Jpi_1); L.append(L_1)
     Er = np.concatenate(Er)
     gg2 = np.concatenate(gg2)
@@ -175,7 +175,7 @@ def get_LL_by_parameter(ladder,
 
 
 
-def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None, do_dE_function=False):
+def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None):
 
     ### setup spin groups
     if initialFBopt.fit_all_spin_groups:
@@ -192,7 +192,7 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
                                                         Elam_shift = initialFBopt.Elam_shift,
                                                         starting_Gg_multiplier = initialFBopt.starting_Gg_multiplier,
                                                         starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier,
-                                                        do_dE_function = do_dE_function)
+                                                        ifb_spacing=initialFBopt.spacing)
 
     ### setup external resonances
     if initialFBopt.external_resonances:

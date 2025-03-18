@@ -137,8 +137,7 @@ def write_fitpy(basepath, threads=1, fixed_resonance_indices=[]):
         f.write(f"""os.environ['OPENBLAS_NUM_THREADS'] = str({threads})\n""")
         f.write(f"""os.environ['MKL_NUM_THREADS'] = str({threads})\n""")
         f.write(f"""os.environ['VECLIB_MAXIMUM_THREADS'] = str({threads})\n""")
-        f.write(f"""os.environ['NUMEXPR_NUM_THREADS'] = str({threads})\n""")
-
+        f.write(f"""os.environ['NUMEXPR_NUM_THREADS'] = str({threads})\n\n""")
         f.write("""from ATARI.utils.atario import load_general_object, save_general_object\n""")
         f.write("""import pandas as pd\n""")
         f.write("""os.chdir(os.path.dirname(__file__))\n""")
@@ -288,7 +287,7 @@ def get_windows_static2(energy_range_total,
         masko = (resonance_ladder.E>rro[0]) & (resonance_ladder.E<rro[1])
         rdfo = resonance_ladder.loc[masko].copy()
 
-        overlap_elim_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[(rdfo.E>dro[0]) & (rdfo.E<dro[1])])
+        overlap_elim_indices .append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[  (rdfo.E>dro[0]) & (rdfo.E<dro[1]) ])
         overlap_fixed_indices.append(((rdfo.E>dro[0]) & (rdfo.E<dro[1])).index[~((rdfo.E>dro[0]) & (rdfo.E<dro[1]))])
 
         maxres_bool.append(len(rdf)>maxres_per_window)

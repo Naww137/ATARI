@@ -84,6 +84,7 @@ class InitialFBOPT:
         self._external_resonances = True
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
+        self._spacing = None
         self._num_Elam = None
         self._Elam_shift = 0
         self._starting_Gg_multiplier = 1
@@ -217,6 +218,13 @@ class InitialFBOPT:
     @spin_group_keys.setter
     def spin_group_keys(self, spin_group_keys):
         self._spin_group_keys = [float(each) for each in spin_group_keys]
+
+    @property
+    def spacing(self):
+        return self._spacing
+    @spacing.setter
+    def spacing(self, spacing):
+        self._spacing = spacing
 
     @property
     def num_Elam(self):

@@ -101,15 +101,23 @@ class AutoFit:
         
         self.particle_pair = particle_pair
 
-        self.rto_test = copy(sammyRTO)
-        self.rto_test.bayes = False
-        self.rto_train = copy(sammyRTO)
-        self.rto_train.bayes = True
+        self.sammyRTO = sammyRTO
 
         if not self.options.parallel_CV:
             self.options.parallel_processes = 1
 
         self.output = AutoFitOUT()
+
+    @property
+    def sammyRTO(self):
+        return self._sammyRTO
+    @sammyRTO.setter
+    def sammyRTO(self, sammyRTO):
+        self._sammyRTO = sammyRTO
+        self.rto_test = copy(sammyRTO)
+        self.rto_test.bayes = False
+        self.rto_train = copy(sammyRTO)
+        self.rto_train.bayes = True
 
 
     def fit(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):

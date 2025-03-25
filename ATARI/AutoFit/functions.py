@@ -50,6 +50,7 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
         
     Gt99_min_max_all = np.array([0.0, 0.0])
+    gn01_min = np.inf
     for Jpi, spin_group in spin_groups.items():
         L = spin_group["Ls"][0]
         _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
@@ -58,6 +59,8 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
             Gt99_min_max_all[0] = Gt99_min_max[0]
         if Gt99_min_max[-1] > Gt99_min_max_all[-1]:
             Gt99_min_max_all[-1] = Gt99_min_max[-1]
+        if spin_group['quantiles']["gn01"] < gn01_min:
+            gn01_min = spin_group['quantiles']["gn01"]
     
 
     # allow Elambda to be just outside of the window
@@ -87,7 +90,7 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
     for isg, (Jpi, spin_group) in enumerate(spin_groups.items()):
         gg2 [isg::num_sgs] = spin_group["<gg2>"] * starting_Gg_multiplier
         gg2 [isg::(2*num_sgs)] *= -1
-        gn2 [isg::num_sgs] = spin_group['quantiles']["gn01"] * starting_Gn1_multiplier
+        gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier
         gn2 [isg::(2*num_sgs)] *= -1
         J_ID[isg::num_sgs] = spin_group['J_ID']
         Jpi [isg::num_sgs] = spin_group['Jpi']

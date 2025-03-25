@@ -2,7 +2,10 @@ from typing import Protocol
 from ATARI.AutoFit.functions import * #eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
+from numpy import newaxis as NA
 import pandas as pd
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 from copy import copy
 from ATARI.AutoFit import sammy_interface_bindings
 from ATARI.utils.datacontainers import Evaluation_Data
@@ -84,6 +87,7 @@ class InitialFBOPT:
         self._external_resonances = True
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
+        self._alternate_spingroups = False
         self._spacing = None
         self._num_Elam = None
         self._Elam_shift = 0
@@ -218,6 +222,13 @@ class InitialFBOPT:
     @spin_group_keys.setter
     def spin_group_keys(self, spin_group_keys):
         self._spin_group_keys = [float(each) for each in spin_group_keys]
+
+    @property
+    def alternate_spingroups(self):
+        return self._alternate_spingroups
+    @alternate_spingroups.setter
+    def alternate_spingroups(self, alternate_spingroups):
+        self._alternate_spingroups = alternate_spingroups
 
     @property
     def spacing(self):
@@ -468,7 +479,7 @@ def correlation_width_estimate(dataset:pd.DataFrame, cov_data:dict=None):
     else:
         Y_var = dataset['exp_unc'].values**2
     length_scale_est = (max(E)-min(E))/len(E) # estimating the length scale from the datapoint frequency
-    kernel = C(1.0) * RBF(length_scale=length_scale_est, length_scale_bounds=(0.3*length_scale_est, 50*length_scale_est))  # Initial guess
+    kernel = ConstantKernel(1.0) * RBF(length_scale=length_scale_est, length_scale_bounds=(0.3*length_scale_est, 50*length_scale_est))  # Initial guess
     gp = GaussianProcessRegressor(kernel=kernel, optimizer="fmin_l_bfgs_b", alpha=Y_var, n_restarts_optimizer=5)
     gp.fit(E[:,NA], Y)
     corr_width = gp.kernel_.k2.length_scale

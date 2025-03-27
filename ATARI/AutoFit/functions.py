@@ -85,20 +85,20 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
         warnings.warn('There are more spingroups than resonance energies in the initial feature bank.')
 
     # get widths
-    gg2  = np.empty((num_Er,))
-    gn2  = np.empty((num_Er,))
-    J_ID = np.empty((num_Er,))
-    Jpi  = np.empty((num_Er,))
-    Ls   = np.empty((num_Er,))
+    gg2  = np.empty((num_Er,), dtype=float)
+    gn2  = np.empty((num_Er,), dtype=float)
+    J_ID = np.empty((num_Er,), dtype=int)
+    Jpi  = np.empty((num_Er,), dtype=float)
+    Ls   = np.empty((num_Er,), dtype=int)
     num_sgs = len(spin_groups)
-    for isg, (Jpi, spin_group) in enumerate(spin_groups.items()):
+    for isg, (jpi_, spin_group) in enumerate(spin_groups.items()):
         gg2 [isg::num_sgs] = spin_group["<gg2>"] * starting_Gg_multiplier
         gg2 [isg::(2*num_sgs)] *= -1
         gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier
         gn2 [isg::(2*num_sgs)] *= -1
         J_ID[isg::num_sgs] = spin_group['J_ID']
-        Jpi [isg::num_sgs] = spin_group['Jpi']
-        Ls  [isg::num_sgs] = spin_group['Ls']
+        Jpi [isg::num_sgs] = jpi_
+        Ls  [isg::num_sgs] = spin_group['Ls'][0]
 
     return Er, gg2, gn2, J_ID, Jpi, Ls
 
@@ -157,7 +157,7 @@ def get_starting_feature_bank(energy_range,
 
     Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
     if alternate_spingroups:
-        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid_v2(energy_range, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
+        Er, gg2, gn2, J_ID, Jpi, L = get_parameter_grid_v2(energy_range, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
     else:
         for sg in spin_groups:
             Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)

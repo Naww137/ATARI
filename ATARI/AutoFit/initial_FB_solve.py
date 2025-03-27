@@ -4,8 +4,8 @@ from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
 from numpy import newaxis as NA
 import pandas as pd
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel, RBF
+# from sklearn.gaussian_process import GaussianProcessRegressor
+# from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 from copy import copy
 from ATARI.AutoFit import sammy_interface_bindings
 from ATARI.utils.datacontainers import Evaluation_Data
@@ -396,91 +396,91 @@ class InitialFB:
     
 
 
-def correlation_func_generator(dataset:pd.DataFrame, cov_data:dict, points_per_eval:int=100):
-    """
-    ...
-    """
-    dataset = copy(dataset.sort_values(by='E'))
-    if (cov_data is not None) and ('diag_stat' in cov_data):
-        assert len(dataset) == len(cov_data['diag_stat'])
-        diag_stat = cov_data['diag_stat']
-        dataset['exp_unc'] = np.sqrt(diag_stat.sort_values(by='E').values)
-    num_points = len(dataset)
-    energies = []
-    corr_widths = []
-    for i in range(int(num_points/points_per_eval)):
-        if i == int(num_points/points_per_eval) - 1:
-            the_end = None
-        else:
-            the_end = (i+1)*points_per_eval
-        dataset_subset = dataset[i*points_per_eval:the_end]
-        E = np.array(dataset_subset['E'])
-        E_avg = 0.5*(max(E)+min(E))
-        corr_width = correlation_width_estimate(dataset_subset, cov_data=None)
-        energies.append(E_avg)
-        corr_widths.append(corr_width)
-    def corr_func(E):
-        return np.interp(E, energies, corr_widths)
-    return corr_func
+# def correlation_func_generator(dataset:pd.DataFrame, cov_data:dict, points_per_eval:int=100):
+#     """
+#     ...
+#     """
+#     dataset = copy(dataset.sort_values(by='E'))
+#     if (cov_data is not None) and ('diag_stat' in cov_data):
+#         assert len(dataset) == len(cov_data['diag_stat'])
+#         diag_stat = cov_data['diag_stat']
+#         dataset['exp_unc'] = np.sqrt(diag_stat.sort_values(by='E').values)
+#     num_points = len(dataset)
+#     energies = []
+#     corr_widths = []
+#     for i in range(int(num_points/points_per_eval)):
+#         if i == int(num_points/points_per_eval) - 1:
+#             the_end = None
+#         else:
+#             the_end = (i+1)*points_per_eval
+#         dataset_subset = dataset[i*points_per_eval:the_end]
+#         E = np.array(dataset_subset['E'])
+#         E_avg = 0.5*(max(E)+min(E))
+#         corr_width = correlation_width_estimate(dataset_subset, cov_data=None)
+#         energies.append(E_avg)
+#         corr_widths.append(corr_width)
+#     def corr_func(E):
+#         return np.interp(E, energies, corr_widths)
+#     return corr_func
 
-def find_feature_bank_spacing(eval_data:Evaluation_Data, rel_dens_factor:float=1.1):
-    """
-    Empirically determines the initial feature bank resonance spacing from the auto-correlation
-    length of a window found using Gaussian Process regression. A relative density factor
-    can be provided to adjust the spacing.
+# def find_feature_bank_spacing(eval_data:Evaluation_Data, rel_dens_factor:float=1.1):
+#     """
+#     Empirically determines the initial feature bank resonance spacing from the auto-correlation
+#     length of a window found using Gaussian Process regression. A relative density factor
+#     can be provided to adjust the spacing.
 
-    Parameters
-    ----------
-    eval_data: Evaluation_Data
-        The evaluation data.
-    rel_dens_factor: float
-        The relative density factor to find the initial feature bank resonance spacing.
-        Default is 1.1.
+#     Parameters
+#     ----------
+#     eval_data: Evaluation_Data
+#         The evaluation data.
+#     rel_dens_factor: float
+#         The relative density factor to find the initial feature bank resonance spacing.
+#         Default is 1.1.
 
-    Returns
-    -------
-    spacing
-        The initial feature bank resonance spacing in eV.
-    """
-    corr_width_min = np.inf
-    for dataset, cov_data in zip(eval_data.datasets, eval_data.covariance_data):
-        corr_width = correlation_width_estimate(dataset, cov_data)
-        if corr_width < corr_width_min:
-            corr_width_min = corr_width
-    spacing = corr_width_min / rel_dens_factor
-    return spacing
+#     Returns
+#     -------
+#     spacing
+#         The initial feature bank resonance spacing in eV.
+#     """
+#     corr_width_min = np.inf
+#     for dataset, cov_data in zip(eval_data.datasets, eval_data.covariance_data):
+#         corr_width = correlation_width_estimate(dataset, cov_data)
+#         if corr_width < corr_width_min:
+#             corr_width_min = corr_width
+#     spacing = corr_width_min / rel_dens_factor
+#     return spacing
 
-def correlation_width_estimate(dataset:pd.DataFrame, cov_data:dict=None):
-    """
-    Estimates the auto-correlation length for a given dataset and covariance data. The
-    auto-correlation length is found by fitting the data with a Gaussian Process model. Note that
-    the Gaussian Process needs to be fit with the statistical variance. The systematic parts can
-    be largely ignored since they will be captured in the regression.
+# def correlation_width_estimate(dataset:pd.DataFrame, cov_data:dict=None):
+#     """
+#     Estimates the auto-correlation length for a given dataset and covariance data. The
+#     auto-correlation length is found by fitting the data with a Gaussian Process model. Note that
+#     the Gaussian Process needs to be fit with the statistical variance. The systematic parts can
+#     be largely ignored since they will be captured in the regression.
     
-    Parameters
-    ----------
-    dataset: DataFrame
-        The dataset under study for auto-correlation.
-    cov_data: dict
-        The implicit data covariance matrix.
+#     Parameters
+#     ----------
+#     dataset: DataFrame
+#         The dataset under study for auto-correlation.
+#     cov_data: dict
+#         The implicit data covariance matrix.
 
-    Returns
-    -------
-    corr_width
-        The auto-correlation length.
-    """
-    dataset = copy(dataset.sort_values(by='E'))
-    E = dataset['E'].values
-    Y = dataset['exp'].values
-    if (cov_data is not None) and ('diag_stat' in cov_data):
-        assert len(dataset) == len(cov_data['diag_stat'])
-        diag_stat = cov_data['diag_stat']
-        Y_var = diag_stat.sort_values(by='E').values
-    else:
-        Y_var = dataset['exp_unc'].values**2
-    length_scale_est = (max(E)-min(E))/len(E) # estimating the length scale from the datapoint frequency
-    kernel = ConstantKernel(1.0) * RBF(length_scale=length_scale_est, length_scale_bounds=(0.3*length_scale_est, 50*length_scale_est))  # Initial guess
-    gp = GaussianProcessRegressor(kernel=kernel, optimizer="fmin_l_bfgs_b", alpha=Y_var, n_restarts_optimizer=5)
-    gp.fit(E[:,NA], Y)
-    corr_width = gp.kernel_.k2.length_scale
-    return corr_width
+#     Returns
+#     -------
+#     corr_width
+#         The auto-correlation length.
+#     """
+#     dataset = copy(dataset.sort_values(by='E'))
+#     E = dataset['E'].values
+#     Y = dataset['exp'].values
+#     if (cov_data is not None) and ('diag_stat' in cov_data):
+#         assert len(dataset) == len(cov_data['diag_stat'])
+#         diag_stat = cov_data['diag_stat']
+#         Y_var = diag_stat.sort_values(by='E').values
+#     else:
+#         Y_var = dataset['exp_unc'].values**2
+#     length_scale_est = (max(E)-min(E))/len(E) # estimating the length scale from the datapoint frequency
+#     kernel = ConstantKernel(1.0) * RBF(length_scale=length_scale_est, length_scale_bounds=(0.3*length_scale_est, 50*length_scale_est))  # Initial guess
+#     gp = GaussianProcessRegressor(kernel=kernel, optimizer="fmin_l_bfgs_b", alpha=Y_var, n_restarts_optimizer=5)
+#     gp.fit(E[:,NA], Y)
+#     corr_width = gp.kernel_.k2.length_scale
+#     return corr_width

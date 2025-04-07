@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from copy import copy
+import warnings
+
 from ATARI.theory.resonance_statistics import wigner_LL, width_LL
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.atario import add_Gw_from_gw
@@ -79,6 +81,8 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
             x += spacing
     Er = np.array(Er)
     num_Er = len(Er)
+    if num_Er < len(spin_groups):
+        warnings.warn('There are more spingroups than resonance energies in the initial feature bank.')
 
     # get widths
     gg2  = np.empty((num_Er,))

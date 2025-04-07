@@ -37,7 +37,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
         elif sammy_INP.experimental_data is not None:
             iter = np.arange(np.floor(np.min(sammy_INP.experimental_data.E)),np.ceil(np.max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
             if len(iter) >= 50:
-                raise ValueError("To many energy windows supplied, please solve in less sections")
+                raise ValueError("Too many energy windows supplied, please solve in less sections")
             string = ''
             for ie in range(len(iter)-1):
                 string += f'{int(iter[ie])}. {int(iter[ie+1])}.\n'
@@ -77,7 +77,7 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
     if getchi2:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
     else:
-        chi2=None
+        chi2  = None
         chi2n = None
 
     return chi2, chi2n

@@ -34,9 +34,9 @@ def find_CV_scores(fold_results, use_MAD:bool=False):
             CV_train_score_std  = 1.4826*np.median(np.abs(objn_train - CV_train_score_mean), axis=0)
         else:
             CV_test_score_mean  = np.mean(objn_test)
-            CV_test_score_std   = np.std(objn_test) / np.sqrt(K_folds)
+            CV_test_score_std   = np.std(objn_test, ddof=1) / np.sqrt(K_folds)
             CV_train_score_mean = np.mean(objn_train)
-            CV_train_score_std  = np.std(objn_train) / np.sqrt(K_folds)
+            CV_train_score_std  = np.std(objn_train, ddof=1) / np.sqrt(K_folds)
         CV_test_scores[Nres]  = {'mean':CV_test_score_mean , 'std':CV_test_score_std }
         CV_train_scores[Nres] = {'mean':CV_train_score_mean, 'std':CV_train_score_std}
     return CV_test_scores, CV_train_scores

@@ -142,8 +142,6 @@ def read_ECSCM(file_path):
     return df_tdte, dfcov
 
 
-
-
 def readpds(pdsfilepath):
     """
     Reads a Sammy .pds derivative file.
@@ -322,6 +320,7 @@ def read_idc(filepath):
 # =============================================================================
 # Sammy Parameter File
 # =============================================================================
+
 def format_float(value, width, sep=''):
     formatted_value = f'{abs(value):0<15f}'  
 
@@ -393,6 +392,7 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
 
     return df
 
+
 def check_sampar_inputs(df):
     # Small perurbation for duplicate resonances
     duplicates = df.duplicated(subset=['E', 'J_ID'], keep=False)
@@ -401,6 +401,7 @@ def check_sampar_inputs(df):
         random_mags = np.random.default_rng().uniform(5e-6, 5e-5, size=duplicates.sum())
         df.loc[duplicates, 'E'] += random_signs*random_mags
     return df
+
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -448,17 +449,6 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
     text += f'\n{initial_parameter_uncertainty}\n'
     with open(filename, 'w') as file:
         file.write(text)
-    # with open(filename, 'w') as file:
-    #     for row in par_array:
-    #         for icol, val in enumerate(row):
-    #             column_width = widths[icol]
-    #             formatted_value = format_float(val, column_width)
-    #             file.write(formatted_value)
-    #         file.write('\n')
-    #     file.write(f'\n{initial_parameter_uncertainty}\n')
-
-    return
-        
       
 
 # ################################################ ###############################################
@@ -476,10 +466,7 @@ def write_estruct_file(Energies, filename):
         text += f'{ept:0<19} {1.0:<19} {1.0:0<7}\n'
     with open(filename,'w') as f:
         f.write(text)
-    # with open(filename,'w') as f:
-    #     for ept in Energies:
-    #         f.write(f'{ept:0<19} {1.0:<19} {1.0:0<7}\n')
-    return
+
 
 def write_samdat(exp_pw, exp_cov, filename):
     """
@@ -538,9 +525,6 @@ def write_samdat(exp_pw, exp_cov, filename):
         text += f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n'
     with open(filename,'w') as f:
         f.write(text)
-    # with open(filename,'w') as f:
-    #     for each in iterable:
-    #         f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
 
 
 def write_idc(filepath, J, C, stat):
@@ -576,35 +560,6 @@ def write_idc(filepath, J, C, stat):
     with open(filepath, 'w+') as f:
         f.write(text)
 
-    # with open(filepath, 'w+') as f:
-    #     f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
-    #     f.write(f"FREE-FORMAt partial derivatives\n")
-    #     width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
-
-    #     for E, data in J.items():
-    #         formatted_E = format_float(E, width)
-    #         f.write(formatted_E)
-    #         formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
-    #         f.write(formatted_data_stat_unc)
-    #         for derivative in data:
-    #             formatted_derivative = format_float(derivative, width, sep=' ')
-    #             f.write(formatted_derivative)
-    #         f.write('\n')
-
-    #     f.write("\nUNCERTAINTies on data- reduction parameters\n")
-    #     for sys_uncertainty in np.sqrt(np.diag(C)):
-    #         formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
-    #         f.write(formatted_uncertainty)
-    #     f.write("\n\n")
-        
-    #     f.write("CORRELATIOns for data-reduction parameters")
-    #     Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
-    #     Corr = Dinv @ C @ Dinv
-    #     for i, row in enumerate(Corr):
-    #         for corr in row[0:i]:
-    #             formatted_correlation = format_float(corr, width, sep=' ')
-    #             f.write(formatted_correlation)
-    #         f.write("\n")
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -619,11 +574,6 @@ def create_sammyinp(filename='sammy.inp', \
     with open(filename,'w+') as f:
         f.write(''.join(template_lines))
 
-    # with open(filename,'w+') as f:
-    #     for line in template_lines:
-    #         f.write(line)
-        
-    return
 
 def write_saminp(filepath   :   str, 
 
@@ -646,7 +596,6 @@ def write_saminp(filepath   :   str,
                 use_least_squares: bool = False,
                 derivatives : bool = False,
                 bayes_scheme  : bool = None
-
                 ):
     
     alphanumeric = copy(alphanumeric)
@@ -722,38 +671,6 @@ def write_saminp(filepath   :   str,
     with open(filepath,'w') as f:
         f.write(text)
 
-    # with open(filepath,'w') as f:
-    #     for line in old_lines:
-
-    #         if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
-    #             broadening = False
-
-    #         if line.startswith("%%%alphanumeric%%%"):
-    #             for cmd in alphanumeric:
-    #                 f.write(f'{cmd}\n')
-            
-    #         elif line.startswith("%%%card2%%%"):
-    #             f.write(f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n")
-
-
-    #         elif line.startswith('%%%card5/6%%%'):
-    #             if broadening:
-    #                 f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n')
-    #             else:
-    #                 pass
-
-    #         elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-    #             f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
-
-    #         elif line.startswith('%%%card8%%%'):
-    #             f.write(f'{reaction}\n')
-
-    #         else:
-    #             f.write(line)
-
-
-
-           
 
 def make_runDIR(sammy_runDIR):
     if os.path.isdir(sammy_runDIR):
@@ -771,12 +688,9 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
     shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
 
 
-
 # ################################################ ###############################################
 # MISC
 # ################################################ ###############################################
-
-
 
 def remove_resolution_function_from_template(template_filepath):
     with open(template_filepath, 'r') as f:
@@ -795,18 +709,3 @@ def remove_resolution_function_from_template(template_filepath):
             text += line
     with open(template_filepath, 'w') as f:
         f.write(text)
-
-    # file = open(template_filepath, 'w')
-    # sg_started = False
-    # end = False
-    # for line in readlines:
-    #     if sg_started:
-    #         if line == '\n':
-    #             end = True
-    #     if line.startswith("%%%card8%%%"):
-    #         sg_started = True
-    #     if not end:
-    #         file.write(line)
-    # file.close()
-
-

@@ -438,14 +438,24 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
             raise ValueError("NoneType was passed as J_ID in the resonance ladder")
 
     widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+    text = ''
+    for row in par_array:
+        for icol, val in enumerate(row):
+            column_width = widths[icol]
+            formatted_value = format_float(val, column_width)
+            text += formatted_value
+        text += '\n'
+    text += f'\n{initial_parameter_uncertainty}\n'
     with open(filename, 'w') as file:
-        for row in par_array:
-            for icol, val in enumerate(row):
-                column_width = widths[icol]
-                formatted_value = format_float(val, column_width)
-                file.write(formatted_value)
-            file.write('\n')
-        file.write(f'\n{initial_parameter_uncertainty}\n')
+        file.write(text)
+    # with open(filename, 'w') as file:
+    #     for row in par_array:
+    #         for icol, val in enumerate(row):
+    #             column_width = widths[icol]
+    #             formatted_value = format_float(val, column_width)
+    #             file.write(formatted_value)
+    #         file.write('\n')
+    #     file.write(f'\n{initial_parameter_uncertainty}\n')
 
     return
         
@@ -461,10 +471,14 @@ def write_estruct_file(Energies, filename):
         pass
     else:
         Energies = np.array([float(E) for E in Energies])
+    text = ''
+    for ept in Energies:
+        text += f'{ept:0<19} {1.0:<19} {1.0:0<7}\n'
     with open(filename,'w') as f:
-        for ept in Energies:
-            f.write(f'{ept:0<19} {1.0:<19} {1.0:0<7}\n')
-        f.close()
+        f.write(text)
+    # with open(filename,'w') as f:
+    #     for ept in Energies:
+    #         f.write(f'{ept:0<19} {1.0:<19} {1.0:0<7}\n')
     return
 
 def write_samdat(exp_pw, exp_cov, filename):
@@ -519,43 +533,78 @@ def write_samdat(exp_pw, exp_cov, filename):
     iexp = cols.get_loc('exp')
     idT = cols.get_loc('exp_unc')
     
-
+    text = ''
+    for each in iterable:
+        text += f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n'
     with open(filename,'w') as f:
-        for each in iterable:
-            f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
-        f.close()
+        f.write(text)
+    # with open(filename,'w') as f:
+    #     for each in iterable:
+    #         f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
 
 
 def write_idc(filepath, J, C, stat):
+    text  = f"NUmber of data-reduction parameters = {J.shape[0]} \n\n"
+    text += f"FREE-FORMAt partial derivatives\n"
+    width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+
+    for E, data in J.items():
+        formatted_E = format_float(E, width)
+        text += formatted_E
+        formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
+        text += formatted_data_stat_unc
+        for derivative in data:
+            formatted_derivative = format_float(derivative, width, sep=' ')
+            text += formatted_derivative
+        text += '\n'
+
+    text += "\nUNCERTAINTies on data- reduction parameters\n"
+    for sys_uncertainty in np.sqrt(np.diag(C)):
+        formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
+        text += formatted_uncertainty
+    text += "\n\n"
+    
+    text += "CORRELATIOns for data-reduction parameters"
+    Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
+    Corr = Dinv @ C @ Dinv
+    for i, row in enumerate(Corr):
+        for corr in row[0:i]:
+            formatted_correlation = format_float(corr, width, sep=' ')
+            text += formatted_correlation
+        text += "\n"
+
     with open(filepath, 'w+') as f:
-        f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
-        f.write(f"FREE-FORMAt partial derivatives\n")
-        width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+        f.write(text)
 
-        for E, data in J.items():
-            formatted_E = format_float(E, width)
-            f.write(formatted_E)
-            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
-            f.write(formatted_data_stat_unc)
-            for derivative in data:
-                formatted_derivative = format_float(derivative, width, sep=' ')
-                f.write(formatted_derivative)
-            f.write('\n')
+    # with open(filepath, 'w+') as f:
+    #     f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
+    #     f.write(f"FREE-FORMAt partial derivatives\n")
+    #     width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
 
-        f.write("\nUNCERTAINTies on data- reduction parameters\n")
-        for sys_uncertainty in np.sqrt(np.diag(C)):
-            formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
-            f.write(formatted_uncertainty)
-        f.write("\n\n")
+    #     for E, data in J.items():
+    #         formatted_E = format_float(E, width)
+    #         f.write(formatted_E)
+    #         formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
+    #         f.write(formatted_data_stat_unc)
+    #         for derivative in data:
+    #             formatted_derivative = format_float(derivative, width, sep=' ')
+    #             f.write(formatted_derivative)
+    #         f.write('\n')
+
+    #     f.write("\nUNCERTAINTies on data- reduction parameters\n")
+    #     for sys_uncertainty in np.sqrt(np.diag(C)):
+    #         formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
+    #         f.write(formatted_uncertainty)
+    #     f.write("\n\n")
         
-        f.write("CORRELATIOns for data-reduction parameters")
-        Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
-        Corr = Dinv @ C @ Dinv
-        for i, row in enumerate(Corr):
-            for corr in row[0:i]:
-                formatted_correlation = format_float(corr, width, sep=' ')
-                f.write(formatted_correlation)
-            f.write("\n")
+    #     f.write("CORRELATIOns for data-reduction parameters")
+    #     Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
+    #     Corr = Dinv @ C @ Dinv
+    #     for i, row in enumerate(Corr):
+    #         for corr in row[0:i]:
+    #             formatted_correlation = format_float(corr, width, sep=' ')
+    #             f.write(formatted_correlation)
+    #         f.write("\n")
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -566,12 +615,13 @@ def create_sammyinp(filename='sammy.inp', \
     
     with open(template, 'r') as f:
         template_lines = f.readlines()
-    f.close()
     
     with open(filename,'w+') as f:
-        for line in template_lines:
-            f.write(line)
-        f.close()
+        f.write(''.join(template_lines))
+
+    # with open(filename,'w+') as f:
+    #     for line in template_lines:
+    #         f.write(line)
         
     return
 
@@ -641,34 +691,65 @@ def write_saminp(filepath   :   str,
     with open(filepath,'r') as f:
         old_lines = f.readlines()
 
-    with open(filepath,'w') as f:
-        for line in old_lines:
+    text = ''
+    for line in old_lines:
 
-            if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
-                broadening = False
+        if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
+            broadening = False
 
-            if line.startswith("%%%alphanumeric%%%"):
-                for cmd in alphanumeric:
-                    f.write(f'{cmd}\n')
-            
-            elif line.startswith("%%%card2%%%"):
-                f.write(f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n")
+        if line.startswith("%%%alphanumeric%%%"):
+            for cmd in alphanumeric:
+                text += f'{cmd}\n'
+        
+        elif line.startswith("%%%card2%%%"):
+            text += f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n"
 
 
-            elif line.startswith('%%%card5/6%%%'):
-                if broadening:
-                    f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n')
-                else:
-                    pass
-
-            elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
-
-            elif line.startswith('%%%card8%%%'):
-                f.write(f'{reaction}\n')
-
+        elif line.startswith('%%%card5/6%%%'):
+            if broadening:
+                text += f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n'
             else:
-                f.write(line)
+                pass
+
+        elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
+            text += f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n'
+
+        elif line.startswith('%%%card8%%%'):
+            text += f'{reaction}\n'
+
+        else:
+            text += line
+    with open(filepath,'w') as f:
+        f.write(text)
+
+    # with open(filepath,'w') as f:
+    #     for line in old_lines:
+
+    #         if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
+    #             broadening = False
+
+    #         if line.startswith("%%%alphanumeric%%%"):
+    #             for cmd in alphanumeric:
+    #                 f.write(f'{cmd}\n')
+            
+    #         elif line.startswith("%%%card2%%%"):
+    #             f.write(f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n")
+
+
+    #         elif line.startswith('%%%card5/6%%%'):
+    #             if broadening:
+    #                 f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n')
+    #             else:
+    #                 pass
+
+    #         elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
+    #             f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
+
+    #         elif line.startswith('%%%card8%%%'):
+    #             f.write(f'{reaction}\n')
+
+    #         else:
+    #             f.write(line)
 
 
 
@@ -698,10 +779,10 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 
 
 def remove_resolution_function_from_template(template_filepath):
-    file = open(template_filepath, 'r')
-    readlines = file.readlines()
-    file.close()
-    file = open(template_filepath, 'w')
+    with open(template_filepath, 'r') as f:
+        readlines = f.readlines()
+
+    text = ''
     sg_started = False
     end = False
     for line in readlines:
@@ -711,7 +792,21 @@ def remove_resolution_function_from_template(template_filepath):
         if line.startswith("%%%card8%%%"):
             sg_started = True
         if not end:
-            file.write(line)
-    file.close()
+            text += line
+    with open(template_filepath, 'w') as f:
+        f.write(text)
+
+    # file = open(template_filepath, 'w')
+    # sg_started = False
+    # end = False
+    # for line in readlines:
+    #     if sg_started:
+    #         if line == '\n':
+    #             end = True
+    #     if line.startswith("%%%card8%%%"):
+    #         sg_started = True
+    #     if not end:
+    #         file.write(line)
+    # file.close()
 
 

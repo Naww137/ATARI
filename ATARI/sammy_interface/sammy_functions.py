@@ -273,9 +273,10 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
 
     if isinstance(sammyINP.experimental_covariance, dict) and len(sammyINP.experimental_covariance)>0:
-        cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
+        # cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
+        cov = sammyINP.experimental_covariance
         write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
-        # filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
+        filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
@@ -500,7 +501,7 @@ def filter_idc_dict(cov, pw_df):
     mask = (Es >= minE) & (Es <= maxE)
     cov_new['diag_stat'] = stat.loc[mask]
     cov_new['Cov_sys'] = C
-    cov_new['Jac_sys'] = {E: derivs for E, derivs in J.items() if (E >= minE) & (E <= maxE)}
+    cov_new['Jac_sys'] = J.loc[:,mask]
     return cov_new
 
 from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
@@ -529,9 +530,9 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             write_samdat(d, None, os.path.join(rundir,f"{exp.title}.dat"))
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
             if isinstance(cov, dict) and len(cov)>0:
-                cov = filter_idc_dict(cov, d)
+                # cov = filter_idc_dict(cov, d)
                 write_idc(os.path.join(rundir, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
-                # filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+                filter_idc_file(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
@@ -560,7 +561,8 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n"
         if save_lsts:
             text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
-        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf \nfi \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -601,7 +603,8 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
         title = f"{ds}_iter$1"
         text += f"##################################\n# Generate YW for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
-        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf \nfi \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -637,7 +640,8 @@ def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
         else: dcov=""
         text += f"##################################\n# Plot for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n"
-        text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n"""   
+        text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""" 
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "results/{ds}.odf \nfi \n"""  
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """

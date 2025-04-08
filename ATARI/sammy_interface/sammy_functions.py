@@ -273,10 +273,9 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
 
     if isinstance(sammyINP.experimental_covariance, dict) and len(sammyINP.experimental_covariance)>0:
-        # cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
-        cov = sammyINP.experimental_covariance
+        cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
         write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
-        filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
+        # filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
@@ -488,7 +487,7 @@ def filter_idc_file(filepath, pw_df):
                 pass
             else:
                 continue
-        text += line + '\n'
+        text += line
     with open(filepath, 'w') as f:
         f.write(text)
 
@@ -498,10 +497,10 @@ def filter_idc_dict(cov, pw_df):
     cov_new = {}
     J, C, stat = cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat']
     Es = stat.index
-    mask = (Es >= minE) & (Es <= maxE)
-    cov_new['diag_stat'] = stat.loc[mask]
-    cov_new['Cov_sys'] = C
-    cov_new['Jac_sys'] = J.loc[:,mask]
+    mask = (Es >= round(minE,5)-1e-5) & (Es <= round(maxE,5)+1e-5)
+    cov_new['Jac_sys']   = J.loc[:,mask]
+    cov_new['Cov_sys']   = C
+    cov_new['diag_stat'] = stat
     return cov_new
 
 from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
@@ -562,7 +561,7 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False
         if save_lsts:
             text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
         text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf \nfi \n"""
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf" \nfi \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -604,7 +603,7 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
         text += f"##################################\n# Generate YW for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
         text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf \nfi \n"""
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf" \nfi \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -641,7 +640,7 @@ def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
         text += f"##################################\n# Plot for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n"
         text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""" 
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "results/{ds}.odf \nfi \n"""  
+        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "results/{ds}.odf" \nfi \n"""  
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """

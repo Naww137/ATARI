@@ -545,7 +545,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 
-def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False):
+def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=False, del_odf:bool=True):
     par = 'results/step$1.par'
     inp_ext = 'initial'
     
@@ -561,7 +561,10 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False
         if save_lsts:
             text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
         text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf" \nfi \n"""
+        if del_odf:
+            text += """rm -f SAMMY.ODF"""
+        else:
+            text += f"""mv -f SAMMY.ODF "iterate/{title}.odf" \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -590,7 +593,7 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False
         f.write(text)
 
 
-def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
+def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list, del_odf:bool=True):
     cov = f"iterate/bayes_iter$1.cov"
     par = f"iterate/bayes_iter$1.par"
     inp_ext = 'iter'
@@ -603,7 +606,10 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
         text += f"##################################\n# Generate YW for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
         text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "iterate/{title}.odf" \nfi \n"""
+        if del_odf:
+            text += """rm -f SAMMY.ODF"""
+        else:
+            text += f"""mv -f SAMMY.ODF "iterate/{title}.odf" \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -632,7 +638,7 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
         f.write(text)
 
 
-def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
+def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list, del_odf:bool=True):
     text = ''
     for i,ds in enumerate(dataset_titles):
         if idc_list[i]: dcov=f"{ds}.idc" 
@@ -640,7 +646,10 @@ def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
         text += f"##################################\n# Plot for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n"
         text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""" 
-        text += f"""if [ -f SAMMY.ODF ]; then \n  mv -f SAMMY.ODF "results/{ds}.odf" \nfi \n"""  
+        if del_odf:
+            text += """rm -f SAMMY.ODF"""
+        else:
+            text += f"""mv -f SAMMY.ODF "results/{ds}.odf" \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -657,7 +666,7 @@ def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
         f.write(text)
     
 
-def setup_YW_scheme(sammyRTO, sammyINPyw): 
+def setup_YW_scheme(sammyRTO, sammyINPyw, del_odf:bool=True): 
 
     try:
         shutil.rmtree(sammyRTO.sammy_runDIR)
@@ -673,9 +682,9 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
 
     make_inputs_for_YW(sammyINPyw, sammyRTO, idc_list)
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
-    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps)
-    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
-    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
+    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps, del_odf=del_odf)
+    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, del_odf=del_odf)
+    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, del_odf=del_odf)
 
     return idc_list
     
@@ -1092,7 +1101,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
     dataset_titles, empty = check_inputs_YW(sammyINPyw, sammyRTO)
 
-    setup_YW_scheme(sammyRTO, sammyINPyw)
+    setup_YW_scheme(sammyRTO, sammyINPyw, del_odf=True)
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 

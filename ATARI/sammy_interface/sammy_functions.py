@@ -273,15 +273,13 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
 
     if isinstance(sammyINP.experimental_covariance, dict) and len(sammyINP.experimental_covariance)>0:
-        write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), 
-                  sammyINP.experimental_covariance['Jac_sys'],
-                  sammyINP.experimental_covariance['Cov_sys'],
-                  sammyINP.experimental_covariance['diag_stat'])
-        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
+        cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
+        write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
+        # filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
-        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
+        filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
         idc = True
     else:
         if not sammyINP.experimental_covariance:
@@ -468,29 +466,42 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts
                 )
 
-def filter_idc(filepath, pw_df):
+def filter_idc_file(filepath, pw_df):
     minE = np.min(pw_df.E)
     maxE = np.max(pw_df.E)
 
     with open(filepath, 'r') as f:
         lines = f.readlines()
-    with open (filepath, 'w') as f:
-        in_partial_derivatives = False
-        for line in lines:
-            if line.lower().startswith("free-forma"):
-                in_partial_derivatives = True
-            elif line.lower().startswith("uncertaint") or not line.strip():
-                in_partial_derivatives = False
-                in_uncertainties = True
 
-            elif in_partial_derivatives:
-                E = float(line.split()[0]) 
-                if (round(E,5)>=round(minE,5)-1e-5) & (round(E,5)<=round(maxE,5)+1e-5):
-                    pass
-                else:
-                    continue
-            
-            f.write(line)
+    text = ''
+    in_partial_derivatives = False
+    for line in lines:
+        if line.lower().startswith("free-forma"):
+            in_partial_derivatives = True
+        elif line.lower().startswith("uncertaint") or not line.strip():
+            in_partial_derivatives = False
+            in_uncertainties = True
+        elif in_partial_derivatives:
+            E = float(line.split()[0]) 
+            if (round(E,5)>=round(minE,5)-1e-5) & (round(E,5)<=round(maxE,5)+1e-5):
+                pass
+            else:
+                continue
+        text += line + '\n'
+    with open(filepath, 'w') as f:
+        f.write(text)
+
+def filter_idc_dict(cov, pw_df):
+    minE = np.min(pw_df.E)
+    maxE = np.max(pw_df.E)
+    cov_new = {}
+    J, C, stat = cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat']
+    Es = stat.index
+    mask = (Es >= minE) & (Es <= maxE)
+    cov_new['diag_stat'] = stat.loc[mask]
+    cov_new['Cov_sys'] = C
+    cov_new['Jac_sys'] = {E: derivs for E, derivs in J.items() if (E >= minE) & (E <= maxE)}
+    return cov_new
 
 from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 
@@ -518,12 +529,13 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             write_samdat(d, None, os.path.join(rundir,f"{exp.title}.dat"))
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
             if isinstance(cov, dict) and len(cov)>0:
+                cov = filter_idc_dict(cov, d)
                 write_idc(os.path.join(rundir, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
-                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+                # filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
-                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+                filter_idc_file(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             else:
                 idc.append(False)
@@ -536,98 +548,110 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
 def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False):
     par = 'results/step$1.par'
     inp_ext = 'initial'
-    with open(os.path.join(rundir, "YWY0.sh") , 'w') as f:
-        ### Copy final iteration result to step + 1 result
-        # f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
-        for i, ds in enumerate(dataset_titles):
-            if idc_list[i]: cov=f"{ds}.idc" 
-            else: cov=""
-            title = f"{ds}_iter0"
-            f.write(f"##################################\n# Generate YW for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
-            if save_lsts:
-                f.write(f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n""")
-            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
-            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter0.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        f.write(""""\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $ndat_string_{ds}")
-        f.write(""""\n""")
+    
+    text = ''
+    ### Copy final iteration result to step + 1 result
+    # f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
+    for i, ds in enumerate(dataset_titles):
+        if idc_list[i]: cov=f"{ds}.idc" 
+        else: cov=""
+        title = f"{ds}_iter0"
+        text += f"##################################\n# Generate YW for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n"
+        if save_lsts:
+            text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n"""
+        text += f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter0.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    text += """"\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $ndat_string_{ds}"
+    text += """"\n"""
+    with open(os.path.join(rundir, "YWY0.sh"), 'w') as f:
+        f.write(text)
     
     cov=""
+    text = ''
+    dataset_inserts = "\n".join([f"iterate/{ds}_iter0.ywy" for ds in dataset_titles])
+    title = f"bayes_iter1"
+    text += f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n"
+    text += f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n"
+    text += f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n"""
     with open(os.path.join(rundir, "BAY0.sh") , 'w') as f:
-        dataset_inserts = "\n".join([f"iterate/{ds}_iter0.ywy" for ds in dataset_titles])
-        title = f"bayes_iter1"
-        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
-        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
-        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
+        f.write(text)
 
 
 def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
     cov = f"iterate/bayes_iter$1.cov"
     par = f"iterate/bayes_iter$1.par"
     inp_ext = 'iter'
+    
+    text = ''
+    for i, ds in enumerate(dataset_titles):
+        if idc_list[i]: dcov=f"{ds}.idc" 
+        else: dcov=""
+        title = f"{ds}_iter$1"
+        text += f"##################################\n# Generate YW for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n"""
+        text += f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    text += """"\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $ndat_string_{ds}"
+    text += """"\n"""
     with open(os.path.join(rundir,"YWYiter.sh"), 'w') as f:
-        for i, ds in enumerate(dataset_titles):
-            if idc_list[i]: dcov=f"{ds}.idc" 
-            else: dcov=""
-            title = f"{ds}_iter$1"
-            f.write(f"##################################\n# Generate YW for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n")
-            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
-            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        f.write(""""\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $ndat_string_{ds}")
-        f.write(""""\n""")
+        f.write(text)
 
+    text = ''
+    dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
+    title = f"bayes_iter$plus_one"
+    text += f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n"
+    text += f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n"
+    text += "plus_one=$(( $1 + 1 ))\n"
+    text += f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n"""
     with open(os.path.join(rundir,"BAYiter.sh"), 'w') as f:
-        dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
-        title = f"bayes_iter$plus_one"
-        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
-        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
-        f.write("plus_one=$(( $1 + 1 ))\n")
-        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
+        f.write(text)
 
 
 def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
+    text = ''
+    for i,ds in enumerate(dataset_titles):
+        if idc_list[i]: dcov=f"{ds}.idc" 
+        else: dcov=""
+        text += f"##################################\n# Plot for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n"
+        text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n"""   
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+        text += f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    for ds in dataset_titles:
+        text += f" $chi2n_string_{ds}"
+    text += """"\n"""
     with open(os.path.join(rundir, "plot.sh") , 'w') as f:
-        for i,ds in enumerate(dataset_titles):
-            if idc_list[i]: dcov=f"{ds}.idc" 
-            else: dcov=""
-            f.write(f"##################################\n# Plot for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n")
-            f.write(f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-            f.write(f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        for ds in dataset_titles:
-            f.write(f" $chi2n_string_{ds}")
-        f.write(""""\n""")
+        f.write(text)
     
 
 def setup_YW_scheme(sammyRTO, sammyINPyw): 

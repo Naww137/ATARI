@@ -7,7 +7,7 @@ import pandas as pd
 from copy import copy
 from uuid import uuid4
 
-def fine_egrid(energy, ppeV=100):
+def fine_egrid(energy, ppeV=10):
     """
     Calculates an energy grid of the same domain with a specified number of points per eV.
 

@@ -23,22 +23,6 @@ def strength_function_estimation(ladder:pd.DataFrame, energy_range:tuple, partic
         Sns[Jpi] = Sn_Jpi
     return Sns
 
-def expected_strength(particle_pair:Particle_Pair):
-    """
-    ...
-    """
-
-    Sns = {}
-    for Jpi, spingroup in particle_pair.spin_groups.items():
-        J_ID = spingroup['J_ID']
-        l = spingroup['Ls'][0]
-        gJ = gstat(abs(Jpi), particle_pair.I, particle_pair.i)
-        gn2m = spingroup['<gn2>']
-        Dm = spingroup['<D>']
-        Sn_Jpi = gJ/(2*l+1) * (gn2m*1e-3/Dm)
-        Sns[Jpi] = Sn_Jpi
-    return Sns
-
 def strength_function_discrepancy(ladder1:pd.DataFrame, ladder2:pd.DataFrame, energy_range:tuple, particle_pair:Particle_Pair):
     """
     ...

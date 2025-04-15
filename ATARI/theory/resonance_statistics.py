@@ -1,9 +1,11 @@
 import numpy as np
+import pandas as pd
 from scipy.linalg import eigvalsh_tridiagonal
 from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
 from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
+from ATARI.theory.scattering_params import gstat
 
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
@@ -26,6 +28,50 @@ def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):
     res_par_avg['quantiles'] = quantiles
 
     return res_par_avg
+
+def expected_strength(particle_pair):
+    """
+    ...
+    """
+
+    Sns = {}
+    for Jpi, spingroup in particle_pair.spin_groups.items():
+        l = spingroup['Ls'][0]
+        gJ = gstat(abs(Jpi), particle_pair.I, particle_pair.i)
+        gn2m = spingroup['<gn2>']
+        Dm = spingroup['<D>']
+        Sn_Jpi = gJ/(2*l+1) * (gn2m*1e-3/Dm)
+        Sns[Jpi] = Sn_Jpi
+    return Sns
+
+def find_external_levels(particle_pair, energy_bounds:tuple):
+    """
+    From F. Frohner and Olivier Bouland, "Treatment of External Levels in Neutron Resonance
+    Fitting: Applications to the Nonfissile Nuclide Cr-52".
+    URL: https://doi.org/10.13182/NSE01-A2176
+    """
+    energy_bounds = (min(energy_bounds), max(energy_bounds))
+    Eb = (energy_bounds[0] + energy_bounds[1])/2
+    I  = energy_bounds[1] - energy_bounds[0]
+
+    spingroups = particle_pair.spin_groups
+    Ls    = [spingroup['Ls']    for spingroup in spingroups.values()]
+    gn2ms = [spingroup['<gn2>'] for spingroup in spingroups.values()]
+    Dms   = [spingroup['<D>']   for spingroup in spingroups.values()]
+    str_tot = np.sum([particle_pair.gn2_to_Gn(gn2m, np.array([Eb]), l[0])*1e-3 for gn2m, l in zip(gn2ms, Ls)]) * np.sum(1/np.array(Dms))
+    # str_tot = np.sum(list(strengths.values()))
+    
+    gg2m = max([spingroup['<gg2>'] for spingroup in spingroups.values()])
+    Ggm = particle_pair.gg2_to_Gg(gg2m)
+
+    E_low  = Eb - (np.sqrt(3)/2) * I
+    E_high = Eb + (np.sqrt(3)/2) * I
+
+    Gn_low  = 1e3 * (3/2) * I * str_tot * np.sqrt(abs(E_low ))
+    Gn_high = 1e3 * (3/2) * I * str_tot * np.sqrt(abs(E_high))
+
+    res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'varyE':[0,0], 'varyGg':[0,0], 'varyGn1':[1,1], 'J_ID':[1,1]})
+    return res_ext
 
 # =====================================================================
 # Resonance level sampling

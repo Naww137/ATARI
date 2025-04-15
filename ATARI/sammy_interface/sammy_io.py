@@ -595,7 +595,8 @@ def write_saminp(filepath   :   str,
                 use_IDC     :   bool    = False,
                 use_least_squares: bool = False,
                 derivatives : bool = False,
-                bayes_scheme  : bool = None
+                bayes_scheme  : bool = None,
+                plot_fit    : bool = True
                 ):
     
     alphanumeric = copy(alphanumeric)
@@ -634,6 +635,9 @@ def write_saminp(filepath   :   str,
 
     if use_IDC:
         alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
+
+    if plot_fit:
+        alphanumeric.append('GENERATE PLOT FILE AUTOMATICALLY')
 
 
 

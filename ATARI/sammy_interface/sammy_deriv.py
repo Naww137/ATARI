@@ -60,9 +60,9 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
                         temp        =   sammyINP.experiment.temp,
                         FP          =   sammyINP.experiment.FP,
                         n           =   sammyINP.experiment.n,
-                        use_IDC=False,
-                        derivatives = True
-                                 )
+                        use_IDC     = False,
+                        derivatives = True,
+                        plt_fit     = True)
     # creating shell script:
     sammy_functions.write_shell_script(sammyINP, 
                                        sammyRTO, 

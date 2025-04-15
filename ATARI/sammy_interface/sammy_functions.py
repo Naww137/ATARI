@@ -183,7 +183,7 @@ def get_ECSCM(sammyRTO, sammyINP):
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), len(exp.energy_grid)) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                filepath    =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
                 bayes       =   sammyRTO.bayes,
                 iterations  =   sammyRTO.iterations,
                 formalism   =   sammyINP.particle_pair.formalism,
@@ -195,8 +195,8 @@ def get_ECSCM(sammyRTO, sammyINP):
                 temp        =   exp.temp,
                 FP          =   exp.FP,
                 n           =   exp.n,
-                alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
-                )
+                alphanumeric=   ["CROSS SECTION COVARIance matrix is wanted"],
+                plot_fit    =   True)
     
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
     _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
@@ -296,21 +296,21 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                                "sammy.inp", 
                                sammyRTO.sammy_runDIR)
     write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
-                bayes       =   sammyRTO.bayes,
-                iterations  =   sammyRTO.iterations,
-                formalism   =   sammyINP.particle_pair.formalism,
-                isotope     =   sammyINP.particle_pair.isotope,
-                M           =   sammyINP.particle_pair.M,
-                ac          =   sammyINP.particle_pair.ac*10,
-                reaction    =   sammyINP.experiment.reaction,
-                energy_range=   sammyINP.experiment.energy_range,
-                temp        =   sammyINP.experiment.temp,
-                FP          =   sammyINP.experiment.FP,
-                n           =   sammyINP.experiment.n,
-                use_IDC     =   idc,
-                alphanumeric =  sammyINP.alphanumeric
-                )
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes        =   sammyRTO.bayes,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINP.particle_pair.formalism,
+                isotope      =   sammyINP.particle_pair.isotope,
+                M            =   sammyINP.particle_pair.M,
+                ac           =   sammyINP.particle_pair.ac*10,
+                reaction     =   sammyINP.experiment.reaction,
+                energy_range =   sammyINP.experiment.energy_range,
+                temp         =   sammyINP.experiment.temp,
+                FP           =   sammyINP.experiment.FP,
+                n            =   sammyINP.experiment.n,
+                use_IDC      =   idc,
+                alphanumeric =   sammyINP.alphanumeric,
+                plot_fit     =   True)
                 
     write_shell_script(sammyINP, 
                        sammyRTO, 
@@ -371,57 +371,57 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
         ### make YWY initial
         fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
-                    bayes       =   True,
-                    iterations  =   sammyRTO.iterations,
-                    formalism   =   sammyINPYW.particle_pair.formalism,
-                    isotope     =   sammyINPYW.particle_pair.isotope,
-                    M           =   sammyINPYW.particle_pair.M,
-                    ac          =   sammyINPYW.particle_pair.ac*10,
-                    reaction    =   exp.reaction,
-                    energy_range=   exp.energy_range,
-                    temp        =   exp.temp,
-                    FP          =   exp.FP,
-                    n           =   exp.n,
-                    # use_IDC=idc,
-                    alphanumeric=["yw"]+idc_flag
-                                    )
+                filepath     =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
+                bayes        =   True,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
+                # use_IDC=idc,
+                alphanumeric =   ["yw"]+idc_flag,
+                plot_fit     =   False)
         ### make YWY for iterations
         fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
-                bayes       =   True,
-                iterations  =   sammyRTO.iterations,
-                formalism   =   sammyINPYW.particle_pair.formalism,
-                isotope     =   sammyINPYW.particle_pair.isotope,
-                M           =   sammyINPYW.particle_pair.M,
-                ac          =   sammyINPYW.particle_pair.ac*10,
-                reaction    =   exp.reaction,
-                energy_range=   exp.energy_range,
-                temp        =   exp.temp,
-                FP          =   exp.FP,
-                n           =   exp.n,
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
+                bayes        =   True,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
                 # use_IDC=idc,
-                alphanumeric=["yw","Use remembered original parameter values"]+idc_flag
-                )
+                alphanumeric =   ["yw","Use remembered original parameter values"]+idc_flag,
+                plot_fit     =   True)
         ### make plotting
         fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
-                    bayes       =   False,
-                    iterations  =   sammyRTO.iterations,
-                    formalism   =   sammyINPYW.particle_pair.formalism,
-                    isotope     =   sammyINPYW.particle_pair.isotope,
-                    M           =   sammyINPYW.particle_pair.M,
-                    ac          =   sammyINPYW.particle_pair.ac*10,
-                    reaction    =   exp.reaction,
-                    energy_range=   exp.energy_range,
-                    temp        =   exp.temp,
-                    FP          =   exp.FP,
-                    n           =   exp.n,
-                    # use_IDC=idc,
-                    alphanumeric=[]+idc_flag
-                    )
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
+                bayes        =   False,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
+                # use_IDC=idc,
+                alphanumeric =   []+idc_flag,
+                plot_fit     =   True)
     
     ### options for least squares
     if sammyINPYW.LS:
@@ -545,7 +545,7 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 
-def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=False, del_odf:bool=True):
+def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=False):
     par = 'results/step$1.par'
     inp_ext = 'initial'
     
@@ -560,11 +560,8 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=Fa
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n"
         if save_lsts:
             text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
-        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        if del_odf:
-            text += """rm -f SAMMY.ODF"""
-        else:
-            text += f"""mv -f SAMMY.ODF "iterate/{title}.odf" \n"""
+        # text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -593,7 +590,7 @@ def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=Fa
         f.write(text)
 
 
-def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list, del_odf:bool=True):
+def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
     cov = f"iterate/bayes_iter$1.cov"
     par = f"iterate/bayes_iter$1.par"
     inp_ext = 'iter'
@@ -605,11 +602,8 @@ def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list, del_odf:bool=T
         title = f"{ds}_iter$1"
         text += f"##################################\n# Generate YW for {ds}\n"
         text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
-        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
-        if del_odf:
-            text += """rm -f SAMMY.ODF"""
-        else:
-            text += f"""mv -f SAMMY.ODF "iterate/{title}.odf" \n"""
+        # text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
     text += "################# read chi2 #######################\n#\n"
     for ds in dataset_titles:
         text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
@@ -682,8 +676,8 @@ def setup_YW_scheme(sammyRTO, sammyINPyw, del_odf:bool=True):
 
     make_inputs_for_YW(sammyINPyw, sammyRTO, idc_list)
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
-    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps, del_odf=del_odf)
-    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, del_odf=del_odf)
+    make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps)
+    make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
     make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, del_odf=del_odf)
 
     return idc_list

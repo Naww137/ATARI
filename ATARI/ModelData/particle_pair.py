@@ -8,7 +8,7 @@ Created on Thu Jun 16 12:18:04 2022
 from typing import Union
 import numpy as np
 import pandas as pd
-from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths
+from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths, find_external_levels
 from ATARI.ModelData.particle import Particle, Ta181, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
 
@@ -471,6 +471,7 @@ class Particle_Pair:
 
     def sample_resonance_ladder(self,
                                 ensemble='NNE',
+                                sample_external_resonances:bool=False,
                                 rng=None, seed=None):
         """
         Generate a resonance ladder sample.
@@ -488,6 +489,8 @@ class Particle_Pair:
             GUE : Gaussian Unitary Ensemble
             GSE : Gaussian Symplectic Ensemble
             Poisson : Poisson Ensemble
+        sample_external_resonances : bool
+            Determines whether external resonances will be sampled. Default is False.
         rng : np.random.Generator or None
             Numpy random number generator object. Default is None.
         seed : int or None
@@ -506,6 +509,12 @@ class Particle_Pair:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
         resonance_ladders = []
+        # External Resonances:
+        if sample_external_resonances:
+            ext_res_ladder = find_external_levels(self, self.energy_range)
+            resonance_ladders.append(ext_res_ladder)
+        
+        # Internal Resonances:
         for Jpi, Jinfo in self.spin_groups.items():
 
             # sample resonance levels for each spin group with negative parity

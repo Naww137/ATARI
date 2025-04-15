@@ -93,7 +93,6 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
     num_sgs = len(spin_groups)
     for isg, (jpi_, spin_group) in enumerate(spin_groups.items()):
         gg2 [isg::num_sgs] = spin_group["<gg2>"] * starting_Gg_multiplier
-        gg2 [isg::(2*num_sgs)] *= -1
         gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier
         gn2 [isg::(2*num_sgs)] *= -1
         J_ID[isg::num_sgs] = spin_group['J_ID']

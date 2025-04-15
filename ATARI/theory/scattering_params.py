@@ -61,7 +61,7 @@ def k_wavenumber(E, M, m):
     mn_eV = 939.565420e6 # eV/c^2
     constant = (np.sqrt(2*mn_eV)/c/hbar)*(1e-14) # 0.002197 #sqrt(2Mn)/hbar 
 
-    k = (M/(M+m))*constant*np.sqrt(E)
+    k = (M/(M+m))*constant*np.sqrt(abs(E))
     return k # 1/√barns 
     
 

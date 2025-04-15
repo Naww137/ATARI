@@ -511,7 +511,7 @@ class Particle_Pair:
         resonance_ladders = []
         # External Resonances:
         if sample_external_resonances:
-            ext_res_ladder = find_external_levels(self, self.energy_range)
+            ext_res_ladder = find_external_levels(self, self.energy_range, return_reduced=True)
             resonance_ladders.append(ext_res_ladder)
         
         # Internal Resonances:

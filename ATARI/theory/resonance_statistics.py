@@ -5,7 +5,7 @@ from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
 from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
-from ATARI.theory.scattering_params import gstat
+from ATARI.theory.scattering_params import gstat, k_wavenumber
 
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
@@ -44,7 +44,7 @@ def expected_strength(particle_pair):
         Sns[Jpi] = Sn_Jpi
     return Sns
 
-def find_external_levels(particle_pair, energy_bounds:tuple):
+def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool=True):
     """
     From F. Frohner and Olivier Bouland, "Treatment of External Levels in Neutron Resonance
     Fitting: Applications to the Nonfissile Nuclide Cr-52".
@@ -56,21 +56,40 @@ def find_external_levels(particle_pair, energy_bounds:tuple):
 
     spingroups = particle_pair.spin_groups
     Ls    = [spingroup['Ls']    for spingroup in spingroups.values()]
+    Jpis  = [spingroup['Jpi']    for spingroup in spingroups.values()]
     gn2ms = [spingroup['<gn2>'] for spingroup in spingroups.values()]
     Dms   = [spingroup['<D>']   for spingroup in spingroups.values()]
-    str_tot = np.sum([particle_pair.gn2_to_Gn(gn2m, np.array([Eb]), l[0])*1e-3 for gn2m, l in zip(gn2ms, Ls)]) * np.sum(1/np.array(Dms))
-    # str_tot = np.sum(list(strengths.values()))
     
     gg2m = max([spingroup['<gg2>'] for spingroup in spingroups.values()])
-    Ggm = particle_pair.gg2_to_Gg(gg2m)
 
     E_low  = Eb - (np.sqrt(3)/2) * I
     E_high = Eb + (np.sqrt(3)/2) * I
 
-    Gn_low  = 1e3 * (3/2) * I * str_tot * np.sqrt(abs(E_low ))
-    Gn_high = 1e3 * (3/2) * I * str_tot * np.sqrt(abs(E_high))
+    s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
+    gn2 = 1e3 * (3/2) * I * s
 
-    res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'varyE':[0,0], 'varyGg':[0,0], 'varyGn1':[1,1], 'J_ID':[1,1]})
+    Ggm = particle_pair.gg2_to_Gg(gg2m)
+    # Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
+    Gn_low  = particle_pair.gn2_to_Gn(gn2, np.array([E_low ]), 0)[0]
+    Gn_high = particle_pair.gn2_to_Gn(gn2, np.array([E_high]), 0)[0]
+    res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'J_ID':[1,1]})
+    if return_reduced:
+        res_ext['gg2'] = gg2m
+        res_ext['gn2'] = gn2
+        res_ext['Jpi'] = Jpis[0]
+        res_ext['L']   = 0
+    # Gnms_low = [particle_pair.gn2_to_Gn(gn2m, np.array([E_low]), l[0]) for gn2m, l in zip(gn2ms, Ls)]
+    # str_low = np.sum(Gnms_low)*1e-3 * np.sum(1/np.array(Dms))
+    # Gn_low  = 1e3 * (3/2) * I * str_low
+    # Gnms_high = [particle_pair.gn2_to_Gn(gn2m, np.array([E_high]), l[0]) for gn2m, l in zip(gn2ms, Ls)]
+    # str_high = np.sum(Gnms_high)*1e-3 * np.sum(1/np.array(Dms))
+    # Gn_high = 1e3 * (3/2) * I * str_high
+    # s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
+    # a = particle_pair.ac
+    # k_low  = k_wavenumber(E_low, particle_pair.M, particle_pair.m)
+    # Gn_low  = 1e3 * (3/2) * I * (2*s*k_low*a)
+    # k_high = k_wavenumber(E_high, particle_pair.M, particle_pair.m)
+    # Gn_high = 1e3 * (3/2) * I * (2*s*k_high*a)
     return res_ext
 
 # =====================================================================
@@ -399,9 +418,12 @@ def sample_RRR_widths(N_levels,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
+    if DOF in (None, np.inf):
+        reduced_widths_square = np.repeat(avg_reduced_width_square, N_levels)
+    else:
+        reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
     sign = 2*rng.randint(0, 2, size=N_levels)-1
-    return np.array(reduced_widths_square * sign)
+    return np.array(reduced_widths_square * sign, dtype=float)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):
     """

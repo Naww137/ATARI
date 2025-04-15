@@ -60,8 +60,15 @@ class Syndat_Model:
                  generative_measurement_model: Optional[Generative_Measurement_Model] = None,
                  reductive_measurement_model: Optional[Reductive_Measurement_Model] = None,
                  options: Optional[syndatOPT] = None,
-                 title = 'Title'
+                 title = 'Title',
+                 rng:np.random.Generator = None,
+                 seed:int=None
                  ):
+        
+        if rng is not None:
+            self.rng = rng
+        else:
+            self.rng = np.random.default_rng(seed)
 
         if generative_experimental_model is not None:
             self.generative_experimental_model = generative_experimental_model
@@ -154,9 +161,9 @@ class Syndat_Model:
 
     def sample(self,
                particle_pair: Optional[Particle_Pair] = None,
-               sammyRTO=None,
-               num_samples=1,
-               save_raw_data = False,
+               sammyRTO = None,
+               num_samples:int = 1,
+               save_raw_data:bool = False,
                pw_true: Optional[pd.DataFrame] = None
                ):
         """
@@ -211,7 +218,8 @@ class Syndat_Model:
             ### sample resonance ladder
             if self.options.sampleRES:
                 assert particle_pair is not None
-                particle_pair.sample_resonance_ladder()
+                particle_pair.sample_resonance_ladder(ensemble=self.options.ensemble,
+                                                      sample_external_resonances=self.options.sample_external_resonances, rng=self.rng)
                 par_true = particle_pair.resonance_ladder 
            
             ### TODO: move this outside of for loop if sample res is false

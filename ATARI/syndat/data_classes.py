@@ -137,15 +137,18 @@ class syndatOPT:
     """
     def __init__(self, **kwargs):
         self._sampleRES = True
+        self._ensemble = 'GOE'
+        self._sample_external_resonances = False
+
         self._sample_counting_noise = True
         self._calculate_covariance = True
         self._explicit_covariance = False
         self._sampleTMP = True
         self._sampleTNCS = True
         self._smoothTNCS = False
+        # self._saveTMP = False
         
         self._save_raw_data = False
-        # self._saveTMP = False
 
         self._force_zero_to_1 = True
 
@@ -166,6 +169,20 @@ class syndatOPT:
     @sampleRES.setter
     def sampleRES(self, sampleRES):
         self._sampleRES = sampleRES
+
+    @property
+    def ensemble(self):
+        return self._ensemble
+    @ensemble.setter
+    def ensemble(self, ensemble):
+        self._ensemble = ensemble
+
+    @property
+    def sample_external_resonances(self):
+        return self._sample_external_resonances
+    @sample_external_resonances.setter
+    def sample_external_resonances(self, sample_external_resonances):
+        self._sample_external_resonances = sample_external_resonances
         
     @property
     def sampleTMP(self):

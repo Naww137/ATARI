@@ -52,22 +52,38 @@ class Syndat_Control:
                  syndat_models: list, #[Syndat_Model],
                  model_correlations: list = [], 
                  sampleRES = True,
+                 ensemble = 'GOE',
+                 sample_external_resonances = False,
                  save_covariance = True,
                  save_raw_data = False,
                  save_true_model_parameters = False,
+                 rng:np.random.Generator = None,
+                 seed:int = None
                  ):
         
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
         self.model_correlations = model_correlations
+
         self.sampleRES = sampleRES
+        self.ensemble = ensemble
+        self.sample_external_resonances = sample_external_resonances
+
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
         self.save_true_model_parameters = save_true_model_parameters
 
         if self.save_true_model_parameters:
             self.true_model_parameters = []
+
+        # Defining RNG:
+        if rng is not None:
+            self.rng = rng
+        else:
+            self.rng = np.random.default_rng(seed)
+        for syndat_model in self.syndat_models:
+            syndat_model.rng = self.rng
 
     def get_sample(self,i):
         data = {}
@@ -120,7 +136,9 @@ class Syndat_Control:
             
             ### sample resonance ladder
             if self.sampleRES:
-                self.particle_pair.sample_resonance_ladder()
+                self.particle_pair.sample_resonance_ladder(ensemble=self.ensemble,
+                                                           sample_external_resonances=self.sample_external_resonances,
+                                                           rng=self.rng)
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
@@ -177,7 +195,7 @@ class Syndat_Control:
             for i, syn_mod in enumerate(self.syndat_models):
 
                 if self.save_raw_data and self.save_true_model_parameters:
-                    out = syndatOUT(title = syn_mod.title,par_true=par_true,pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i],true_model_parameters=true_model_parameters_list)
+                    out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i], true_model_parameters=true_model_parameters_list)
                 elif self.save_raw_data:
                     out = syndatOUT(title = syn_mod.title, par_true=par_true, pw_reduced=reduced_data_list[i], pw_raw=raw_data_list[i])
                 elif self.save_true_model_parameters:

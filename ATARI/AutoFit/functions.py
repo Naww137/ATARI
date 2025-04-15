@@ -3,7 +3,7 @@ import pandas as pd
 from copy import copy
 import warnings
 
-from ATARI.theory.resonance_statistics import wigner_LL, width_LL
+from ATARI.theory.resonance_statistics import wigner_LL, width_LL, find_external_levels
 from ATARI.theory.scattering_params import FofE_recursive
 from ATARI.utils.atario import add_Gw_from_gw
 
@@ -177,22 +177,23 @@ def generate_external_resonance_ladder(spin_groups: list[dict],
                                         energy_range,
                                         particle_pair):
     
-    Er = []; gg2 = []; gn2 = []; J_ID = []; Jpi = []; Ls = []
-    for sg in spin_groups:
-        Er.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])
-        gg2.extend([sg["<gg2>"]]*2)
-        gn2.extend([sg["<gn2>"]]*2)
-        J_ID.extend([sg["J_ID"]]*2)
-        Jpi.extend([sg["Jpi"]]*2)
+    # Er = []; gg2 = []; gn2 = []; J_ID = []; Jpi = []; Ls = []
+    # for sg in spin_groups:
+    #     Er.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])
+    #     gg2.extend([sg["<gg2>"]]*2)
+    #     gn2.extend([sg["<gn2>"]]*2)
+    #     J_ID.extend([sg["J_ID"]]*2)
+    #     Jpi.extend([sg["Jpi"]]*2)
         
-        # check for L
-        if len(sg["Ls"]) > 1:
-                raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
-        else:
-            L = sg["Ls"][0]
-        Ls.extend([L]*2)
-
-    return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=1, varyGn1=1)
+    #     # check for L
+    #     if len(sg["Ls"]) > 1:
+    #             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+    #     else:
+    #         L = sg["Ls"][0]
+    #     Ls.extend([L]*2)
+    # return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=1, varyGn1=1)
+    ext_ladder = find_external_levels(particle_pair, energy_range, return_reduced=True)
+    return get_resonance_ladder(particle_pair, ext_ladder.E, ext_ladder.gg2, ext_ladder.gn2, ext_ladder.J_ID, ext_ladder.Jpi, ext_ladder.L, varyE=0, varyGg=0, varyGn1=1)
 
 
 def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):

@@ -69,7 +69,10 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
     # Gamma widths: (if gamma_width_on is True)
     if gamma_width_on:
         for g, Gnm in enumerate(Gnms):
-            posterior[:,g] *= porter_thomas_dist.pdf(Gg, mean=reaction.Ggm[g], df=reaction.gDOF[g], trunc=0.0)
+            if reaction.gDOF[g] == -1:
+                posterior[:,g] *= 1.0 if Gg == reaction.Ggm else 0.0
+            else:
+                posterior[:,g] *= porter_thomas_dist.pdf(Gg, mean=reaction.Ggm[g], df=reaction.gDOF[g], trunc=0.0)
 
     # False distribution:
     if (reaction.false_dens != 0.0) and (false_width_dist is not None):

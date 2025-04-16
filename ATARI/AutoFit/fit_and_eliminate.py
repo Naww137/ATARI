@@ -570,8 +570,9 @@ class FitAndEliminate:
             # if (self.options.greedy_mode):
             # Reordering resonances:
             initial_feature_bank = initial_feature_bank.sort_values(by='Gn1') # sort ladder by Gn - to del smallest res. first
-            print(initial_feature_bank)
-            print(delta_objn_log, len(delta_objn_log))
+            if self.options.chi2_memory_factor != 0.0:
+                print('Log of last recorded changes in objective value:')
+                print(delta_objn_log)
             fixed_resonance_ladder.index
             delta_objn_log = [delta_objn_log[idx-np.sum(fixed_resonance_ladder.index < idx)] for idx in initial_feature_bank.index]
             initial_feature_bank.reset_index(drop=True, inplace=True)

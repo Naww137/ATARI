@@ -188,6 +188,9 @@ class Reaction:
         else:                   self.gg2m = None
 
         # Gamma Channel Degrees of Freedom:
+        for idx, gdof in enumerate(gDOF):
+            if (gdof is None) or (gdof == np.inf):
+                gDOF[idx] = -1
         if gDOF is not None:    self.gDOF = spingroupParameter(gDOF, 'gDOF', self.num_groups, dtype=int)
         else:                   self.gDOF = self.DEFAULT_GDOF * np.ones((self.num_groups,), dtype=int)
 

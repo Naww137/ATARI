@@ -20,8 +20,12 @@ def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):
     quantiles['D99']  = getD(0.99,res_par_avg)
     quantiles['gn01'] = res_par_avg['<gn2>']*chi2.ppf(0.01, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
     quantiles['gn99'] = res_par_avg['<gn2>']*chi2.ppf(0.99, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
-    quantiles['gg01'] = res_par_avg['<gg2>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
-    quantiles['gg99'] = res_par_avg['<gg2>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+    if (g_dof is None) or (g_dof == np.inf):
+        quantiles['gg01'] = res_par_avg['<gg2>']
+        quantiles['gg99'] = res_par_avg['<gg2>']
+    else:
+        quantiles['gg01'] = res_par_avg['<gg2>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+        quantiles['gg99'] = res_par_avg['<gg2>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
     quantiles['gt01'] = quantiles['gn01'] + quantiles['gg01']
     quantiles['gt99'] = quantiles['gn99'] + quantiles['gg99']
 

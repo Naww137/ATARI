@@ -17,7 +17,6 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starti
 
     # allow Elambda to be just outside of the window
     _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
-    print(res_par_avg['quantiles']['gt99'])
     Gt99_min_max = res_par_avg['quantiles']['gt99']*P_array[0]
     max_Elam = max(energy_range) + Gt99_min_max[0]*1e-3
     min_Elam = min(energy_range) - Gt99_min_max[1]*1e-3
@@ -26,11 +25,6 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starti
     x_start = min_Elam; x_end = max_Elam
     x = x_start
     Er = []
-    print(energy_range)
-    print(Gt99_min_max)
-    print(x_start)
-    print(x_end)
-    print(spacing)
     while x < x_end:
         Er.append(x)
         if callable(spacing):
@@ -47,10 +41,6 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starti
     J_ID = np.repeat(res_par_avg["J_ID"], num_Er)
     Jpi = np.repeat(res_par_avg['Jpi'], num_Er)
     Ls = np.repeat(res_par_avg['Ls'], num_Er)
-
-    print('\n\n\n')
-    print(Er, '****')
-    print('\n\n\n')
 
     return Er, gg2, gn2, J_ID, Jpi, Ls
 
@@ -114,7 +104,6 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
 
 def get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=0, varyGn1=0):
     atari_ladder = pd.DataFrame({"E":Er, "gg2":gg2, "gn2":gn2, "Jpi":Jpi, "L":Ls, "varyE":np.ones(len(Er))*varyE, "varyGg":np.ones(len(Er))*varyGg, "varyGn1":np.ones(len(Er))*varyGn1 ,"J_ID":J_ID})
-    print('LS!!! -- ', Ls)
     return add_Gw_from_gw(atari_ladder, particle_pair)
 
 
@@ -169,8 +158,6 @@ def get_starting_feature_bank(energy_range,
         Er, gg2, gn2, J_ID, Jpi, L = get_parameter_grid_v2(energy_range, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
     else:
         Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
-        print(energy_range)
-        print(spin_groups)
         for sg in spin_groups:
             Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
             Er.append(Er_1); gg2.append(gg2_1); gn2.append(gn2_1); J_ID.append(J_ID_1); Jpi.append(Jpi_1); L.append(L_1)
@@ -180,14 +167,6 @@ def get_starting_feature_bank(energy_range,
         J_ID = np.concatenate(J_ID) 
         Jpi = np.concatenate(Jpi)    
         L = np.concatenate(L)
-        print()
-        print(Er)
-        print(gg2)
-        print(gn2)
-        print(J_ID)
-        print(Jpi)
-        print(L)
-        print()
 
     return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, L, varyE=varyE, varyGg=varyGg, varyGn1=varyGn1)
 

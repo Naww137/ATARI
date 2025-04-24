@@ -621,6 +621,7 @@ class FitAndEliminate:
                 break
 
             ### test all N-1 priors
+            any_prior_passed_test = False
             if will_test_priors:
                 time_test_priors_start = time.time()
                 prior_test_out = self.test_priors(current_level,

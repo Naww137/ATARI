@@ -598,7 +598,6 @@ class FitAndEliminate:
                 print('*'*40)
                 print()
             
-            fit_code_init_level = f'init_sol_level_{current_level}'
             ladder, fixed_resonances_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
             initial_ladder_chars = self.evaluate_prior(ladder)
             
@@ -608,13 +607,10 @@ class FitAndEliminate:
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             if (self.options.print_bool):
-                print()
-                print(f'\t{fit_code_init_level}')
-                print(f'\tBase objective value for level: {base_obj}')
-                print()
+                print(f'\n\tBase objective value for level: {base_obj}\n')
 
             # if we are on the level of target resonances - just stop - by default don't stop until 0
-            if (current_level==target_ires):
+            if current_level == target_ires:
                 break
 
             ### test all N-1 priors
@@ -650,7 +646,7 @@ class FitAndEliminate:
                     deep_stage_ladder_start = best_model_chars.par
                 else:
                     will_test_priors = False
-                    print('NO LONGER TESTING PRIORS!')
+                    print('\nNo priors passed test. No longer testing priors...\n')
             ### else test all N-1 fitted models 
             if (not will_test_priors) or (not any_prior_passed_test):
                 fitted_test_out = self.test_fitted_models(current_level,
@@ -672,10 +668,8 @@ class FitAndEliminate:
             # if we are doing deep fit on this stage
             if ((deep_stage_ladder_start.shape[0]- fixed_resonance_ladder.shape[0]) <= start_deep_fit_from):
                 if (self.options.print_bool):
-                    print()
                     print('Starting "deep" fitting of best initial guess by chi2...')
-                    print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}')
-                    print()
+                    print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}\n')
 
                 posterior_deep_SO, sol_fit_time_deep, derivative_evaluations = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
                                                                                                  fixed_resonance_df= fixed_resonance_ladder,
@@ -685,9 +679,7 @@ class FitAndEliminate:
                 level_derivative_evaluations += derivative_evaluations
             else:
                 if (self.options.print_bool):
-                    print()
-                    print('Skipping "deep" fitting stage, utilizing best model for the next step w/o chi2...')
-                    print()
+                    print('\nSkipping "deep" fitting stage, utilizing best model for the next step w/o chi2...\n')
                 
                 posterior_deep_SO = best_model_chars
                 sol_fit_time_deep = 0
@@ -707,12 +699,6 @@ class FitAndEliminate:
             deep_obj_post = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
             benefit_deep_obj = deep_obj_post - base_obj
-
-            selected_ladder_chars = cur_sol_chars_deep
-            selected_ladder_chi2_prior = deep_chi2_prior
-            selected_ladder_chi2_post  = deep_chi2_post
-            selected_ladder_obj_prior  = deep_obj_prior
-            selected_ladder_obj_post   = deep_obj_post
             
             ### printout
             if (self.options.print_bool):
@@ -724,6 +710,10 @@ class FitAndEliminate:
                 print(f'\t objective value before: {deep_obj_prior}')
                 print(f'\t objective value after: {deep_obj_post}')
                 print()
+
+            selected_ladder_chars     = cur_sol_chars_deep
+            selected_ladder_chi2_post = deep_chi2_post
+            selected_ladder_obj_post  = deep_obj_post
 
             # checking if final model passed the test
             if ((benefit_deep_obj <= delta_obj_allowed) & final_model_passed_test):
@@ -1028,13 +1018,11 @@ class FitAndEliminate:
 
             # Check if this model is best so far
             if ((benefit_obj_per_ndata <= delta_obj_allowed)):
+                test_result = "✓"  # Check mark if the test is passed
+                sign = "<="
                 
                 # mark that at least one sol passed the chi2 test
                 any_model_passed_test = True
-                current_model_passed_test = True
-
-                test_result = "✓"  # Check mark if the test is passed
-                sign = "<="
 
                 posteriors_passed_cnt +=1
 
@@ -1042,19 +1030,16 @@ class FitAndEliminate:
                     print()
                     print('Model passed chi2 test!')
             else:
-
-                current_model_passed_test = False
-
                 test_result = "✗"
                 sign = ">"
 
             # TODO: check - so we will use always
             if (interm_step_obj < best_model_obj):
                 
-                best_model_obj = interm_step_obj
+                best_model_obj             = interm_step_obj
                 best_benefit_obj_per_ndata = benefit_obj_per_ndata
-                best_removed_resonance = j
-                best_model_chars = cur_sol_chars
+                best_removed_resonance     = j
+                best_model_chars           = cur_sol_chars
 
             if (self.options.print_bool):
                 print()
@@ -1132,9 +1117,9 @@ class FitAndEliminate:
         
         if ladder_df.shape[0] == fixed_resonance_df.shape[0]:
             sammy_OUT = self.evaluate_prior(ladder_df)
-            sammy_OUT.pw_post = sammy_OUT.pw
-            sammy_OUT.par_post = sammy_OUT.par
-            sammy_OUT.chi2_post = sammy_OUT.chi2
+            sammy_OUT.pw_post    = sammy_OUT.pw
+            sammy_OUT.par_post   = sammy_OUT.par
+            sammy_OUT.chi2_post  = sammy_OUT.chi2
             sammy_OUT.chi2n_post = sammy_OUT.chi2n
         else:
             sammy_OUT = self.solver_eliminate.fit(ladder_df, [])

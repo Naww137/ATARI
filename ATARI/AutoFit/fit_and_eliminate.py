@@ -413,6 +413,13 @@ class FitAndEliminate:
                 self.output.initial_fits.append(out)
                 self.total_derivative_evaluations += out.total_derivative_evaluations
                 self.output.derivative_evaluations.append(out.total_derivative_evaluations)
+
+        Ndata = np.sum([len(df) for df in samout_final.pw_post])
+        chi2n = np.sum(samout_final.chi2_post) / Ndata
+        if chi2n > 1.0:
+            warnings.warn(f'Chi-squared is higher than expected for the initial fit: {chi2n:.3f}.')
+        if chi2n > 3.0:
+            raise RuntimeError(f'Chi-squared is way higher than expected: {chi2n:.3f}.\nFitting has failed.')
         
         return samout_final 
     

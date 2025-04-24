@@ -836,6 +836,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
     total_derivative_evaluations = 0
+    if sammyINPyw.LevMar:
+        assert sammyINPyw.LevMarV > 1.0
+        starting_off = True # this says that we are still calibrating the fudge parameter at the start.
     ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
@@ -852,16 +855,17 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
         ### after step 1, do convergence checking
-        if istep>=1:
+        if istep >= 1:
+            if (istep == 1) and sammyRTO.Print:
+                print('Calibrating initial step size...')
             # par_df_current = par_df_next
 
             ### Levenberg-Marquardt algorithm to update fudge for upcoming step based on chi2 of current parameters
             if sammyINPyw.LevMar:
-                assert(sammyINPyw.LevMarV>1)
 
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
                     fudge *= sammyINPyw.LevMarV
-                    fudge = min(fudge,sammyINPyw.maxF)
+                    fudge = min(fudge, sammyINPyw.maxF)
                     update_fudge_in_parfile(rundir, istep, fudge)
                 else:
                     if sammyRTO.Print:
@@ -869,8 +873,16 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
 
                     while True:  
-                        fudge /= sammyINPyw.LevMarVd
-                        fudge = max(fudge, sammyINPyw.minF)
+                        if starting_off: # still calibrating initial step size
+                            if fudge >= sammyINPyw.maxF:
+                                if sammyRTO.Print:
+                                    print('Fudge above maximum value. No step is large enough. Ending initial step calibration...')
+                                break
+                            fudge *= sammyINPyw.LevMarV
+                            fudge = min(fudge, sammyINPyw.maxF)
+                        else:
+                            fudge /= sammyINPyw.LevMarVd
+                            fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
                         converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
                         total_derivative_evaluations += iterations
@@ -881,15 +893,23 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
                         if sammyRTO.Print:
                             print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
+                        
+                        if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                            starting_off = False
+                            if sammyRTO.Print:
+                                print('Found significent change. No longer calibrating initial step size...')
 
-                        if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
+                        if (chi2_list[-1] < chi2_log[istep-1][-1]) or (fudge==sammyINPyw.minF):
                             break
-                        else:
-                            pass
+
+                if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                    starting_off = False
+                    if sammyRTO.Print:
+                        print('Found significent change. No longer calibrating initial step size...')
             
             ### convergence check
             Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
-            if Dchi2 < sammyINPyw.step_threshold:
+            if (not starting_off) and (Dchi2 < sammyINPyw.step_threshold):
 
                 no_improvement_tracker += 1
                 if no_improvement_tracker >= sammyINPyw.step_threshold_lag:

@@ -5,7 +5,7 @@ from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
 from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
-from ATARI.theory.scattering_params import gstat, k_wavenumber
+from ATARI.theory.scattering_params import gstat
 
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
@@ -58,30 +58,69 @@ def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool
     Eb = (energy_bounds[0] + energy_bounds[1])/2
     I  = energy_bounds[1] - energy_bounds[0]
 
-    spingroups = particle_pair.spin_groups
-    Ls    = [spingroup['Ls']    for spingroup in spingroups.values()]
-    Jpis  = [spingroup['Jpi']    for spingroup in spingroups.values()]
-    gn2ms = [spingroup['<gn2>'] for spingroup in spingroups.values()]
-    Dms   = [spingroup['<D>']   for spingroup in spingroups.values()]
-    
-    gg2m = max([spingroup['<gg2>'] for spingroup in spingroups.values()])
-
     E_low  = Eb - (np.sqrt(3)/2) * I
     E_high = Eb + (np.sqrt(3)/2) * I
 
-    s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
-    gn2 = 1e3 * (3/2) * I * s
+    res_ext = pd.DataFrame()
+    for spingroup in particle_pair.spin_groups.values():
+        Ls   = spingroup['Ls']
+        Jpi  = spingroup['Jpi']
+        J_ID = spingroup['J_ID']
+        gn2m = spingroup['<gn2>']
+        gg2m = spingroup['<gg2>']
+        Dm   = spingroup['<D>']
+        
+        s = 1e-3 * gn2m / Dm
+        gn2 = 1e3 * (3/2) * I * s
 
-    Ggm = particle_pair.gg2_to_Gg(gg2m)
-    # Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
-    Gn_low  = particle_pair.gn2_to_Gn(gn2, np.array([E_low ]), 0)[0]
-    Gn_high = particle_pair.gn2_to_Gn(gn2, np.array([E_high]), 0)[0]
-    res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'J_ID':[1,1]})
-    if return_reduced:
-        res_ext['gg2'] = gg2m
-        res_ext['gn2'] = gn2
-        res_ext['Jpi'] = Jpis[0]
-        res_ext['L']   = 0
+        Ggm = particle_pair.gg2_to_Gg(gg2m)
+        Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
+        res_ext_sg = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gns[0],Gns[1]], 'J_ID':[J_ID,J_ID]})
+        if return_reduced:
+            res_ext_sg['gg2'] = gg2m
+            res_ext_sg['gn2'] = gn2
+            res_ext_sg['Jpi'] = Jpi
+            res_ext_sg['L']   = Ls[0] # we only support the first L...
+        res_ext = pd.concat((res_ext, res_ext_sg))
+        res_ext.reset_index()
+    return res_ext
+
+# def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool=True):
+#     """
+#     From F. Frohner and Olivier Bouland, "Treatment of External Levels in Neutron Resonance
+#     Fitting: Applications to the Nonfissile Nuclide Cr-52".
+#     URL: https://doi.org/10.13182/NSE01-A2176
+#     """
+#     energy_bounds = (min(energy_bounds), max(energy_bounds))
+#     Eb = (energy_bounds[0] + energy_bounds[1])/2
+#     I  = energy_bounds[1] - energy_bounds[0]
+
+#     spingroups = particle_pair.spin_groups
+#     Ls    = [spingroup['Ls']    for spingroup in spingroups.values()]
+#     Jpis  = [spingroup['Jpi']    for spingroup in spingroups.values()]
+#     gn2ms = [spingroup['<gn2>'] for spingroup in spingroups.values()]
+#     Dms   = [spingroup['<D>']   for spingroup in spingroups.values()]
+    
+#     gg2m = max([spingroup['<gg2>'] for spingroup in spingroups.values()])
+
+#     E_low  = Eb - (np.sqrt(3)/2) * I
+#     E_high = Eb + (np.sqrt(3)/2) * I
+
+#     s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
+#     gn2 = 1e3 * (3/2) * I * s
+
+#     Ggm = particle_pair.gg2_to_Gg(gg2m)
+#     # Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
+#     Gn_low  = particle_pair.gn2_to_Gn(gn2, np.array([E_low ]), 0)[0]
+#     Gn_high = particle_pair.gn2_to_Gn(gn2, np.array([E_high]), 0)[0]
+#     res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'J_ID':[1,1]})
+#     if return_reduced:
+#         res_ext['gg2'] = gg2m
+#         res_ext['gn2'] = gn2
+#         res_ext['Jpi'] = Jpis[0]
+#         res_ext['L']   = 0
+#     return res_ext
+
     # Gnms_low = [particle_pair.gn2_to_Gn(gn2m, np.array([E_low]), l[0]) for gn2m, l in zip(gn2ms, Ls)]
     # str_low = np.sum(Gnms_low)*1e-3 * np.sum(1/np.array(Dms))
     # Gn_low  = 1e3 * (3/2) * I * str_low
@@ -94,7 +133,7 @@ def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool
     # Gn_low  = 1e3 * (3/2) * I * (2*s*k_low*a)
     # k_high = k_wavenumber(E_high, particle_pair.M, particle_pair.m)
     # Gn_high = 1e3 * (3/2) * I * (2*s*k_high*a)
-    return res_ext
+    # return res_ext
 
 # =====================================================================
 # Resonance level sampling
@@ -426,7 +465,7 @@ def sample_RRR_widths(N_levels,
         reduced_widths_square = np.repeat(avg_reduced_width_square, N_levels)
     else:
         reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
-    sign = 2*rng.randint(0, 2, size=N_levels)-1
+    sign = 2*rng.integers(0, 2, size=N_levels)-1
     return np.array(reduced_widths_square * sign, dtype=float)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):

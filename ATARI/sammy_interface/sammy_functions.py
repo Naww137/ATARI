@@ -828,7 +828,6 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     ### some convenient definitions
-    istep = 0
     no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
@@ -843,7 +842,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
-    while istep<sammyINPyw.max_steps:
+    for istep in range(sammyINPyw.max_steps):
         
         ### options to batch parameters being fit
         if sammyINPyw.batch_fitpar:
@@ -863,22 +862,29 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
             ### Levenberg-Marquardt algorithm to update fudge for upcoming step based on chi2 of current parameters
             if sammyINPyw.LevMar:
 
-                # Searching for significant change to end calibration phase:
-                if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
-                    starting_off = False
-                    if sammyRTO.Print:
-                        print('Found significent change. No longer calibrating initial step size...')
-
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
+                    # Searching for significant change to end calibration phase:
+                    if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                        starting_off = False
+                        if sammyRTO.Print:
+                            print('Found significent change. No longer calibrating initial step size...')
+
                     fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge, sammyINPyw.maxF)
                     update_fudge_in_parfile(rundir, istep, fudge)
+                    
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
                         print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
 
                     while True:  
+                        # Searching for significant change to end calibration phase:
+                        if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                            starting_off = False
+                            if sammyRTO.Print:
+                                print('Found significent change. No longer calibrating initial step size...')
+
                         if starting_off: # still calibrating initial step size
                             if fudge >= sammyINPyw.maxF:
                                 raise RuntimeError('Fudge above maximum value. No step is large enough. Please increase maximum fudge.')
@@ -967,9 +973,6 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
         #     fudge /= sammyINPyw.LevMarVd
         #     fudge = max(fudge, sammyINPyw.minF)
-
-        ### update step
-        istep += 1
 
     if sammyRTO.Print:
         print("Maximum steps reached")

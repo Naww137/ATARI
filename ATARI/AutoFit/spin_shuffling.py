@@ -157,7 +157,6 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             respar_mask_in_window = (shuffled_respar['E'] > window_E_bounds[0]) & (shuffled_respar['E'] < window_E_bounds[1])
             shuffled_respar_in_window = shuffled_respar.loc[respar_mask_in_window]
             num_res = len(shuffled_respar_in_window)
-            print(num_res, target_Nres)
             if (target_Nres is not None) and (num_res != target_Nres):
                 continue # if shuffle does not have target number of resonances, don't add to list
             add_shuffle_to_list = True
@@ -201,11 +200,13 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             # Else, optimize and add to the list:
             shuffled_respars_already_listed.append(shuffled_respar)
             sammy_out = solver.fit(shuffled_respar, external_resonance_indices=fixed_resonance_indices)
-            if len(shuffled_respar) == len(fixed_resonance_indices): # FIXME: DOES THIS WORK?
+            if len(shuffled_respar) == len(fixed_resonance_indices):
                 chi2 = np.sum(sammy_out.chi2)
+                respar = sammy_out.par
             else:
                 chi2 = np.sum(sammy_out.chi2_post)
-            obj_value = objective_func(chi2=chi2, res_ladder=sammy_out.par_post, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
+                respar = sammy_out.par_post
+            obj_value = objective_func(chi2=chi2, res_ladder=respar, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
                                     Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
             
             spin_shuffle_case = {'sammy_out': sammy_out,

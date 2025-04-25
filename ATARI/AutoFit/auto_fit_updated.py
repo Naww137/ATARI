@@ -196,6 +196,7 @@ class AutoFit:
                 print(f"=============\nFitting to {Nres_target} Resonances With Spin Shuffling\n=============")
             fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
             fit_eliminate_options_with_shuffle.spin_shuffle = True
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
             fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
             internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(elimination_history[Nres_max_num_res]['selected_ladder_chars'].par_post, fixed_resonance_indices)
             elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
@@ -206,6 +207,7 @@ class AutoFit:
                 print(f"=============\nFitting to {Nres_target} Resonances With Spin Shuffling\n=============")
             fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
             fit_eliminate_options_with_shuffle.spin_shuffle = True
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
             fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
             initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
             fixed_resonance_indices = fe.output.external_resonance_indices
@@ -380,6 +382,7 @@ class AutoFit:
             # Optimization of the resonance ladder after spin-shuffling:
             fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
             fit_eliminate_options_with_shuffle.spin_shuffle = True
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
             fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
             internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(elimination_history_pre_shuffle[Nres_max_num_res]['selected_ladder_chars'].par_post, fixed_resonance_indices)
             elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=0, fixed_resonance_ladder=fixed_resonances)
@@ -389,6 +392,7 @@ class AutoFit:
             # Optimization with spin-shuffling only:
             fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
             fit_eliminate_options_with_shuffle.spin_shuffle = True
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
             fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
             initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
             fixed_resonance_indices = fe.output.external_resonance_indices

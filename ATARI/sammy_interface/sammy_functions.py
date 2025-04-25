@@ -839,6 +839,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     if sammyINPyw.LevMar:
         assert sammyINPyw.LevMarV > 1.0
         starting_off = True # this says that we are still calibrating the fudge parameter at the start.
+        stop_stepping = False
     ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
@@ -858,10 +859,15 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         if istep >= 1:
             if (istep == 1) and sammyRTO.Print:
                 print('Calibrating initial step size...')
-            # par_df_current = par_df_next
 
             ### Levenberg-Marquardt algorithm to update fudge for upcoming step based on chi2 of current parameters
             if sammyINPyw.LevMar:
+
+                # Searching for significant change to end calibration phase:
+                if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                    starting_off = False
+                    if sammyRTO.Print:
+                        print('Found significent change. No longer calibrating initial step size...')
 
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
                     fudge *= sammyINPyw.LevMarV
@@ -887,57 +893,71 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
                         #     fudge /= sammyINPyw.LevMarVd
                         #     fudge = max(fudge, sammyINPyw.minF)
+
+                        chi2_prev = chi2_list[-1]
                         i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
-                        
-                        if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
-                            starting_off = False
-                            if sammyRTO.Print:
-                                print('Found significent change. No longer calibrating initial step size...')
+                            print(f"\t\t{fudge:<5.3f}: {np.round(chi2_list,4)}")
 
-                        if (chi2_list[-1] < chi2_log[istep-1][-1]) or (fudge == sammyINPyw.minF):
+                        if chi2_list[-1] < chi2_log[istep-1][-1]: # found a better solution!
                             break
 
-                if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
-                    starting_off = False
-                    if sammyRTO.Print:
-                        print('Found significent change. No longer calibrating initial step size...')
-            
-            ### convergence check
-            Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
-            if (not starting_off) and (Dchi2 < sammyINPyw.step_threshold):
-
-                no_improvement_tracker += 1
-                if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
-                    
-                    if Dchi2 < 0:
-                        criteria = f"Chi2 increased, taking solution {istep-1}"
-                        if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                        elif fudge <= sammyINPyw.minF:
                             criteria = f"Fudge below minimum value, taking solution {istep-1}"
-                        if sammyRTO.Print:
-                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
-                            print(criteria)
-                        return max(istep-1, 0), total_derivative_evaluations
-                    else:
-                        criteria = "Chi2 improvement below threshold"
-                    if sammyRTO.Print:
-                        print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
-                        print(criteria)
-                    return istep, total_derivative_evaluations
-                
-                else:
-                    pass
+                            stop_stepping = True
+                            last_step = max(istep-1, 0)
+                            break
 
-            else:   
-                no_improvement_tracker = 0
+                        elif (not starting_off) and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) < sammyINPyw.step_threshold) \
+                             and (abs(chi2_list[-1] - chi2_prev) < sammyINPyw.step_threshold):
+                            criteria = "No significant change in chi2 has been made. Assuming convergence."
+                            stop_stepping = True
+                            last_step = max(istep-1, 0)
+                            break
+            
+                ### convergence check
+                Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+                if not starting_off:
+                    if stop_stepping:
+                        if sammyRTO.Print:
+                            print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                            print(criteria)
+                        return last_step, total_derivative_evaluations
+                    elif Dchi2 < sammyINPyw.step_threshold:
+                        no_improvement_tracker += 1
+                        if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print("Chi2 improvement below threshold")
+                            return istep, total_derivative_evaluations
+                    else:   
+                        no_improvement_tracker = 0
+
+            else: # not using LevMar
+                Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+                ### convergence check
+                if Dchi2 < sammyINPyw.step_threshold:
+                    no_improvement_tracker += 1
+                    if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                        if Dchi2 < 0:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print(f"Chi2 increased, taking solution {istep-1}")
+                            return max(istep-1, 0), total_derivative_evaluations
+                        else:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print("Chi2 improvement below threshold")
+                            return istep, total_derivative_evaluations
+                else:   
+                    no_improvement_tracker = 0
             
 
         ### Log chi2
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
-            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
+            print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
         
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
@@ -951,8 +971,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         ### update step
         istep += 1
 
-    if sammyRTO.Print: print("Maximum steps reached")
-    return max(istep, 0), total_derivative_evaluations
+    if sammyRTO.Print:
+        print("Maximum steps reached")
+    return istep, total_derivative_evaluations
 
 
 # from ATARI.utils.datacontainers import Evaluation_Data

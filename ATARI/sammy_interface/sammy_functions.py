@@ -875,9 +875,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     while True:  
                         if starting_off: # still calibrating initial step size
                             if fudge >= sammyINPyw.maxF:
-                                if sammyRTO.Print:
-                                    print('Fudge above maximum value. No step is large enough. Ending initial step calibration...')
-                                break
+                                raise RuntimeError('Fudge above maximum value. No step is large enough. Please increase maximum fudge.')
                             fudge *= sammyINPyw.LevMarV
                             fudge = min(fudge, sammyINPyw.maxF)
                         else:
@@ -899,7 +897,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                             if sammyRTO.Print:
                                 print('Found significent change. No longer calibrating initial step size...')
 
-                        if (chi2_list[-1] < chi2_log[istep-1][-1]) or (fudge==sammyINPyw.minF):
+                        if (chi2_list[-1] < chi2_log[istep-1][-1]) or (fudge == sammyINPyw.minF):
                             break
 
                 if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):

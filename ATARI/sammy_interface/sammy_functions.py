@@ -872,7 +872,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge, sammyINPyw.maxF)
                     update_fudge_in_parfile(rundir, istep, fudge)
-                    
+
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
@@ -887,7 +887,11 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
                         if starting_off: # still calibrating initial step size
                             if fudge >= sammyINPyw.maxF:
-                                raise RuntimeError('Fudge above maximum value. No step is large enough. Please increase maximum fudge.')
+                                if sammyRTO.Print:
+                                    criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
+                                stop_stepping = True
+                                last_step = max(istep-1, 0)
+                                break
                             fudge *= sammyINPyw.LevMarV
                             fudge = min(fudge, sammyINPyw.maxF)
                         else:

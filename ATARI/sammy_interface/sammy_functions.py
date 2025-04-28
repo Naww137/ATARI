@@ -912,6 +912,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                             if fudge >= sammyINPyw.maxF:
                                 criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
                                 stop_stepping = True
+                                starting_off = False
                                 last_step = max(istep-1, 0)
                                 break
                             fudge *= sammyINPyw.LevMarVc

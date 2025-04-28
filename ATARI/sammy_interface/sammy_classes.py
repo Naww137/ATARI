@@ -206,6 +206,8 @@ class SammyInputDataYW:
     LevMarVd: float = 5.0
     minF:   float = 1e-5
     maxF:   float = 10
+    LevMarVc        : float = 5.0
+    calibrate_fudge : float = True
     
     initial_parameter_uncertainty: float = 1.0
 
@@ -234,6 +236,9 @@ class SolverOPTs_YW(SolverOPTs):
     iterations                      : int       = 2
     step_threshold_lag              : int       = 1
     autoelim_threshold              : Optional[float] = None
+
+    LevMarVc                        : float     = 5.0
+    calibrate_fudge                 : float     = True
 
     LS                              : bool      = False
     batch_fitpar                    : bool      = False

@@ -837,7 +837,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     total_derivative_evaluations = 0
     if sammyINPyw.LevMar:
         assert sammyINPyw.LevMarV > 1.0
-        starting_off = True # this says that we are still calibrating the fudge parameter at the start.
+        starting_off = sammyINPyw.calibrate_fudge # this says that we are still calibrating the fudge parameter at the start.
+        if starting_off:    assert sammyINPyw.LevMarVc > 1.0
         stop_stepping = False
     ### start loop
     if sammyRTO.Print:
@@ -875,7 +876,10 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                             starting_off = False
                             last_step = istep
 
-                    fudge *= sammyINPyw.LevMarV
+                    if starting_off:
+                        fudge *= sammyINPyw.LevMarVc
+                    else:
+                        fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge, sammyINPyw.maxF)
                     update_fudge_in_parfile(rundir, istep, fudge)
 
@@ -897,7 +901,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                                 stop_stepping = True
                                 last_step = max(istep-1, 0)
                                 break
-                            fudge *= sammyINPyw.LevMarV
+                            fudge *= sammyINPyw.LevMarVc
                             fudge = min(fudge, sammyINPyw.maxF)
                         else:
                             fudge /= sammyINPyw.LevMarVd

@@ -864,10 +864,16 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
                     # Searching for significant change to end calibration phase:
-                    if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
-                        starting_off = False
-                        if sammyRTO.Print:
-                            print('Found significent change. No longer calibrating initial step size...')
+                    if starting_off:
+                        if abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold:
+                            starting_off = False
+                            if sammyRTO.Print:
+                                print('Found significent change. No longer calibrating initial step size...')
+                        elif fudge >= sammyINPyw.maxF:
+                            criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
+                            stop_stepping = True
+                            starting_off = False
+                            last_step = istep
 
                     fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge, sammyINPyw.maxF)
@@ -887,8 +893,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
                         if starting_off: # still calibrating initial step size
                             if fudge >= sammyINPyw.maxF:
-                                if sammyRTO.Print:
-                                    criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
+                                criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
                                 stop_stepping = True
                                 last_step = max(istep-1, 0)
                                 break

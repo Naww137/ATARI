@@ -362,7 +362,7 @@ def plot_reduced_data_TY(datasets   :  list,
 
         if (show_spingroups):
             # add txt with
-            sp_gr_txt = np.round(int(res.J_ID),0)
+            sp_gr_txt = int(res.J_ID)
             
             y_text_position = ymax  # Position the text at the top of the original y-axis limit
             x_text_position = res_E + x_offset
@@ -386,7 +386,7 @@ def plot_reduced_data_TY(datasets   :  list,
 
         if (show_spingroups):
             # add txt with
-            sp_gr_txt = np.round(true_res.J_ID,0)
+            sp_gr_txt = int(true_res.J_ID)
             y_text_position = ymax  # Position the text at the top of the original y-axis limit
             x_text_position = true_res_energy
             
@@ -527,7 +527,7 @@ def plot_datafits(datasets, experiments,
 
         if (show_spingroups):
             # add txt with
-            sp_gr_txt = np.round(int(res.J_ID),0)
+            sp_gr_txt = int(res.J_ID)
             
             y_text_position = ymax  # Position the text at the top of the original y-axis limit
             x_text_position = res_E + x_offset
@@ -551,7 +551,7 @@ def plot_datafits(datasets, experiments,
 
         if (show_spingroups):
             # add txt with
-            sp_gr_txt = np.round(true_res.J_ID,0)
+            sp_gr_txt = int(true_res.J_ID)
             y_text_position = ymax  # Position the text at the top of the original y-axis limit
             x_text_position = true_res_energy
             

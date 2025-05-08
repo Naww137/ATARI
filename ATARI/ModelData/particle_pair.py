@@ -526,10 +526,11 @@ class Particle_Pair:
             gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)
 
             # convert to partial widths with checks for multiple channels not-implemented error
-            if len(Jinfo["Ls"]) > 1:
-                raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
-            else:
-                L = Jinfo["Ls"][0]
+            # if len(Jinfo["Ls"]) > 1:
+            #     raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
+            # else:
+            #     L = Jinfo["Ls"][0]
+            L = min(Jinfo["Ls"])
             Gg_samples = self.gg2_to_Gg(gg2_samples)
             Gn1_samples = self.gn2_to_Gn(gn2_samples, levels, L)
             zeros = np.zeros(len(levels)) #"varyE", "varyGg", "varyGn1", #zeros, zeros, zeros,

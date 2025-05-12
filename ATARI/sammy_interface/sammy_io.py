@@ -105,13 +105,13 @@ def readpar(filepath):
                             else:
                                 value = float(joiner.join(splitvals))
                         except ValueError:
-                            value = np.nan
+                            value = None
 
                 row.append(value)
                 start += width
             data.append(row)
     df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
-    return df.dropna(axis=1)
+    return df.dropna(axis=1, how='all')
 
 
 def read_ECSCM(file_path):

@@ -735,10 +735,14 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
     if sammyINP.idc_at_theory:
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
+        print('\nWith NA:')
+        print(resonance_ladder)
         if resonance_ladder.isnull().values.any():
             if sammyRTO.Print:
                 print('Encountered invalid value when reading SAMMY.par. Taking value from previous iteration.')
             resonance_ladder = resonance_ladder.combine_first(sammyINP.resonance_ladder)
+            print('\nWithout NA:')
+            print(resonance_ladder)
         sammyINP.resonance_ladder = resonance_ladder
         _ = update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
     

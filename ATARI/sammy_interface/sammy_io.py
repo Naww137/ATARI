@@ -83,27 +83,29 @@ def readpar(filepath):
                     try:
                         value = float(value)
                     except:
-                        sign='+'
-                        splitvals = value.split('-')
-                        if splitvals[0] == '':
-                            splitvals = splitvals[1::]
-                            sign = '-'
-
-                        if len(splitvals) == 1:
-                            splitvals = splitvals[0].split('+')
+                        try:
+                            sign='+'
+                            splitvals = value.split('-')
                             if splitvals[0] == '':
                                 splitvals = splitvals[1::]
-                                sign = '+'
-                            joiner = 'e+'
+                                sign = '-'
 
-                        else:
-                            joiner = 'e-'
+                            if len(splitvals) == 1:
+                                splitvals = splitvals[0].split('+')
+                                if splitvals[0] == '':
+                                    splitvals = splitvals[1::]
+                                    sign = '+'
+                                joiner = 'e+'
 
-                        if sign == '-':
-                            value = -float(joiner.join(splitvals))
-                        else:
-                            value = float(joiner.join(splitvals))
-                            
+                            else:
+                                joiner = 'e-'
+
+                            if sign == '-':
+                                value = -float(joiner.join(splitvals))
+                            else:
+                                value = float(joiner.join(splitvals))
+                        except ValueError:
+                            value = np.nan
 
                 row.append(value)
                 start += width

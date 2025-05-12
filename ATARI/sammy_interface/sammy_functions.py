@@ -142,6 +142,9 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
                 if inres:
                     f.write(line)
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"))
+    if resonance_ladder.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
+    
     
     # could also read endf spin groups here! 
 
@@ -213,6 +216,8 @@ def execute_sammy(sammy_RTO:SammyRunTimeOptions):
     chi2, chi2n = runsammy_shellpipe(sammy_RTO)
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
     par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
+    if par_df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     return lst_df, par_df, chi2, chi2n
 
 
@@ -730,6 +735,11 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
     if sammyINP.idc_at_theory:
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
+        if resonance_ladder.isnull().values.any():
+            if sammyRTO.Print:
+                print('Encountered invalid value when reading SAMMY.par. Taking value from previous iteration.')
+            resonance_ladder = resonance_ladder.combine_first(sammyINP.resonance_ladder)
+        sammyINP.resonance_ladder = resonance_ladder
         _ = update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
     
     runsammy_ywy0 = subprocess.run(
@@ -764,6 +774,8 @@ def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
     # if True:# sammyINPyw.batch_reduce_width:
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
     df = readpar(parfile)
+    if df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     proportion = 0.
     factor = np.random.rand(len(df))
     factor[factor <= proportion] = 0.75
@@ -805,6 +817,8 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
     df = readpar(parfile)
+    if df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     df_internal, df_external = separate_external_resonance_ladder(df, sammyINPyw.external_resonance_indices)
     varyE = np.any(df_internal['varyE']==1)
     varyGg = np.any(df_internal['varyGg']==1)
@@ -831,7 +845,6 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
     no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
-    par_df_current = sammyINPyw.resonance_ladder
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
     total_derivative_evaluations = 0
@@ -1105,6 +1118,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
+    if par.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
 
     if sammyINP.idc_at_theory:
         covariance_data_at_theory = update_idc_to_theory(sammyINP, sammyRTO, par)
@@ -1272,6 +1287,8 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
         # def Lasso_from_previous_step(rundir, istep, sammyINPyw, fudge):
             parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
             par_df_next = readpar(parfile_next)
+            if par_df_next.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
             df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
             df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
             fit_mask = df_internal_current.varyGn1 == 1

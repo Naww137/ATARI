@@ -1289,7 +1289,7 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
             parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
             par_df_next = readpar(parfile_next)
             if par_df_next.isnull().values.any():
-        raise ValueError('The sammy.par file contains unreadable text.')
+                raise ValueError('The sammy.par file contains unreadable text.')
             df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
             df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
             fit_mask = df_internal_current.varyGn1 == 1

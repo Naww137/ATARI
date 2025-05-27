@@ -95,7 +95,7 @@ class RunMaster:
         self.level_spacing_dists = np.array(level_spacing_dists)
         self.lvl_dens = np.array([lvl_spacing_dist.lvl_dens for lvl_spacing_dist in level_spacing_dists] + [false_dens])
 
-        self._ladder_checks(E, energy_range, level_spacing_dists)
+        self._ladder_checks(self.E, energy_range, level_spacing_dists)
 
         self.L = len(self.E) # Number of resonances
         self.G = len(self.lvl_dens) - 1 # number of spingroups (not including false group)
@@ -140,7 +140,7 @@ Maximum energy = {max(E)}
         
         # Check if there is an unreasonably large gap in the resonance data:
         for level_spacing_dist in level_spacing_dists:
-            if level_spacing_dist.sf(dE_max) > 1e-6: # one in a million chance of occuring
+            if level_spacing_dist.sf(np.array([dE_max])) > 1e-6: # one in a million chance of occuring
                 break
         else:
             raise ValueError('There is a large gap in the provided resonances that is improbable under resonance statistics.')

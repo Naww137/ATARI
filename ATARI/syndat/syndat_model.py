@@ -321,6 +321,29 @@ class Syndat_Model:
             pw_true["tof"] = e_to_t(pw_true.E.values, generative_experimental_model.FP[0], True)*1e9+generative_experimental_model.t0[0]
         
         return pw_true
+
+    def check_sample(self,
+                     pw_true: pd.DataFrame,
+                     particle_pair:Optional[Particle_Pair]=None,
+                     sammyRTO = None):
+        
+        # Black resonance check:
+        NUM_POINTS_IN_CHECK = 25
+        TRANSMISSION_THRESHOLD = 0.35
+        pw_true['true'] = 0.0
+        raw_data, true_model_parameters = self.generate_raw_observables(pw_true, true_model_parameters={})
+        reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
+        exp_data = reduced_data['exp'].to_numpy()
+        transmission_means = []
+        i = 0
+        while NUM_POINTS_IN_CHECK*(i+1) < len(exp_data):
+            transmission_mean = np.mean(exp_data[NUM_POINTS_IN_CHECK*i:NUM_POINTS_IN_CHECK*(i+1)])
+            transmission_means.append(transmission_mean)
+        for transmission_mean in transmission_means:
+            if transmission_mean > TRANSMISSION_THRESHOLD:
+                return False, 'transmission is above threshold with black resonances'
+            
+        return True, ''
         
     # @staticmethod
     # def generate_true_experimental_objects(particle_pair: Optional[Particle_Pair],

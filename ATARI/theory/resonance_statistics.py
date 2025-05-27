@@ -82,7 +82,7 @@ def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool
             res_ext_sg['Jpi'] = Jpi
             res_ext_sg['L']   = Ls[0] # we only support the first L...
         res_ext = pd.concat((res_ext, res_ext_sg))
-        res_ext.reset_index()
+        res_ext.reset_index(drop=True, inplace=True)
     return res_ext
 
 # def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool=True):

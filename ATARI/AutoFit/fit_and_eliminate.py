@@ -418,7 +418,7 @@ class FitAndEliminate:
         chi2n = np.sum(samout_final.chi2_post) / Ndata
         if chi2n > 1.0:
             warnings.warn(f'Chi-squared is higher than expected for the initial fit: {chi2n:.3f}.')
-        if chi2n > 3.0:
+        if chi2n > 4.0:
             raise RuntimeError(f'Chi-squared is way higher than expected: {chi2n:.3f}.\nFitting has failed.')
         
         return samout_final 

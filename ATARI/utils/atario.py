@@ -131,13 +131,19 @@ def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
 def add_Gw_from_gw(resonance_ladder, particle_pair):
     ladder = copy(resonance_ladder)
     Ls_present = np.unique(ladder.L)
-    if len(Ls_present) == 1 and Ls_present[0] == 0:
-        pass
-    else:
-        raise NotImplementedError("Need to update Gw_from_gw function for multiple L-waves")
-    _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
+    # if len(Ls_present) == 1 and Ls_present[0] == 0:
+    #     pass
+    # else:
+    #     raise NotImplementedError("Need to update Gw_from_gw function for multiple L-waves")
+    # _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
+    # ladder['Gg'] = g2_to_G(ladder.gg2.values, 1.0) # capture widths have a penetrability of 1.0
+    # ladder['Gn1'] = g2_to_G(ladder.gn2.values, P_array[0])
+    # ladder = ladder[["E", "Gg", "Gn1"] + [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
+    # return ladder
     ladder['Gg'] = g2_to_G(ladder.gg2.values, 1.0) # capture widths have a penetrability of 1.0
-    ladder['Gn1'] = g2_to_G(ladder.gn2.values, P_array[0])
+    for l in Ls_present:
+        _, P_array, _, _ = FofE_recursive(ladder.loc[ladder.L==l,'E'].values, particle_pair.ac, particle_pair.M, particle_pair.m, l)
+        ladder.loc[ladder.L==l,'Gn1'] = g2_to_G(ladder.loc[ladder.L==l,'gn2'].values, P_array[0])
     ladder = ladder[["E", "Gg", "Gn1"] + [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
     return ladder
 

@@ -48,7 +48,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     sammy_io.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
     # making sammy input file:
     sammy_io.write_saminp(
-                        filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                        filepath    =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
                         bayes       =   False,
                         iterations  =   sammyRTO.iterations,
                         formalism   =   sammyINP.particle_pair.formalism,
@@ -62,7 +62,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
                         n           =   sammyINP.experiment.n,
                         use_IDC     = False,
                         derivatives = True,
-                        plt_fit     = True)
+                        plot_fit    = True)
     # creating shell script:
     sammy_functions.write_shell_script(sammyINP, 
                                        sammyRTO, 

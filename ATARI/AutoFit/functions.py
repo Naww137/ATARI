@@ -47,9 +47,9 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starti
 def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_multiplier, starting_Gn1_multiplier):
     
     spin_groups = particle_pair.spin_groups
-    for Jpi, spin_group in spin_groups.items():
-        if len(spin_group["Ls"]) > 1:
-            raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+    # for Jpi, spin_group in spin_groups.items():
+    #     if len(spin_group["Ls"]) > 1:
+    #         raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
         
     Gt99_min_max_all = np.array([0.0, 0.0])
     gn01_min = np.inf
@@ -308,11 +308,14 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
             Gn_int = partial_ladder_internal['Gn1'].to_numpy(dtype=float) # Porter-Thomas distribution should only be used on the internal resonances
 
             if Wigner_informed:
-                mean_level_spacing = spingroup['<D>']
-                log_likelihood += wigner_LL(E, mean_level_spacing)
-                # wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances (old and incorrect implementation)
-                wigner_correction_factor = (len(E) - 1) * np.log(np.sqrt(np.pi/(2*np.e)) / mean_level_spacing) # to account for virtual resonances (new implementation at mode of Wigner distribution)
-                log_likelihood -= wigner_correction_factor
+                if len(E) == 0:
+                    log_likelihood = -np.inf
+                else:
+                    mean_level_spacing = spingroup['<D>']
+                    log_likelihood += wigner_LL(E, mean_level_spacing)
+                    # wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances (old and incorrect implementation)
+                    wigner_correction_factor = (len(E) - 1) * np.log(np.sqrt(np.pi/(2*np.e)) / mean_level_spacing) # to account for virtual resonances (new implementation at mode of Wigner distribution)
+                    log_likelihood -= wigner_correction_factor
 
             if PorterThomas_informed:
                 mean_neutron_width = spingroup['<gn2>']

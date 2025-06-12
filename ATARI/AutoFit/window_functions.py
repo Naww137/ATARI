@@ -6,6 +6,10 @@ import time
 from copy import copy
 
 from ATARI.theory.resonance_statistics import find_external_levels
+from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
+from ATARI.sammy_interface.sammy_classes import SolverOPTs, SammyRunTimeOptions
+from ATARI.utils.datacontainers import Evaluation_Data
+from ATARI.AutoFit.spin_shuffling import minimize_spingroup_shuffling
 
 def get_windows(resonance_energies_start, resonances_per_window, data_overlap, external_resonance_buffer, total_data_range, data_overlap_fraction = None, minimum_step=5):
 
@@ -326,13 +330,14 @@ def get_windows_stage_1(energy_range_total,
     d = data_overlap_size
 
     assert b+ 2*c < a-b-2*c
-    assert d > b+ 2*c # makes sure the stage 2 range encompasses the stage 1 overlap
-    assert d < a-b-2*c # makes sure that the stage 2 regions do not overlap
+    assert d > b + 2*c # makes sure the stage 2 range encompasses the stage 1 overlap
+    assert d < a - b # makes sure that the stage 2 regions do not overlap
 
     Estart = float(min(energy_range_total))
     c_array = np.array([-c, c])
 
     data_ranges = []
+    param_ranges = []
     resonance_dataframes = []
     fixed_indices = []
     maxres_bool = []
@@ -366,6 +371,7 @@ def get_windows_stage_1(energy_range_total,
         maxres_bool.append(len(res_ladder_internal)>maxres_per_window)
         resonance_dataframes.append(res_ladder_full)
         data_ranges.append(data_range)
+        param_ranges.append(data_range_extended)
         if Eend >= max(energy_range_total):
             break
         
@@ -374,7 +380,7 @@ def get_windows_stage_1(energy_range_total,
     if np.any(maxres_bool):
         print(f"Efficiency Warning: {maxres_bool} windows have more than {maxres_per_window}, consider reducing window size parameters.")
 
-    return data_ranges, resonance_dataframes, fixed_indices
+    return data_ranges, param_ranges, resonance_dataframes, fixed_indices
 
 def get_windows_stage_2(resonance_ladders_internal:list, 
                         data_ranges:list,
@@ -382,27 +388,30 @@ def get_windows_stage_2(resonance_ladders_internal:list,
                         window_size:float = 10.0,
                         data_overlap_size:float = 12.5,
                         data_overlap_fraction:float = 0.25,
-                        external_resonance_buffer:float = 2.0,
+                        external_overlap_resonance_buffer:float = 0.0,
                         maxres_per_window:int = 50
                         ):
 
-    a = float(window_size)
+    # a = float(window_size)
     b = float(window_size*data_overlap_fraction)
-    c = float(external_resonance_buffer)
+    # c = float(external_resonance_buffer)
     d = data_overlap_size
 
-    assert b+ 2*c < a-b-2*c
-    assert d > b+ 2*c
-    assert d < a-b-2*c
+    # assert b+ 2*c < a-b-2*c
+    # assert d > b+ 2*c
+    # assert d < a-b-2*c
 
     data_ranges_overlap = []
+    param_ranges_overlap = []
     resonance_dataframes_overlap = []
     overlap_fixed_indices = []
     for i in range(len(resonance_ladders_internal)-1):
         Eend = data_ranges[i][1]
         Estarto = Eend-(d+b)/2
-        data_range_overlap = np.array([Estarto, Estarto+d]) # range for stage 2 (overlap)
-        data_range_overlap_extended = np.array([data_ranges[i][0], data_ranges[i+1][-1]])
+        Eendo = Estarto+d
+        data_range_overlap = np.array([Estarto, Eendo]) # range for stage 2 (overlap)
+        data_range_overlap_extended_res = np.array([data_ranges[i][0], data_ranges[i+1][-1]])
+        data_range_overlap_extended_data = np.array([Estarto-external_overlap_resonance_buffer,Eend+external_overlap_resonance_buffer])
 
         # Getting combined dataframe:
         resonance_ladder_low  = resonance_ladders_internal[i]
@@ -417,12 +426,11 @@ def get_windows_stage_2(resonance_ladders_internal:list,
         res_ladder_fixed = res_ladder_comb.loc[~mask_can_vary].copy()
         res_ladder_fixed.sort_values(by='E', inplace=True)
         res_ladder_fixed.reset_index(drop=True, inplace=True)
-        res_ladder_fixed['varyE'  ] = 0
-        res_ladder_fixed['varyGn1'] = 0
-        res_ladder_fixed['varyGg' ] = 0
+        vary_cols = [col for col in res_ladder_fixed.columns if col.startswith("vary")]
+        res_ladder_fixed[vary_cols] = 0
 
         # Add external levels:
-        ext_res = find_external_levels(particle_pair, data_range_overlap_extended, return_reduced=False)
+        ext_res = find_external_levels(particle_pair, data_range_overlap_extended_res, return_reduced=False)
         ext_res['varyE']   = 0
         ext_res['varyGg']  = 0
         ext_res['varyGn1'] = 1
@@ -437,7 +445,8 @@ def get_windows_stage_2(resonance_ladders_internal:list,
         resonance_dataframe_overlap['varyGn2'] = 0.0
         resonance_dataframe_overlap['varyGn3'] = 0.0
         resonance_dataframes_overlap.append(resonance_dataframe_overlap)
-        data_ranges_overlap.append(data_range_overlap)
+        data_ranges_overlap.append(data_range_overlap_extended_data)
+        param_ranges_overlap.append(data_range_overlap_extended_res)
 
     # Finding and stitching all resonances without overlap:
     all_resonances_wo_overlap = pd.concat(resonance_ladders_internal, join='inner', ignore_index=True)
@@ -453,18 +462,170 @@ def get_windows_stage_2(resonance_ladders_internal:list,
     all_resonances_wo_overlap['varyGn2'] = 0.0
     all_resonances_wo_overlap['varyGn3'] = 0.0
 
-    return data_ranges_overlap, resonance_dataframes_overlap, overlap_fixed_indices, all_resonances_wo_overlap
+    return data_ranges_overlap, param_ranges_overlap, resonance_dataframes_overlap, overlap_fixed_indices, all_resonances_wo_overlap
 
+# def get_windows_stage_3(energy_range_total:tuple, 
+#                         resonance_ladder:pd.DataFrame,
+#                         particle_pair,
+#                         window_size:float = 10.0, # eV
+#                         data_overlap_fraction:float = 0.25,
+#                         parameter_buffer:float = 5.0, # eV
+#                         data_buffer:float = 2.0, # eV
+#                         ):
+    
+#     assert 0.0 < data_overlap_fraction < 1.0, 'Overlap fraction must be a number between 0 and 1.'
+    
+#     Estart = energy_range_total[0]
+#     data_ranges = []
+#     data_ranges_data_buffer = []
+#     resonance_dataframes = []
+#     fixed_indices = []
+#     while True:
+#         Eend = Estart + window_size
+#         data_range = np.array([Estart, Eend])
+#         if Estart == energy_range_total[0]:
+#             data_range_param = np.array([Estart, Eend+parameter_buffer])
+#             data_range_data_buffer = np.array([Estart, Eend+data_buffer])
+#         else:
+#             data_range_param = np.array([Estart-parameter_buffer, Eend+parameter_buffer])
+#             data_range_data_buffer = np.array([Estart-data_buffer, Eend+data_buffer])
+#         data_ranges.append(data_range)
+#         data_ranges_data_buffer.append(data_range_data_buffer)
 
-def cut_resonances_outside_window(ladder:pd.DataFrame, energy_range:tuple, resolution_broadening, threshold_factor:float=2.0):
-    ladder_cut = copy(ladder)
-    for idx in ladder_cut.index:
-        tot_width = 1e-3 * (2*ladder_cut.loc[idx,'Gn1'] + ladder_cut.loc[idx,'Gg']) # meV -> eV
-        tot_broad_low  = tot_width + resolution_broadening(energy_range[0])
-        tot_broad_high = tot_width + resolution_broadening(energy_range[1])
-        if   ladder_cut.loc[idx,'E'] - threshold_factor * tot_broad_high > energy_range[1]:
-            ladder_cut.drop(index=idx, inplace=True)
-        elif ladder_cut.loc[idx,'E'] + threshold_factor * tot_broad_low  < energy_range[0]:
-            ladder_cut.drop(index=idx, inplace=True)
-    ladder_cut.reset_index()
-    return ladder_cut
+#         mask_param = (resonance_ladder.E>data_range_param[0]) & (resonance_ladder.E<data_range_param[1])
+#         res_ladder_internal = resonance_ladder.loc[mask_param].copy()
+#         mask_can_vary = (res_ladder_internal.E < data_range[1]) & (res_ladder_internal.E > data_range[0])
+#         res_ladder_fixed = res_ladder_internal.loc[~mask_can_vary].copy()
+#         res_ladder_fixed.sort_values(by='E', inplace=True)
+#         res_ladder_fixed.reset_index(drop=True, inplace=True)
+#         vary_cols = [col for col in res_ladder_fixed.columns if col.startswith("vary")]
+#         res_ladder_fixed[vary_cols] = 0
+#         ext_res = find_external_levels(particle_pair, data_range_param, return_reduced=False)
+#         ext_res['varyE']   = 0
+#         ext_res['varyGg']  = 0
+#         ext_res['varyGn1'] = 1
+#         res_ladder_fixed = pd.concat((ext_res, res_ladder_fixed), join='outer', ignore_index=True)
+#         res_ladder_full = pd.concat((res_ladder_fixed, res_ladder_internal))
+#         res_ladder_full.reset_index(drop=True, inplace=True)
+#         # FIXME: THIS IS A PATCHFIX FOR AN UNDERLYING PROBLEM OF UNKNOWN SOURCE:
+#         res_ladder_full['Gn2'] = 0.0
+#         res_ladder_full['Gn3'] = 0.0
+#         res_ladder_full['varyGn2'] = 0.0
+#         res_ladder_full['varyGn3'] = 0.0
+#         resonance_dataframes.append(res_ladder_full)
+
+#         fixed_indices_window = [i for i in range(len(res_ladder_fixed))]
+#         fixed_indices.append(fixed_indices_window)
+
+#         if Eend >= max(energy_range_total):
+#             break
+
+#         Estart += window_size * (1.0 - data_overlap_fraction)
+
+#     return data_ranges, data_ranges_data_buffer, resonance_dataframes, fixed_indices
+
+def execute_stage_3(energy_range_total:tuple, 
+                    resonance_ladder:pd.DataFrame,
+                    sammy_rto:SammyRunTimeOptions,
+                    solver_opts:SolverOPTs,
+                    particle_pair,
+                    eval_data:Evaluation_Data,
+
+                    num_shuffles:int=10,
+                    model_selection:str='chi2',
+
+                    window_size:float = 20.0, # eV
+                    data_overlap_fraction:float = 0.25,
+                    parameter_buffer:float = 5.0, # eV
+                    data_buffer:float = 2.0, # eV
+                    ):
+    
+    assert 0.0 < data_overlap_fraction < 1.0, 'Overlap fraction must be a number between 0 and 1.'
+    
+    Estart = energy_range_total[0]
+    full_ladder = copy(resonance_ladder)
+    while True:
+        Eend = Estart + window_size
+        data_range = np.array([Estart, Eend])
+        data_range_param = np.array([max(Estart-parameter_buffer,energy_range_total[0]), min(Eend+parameter_buffer,energy_range_total[1])])
+        data_range_data_buffer = np.array([max(Estart-data_buffer,energy_range_total[0]), min(Eend+data_buffer,energy_range_total[1])])
+
+        eval_data_trunc = eval_data.truncate(data_range_data_buffer)
+        solver = Solver_factory(sammy_rto, solver_opts._solver, solver_opts, particle_pair, eval_data_trunc)
+        # solver_no_bayes = copy(solver)
+        # solver_no_bayes.set_bayes(False)
+
+        mask_param = (full_ladder.E>data_range_param[0]) & (full_ladder.E<data_range_param[1])
+        res_ladder_internal = full_ladder.loc[mask_param].copy()
+        mask_can_vary = (res_ladder_internal.E > data_range[0]) & (res_ladder_internal.E < data_range[1])
+        res_ladder_can_vary = res_ladder_internal.loc[mask_can_vary].copy()#.reset_index(drop=True)
+        res_ladder_fixed = res_ladder_internal.loc[~mask_can_vary].copy()
+        # res_ladder_fixed.sort_values(by='E', inplace=True)
+        # res_ladder_fixed.reset_index(drop=True, inplace=True)
+        vary_cols = [col for col in res_ladder_fixed.columns if col.startswith("vary")]
+        res_ladder_fixed[vary_cols] = 0
+        # ext_res = find_external_levels(particle_pair, data_range_param, return_reduced=False)
+        # ext_res['varyE']   = 0
+        # ext_res['varyGg']  = 0
+        # ext_res['varyGn1'] = 1
+        # res_ladder_fixed = pd.concat((ext_res, res_ladder_fixed), join='outer', ignore_index=True)
+        res_ladder_comb = pd.concat((res_ladder_fixed, res_ladder_can_vary))
+        # res_ladder_comb.reset_index(drop=True, inplace=True)
+        # FIXME: THIS IS A PATCHFIX FOR AN UNDERLYING PROBLEM OF UNKNOWN SOURCE:
+        # res_ladder_comb.drop(columns=[] inplace=True)
+        res_ladder_comb['Gn2'] = 0.0
+        res_ladder_comb['Gn3'] = 0.0
+        res_ladder_comb['varyGn2'] = 0.0
+        res_ladder_comb['varyGn3'] = 0.0
+
+        # fixed_indices_window = [i for i in range(len(res_ladder_fixed))]
+        # varied_indices_window = [i for i in range(len(res_ladder_fixed), len(res_ladder_comb))]
+        fixed_spingroup_indices = res_ladder_comb.index[res_ladder_comb.E < data_range[0]]
+        
+        # samout = solver_no_bayes.fit(res_ladder_comb, fixed_indices_window)
+        # print('chi2:', np.sum(samout.chi2)/eval_data_trunc.N)
+        # print('N:', eval_data_trunc.N)
+        # print('Data Range:', min(data_range_data_buffer), max(data_range_data_buffer), 'eV')
+        particle_pair.resonance_ladder = res_ladder_comb
+        particle_pair.energy_range = data_range_param
+        spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=model_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
+        samout_best = None
+        obj_best    = np.inf
+        for spin_shuffle_case in spin_shuffle_cases:
+            if spin_shuffle_case['obj_value'] < obj_best:
+                obj_best = spin_shuffle_case['obj_value']
+                samout_best = spin_shuffle_case['sammy_out']
+        respar_window = samout_best.par_post
+        # mask_full = (full_ladder.E>data_range[0]) & (full_ladder.E<data_range[1])
+        # non_vary_cols = [col for col in res_ladder_fixed.columns if not col.startswith("vary")]
+        print(res_ladder_comb)
+        print(respar_window)
+        assert len(respar_window) == len(res_ladder_comb)
+        full_ladder.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']] = respar_window.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']]
+        assert len(full_ladder) == len(resonance_ladder)
+
+        # print(full_ladder)
+
+        # Break condition:
+        if Eend >= max(energy_range_total):
+            break
+
+        Estart += window_size * (1.0 - data_overlap_fraction)
+
+        full_ladder = full_ladder.loc[:,['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']]
+    return full_ladder
+
+    # return data_ranges, data_ranges_data_buffer, resonance_dataframes, fixed_indices
+
+# def cut_resonances_outside_window(ladder:pd.DataFrame, energy_range:tuple, resolution_broadening, threshold_factor:float=2.0):
+#     ladder_cut = copy(ladder)
+#     for idx in ladder_cut.index:
+#         tot_width = 1e-3 * (2*ladder_cut.loc[idx,'Gn1'] + ladder_cut.loc[idx,'Gg']) # meV -> eV
+#         tot_broad_low  = tot_width + resolution_broadening(energy_range[0])
+#         tot_broad_high = tot_width + resolution_broadening(energy_range[1])
+#         if   ladder_cut.loc[idx,'E'] - threshold_factor * tot_broad_high > energy_range[1]:
+#             ladder_cut.drop(index=idx, inplace=True)
+#         elif ladder_cut.loc[idx,'E'] + threshold_factor * tot_broad_low  < energy_range[0]:
+#             ladder_cut.drop(index=idx, inplace=True)
+#     ladder_cut.reset_index()
+#     return ladder_cut

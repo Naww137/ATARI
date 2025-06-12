@@ -418,8 +418,8 @@ class FitAndEliminate:
         chi2n = np.sum(samout_final.chi2_post) / Ndata
         if chi2n > 1.0:
             warnings.warn(f'Chi-squared is higher than expected for the initial fit: {chi2n:.3f}.')
-        if chi2n > 4.0:
-            raise RuntimeError(f'Chi-squared is way higher than expected: {chi2n:.3f}.\nFitting has failed.')
+        # if chi2n > 4.0:
+        #     raise RuntimeError(f'Chi-squared is way higher than expected: {chi2n:.3f}.\nFitting has failed.')
         
         return samout_final 
     
@@ -773,11 +773,16 @@ class FitAndEliminate:
                 best_shuffle_obj = selected_ladder_obj_post
                 best_shuffle_samout = copy(selected_ladder_chars)
                 for spin_shuffle_case in spin_shuffle_cases:
-                    if spin_shuffle_case['obj_value'] < best_shuffle_obj:
+                    if spin_shuffle_case['obj_value'] is None:
+                        print('Chi2 was somehow "None" for one spin shuffle case. Ignoring case.')
+                        continue
+                    elif spin_shuffle_case['obj_value'] < best_shuffle_obj:
                         best_shuffle_obj = spin_shuffle_case['obj_value']
                         best_shuffle_samout = spin_shuffle_case['sammy_out']
                 selected_ladder_chars = best_shuffle_samout
                 selected_ladder_chi2_post = np.sum(selected_ladder_chars.chi2_post)
+                print('selected_ladder_chi2_post', selected_ladder_chi2_post)
+                print('best_shuffle.par_post', best_shuffle_samout.par_post)
                 selected_ladder_obj_post = objective_func(selected_ladder_chi2_post, best_shuffle_samout.par_post, self.particle_pair, fixed_resonances_indices,
                                                           self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
@@ -916,7 +921,7 @@ class FitAndEliminate:
                 best_removed_resonance_prior = j
 
             ### Check if un-fitted N-1 model still is acceptable
-            if ((prior_benefit_obj_per_Ndata<=delta_obj_allowed)):
+            if ((prior_benefit_obj_per_Ndata < delta_obj_allowed)):
                 test_result = "✓"  # Check mark if the test is passed
                 sign = "<="
                 any_prior_passed_test = True

@@ -12,7 +12,7 @@ from ATARI.AutoFit.sammy_interface_bindings import Solver
 # from ATARI.AutoFit.functions import separate_external_resonance_ladder
 
 from ATARI.TAZ.RunMaster import RunMaster
-from ATARI.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.PTBayes import PTBayes, prior_fix_spingroups
 from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
 
 def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_signs:np.ndarray, capture_width_signs:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
@@ -45,6 +45,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
                        num_shuffles:float,
                        window_E_bounds:Tuple[float,float],
                        false_dens:float=0.0, false_width_dist:Union[rv_continuous,None]=None,
+                       no_shuffle_indices:list=[],
                        rng:np.random.Generator=None, seed:int=None):
     """
     ...
@@ -53,9 +54,12 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     if rng is None:
         rng = np.random.default_rng(seed)
 
+    original_indices = respar.index
     sort_indices = respar['E'].argsort()
     unsort_indices = np.argsort(sort_indices.values)
     respar_sorted = respar.iloc[sort_indices].reset_index(drop=True)
+    no_shuffle_indices_sorted = respar.iloc[sort_indices].loc[no_shuffle_indices].reset_index(drop=True).index
+    # no_shuffle_indices_sorted = np.array(no_shuffle_indices)[sort_indices]
     # Neglecting external resonances:
     respar_mask_in_window = (respar_sorted['E'] > window_E_bounds[0]) & (respar_sorted['E'] < window_E_bounds[1])
     respar_window = respar_sorted.loc[respar_mask_in_window]
@@ -66,7 +70,8 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     # J_IDs = [spingroup['J_ID'] for spingroup in particle_pair.spin_groups.values()]
     # respar, _ = ATARI_to_TAZ_resonances(respar, J_IDs)
     reaction_TAZ.false_dens = false_dens
-    prior, log_likelihood_prior = PTBayes(respar_window, reaction_TAZ, false_width_dist=false_width_dist)
+    prior = prior_fix_spingroups(respar_window, reaction_TAZ, no_shuffle_indices_sorted)
+    prior, log_likelihood_prior = PTBayes(respar_window, reaction_TAZ, false_width_dist=false_width_dist, prior=prior)
     print('Porter-Thomas Prior:')
     print(prior)
     print()
@@ -75,9 +80,14 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     print()
     print('Resonance Parameters:')
     print(respar_sorted)
+    print()
 
     run_master = RunMaster(E=respar_window['E'], energy_range=window_E_bounds, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
     spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)
+    posterior = run_master.WigBayes()
+    print('Wigner Posterior:')
+    print(posterior)
+    print()
     neutron_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling neutron width sign
     capture_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling capture width sign
     
@@ -89,6 +99,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
         print(f'{shuffle_id}: {spin_shuffle.tolist()} | {neutron_width_signs[:,shuffle_id].tolist()} | {capture_width_signs[:,shuffle_id].tolist()}')
         shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, neutron_width_signs=neutron_width_signs[:,shuffle_id], capture_width_signs=capture_width_signs[:,shuffle_id], particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
         shuffled_respar = shuffled_respar.iloc[unsort_indices].reset_index(drop=True) # unsorting resonance parameters (so that fixed resonance indices are consistent)
+        shuffled_respar.index = original_indices
         shuffled_respars.append(shuffled_respar)
     return shuffled_respars
 
@@ -100,7 +111,8 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                  fixed_resonance_indices = [],
                                  target_Nres:int=None, unique_cases_only:bool=False,
                                  rng:np.random.Generator=None, seed:int=None,
-                                 verbose:bool=False):
+                                 verbose:bool=False,
+                                 no_shuffle_indices = []):
     """
     ...
     """
@@ -114,7 +126,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
     elif model_selection == 'chi2+Wig':
         Wig_informed = True
         PT_informed  = False
-    elif model_selection == 'chi2+Wig+PT':
+    elif model_selection in ('chi2+Wig+PT','chi2+PT+Wig'):
         Wig_informed = True
         PT_informed  = True
     else:
@@ -148,6 +160,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                             num_shuffles=num_shuffles_per_attempt,
                                             window_E_bounds=window_E_bounds,
                                             false_dens=false_dens, false_width_dist=false_width_dist,
+                                            no_shuffle_indices=no_shuffle_indices,
                                             rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
         
         # Only accept shuffles that have the desired size:
@@ -201,11 +214,14 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             shuffled_respars_already_listed.append(shuffled_respar)
             sammy_out = solver.fit(shuffled_respar, external_resonance_indices=fixed_resonance_indices)
             if len(shuffled_respar) == len(fixed_resonance_indices):
-                chi2 = np.sum(sammy_out.chi2)
-                respar = sammy_out.par
-            else:
-                chi2 = np.sum(sammy_out.chi2_post)
-                respar = sammy_out.par_post
+                sammy_out.par_post   = sammy_out.par
+                sammy_out.pw_post    = sammy_out.pw
+                sammy_out.chi2_post  = sammy_out.chi2
+                sammy_out.chi2n_post = sammy_out.chi2n
+            sammy_out.par.index      = shuffled_respar.index
+            sammy_out.par_post.index = shuffled_respar.index
+            chi2 = np.sum(sammy_out.chi2_post)
+            respar = sammy_out.par_post
             obj_value = objective_func(chi2=chi2, res_ladder=respar, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
                                     Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
             

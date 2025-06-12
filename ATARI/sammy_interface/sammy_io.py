@@ -682,7 +682,8 @@ def make_runDIR(sammy_runDIR):
     if os.path.isdir(sammy_runDIR):
         pass
     else:
-        os.mkdir(sammy_runDIR)
+        # os.mkdir(sammy_runDIR)
+        os.makedirs(sammy_runDIR)
 
 def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 

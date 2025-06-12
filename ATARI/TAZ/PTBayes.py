@@ -56,8 +56,8 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
     Gn = resonances['Gn1'].to_numpy()
     
     # Setting prior:
-    if prior == None:
-        prob = reaction.lvl_dens_all / np.sum(reaction.lvl_dens_all)
+    prob = reaction.lvl_dens_all / np.sum(reaction.lvl_dens_all)
+    if prior is None:
         prior = np.tile(prob, (E.size,1))
     posterior = prior
 
@@ -139,3 +139,33 @@ def PTMaxLogLikelihoods(probs, num_best:int):
     best_spingroup_ladders = best_spingroup_ladders[::-1]
     best_log_likelihoods   = best_log_likelihoods  [::-1]
     return best_spingroup_ladders, best_log_likelihoods
+
+def prior_fix_spingroups(resonances:DataFrame, reaction:Reaction, fixed_res_indices:list):
+    """
+    Produces a prior that is ordinarily uninformed, except for specified resonances where the
+    spingroups are fixed.
+
+    Parameters
+    ----------
+    resonances        : DataFrame
+        The resonance ladder.
+    reaction          : Reaction
+        The TAZ Reaction object.
+    fixed_res_indices : List[int]
+        List of fixed resonance indices.
+
+    Returns
+    -------
+    prior : float [L,G+1]
+        The prior probabilities for the prior spingroup.
+    """
+
+    E  = resonances['E'].to_numpy()
+    prob = reaction.lvl_dens_all / np.sum(reaction.lvl_dens_all)
+    prior = np.tile(prob, (E.size,1))
+    for g, jid in enumerate(reaction.J_ID):
+        indices = resonances.index[resonances.J_ID == jid]
+        fixed_indices = list(set(indices) & set(fixed_res_indices))
+        prior[fixed_indices,:] = 0.0
+        prior[fixed_indices,g] = 1.0
+    return prior

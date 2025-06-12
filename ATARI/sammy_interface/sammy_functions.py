@@ -1120,7 +1120,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
     if par.isnull().values.any():
-        raise ValueError('The sammy.par file contains unreadable text.')
+        raise ValueError(f'The sammy.par file contains unreadable text:\n{par}')
 
     if sammyINP.idc_at_theory:
         covariance_data_at_theory = update_idc_to_theory(sammyINP, sammyRTO, par)

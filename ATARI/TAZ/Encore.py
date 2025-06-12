@@ -369,38 +369,86 @@ numerical instability.
         L = s.L;    G = s.G
         sampled_groups = G * np.ones((L,num_trials), dtype='u1') # the sampled spingroups (default as false)
 
+        # for tr in range(num_trials):
+        #     last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
+        #     last_seen_all = 0
+        #     while True: # iterate procedure until the resonance ladder is filled
+        #         iMax = [s.iMax[last_seen[g],0,g] for g in range(G)]
+        #         iMaxmin = np.min(iMax)
+        #         likelihoods = np.zeros((iMaxmin-last_seen_all,G), dtype='f8')
+        #         mult_chain = 1.0
+        #         lls = np.arange(last_seen_all+1, iMaxmin+1, dtype='u4')
+        #         for lidx, ll in enumerate(lls): # last leader
+        #             mult_chain *= s.PW[ll]
+        #             if mult_chain == 0.0:   break   # potential computation time improvement
+        #             slices = [slice(ll+1, iMax[g]+1) for g in range(G)]
+        #             for gn in range(G): # next leader group
+        #                 slicesn = insert_slice(slices, ll, gn)
+        #                 lsps = 1.0
+        #                 for g in range(G):
+        #                     lsps = lsps * s.get_LSP(last_seen[g], slicesn[g], g)
+        #                 # likelihoods[lidx,gn] = s.LSP[last_seen[gn],ll,0] * s.Prior[ll,gn] * mult_chain \
+        #                 #                         * np.sum(lsps * s.CPR[*slicesn])
+        #                 likelihoods[lidx,gn] = s.Prior[ll,gn] * mult_chain \
+        #                                         * np.sum(lsps * s.CPR[*slicesn])
+        #             mult_chain *= s.Prior[ll,G]
+        #         prob_sgs = np.sum(likelihoods, axis=0) / np.sum(likelihoods)
+        #         g = rng.choice(G, p=prob_sgs)
+        #         sample_probs = likelihoods[:,g] / np.sum(likelihoods[:,g])
+        #         last_seen[g] = rng.choice(lls, p=sample_probs)
+        #         last_seen_all = last_seen[g]
+        #         if last_seen_all == L+1:
+        #             break # ladder complete
+        #         i_new = last_seen_all - 1
+        #         print(i_new, prob_sgs, g)
+        #         sampled_groups[i_new,tr] = g
+        #         if last_seen_all == L:
+        #             break # ladder complete
+
         for tr in range(num_trials):
             last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
-            last_seen_all = 0
-            while True: # iterate procedure until the resonance ladder is filled
+            for i in range(1,L+1):
+                likelihoods = np.zeros((G,), dtype='f8')
                 iMax = [s.iMax[last_seen[g],0,g] for g in range(G)]
-                iMaxmin = np.min(iMax)
-                likelihoods = np.zeros((iMaxmin-last_seen_all,G), dtype='f8')
-                mult_chain = 1.0
-                lls = np.arange(last_seen_all+1, iMaxmin+1, dtype='u4')
-                for lidx, ll in enumerate(lls): # last leader
-                    mult_chain *= s.PW[ll]
-                    if mult_chain == 0.0:   break   # potential computation time improvement
-                    slices = [slice(ll+1, iMax[g]+1) for g in range(G)]
-                    for gn in range(G): # next leader group
-                        slicesn = insert_slice(slices, ll, gn)
-                        lsps = 1.0
-                        for g in range(G):
-                            lsps = lsps * s.get_LSP(last_seen[g], slicesn[g], g)
-                        likelihoods[lidx,gn] = s.LSP[last_seen[gn],ll,0] * s.Prior[ll,gn] * mult_chain \
-                                                * np.sum(lsps * s.CPR[*slicesn])
-                    mult_chain *= s.Prior[ll,G]
-                prob_sgs = np.sum(likelihoods, axis=0) / np.sum(likelihoods)
+                slices = [slice(i+1, iMax[g]+1) for g in range(G)]
+                # print(last_seen)
+                # print(slices)
+                for gn in range(G): # next leader group
+                    slicesn = insert_slice(slices, i, gn)
+                    lsps = 1.0
+                    # print(s.get_LSP(last_seen[1-gn], slicesn[1-gn], 1-gn))
+                    for g in range(G):
+                        lsps = lsps * s.get_LSP(last_seen[g], slicesn[g], g)
+                        # print('\t', s.get_LSP(last_seen[g], i, g))
+                        # print('\t', np.sum(s.get_LSP(last_seen[g], slicesn[g], g)))
+                    likelihoods[gn] = s.Prior[i,gn] * np.sum(lsps * s.CPR[*slicesn])
+                    # print('\t\t', s.Prior[i,gn])
+                    
+                # print(likelihoods)
+
+
+                prob_sgs = likelihoods / np.sum(likelihoods)
                 g = rng.choice(G, p=prob_sgs)
-                sample_probs = likelihoods[:,g] / np.sum(likelihoods[:,g])
-                last_seen[g] = rng.choice(lls, p=sample_probs)
-                last_seen_all = last_seen[g]
-                if last_seen_all == L+1:
-                    break # ladder complete
-                i_new = last_seen_all - 1
-                sampled_groups[i_new,tr] = g
-                if last_seen_all == L:
-                    break # ladder complete
+                last_seen[g] = i
+                sampled_groups[i-1,tr] = g
+
+                print(i, prob_sgs, g)
+
+        # for tr in range(num_trials):
+        #     last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
+        #     last_seen_all = 0
+
+        #     for i in range(1,L+1):
+        #         slicesL = [slice(s.iMax[i,1,g], max(i,1)    ) for g in range(G)]
+        #         slicesR = [slice(s.iMax[i,0,g], min(i,L), -1) for g in range(G)]
+        #         for gt in range(G):
+        #             lsps = np.array(1.0, ndmin=2*G)
+        #             for g in range(G):
+        #                 if g == gt:     continue
+        #                 lsps = lsps * s.LSP[last_seen[g],slicesR[g],g]
+        #             slicesiL = insert_slice(slicesL, i, gt)
+        #             slicesiR = insert_slice(slicesR, i, gt)
+        #             sp[i-1,gt] = s.Prior[i,gt] * s.PW[i] * np.sum(lsps * s.CPR[*slicesiR])
 
         return sampled_groups
     

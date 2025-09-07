@@ -766,13 +766,20 @@ class FitAndEliminate:
                 print()
 
             if self.options.spin_shuffle:
+                shuffle_selection_criteria = 'chi2'
+                if self.options.Wigner_informed_variable_selection:
+                    shuffle_selection_criteria += '+Wig'
+                if self.options.PorterThomas_informed_variable_selection:
+                    shuffle_selection_criteria += '+PT'
                 spin_shuffle_cases = minimize_spingroup_shuffling(selected_ladder_chars.par_post, self.solver_eliminate, self.options.num_shuffles,
-                                                                  self.options.E_window_spin, model_selection=self.options.shuffle_selection_criteria,
+                                                                  self.options.E_window_spin, model_selection=shuffle_selection_criteria,
                                                                   fixed_resonance_indices=fixed_resonances_indices)
                 
                 best_shuffle_obj = selected_ladder_obj_post
                 best_shuffle_samout = copy(selected_ladder_chars)
-                for spin_shuffle_case in spin_shuffle_cases:
+                print(f'Prior Obj: {best_shuffle_obj:.5f}')
+                for j, spin_shuffle_case in enumerate(spin_shuffle_cases):
+                    print(f'Shuffle case #{j:>2} Obj: {spin_shuffle_case['obj_value']:.5f}')
                     if spin_shuffle_case['obj_value'] is None:
                         print('Chi2 was somehow "None" for one spin shuffle case. Ignoring case.')
                         continue
@@ -981,6 +988,7 @@ class FitAndEliminate:
         best_model_chars = None
         best_benefit_obj_per_ndata = np.inf
         level_derivative_evaluations = 0
+        best_model_obj = np.inf
 
         # selecting the most perspective model from the chi2 point of view with limited iterations allowed
         for j in range(current_level):  # For every resonance in the current ladder
@@ -997,7 +1005,8 @@ class FitAndEliminate:
             #     continue
 
             # No need to fit if we know it will be bad (from historical runs)
-            if (delta_objn_log[j] is not None) and (best_benefit_obj_per_ndata < delta_objn_log[j] * chi2_memory_factor):
+            print(delta_objn_log[j])
+            if (delta_objn_log[j] is not None) and (delta_objn_log[j] != np.inf)  and (best_benefit_obj_per_ndata < delta_objn_log[j] * chi2_memory_factor):
                 print(f'Skipping model #{j} because historical delta chi2 was too high relative to current best...')
                 continue
         
@@ -1024,7 +1033,9 @@ class FitAndEliminate:
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
             interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair, fixed_resonances_indices,
                                              self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-
+            print('interm_step_chi2', interm_step_chi2)
+            print('interm_step_obj', interm_step_obj)
+            print('base_obj', base_obj)
             benefit_obj = interm_step_obj - base_obj
             benefit_obj_per_ndata = benefit_obj / self.solver_eliminate.Ndata
             delta_objn_log[j] = benefit_obj_per_ndata
@@ -1047,7 +1058,7 @@ class FitAndEliminate:
                 sign = ">"
 
             # TODO: check - so we will use always
-            if (interm_step_obj < best_model_obj):
+            if (best_model_obj == np.inf) or (interm_step_obj <= best_model_obj):
                 
                 best_model_obj             = interm_step_obj
                 best_benefit_obj_per_ndata = benefit_obj_per_ndata

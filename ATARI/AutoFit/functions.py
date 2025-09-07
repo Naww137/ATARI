@@ -309,7 +309,7 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
 
             if Wigner_informed:
                 if len(E) == 0:
-                    log_likelihood = -np.inf
+                    log_likelihood += 0.0
                 else:
                     mean_level_spacing = spingroup['<D>']
                     log_likelihood += wigner_LL(E, mean_level_spacing)

@@ -80,6 +80,8 @@ def Solver_factory(rto,
                                     cap_norm_unc=cap_norm_unc, 
                                     measurement_models = evaluation_data.measurement_models,
                                     **filter_public_attributes(solver_options))
+        print('\n\nDataset Energies in Solver:')
+        print([dataset.E for dataset in sammyINP.datasets])
         fit_func = sammy_functions.run_sammy_YW
 
     elif solver == "EXT":

@@ -21,8 +21,10 @@ def get_Gs_Ts(resonance_ladder,
     Gs = []; Ts = []; pw_list = []
     for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
         sammyINP = sammy_classes.SammyInputData(particle_pair, resonance_ladder, experiment=exp, experimental_data = dat, experimental_covariance=exp_cov)
+        # print('Resonance Ladder In:', sammyINP.resonance_ladder)
         sammy_out = get_derivatives(sammyINP, rto, get_theo=True, u_or_p='u')
         Gs.append(sammy_out.derivatives)
+        # print('Resonance Ladder Out:', sammy_out.par)
         
         if exp.reaction == "transmission":
             key = "theo_trans"
@@ -138,11 +140,13 @@ def get_p_resonance_ladder_from_Pu_vector(Pu,
     par_post['varyGn1'] = initial_reslad['varyGn1']
     par_post['varyGg']  = initial_reslad['varyGg']
 
-    return par_post
+    original_order = par_post.reset_index().sort_values(by=['J_ID', 'E']).index
+
+    return par_post, original_order
 
 def get_derivatives_for_step(rto, D, V, 
                              datasets, covariance_data, ### dont need these two things if I update get_derivatives function Cole created
-                             res_lad, 
+                             res_lad,
                              particle_pair,
                              experiments, 
                              zero_derivs_at_no_vary = True,
@@ -189,7 +193,7 @@ def evaluate_chi2_location_and_gradient(rto, Pu, starting_ladder, particle_pair,
                                         datasets,covariance_data,experiments,
                                         inp_for_theory, V_is_inv=False, covs=None,
                                         Porter_Thomas_fitting:bool=False, Wigner_fitting:bool=False):
-    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder,particle_pair)
+    res_lad, original_order = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
 
     if inp_for_theory is not None:
         V = get_V_at_T(inp_for_theory, rto, res_lad)
@@ -360,6 +364,7 @@ def fit(rto,
     obj_log = []
 
     total_derivative_evaluations = 0
+    starting_ladder.sort_values(by=['J_ID', 'E'], inplace=True)
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
     print(f"Stepping until convergence\nstep\talpha\t:\tobj\tchi2\n")
@@ -446,6 +451,7 @@ def fit(rto,
         ### step coeficients
         Pu_next = take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode=mode)
 
+    print('Final Ladder:', res_lad)
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
 

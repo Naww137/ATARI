@@ -12,42 +12,56 @@ def Wigner_1sg(E, MLS:float):
     """
 
     Nres = len(E)
-    dens = 1.0 / MLS
-    E = np.array(E)
-    sort_indices = np.argsort(E)
-    E = E[sort_indices]
-    # u = p2u_E(E)
-    dE = np.diff(E)
-    LL = -(pi/4) * np.sum((dens*dE)**2) + np.sum(np.log((pi/2)*dens**2 * dE))
-    
-    dE_du = 1.0 / du_dp_E(E)
+    if   Nres <= 1:
+        LL   = 0.0
+        jac  = np.zeros((Nres,))
+        hess = np.zeros((Nres,Nres))
+    else:
+        dens = 1.0 / MLS
+        E = np.array(E)
+        sort_indices = np.argsort(E)
+        E = E[sort_indices]
+        # u = p2u_E(E)
+        dE = np.diff(E)
+        if   any(dE < 0):
+            print('\nError found. Energies as follows:')
+            print(E)
+            raise RuntimeError('Some dE are negative when calculating Wigner likelihoods.')
+        elif any(dE <= 0):
+            print('\nError found. Energies as follows:')
+            print(E)
+            raise RuntimeError('Some dE are zero when calculating Wigner likelihoods.')
+        dE_du = 1.0 / du_dp_E(E)
 
-    # Building Jacobian:
-    dLL_dE = np.zeros((Nres,))
-    dLL_dE[1:-1] =  (pi/2)*(dens**2) * (E[2:] - 2*E[1:-1] + E[:-2]) + (1/dE[:-1] - 1/dE[1:])
-    dLL_dE[0]    =  (pi/2)*(dens**2) * dE[0]  + 1/dE[0]
-    dLL_dE[-1]   = -(pi/2)*(dens**2) * dE[-1] - 1/dE[-1]
-    dLL_du = dLL_dE * dE_du
-    jac = dLL_du
+        LL = -(pi/4) * np.sum((dens*dE)**2) + np.sum(np.log((pi/2)*dens**2 * dE))
 
-    # This part is weird. There is no good way to convert from E to u.
-    d2LL_du2 = np.zeros((Nres,))
-    d2LL_du2[1:-1] = pi*(dens**2) * (E[2:] - 6*E[1:-1] + E[:-2]) - 2 * ((E[1:-1] + E[:-2])/dE[:-1]**2 + (E[2:] + E[1:-1])/dE[1:]**2)
-    d2LL_du2[0]    = pi*(dens**2) * (E[1]  - 3*E[0] ) - 2 * (E[1]  + E[0] )/dE[0]**2
-    d2LL_du2[-1]   = pi*(dens**2) * (E[-2] - 3*E[-1]) - 2 * (E[-1] + E[-2])/dE[-1]**2
+        # Building Jacobian:
+        dLL_dE = np.zeros((Nres,))
+        # dLL_dE[1:-1] =  (pi/2)*(dens**2) * (E[2:] - 2*E[1:-1] + E[:-2]) + (1/dE[:-1] - 1/dE[1:])
+        dLL_dE[1:-1] =  (pi/2)*(dens**2) * (dE[1:] - dE[:-1]) + (1/dE[:-1] - 1/dE[1:])
+        dLL_dE[0]    =  (pi/2)*(dens**2) * dE[0]  - 1/dE[0]
+        dLL_dE[-1]   = -(pi/2)*(dens**2) * dE[-1] + 1/dE[-1]
+        dLL_du = dLL_dE * dE_du
+        jac = dLL_du
 
-    d2LL_dEdF = (pi/2)*(dens**2) + 1/dE**2
-    d2LL_dudv = d2LL_dEdF * dE_du[:-1] * dE_du[1:]
+        # This part is weird. There is no good way to convert from E to u.
+        d2LL_du2 = np.zeros((Nres,))
+        d2LL_du2[1:-1] = pi*(dens**2) * (E[2:] - 6*E[1:-1] + E[:-2]) - 2 * ((E[1:-1] + E[:-2])/dE[:-1]**2 + (E[2:] + E[1:-1])/dE[1:]**2)
+        d2LL_du2[0]    = pi*(dens**2) * (E[1]  - 3*E[0] ) - 2 * (E[1]  + E[0] )/dE[0]**2
+        d2LL_du2[-1]   = pi*(dens**2) * (E[-2] - 3*E[-1]) - 2 * (E[-1] + E[-2])/dE[-1]**2
 
-    # Building the hessian from double derivatives:
-    hess = np.zeros((Nres,Nres))
-    hess += np.diag(d2LL_du2)
-    hess[1:,:-1] += np.diag(d2LL_dudv)
-    hess[:-1,1:] += np.diag(d2LL_dudv)
+        d2LL_dEdF = (pi/2)*(dens**2) + 1/dE**2
+        d2LL_dudv = d2LL_dEdF * dE_du[:-1] * dE_du[1:]
 
-    # Unsorting:
-    jac[sort_indices] = jac
-    hess[np.ix_(sort_indices,sort_indices)] = hess
+        # Building the hessian from double derivatives:
+        hess = np.zeros((Nres,Nres))
+        hess += np.diag(d2LL_du2)
+        hess[1:,:-1] += np.diag(d2LL_dudv)
+        hess[:-1,1:] += np.diag(d2LL_dudv)
+
+        # Unsorting:
+        jac[sort_indices] = jac
+        hess[np.ix_(sort_indices,sort_indices)] = hess
 
     return LL, jac, hess
 

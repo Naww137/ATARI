@@ -321,7 +321,8 @@ def get_windows_stage_1(energy_range_total,
                         data_overlap_size:float = 12.5,
                         data_overlap_fraction:float = 0.25,
                         external_resonance_buffer:float = 2.0,
-                        maxres_per_window:int = 50
+                        maxres_per_window:int = 50,
+                        add_external_resonances:bool=True
                        ):
 
     a = float(window_size)
@@ -352,10 +353,13 @@ def get_windows_stage_1(energy_range_total,
         res_ladder_internal = resonance_ladder.loc[mask].copy()
 
         # Add external levels:
-        ext_res = find_external_levels(particle_pair, data_range, return_reduced=False)
-        ext_res['varyE']   = 0
-        ext_res['varyGg']  = 0
-        ext_res['varyGn1'] = 1
+        if add_external_resonances:
+            ext_res = find_external_levels(particle_pair, data_range, return_reduced=False)
+            ext_res['varyE']   = 0
+            ext_res['varyGg']  = 0
+            ext_res['varyGn1'] = 1
+        else:
+            ext_res = pd.DataFrame({'E':[], 'Gg':[], 'Gn1':[], 'varyE':[], 'varyGg':[], 'varyGn1':[], 'J_ID':[]})
 
         # Combining external and internal levels:
         res_ladder_full = pd.concat((ext_res, res_ladder_internal))
@@ -389,7 +393,8 @@ def get_windows_stage_2(resonance_ladders_internal:list,
                         data_overlap_size:float = 12.5,
                         data_overlap_fraction:float = 0.25,
                         external_overlap_resonance_buffer:float = 0.0,
-                        maxres_per_window:int = 50
+                        maxres_per_window:int = 50,
+                        add_external_resonances:bool=True
                         ):
 
     # a = float(window_size)
@@ -430,10 +435,13 @@ def get_windows_stage_2(resonance_ladders_internal:list,
         res_ladder_fixed[vary_cols] = 0
 
         # Add external levels:
-        ext_res = find_external_levels(particle_pair, data_range_overlap_extended_res, return_reduced=False)
-        ext_res['varyE']   = 0
-        ext_res['varyGg']  = 0
-        ext_res['varyGn1'] = 1
+        if add_external_resonances:
+            ext_res = find_external_levels(particle_pair, data_range_overlap_extended_res, return_reduced=False)
+            ext_res['varyE']   = 0
+            ext_res['varyGg']  = 0
+            ext_res['varyGn1'] = 1
+        else:
+            ext_res = pd.DataFrame({'E':[], 'Gg':[], 'Gn1':[], 'varyE':[], 'varyGg':[], 'varyGn1':[], 'J_ID':[]})
         res_ladder_fixed = pd.concat((ext_res, res_ladder_fixed), join='outer', ignore_index=True)
 
         # Recombining:

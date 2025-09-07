@@ -34,6 +34,17 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
         The SAMMY output data object.
     """
 
+    # Sorting resonance ladder: (this is the order that PDS uses)
+    res_ladder = sammyINP.resonance_ladder
+    res_ladder_sorted = res_ladder.sort_values(by=['J_ID', 'E'])
+    sammyINP.resonance_ladder = res_ladder_sorted
+
+    # getting sorting indices:
+    sorting_indices = np.array(res_ladder.reset_index(drop=True).sort_values(by=['J_ID', 'E']).index)
+    ider = []
+    for i in sorting_indices:
+        ider.extend([3*i, 3*i+1, 3*i+2])
+
     sammy_io.make_runDIR(sammyRTO.sammy_runDIR)
     # Setting up sammy input file:
     if isinstance(sammyINP.experimental_data, pd.DataFrame):
@@ -48,21 +59,21 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     sammy_io.fill_runDIR_with_templates(sammyINP.experiment.template, "sammy.inp", sammyRTO.sammy_runDIR)
     # making sammy input file:
     sammy_io.write_saminp(
-                        filepath    =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
-                        bayes       =   False,
-                        iterations  =   sammyRTO.iterations,
-                        formalism   =   sammyINP.particle_pair.formalism,
-                        isotope     =   sammyINP.particle_pair.isotope,
-                        M           =   sammyINP.particle_pair.M,
-                        ac          =   sammyINP.particle_pair.ac*10,
-                        reaction    =   sammyINP.experiment.reaction,
-                        energy_range=   sammyINP.experiment.energy_range,
-                        temp        =   sammyINP.experiment.temp,
-                        FP          =   sammyINP.experiment.FP,
-                        n           =   sammyINP.experiment.n,
-                        use_IDC     = False,
-                        derivatives = True,
-                        plot_fit    = True)
+                        filepath     = os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                        bayes        = False,
+                        iterations   = sammyRTO.iterations,
+                        formalism    = sammyINP.particle_pair.formalism,
+                        isotope      = sammyINP.particle_pair.isotope,
+                        M            = sammyINP.particle_pair.M,
+                        ac           = sammyINP.particle_pair.ac*10,
+                        reaction     = sammyINP.experiment.reaction,
+                        energy_range = sammyINP.experiment.energy_range,
+                        temp         = sammyINP.experiment.temp,
+                        FP           = sammyINP.experiment.FP,
+                        n            = sammyINP.experiment.n,
+                        use_IDC      = False,
+                        derivatives  = True,
+                        plot_fit     = True)
     # creating shell script:
     sammy_functions.write_shell_script(sammyINP, 
                                        sammyRTO, 
@@ -73,20 +84,33 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     derivs_dict = sammy_functions.readpds(os.path.join(sammyRTO.sammy_runDIR, 'SAMMY.PDS'))
 
     ### sort derivatives based on resonance_ladder order
-    pu_reslad = get_Pu_vec_from_reslad(sammyINP.resonance_ladder,sammyINP.particle_pair)
-    pu_derivs = np.array(derivs_dict["U"]).reshape(-1,3)
-    ider = []
-    for row in pu_reslad.reshape(-1,3):
-        for i, drow in enumerate(pu_derivs):
-            if np.all(np.isclose(row,drow, atol=1e-3)):
-                ider.extend([i*3,i*3+1,i*3+2])
-                break                                           # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
-    assert(len(ider) == len(sammyINP.resonance_ladder)*3)
-    if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, atol=1e-3)):
-        maxdiff = np.max( abs(np.array(derivs_dict["U"])[ider] - pu_reslad))
-        print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {maxdiff}")
+    # pu_reslad = get_Pu_vec_from_reslad(par_df, sammyINP.particle_pair)
+    # new_indices = sammyINP.resonance_ladder.reset_index().sort_values(['J_ID', 'E']).index.argsort()
+    # ider = np.concatenate([[3*i, 3*i+1, 3*i+2] for i in new_indices])
+    # pu_derivs = np.array(derivs_dict["U"]).reshape(-1,3)
+    # ider = []
+    # excluded_rows = []
+    # for row in pu_reslad.reshape(-1,3):
+    #     for i, drow in enumerate(pu_derivs):
+    #         if i in excluded_rows:
+    #             continue
+    #         elif np.all(np.isclose(row,drow, atol=1e-2)):
+    #             ider.extend([i*3,i*3+1,i*3+2])
+    #             excluded_rows.append(i)
+    #             break                              # TODO: This is not the best way to do this, it assumes if parameters are the same within 1e-4 then derivative is the same
+    #     else:
+    #         raise RuntimeError(f'No matching derivative rows for ladder row, {row}!\n{pu_derivs}')
+    # print()
+    # print('\nLadder:')
+    # print(pu_reslad)
+    # assert(len(ider) == len(sammyINP.resonance_ladder)*3)
+    # if not np.all(np.isclose(np.array(derivs_dict["U"])[ider], pu_reslad, rtol=1e-2)):
+    #     maxdiff = np.max( abs(np.array(derivs_dict["U"])[ider] - pu_reslad))
+    #     print(f"WARNING: Pu in .IDF file does not agree with Pu in python API with max absolute difference: {maxdiff}")
     
-    derivs_dict["PARTIAL_DERIVATIVES"] = derivs_dict["PARTIAL_DERIVATIVES"][:, ider]
+    # Unsorting derivatives:
+    # derivs_dict["PARTIAL_DERIVATIVES"] = derivs_dict["PARTIAL_DERIVATIVES"][:, ider]
+    derivs_dict["PARTIAL_DERIVATIVES"][:, ider] = derivs_dict["PARTIAL_DERIVATIVES"]
 
     # convert to p if necessary
     if   u_or_p == 'p':

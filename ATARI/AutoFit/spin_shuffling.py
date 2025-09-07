@@ -88,8 +88,10 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     print('Wigner Posterior:')
     print(posterior)
     print()
-    neutron_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling neutron width sign
-    capture_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling capture width sign
+    # neutron_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling neutron width sign
+    # capture_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling capture width sign
+    neutron_width_signs = rng.choice([1], size=spin_shuffles.shape) # shuffling neutron width sign
+    capture_width_signs = rng.choice([1], size=spin_shuffles.shape) # shuffling capture width sign
     
     print('Spin Shuffles:')
 
@@ -132,6 +134,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
     else:
         raise ValueError(f'Unknown model selection criteria, "{model_selection}".')
     
+    solver.set_bayes(True)
     particle_pair = solver.sammyINP.particle_pair
 
     # Check if there is enough resonances to generate the desired number of shuffles:

@@ -405,52 +405,68 @@ numerical instability.
         #         if last_seen_all == L:
         #             break # ladder complete
 
-        for tr in range(num_trials):
-            last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
-            for i in range(1,L+1):
-                likelihoods = np.zeros((G,), dtype='f8')
-                iMax = [s.iMax[last_seen[g],0,g] for g in range(G)]
-                slices = [slice(i+1, iMax[g]+1) for g in range(G)]
-                # print(last_seen)
-                # print(slices)
-                for gn in range(G): # next leader group
-                    slicesn = insert_slice(slices, i, gn)
-                    lsps = 1.0
-                    # print(s.get_LSP(last_seen[1-gn], slicesn[1-gn], 1-gn))
-                    for g in range(G):
-                        lsps = lsps * s.get_LSP(last_seen[g], slicesn[g], g)
-                        # print('\t', s.get_LSP(last_seen[g], i, g))
-                        # print('\t', np.sum(s.get_LSP(last_seen[g], slicesn[g], g)))
-                    likelihoods[gn] = s.Prior[i,gn] * np.sum(lsps * s.CPR[*slicesn])
-                    # print('\t\t', s.Prior[i,gn])
-                    
-                # print(likelihoods)
-
-
-                prob_sgs = likelihoods / np.sum(likelihoods)
-                g = rng.choice(G, p=prob_sgs)
-                last_seen[g] = i
-                sampled_groups[i-1,tr] = g
-
-                print(i, prob_sgs, g)
-
         # for tr in range(num_trials):
         #     last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
-        #     last_seen_all = 0
-
         #     for i in range(1,L+1):
-        #         slicesL = [slice(s.iMax[i,1,g], max(i,1)    ) for g in range(G)]
-        #         slicesR = [slice(s.iMax[i,0,g], min(i,L), -1) for g in range(G)]
-        #         for gt in range(G):
-        #             lsps = np.array(1.0, ndmin=2*G)
+        #         likelihoods = np.zeros((G+1,), dtype='f8')
+        #         iMax = [s.iMax[last_seen[g],0,g] for g in range(G)]
+        #         slices = [slice(i+1, iMax[g]+1) for g in range(G)]
+        #         # print(last_seen)
+        #         # print(slices)
+        #         for gn in range(G): # next leader group
+        #             slicesn = insert_slice(slices, i, gn)
+        #             lsps = 1.0
+        #             # print(s.get_LSP(last_seen[1-gn], slicesn[1-gn], 1-gn))
         #             for g in range(G):
-        #                 if g == gt:     continue
-        #                 lsps = lsps * s.LSP[last_seen[g],slicesR[g],g]
-        #             slicesiL = insert_slice(slicesL, i, gt)
-        #             slicesiR = insert_slice(slicesR, i, gt)
-        #             sp[i-1,gt] = s.Prior[i,gt] * s.PW[i] * np.sum(lsps * s.CPR[*slicesiR])
+        #                 lsps = lsps * s.get_LSP(last_seen[g], slicesn[g], g)
+        #                 # print('\t', s.get_LSP(last_seen[g], i, g))
+        #                 # print('\t', np.sum(s.get_LSP(last_seen[g], slicesn[g], g)))
+        #             likelihoods[gn] = s.Prior[i,gn] * np.sum(lsps * s.CPR[*slicesn])
+        #             # print('\t\t', s.Prior[i,gn])
+                    
+        #         # print(likelihoods)
 
-        return sampled_groups
+
+        #         prob_sgs = likelihoods / np.sum(likelihoods)
+        #         g = rng.choice(G, p=prob_sgs)
+        #         last_seen[g] = i
+        #         sampled_groups[i-1,tr] = g
+
+        #         print(i, prob_sgs, g)
+
+        for tr in range(num_trials):
+            last_seen_of_group = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
+            last_seen_true = 0
+            while True:
+                iMax = [s.iMax[last_seen_of_group[g],0,g] for g in range(G)]
+                likelihoods = {(i,g): 0.0 for g in range(G) for i in range(last_seen_true+1,iMax[g]+1)}
+                for g in range(G): # group for next candidate
+                    mult_chain = 1.0
+                    for i in range(last_seen_true+1,iMax[g]): # index/position for next candidate
+                        mult_chain *= s.PW[i]
+                        if mult_chain == 0.0:   break   # potential computation time improvement
+                        slices = [slice(i+1, iMax[g]+1) for g in range(G)]
+                        slicesn = insert_slice(slices, i, g)
+                        lsps = 1.0
+                        for g_ in range(G):
+                            lsps = lsps * s.get_LSP(last_seen_of_group[g_], slicesn[g_], g_)
+                        likelihoods[(i,g)] = mult_chain * s.Prior[i,g] \
+                                            * np.sum(lsps * s.CPR[*slicesn])
+                        mult_chain *= s.Prior[i,G]
+                
+                # Calculating probabilities:
+                total_likelihood = sum(likelihoods.values())
+                probs = {tup: likelihood/total_likelihood for tup,likelihood in likelihoods.items()}
+                i,g = rng.choice(list(probs.keys()), p=list(probs.values()))
+                last_seen_true = i
+                last_seen_of_group[g] = i
+                if last_seen_true == L+1:
+                    break # ladder complete
+                print(last_seen_true, probs, g)
+                sampled_groups[last_seen_true,tr] = g
+                if last_seen_true == L:
+                    break # ladder complete
+
     
     # ==================================================================================
     # Sample Probability

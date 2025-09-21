@@ -353,8 +353,11 @@ def sample_RRR_widths(N_levels,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
-    sign = 2*rng.randint(0, 2, size=N_levels)-1
+    if DOF == np.inf:
+        reduced_widths_square = avg_reduced_width_square * np.ones((N_levels,))
+    else:
+        reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
+    sign = 2*rng.integers(0, 2, size=N_levels)-1
     return np.array(reduced_widths_square * sign)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):

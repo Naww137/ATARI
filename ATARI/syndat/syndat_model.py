@@ -157,7 +157,9 @@ class Syndat_Model:
                sammyRTO=None,
                num_samples=1,
                save_raw_data = False,
-               pw_true: Optional[pd.DataFrame] = None
+               pw_true: Optional[pd.DataFrame] = None,
+               rng:np.random.Generator = None,
+               seed:int = None
                ):
         """
         Method to sample from the Syndat Model.
@@ -189,6 +191,13 @@ class Syndat_Model:
             _description_
         """
 
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
+
         ### Generate pw true
         generate_pw_true_with_sammy = False
         par_true = None
@@ -211,13 +220,13 @@ class Syndat_Model:
             ### sample resonance ladder
             if self.options.sampleRES:
                 assert particle_pair is not None
-                particle_pair.sample_resonance_ladder()
+                particle_pair.sample_resonance_ladder(ensemble='GOE', rng=rng)
                 par_true = particle_pair.resonance_ladder 
            
             ### TODO: move this outside of for loop if sample res is false
             pw_true = self.generate_true_experimental_objects(particle_pair, sammyRTO, generate_pw_true_with_sammy, pw_true, self.generative_experimental_model)
 
-            raw_data, true_model_parameters = self.generate_raw_observables(pw_true, true_model_parameters={})
+            raw_data, true_model_parameters = self.generate_raw_observables(pw_true, true_model_parameters={}, rng=rng)
 
             reduced_data, covariance_data, raw_data = self.reduce_raw_observables(raw_data)
 
@@ -240,11 +249,18 @@ class Syndat_Model:
     #     h5io.write_pw_exp(filepath, isample, sample_dict[t].pw_reduced, title=t, CovT=None, CovXS=None)
         
 
-    def generate_raw_observables(self, pw_true, true_model_parameters: dict):
+    def generate_raw_observables(self, pw_true, true_model_parameters: dict, rng:np.random.Generator=None, seed:int=None):
+
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
 
         # if not in true_model_parameters, sample uncorrelated true_model_parameter
         if self.options.sampleTMP:
-            true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters)
+            true_model_parameters = self.generative_measurement_model.sample_true_model_parameters(true_model_parameters, rng=rng)
         else:
             true_model_parameters = self.generative_measurement_model.model_parameters
 

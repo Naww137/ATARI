@@ -280,7 +280,9 @@ class Capture_Yield_RPI:
     def generate_raw_data(self,
                           pw_true,
                           true_model_parameters, # need to build better protocol for this 
-                          options: syndatOPT
+                          options: syndatOPT,
+                          rng:np.random.Generator = None,
+                          seed:int = None
                           ) -> pd.DataFrame:
         """
         Generates a set of noisy, count data from a theoretical yield via the novel inverse-reduction method (Walton, et al.).
@@ -307,6 +309,13 @@ class Capture_Yield_RPI:
             _description_
         """
 
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
+
         if true_model_parameters.incident_neutron_spectrum_f is None:
             raise ValueError("incident neutron flux spectrum is None, please provide this data or approximate it using the method in this class")
         if len(true_model_parameters.incident_neutron_spectrum_f) != len(pw_true):
@@ -325,7 +334,7 @@ class Capture_Yield_RPI:
         true_gamma_counts = inverse_reduction(pw_true, true_model_parameters)
 
         if options.sample_counting_noise:
-            c = pois_noise(true_gamma_counts)
+            c = pois_noise(true_gamma_counts, rng=rng)
         else:
             c = true_gamma_counts
 

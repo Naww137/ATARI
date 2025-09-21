@@ -346,9 +346,16 @@ class transmission_rpi_parameters:
             raise ValueError("background function set on bkg_func not recognized")
         self._bkg_func = bkg_func
 
-    def sample_parameters(self, true_model_parameters: dict):
-        sampled_params = {}
+    def sample_parameters(self, true_model_parameters: dict, rng:np.random.Generator=None, seed:int=None):
 
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
+
+        sampled_params = {}
         for param_name, param_values in self.__dict__.items():
             if param_name in true_model_parameters:
                 assert true_model_parameters[param_name][1] == 0.0, "provided true model parameter with non-zero uncertainty"
@@ -360,12 +367,12 @@ class transmission_rpi_parameters:
                         sample = mean
                     else:
                         if param_name == 'a_b':
-                            sample = np.random.multivariate_normal(mean, uncertainty)
+                            sample = rng.multivariate_normal(mean, uncertainty)
                         else:
-                            sample = np.random.normal(loc=mean, scale=uncertainty)
+                            sample = rng.normal(loc=mean, scale=uncertainty)
                     sampled_params[param_name] = (sample, 0.0)
                 if isinstance(param_values, pd.DataFrame):
-                    new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
+                    new_c = rng.normal(loc=param_values.ct, scale=param_values.dct)
                     df = deepcopy(param_values)
                     df['ct'] = new_c
                     df['dct'] = np.sqrt(new_c)
@@ -422,8 +429,8 @@ class Transmission_RPI:
         return string
 
 
-    def sample_true_model_parameters(self, true_model_parameters: dict):
-        return self.model_parameters.sample_parameters(true_model_parameters)
+    def sample_true_model_parameters(self, true_model_parameters: dict, rng:np.random.Generator=None, seed:int=None):
+        return self.model_parameters.sample_parameters(true_model_parameters, rng=rng, seed=seed)
     
     
     def truncate_energy_range(self, new_energy_range):

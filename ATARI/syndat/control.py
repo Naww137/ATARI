@@ -52,6 +52,7 @@ class Syndat_Control:
                  syndat_models: list, #[Syndat_Model],
                  model_correlations: list = [], 
                  sampleRES = True,
+                 ensemble:str='GOE',
                  save_covariance = True,
                  save_raw_data = False,
                  save_true_model_parameters = False,
@@ -73,6 +74,7 @@ class Syndat_Control:
         self.syndat_models = syndat_models
         self.model_correlations = model_correlations
         self.sampleRES = sampleRES
+        self.ensemble = ensemble
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
         self.save_true_model_parameters = save_true_model_parameters
@@ -131,7 +133,7 @@ class Syndat_Control:
             
             ### sample resonance ladder
             if self.sampleRES:
-                self.particle_pair.sample_resonance_ladder(ensemble='GOE', rng=self.rng)
+                self.particle_pair.sample_resonance_ladder(ensemble=self.ensemble, rng=self.rng)
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs

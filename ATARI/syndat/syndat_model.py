@@ -220,7 +220,7 @@ class Syndat_Model:
             ### sample resonance ladder
             if self.options.sampleRES:
                 assert particle_pair is not None
-                particle_pair.sample_resonance_ladder(ensemble='GOE', rng=rng)
+                particle_pair.sample_resonance_ladder(ensemble=self.options.ensemble, rng=rng)
                 par_true = particle_pair.resonance_ladder 
            
             ### TODO: move this outside of for loop if sample res is false

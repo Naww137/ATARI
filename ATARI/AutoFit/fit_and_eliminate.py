@@ -703,7 +703,7 @@ class FitAndEliminate:
             deep_obj_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
-                    obj_stopping_criteria = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
+                    obj_stopping_criteria = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                                            Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
                     obj_type = 'chi2'
                     if Wigner_informed_stopping_criteria:

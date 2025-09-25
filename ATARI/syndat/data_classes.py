@@ -137,6 +137,7 @@ class syndatOPT:
     """
     def __init__(self, **kwargs):
         self._sampleRES = True
+        self._ensemble = 'GOE'
         self._sample_counting_noise = True
         self._calculate_covariance = True
         self._explicit_covariance = False
@@ -166,6 +167,13 @@ class syndatOPT:
     @sampleRES.setter
     def sampleRES(self, sampleRES):
         self._sampleRES = sampleRES
+
+    @property
+    def ensemble(self):
+        return self._ensemble
+    @ensemble.setter
+    def ensemble(self, ensemble):
+        self._ensemble = ensemble
         
     @property
     def sampleTMP(self):

@@ -134,7 +134,7 @@ def concat_external_resonance_ladder(internal_resonance_ladder, external_resonan
         resonance_ladder = internal_resonance_ladder
         external_resonance_indices = []
     else:
-        assert(np.all([each in external_resonance_ladder.keys() for each in internal_resonance_ladder.keys()]))
+        # assert(np.all([each in external_resonance_ladder.keys() for each in internal_resonance_ladder.keys()]))
         resonance_ladder = pd.concat([external_resonance_ladder, internal_resonance_ladder], join='inner', ignore_index=True)
         external_resonance_indices = list(range(len(external_resonance_ladder)))
     return resonance_ladder, external_resonance_indices

@@ -9,6 +9,19 @@ from ATARI.ModelData.experimental_model import Experimental_Model
 
 
 
+def generate_sammy_rundir_uniq_name(path_to_sammy_temps: str, case_id: int = 0, addit_str: str = ''):
+
+    if not os.path.exists(path_to_sammy_temps):
+        os.mkdir(path_to_sammy_temps)
+
+    # Generating a unique string from uuid:
+    unique_string = str(uuid4())
+
+    sammy_rundirname = path_to_sammy_temps+'SAMMY_runDIR_'+addit_str+'_'+str(case_id)+'_'+unique_string+'/'
+
+    return sammy_rundirname
+
+
 def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                                         particle_pair, 
                                         resonance_ladder, 

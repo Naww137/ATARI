@@ -52,16 +52,29 @@ class Syndat_Control:
                  syndat_models: list, #[Syndat_Model],
                  model_correlations: list = [], 
                  sampleRES = True,
+                 ensemble:str='GOE',
                  save_covariance = True,
                  save_raw_data = False,
                  save_true_model_parameters = False,
+                 rng:np.random.Generator = None,
+                 seed:int = None
                  ):
+        
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                self.rng = np.random # uses np.random.seed
+            else:
+                self.rng = np.random.default_rng(seed) # generates rng from provided seed
+        else:
+            self.rng = rng
         
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
         self.model_correlations = model_correlations
         self.sampleRES = sampleRES
+        self.ensemble = ensemble
         self.save_covariance = save_covariance
         self.save_raw_data = save_raw_data
         self.save_true_model_parameters = save_true_model_parameters
@@ -98,7 +111,7 @@ class Syndat_Control:
                pw_true_list: Optional[list[pd.DataFrame]] = None,
                save_samples_to_hdf5 = False,
                hdf5_file = None,
-               overwrite=False
+               overwrite = False
                ):
 
         generate_pw_true_with_sammy = False
@@ -120,11 +133,11 @@ class Syndat_Control:
             
             ### sample resonance ladder
             if self.sampleRES:
-                self.particle_pair.sample_resonance_ladder()
+                self.particle_pair.sample_resonance_ladder(ensemble=self.ensemble, rng=self.rng)
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
-            sampled_parameter_correlations = self.sample_model_correlations()
+            sampled_parameter_correlations = self.sample_model_correlations(rng=self.rng)
 
             ### generate true experimental objects with sammy or just take pw_true arguement
             pw_true_list = []
@@ -212,7 +225,14 @@ class Syndat_Control:
     
 
 
-    def sample_model_correlations(self):
+    def sample_model_correlations(self, rng:np.random.Generator=None, seed:int=None):
+
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
 
         sampled_model_correlations = []
 
@@ -257,12 +277,12 @@ class Syndat_Control:
                                         sample = mean
                                     else:
                                         if param_name == 'a_b':
-                                            sample = np.random.multivariate_normal(mean, uncertainty)
+                                            sample = rng.multivariate_normal(mean, uncertainty)
                                         else:
-                                            sample = np.random.normal(loc=mean, scale=uncertainty)
+                                            sample = rng.normal(loc=mean, scale=uncertainty)
                                     sampled_dict[param_name] = (sample, 0.0)
                                 if isinstance(param_values, pd.DataFrame):
-                                    new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
+                                    new_c = rng.normal(loc=param_values.ct, scale=param_values.dct)
                                     df = deepcopy(param_values)
                                     df.loc[:,'ct'] = new_c
                                     df.loc[:,'dct'] = np.sqrt(new_c)

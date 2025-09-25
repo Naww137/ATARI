@@ -25,7 +25,7 @@ def gaus_noise(vector, std_vec):
     return vector + noise
 
 
-def pois_noise(vector):
+def pois_noise(vector, rng:np.random.Generator=None, seed:int=None):
     """
     Samples poissonian noise around a vector of values.
     Parameters
@@ -37,7 +37,13 @@ def pois_noise(vector):
     noisy_vector
         Noisy vector sampled as poissonian around each expected value
     """
-    noisy_vector = np.random.default_rng().poisson(lam=vector)
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+    noisy_vector = rng.poisson(lam=vector)
     return noisy_vector
 
 
@@ -76,7 +82,7 @@ def cts_to_ctr(cts, d_cts, bw, trig):
 
 
 
-def sample_true_underlying_parameters(parameter_dict, bool):
+def sample_true_underlying_parameters(parameter_dict, bool:bool, rng:np.random.Generator=None, seed:int=None):
     """
     Given a parameter dictionary of form {'key': (val, unc)}, this function will sample true underlying parameters from N(val, unc).
     A true underlying parameter dictionary is returned with the input parameter dictionary unchanged.
@@ -93,15 +99,22 @@ def sample_true_underlying_parameters(parameter_dict, bool):
     _type_
         _description_
     """
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
     true_parameter_dict = deepcopy(parameter_dict)
     if bool:
         for par in true_parameter_dict:
             if isinstance(true_parameter_dict[par][1], list):
-                true_parameter_dict[par] = (list(np.random.default_rng().multivariate_normal(true_parameter_dict[par][0], true_parameter_dict[par][1])), 0)
+                true_parameter_dict[par] = (list(rng.multivariate_normal(true_parameter_dict[par][0], true_parameter_dict[par][1])), 0)
             else:
                 mean = true_parameter_dict[par][0]
                 stdev = true_parameter_dict[par][1]
-                true_parameter_dict[par] = (np.random.default_rng().normal(mean, stdev), 0)
+                true_parameter_dict[par] = (rng.normal(mean, stdev), 0)
 
     return true_parameter_dict
 

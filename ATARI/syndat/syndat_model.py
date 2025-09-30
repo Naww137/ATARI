@@ -194,7 +194,7 @@ class Syndat_Model:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -254,7 +254,7 @@ class Syndat_Model:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -269,7 +269,8 @@ class Syndat_Model:
         ### generate raw count data from generative reduction model
         raw_data = self.generative_measurement_model.generate_raw_data(pw_true, 
                                                                         true_model_parameters, 
-                                                                        self.options)
+                                                                        self.options,
+                                                                        rng=rng)
         
         return raw_data, true_model_parameters
 

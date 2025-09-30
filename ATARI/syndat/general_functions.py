@@ -40,7 +40,7 @@ def pois_noise(vector, rng:np.random.Generator=None, seed:int=None):
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
     noisy_vector = rng.poisson(lam=vector)
@@ -102,7 +102,7 @@ def sample_true_underlying_parameters(parameter_dict, bool:bool, rng:np.random.G
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 

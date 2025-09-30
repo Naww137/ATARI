@@ -198,7 +198,7 @@ def reduce_raw_count_data(tof, c,C, dc,dC, bw, trigo,trigs, a,b, k,K, Bi, b0,B0,
     return Tn, unc_data, rates
 
 
-def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k,K, Bi, b0,B0, alpha, dm1):
+def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k,K, Bi, b0,B0, alpha, dm1, rng:np.random.Generator=None, seed:int=None):
     """
     Generates raw count data for sample-in given a theoretical tranmission. 
     
@@ -240,6 +240,14 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     open_df : pandas.DataFrame
         Dataframe containing data for sample out.
     """
+
+    # Random number generator:
+    if rng is None:
+        if seed is None:
+            rng = np.random.default_rng() # uses np.random.seed
+        else:
+            rng = np.random.default_rng(seed) # generates rng from provided seed
+
     # calculate open count rates
     Cr, dCr = cts_to_ctr(open_df.ct, open_df.dct, open_df.bw, trigo) # cts_o/(bw*trig)
     open_df['c'] = Cr; 
@@ -263,14 +271,14 @@ def inverse_reduction(sample_df, open_df, add_noise, sample_turp, trigo,trigs, k
     c_cycle = theo_c/cycles
     
     if sample_turp:
-        monitor_factors = np.random.default_rng().normal(1,dm1, size=cycles)
+        monitor_factors = rng.normal(1,dm1, size=cycles)
     else:
         monitor_factors = np.ones((cycles))
 
     if add_noise:
-        c = pois_noise(c_cycle)*monitor_factors[0]
+        c = pois_noise(c_cycle, rng=rng)*monitor_factors[0]
         for i in range(cycles-1):
-            c += pois_noise(c_cycle)*monitor_factors[i]
+            c += pois_noise(c_cycle, rng=rng)*monitor_factors[i]
     else:
         c = c_cycle*monitor_factors[0]
         for i in range(cycles-1):
@@ -351,7 +359,7 @@ class transmission_rpi_parameters:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -458,11 +466,21 @@ class Transmission_RPI:
     def generate_raw_data(self,
                           pw_true,
                           true_model_parameters, # need to build better protocol for this 
-                          options: syndatOPT
+                          options: syndatOPT,
+                          rng:np.random.Generator=None,
+                          seed:int=None
                           ) -> pd.DataFrame:
         """
         !!! Document !!!!
         """
+
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random.default_rng() # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
+
         assert true_model_parameters.open_neutron_spectrum is not None
         if len(true_model_parameters.open_neutron_spectrum) != len(pw_true):
             raise ValueError("neutron spectrum and sample data are not of the same length, check energy domain")
@@ -489,17 +507,18 @@ class Transmission_RPI:
                                                     true_Bi,
                                                     true_model_parameters.b0s[0],
                                                     true_model_parameters.b0o[0],
-                                                    monitor_array, true_model_parameters.m1[1])
+                                                    monitor_array, true_model_parameters.m1[1],
+                                                    rng=rng)
         
         raw_data = copy(sample_data)
 
         raw_data['bs_true'] = true_model_parameters.m2[0]*true_Bi*true_model_parameters.ks[0] + true_model_parameters.b0s[0]
         raw_data['bo_true'] = true_model_parameters.m4[0]*true_Bi*true_model_parameters.ko[0] + true_model_parameters.b0o[0]
 
-        raw_data['cto_true'] = open_data['ct']
+        raw_data['cto_true']  = open_data['ct']
         raw_data['dcto_true'] = open_data['dct']
-        raw_data['co_true'] = open_data['c']
-        raw_data['dco_true'] = open_data['dc']
+        raw_data['co_true']   = open_data['c']
+        raw_data['dco_true']  = open_data['dc']
 
         return raw_data
 

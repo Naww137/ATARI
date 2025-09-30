@@ -63,7 +63,7 @@ class Syndat_Control:
         # Random number generator:
         if rng is None:
             if seed is None:
-                self.rng = np.random # uses np.random.seed
+                self.rng = np.random.default_rng() # uses np.random.seed
             else:
                 self.rng = np.random.default_rng(seed) # generates rng from provided seed
         else:
@@ -230,7 +230,7 @@ class Syndat_Control:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 

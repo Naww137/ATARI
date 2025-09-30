@@ -67,7 +67,7 @@ def sample_wigner_invCDF(N_samples:int,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -104,7 +104,7 @@ def sample_NNE_energies(E_range, avg_level_spacing:float,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
     
@@ -152,7 +152,7 @@ def sample_GE_eigs(num_eigs:int, beta:int=1,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -204,7 +204,7 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -285,7 +285,7 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -349,7 +349,7 @@ def sample_RRR_widths(N_levels,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 

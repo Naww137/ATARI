@@ -137,8 +137,9 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
         with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"), 'w') as f:
             inres = False
             for line in readlines:
-                if line.lower().startswith("resonances"):
+                if line.lower().startswith("resonance"):
                     inres = True
+                    continue
                 if inres:
                     f.write(line)
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"))

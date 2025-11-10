@@ -57,6 +57,7 @@ class Syndat_Control:
                  save_covariance = True,
                  save_raw_data = False,
                  save_true_model_parameters = False,
+                 no_systematic_bias = False,
                  rng:np.random.Generator = None,
                  seed:int = None
                  ):
@@ -76,6 +77,8 @@ class Syndat_Control:
 
         if self.save_true_model_parameters:
             self.true_model_parameters = []
+
+        self.no_systematic_bias = no_systematic_bias
 
         # Defining RNG:
         if rng is not None:
@@ -278,12 +281,19 @@ class Syndat_Control:
                                             sample = np.random.multivariate_normal(mean, uncertainty)
                                         else:
                                             sample = np.random.normal(loc=mean, scale=uncertainty)
-                                    sampled_dict[param_name] = (sample, 0.0)
+                                    if self.no_systematic_bias:
+                                        sampled_dict[param_name] = (mean, 0.0)
+                                    else:
+                                        sampled_dict[param_name] = (sample, 0.0)
                                 if isinstance(param_values, pd.DataFrame):
                                     new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
                                     df = deepcopy(param_values)
-                                    df.loc[:,'ct'] = new_c
-                                    df.loc[:,'dct'] = np.sqrt(new_c)
+                                    if self.no_systematic_bias:
+                                        df.loc[:,'ct'] = param_values.ct
+                                        df.loc[:,'dct'] = np.sqrt(param_values.ct)
+                                    else:
+                                        df.loc[:,'ct'] = new_c
+                                        df.loc[:,'dct'] = np.sqrt(new_c)
                                     sampled_dict[param_name] = df
 
             sampled_model_correlations.append(sampled_dict)

@@ -540,7 +540,7 @@ def execute_stage_3(energy_range_total:tuple,
                     eval_data:Evaluation_Data,
 
                     num_shuffles:int=10,
-                    model_selection:str='chi2',
+                    variable_selection:str='chi2',
 
                     window_size:float = 20.0, # eV
                     data_overlap_fraction:float = 0.25,
@@ -560,6 +560,7 @@ def execute_stage_3(energy_range_total:tuple,
 
         eval_data_trunc = eval_data.truncate(data_range_data_buffer)
         solver = Solver_factory(sammy_rto, solver_opts._solver, solver_opts, particle_pair, eval_data_trunc)
+        solver.set_bayes(True)
         # solver_no_bayes = copy(solver)
         # solver_no_bayes.set_bayes(False)
 
@@ -596,7 +597,7 @@ def execute_stage_3(energy_range_total:tuple,
         # print('Data Range:', min(data_range_data_buffer), max(data_range_data_buffer), 'eV')
         particle_pair.resonance_ladder = res_ladder_comb
         particle_pair.energy_range = data_range_param
-        spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=model_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
+        spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
         samout_best = None
         obj_best    = np.inf
         for spin_shuffle_case in spin_shuffle_cases:

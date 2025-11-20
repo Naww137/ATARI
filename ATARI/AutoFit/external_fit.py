@@ -135,14 +135,18 @@ def get_p_resonance_ladder_from_Pu_vector(Pu,
     Pp[:,2] = u2p_n(Gnu, Pp[:,0], L[J_ID-1], particle_pair)
 
     par_post = pd.DataFrame(Pp, columns=['E', 'Gg', 'Gn1'])
+    initial_reslad = initial_reslad.reset_index(drop=True)
+    # print(f'Pp: {Pp}')
+    # print(f'INIT: {initial_reslad[['E', 'Gg', 'Gn1', 'J_ID', 'varyE', 'varyGn1']]}')
     par_post['J_ID']    = initial_reslad['J_ID']
     par_post['varyE']   = initial_reslad['varyE']
-    par_post['varyGn1'] = initial_reslad['varyGn1']
     par_post['varyGg']  = initial_reslad['varyGg']
+    par_post['varyGn1'] = initial_reslad['varyGn1']
+    # print('Par Post:', par_post)
 
-    original_order = par_post.reset_index().sort_values(by=['J_ID', 'E']).index
+    # original_order = par_post.reset_index().sort_values(by=['J_ID', 'E']).index
 
-    return par_post, original_order
+    return par_post#, original_order
 
 def get_derivatives_for_step(rto, D, V, 
                              datasets, covariance_data, ### dont need these two things if I update get_derivatives function Cole created
@@ -162,6 +166,7 @@ def get_derivatives_for_step(rto, D, V,
 
     # zero derivative for parameters not varied
     if zero_derivs_at_no_vary:
+        print('Zeroing Res. Lad.:', res_lad)
         G = zero_G_at_no_vary(G, res_lad)
 
     if V_is_inv:
@@ -172,7 +177,7 @@ def get_derivatives_for_step(rto, D, V,
     # calculate derivative and chi2
     chi2 = (D-T).T @ Vinv @ (D-T)
     jac_chi2  = - 2 * G.T @ Vinv @ (D - T)
-    hess_chi2 = G.T @ Vinv @ G
+    hess_chi2 = 2 * G.T @ Vinv @ G
     
     jac  = jac_chi2
     hess = hess_chi2
@@ -185,6 +190,18 @@ def get_derivatives_for_step(rto, D, V,
         jac  += -2*jac_Wig
         hess += -2*hess_Wig
 
+    # Zeroing out non-varied resonances:
+    if zero_derivs_at_no_vary:
+        indices_e = 3*res_lad.index[res_lad['varyE'] == 0].to_numpy()
+        indices_g = 3*res_lad.index[res_lad['varyGg'] == 0].to_numpy() + 1
+        indices_n = 3*res_lad.index[res_lad['varyGn1'] == 0].to_numpy()  + 2
+        jac[indices_e] = 0.0
+        jac[indices_g] = 0.0
+        jac[indices_n] = 0.0
+        hess[indices_e,indices_e] = 0.0
+        hess[indices_g,indices_g] = 0.0
+        hess[indices_n,indices_n] = 0.0
+
     return chi2, jac, hess, sammy_pws
 
 
@@ -193,7 +210,7 @@ def evaluate_chi2_location_and_gradient(rto, Pu, starting_ladder, particle_pair,
                                         datasets,covariance_data,experiments,
                                         inp_for_theory, V_is_inv=False, covs=None,
                                         Porter_Thomas_fitting:bool=False, Wigner_fitting:bool=False):
-    res_lad, original_order = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
+    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
 
     if inp_for_theory is not None:
         V = get_V_at_T(inp_for_theory, rto, res_lad)
@@ -364,7 +381,14 @@ def fit(rto,
     obj_log = []
 
     total_derivative_evaluations = 0
+    original_order = starting_ladder.reset_index().sort_values(by=['J_ID', 'E']).index
+    original_order = np.argsort(original_order)
+    # print('Start:', starting_ladder)
+    # print('Order:', original_order)
     starting_ladder.sort_values(by=['J_ID', 'E'], inplace=True)
+    # print('Reordered:', starting_ladder)
+    # res_lad_ordered = starting_ladder.reset_index(drop=True).loc[original_order].reset_index()
+    # print('Back to Start:', res_lad_ordered)
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
     print(f"Stepping until convergence\nstep\talpha\t:\tobj\tchi2\n")
@@ -436,6 +460,9 @@ def fit(rto,
         if print_bool:
             print(f"{int(istep)}\t{np.round(float(alpha),7):<8}:\t{obj:.2f}\t{chi2:.2f}")
 
+        ### Put res ladder order back to how it started
+        res_lad_ordered = res_lad.reset_index(drop=True).loc[original_order].reset_index(drop=True)
+        
         ### update Pu to Pu_next and save things
         Pu = Pu_next
         jac = jac_next
@@ -446,12 +473,13 @@ def fit(rto,
         saved_gradients.append(gradient)
         save_Pu.append(Pu)
         saved_pw_lists.append(sammy_pws)
-        saved_res_lads.append(copy(res_lad))
+        saved_res_lads.append(copy(res_lad_ordered))
 
         ### step coeficients
         Pu_next = take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode=mode)
 
-    print('Final Ladder:', res_lad)
+    # print('Unordered Final Ladder:', res_lad)
+    print('Final Ladder:', res_lad_ordered)
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
 
@@ -619,7 +647,6 @@ def get_chi2(D, Vinv, pw_lists, experiments):
             key = "theo_xs"
         Ts.append(pw[key].values)
     T = np.concatenate(Ts)
-    print(D.shape, T.shape, Vinv.shape)
     return (D-T).T @ Vinv @ (D-T)
 
 

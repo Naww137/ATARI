@@ -5,6 +5,7 @@ import numpy as np
 from numpy import newaxis as NA
 import pandas as pd
 from scipy.interpolate import interpn
+from copy import copy
 
 from ATARI.theory.scattering_params import FofE_recursive
 
@@ -36,7 +37,7 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
 
     # Sorting resonance ladder: (this is the order that PDS uses)
     res_ladder = sammyINP.resonance_ladder
-    res_ladder_sorted = res_ladder.sort_values(by=['J_ID', 'E'])
+    res_ladder_sorted = res_ladder.sort_values(by=['J_ID', 'E']).reset_index(drop=True)
     sammyINP.resonance_ladder = res_ladder_sorted
 
     # getting sorting indices:
@@ -44,6 +45,9 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     ider = []
     for i in sorting_indices:
         ider.extend([3*i, 3*i+1, 3*i+2])
+    # print('Sorting Indices:', sorting_indices)
+    # print('Res. Lad. Sorted:', res_ladder_sorted)
+    # print('Res. Lad. Original:', res_ladder)
 
     sammy_io.make_runDIR(sammyRTO.sammy_runDIR)
     # Setting up sammy input file:
@@ -110,6 +114,9 @@ def get_derivatives(sammyINP:SammyInputData, sammyRTO:SammyRunTimeOptions, get_t
     
     # Unsorting derivatives:
     # derivs_dict["PARTIAL_DERIVATIVES"] = derivs_dict["PARTIAL_DERIVATIVES"][:, ider]
+    # print('PAR DF: ', par_df)
+    # print(derivs_dict["PARTIAL_DERIVATIVES"].shape, len(ider))
+    # print('ider:', ider)
     derivs_dict["PARTIAL_DERIVATIVES"][:, ider] = derivs_dict["PARTIAL_DERIVATIVES"]
 
     # convert to p if necessary

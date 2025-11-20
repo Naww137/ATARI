@@ -143,7 +143,7 @@ Maximum energy = {max(E)}
             if level_spacing_dist.sf(np.array([dE_max])) > 1e-6: # one in a million chance of occuring
                 break
         else:
-            raise ValueError('There is a large gap in the provided resonances that is improbable under resonance statistics.')
+            warnings.warn('There is a large gap in the provided resonances that is improbable under resonance statistics.', RuntimeWarning)
 
     def _prepare_encore_pipe(self, err:float):
         """

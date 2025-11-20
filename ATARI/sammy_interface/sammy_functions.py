@@ -1140,7 +1140,7 @@ def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     return par, lsts, chi2s, chi2ns, covariance_data_at_theory
 
 
-def check_inputs_YW(sammyINPyw, sammyRTO):
+def check_inputs_YW(sammyINPyw, sammyRTO, ignore_bayes_conflict:bool=True):
     empty = False
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     if len(np.unique(dataset_titles)) != len(dataset_titles):
@@ -1157,7 +1157,10 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
         if not np.any([each in sammyINPyw.resonance_ladder for each in ["varyE", "varyGg", "varyGn1"]]):
             raise ValueError("No vary flag columns in resonance ladder")
         if np.sum([sammyINPyw.resonance_ladder["varyE"], sammyINPyw.resonance_ladder["varyGg"], sammyINPyw.resonance_ladder["varyGn1"]]) == 0:
-            raise ValueError("Bayes set to true but no varied parameters")
+            if ignore_bayes_conflict:
+                sammyRTO.bayes = False
+            else:
+                raise ValueError("Bayes set to true but no varied parameters")
 
     return dataset_titles, empty
 

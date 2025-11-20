@@ -278,9 +278,14 @@ Index:     {idx}
         s.TP = (TPL + TPR) / 2
 
         # If the two sides are past a threshold percent difference, raise a warning:
-        percent_error = 100.0 * abs(TPL - TPR) / s.TP
-        if percent_error > s.TP_ERROR_THRESHOLD:
+        if s.TP == 0.0:
             warnings.warn(f"""
+The calculated total probability ("TP") is 0. This will cause errors in WigBayes calculations.
+""", RuntimeWarning)
+        else:
+            percent_error = 100.0 * abs(TPL - TPR) / s.TP
+            if percent_error > s.TP_ERROR_THRESHOLD:
+                warnings.warn(f"""
 In calculating the total probability ("TP"), there was a percent error of {percent_error:.3f}%.
 This exceeds the set limit of {s.TP_ERROR_THRESHOLD:.3f}%. This error could be attributed to a bug or
 numerical instability.
@@ -305,6 +310,9 @@ numerical instability.
         posterior : float [L,G+1]
             The posterior probabilities.
         """
+
+        if s.TP == 0.0:
+            raise ValueError('The calculated total probability ("TP") is 0. Cannot accurately quantify WigBayes probabilities.')
 
         L = s.L; G = s.G
         sp = np.zeros((L,G), dtype='f8') # No longer need the edge cases, so the bounds are 0:L instead of 0:L+2

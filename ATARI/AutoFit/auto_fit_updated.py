@@ -74,7 +74,10 @@ class AutoFitOPT:
 
     # other
     print_bool                      : bool  = True
+    Nres_selected                   : int   = None
     use_1std_rule                   : bool  = True
+    use_1disc_rule                  : bool  = False
+    discrepancy_threshold           : float = 1.0
     use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
 
@@ -159,13 +162,16 @@ class AutoFit:
         Nres_max_num_res = find_max_num_resonances(self.particle_pair, window_size=self.fit_and_elim_options.E_window_spin)
 
         ### Run CV
-        if self.options.print_bool:
-            print("=============\nRunning Cross Validation\n=============")
-        folds_data, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices, Nres_max_num_res=Nres_max_num_res)
-        CV_test_scores, CV_train_scores = find_CV_scores(folds_data, use_MAD=self.options.use_MAD)
-        
-        ### Get cardinality from CV results
-        Nres_selected = find_model_complexity(CV_test_scores, use_1std_rule=self.options.use_1std_rule)
+        if not hasattr(self.options,'Nres_selected') \
+            or (self.options.Nres_selected is None):
+            if self.options.print_bool:
+                print("=============\nRunning Cross Validation\n=============")
+            folds_data, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices, Nres_max_num_res=Nres_max_num_res)
+            Nres_array, CV_test_score_means, CV_test_score_cov, CV_train_score_means, CV_train_score_cov = find_CV_scores(folds_data, use_MAD=self.options.use_MAD)
+            ### Get cardinality from CV results
+            Nres_selected = find_model_complexity(Nres_array, CV_test_score_means, CV_test_score_cov, use_1std_rule=self.options.use_1std_rule, use_1disc_rule=self.options.use_1disc_rule, disc_thres=self.options.discrepancy_threshold)
+        else:
+            Nres_selected = self.options.Nres_selected
 
         if self.options.final_fit_to_0_res: Nres_target = 0
         else: Nres_target = Nres_selected

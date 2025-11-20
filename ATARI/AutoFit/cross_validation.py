@@ -2,6 +2,7 @@ from typing import List
 from copy import deepcopy
 import numpy as np
 import pandas as pd
+from numpy import newaxis as NA
 
 # from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.utils.datacontainers import Evaluation_Data
@@ -17,8 +18,8 @@ def find_CV_scores(fold_results, use_MAD:bool=False):
     ...
     """
 
-    CV_test_scores = {}
-    CV_train_scores = {}
+    objn_tests  = []
+    objn_trains = []
     for Nres, fold_result in fold_results.items():
         obj_test    = np.array(fold_result.obj_test   )
         ndata_test  = np.array(fold_result.ndata_test )
@@ -26,20 +27,70 @@ def find_CV_scores(fold_results, use_MAD:bool=False):
         ndata_train = np.array(fold_result.ndata_train)
         objn_test  = obj_test  / ndata_test
         objn_train = obj_train / ndata_train
-        K_folds = len(obj_test)
-        if use_MAD:
-            CV_test_score_mean  = np.median(objn_test)
-            CV_test_score_std   = 1.4826*np.median(np.abs(objn_test - CV_test_score_mean), axis=0)
+        objn_tests .append(objn_test )
+        objn_trains.append(objn_train)
+    objn_tests  = np.array(objn_tests )
+    objn_trains = np.array(objn_trains)
+
+    # K_folds = len(obj_test)
+    if use_MAD:
+        CV_test_score_means  = []
+        CV_test_score_stds   = []
+        CV_train_score_means = []
+        CV_train_score_stds  = []
+        for CV_test_score_mean, CV_train_score_mean, objn_test, objn_train in zip(CV_test_score_means, CV_train_score_means, objn_tests, objn_trains):
+            CV_test_score_mean  = np.median(objn_test )
             CV_train_score_mean = np.median(objn_train)
-            CV_train_score_std  = 1.4826*np.median(np.abs(objn_train - CV_train_score_mean), axis=0)
-        else:
-            CV_test_score_mean  = np.mean(objn_test)
-            CV_test_score_std   = np.std(objn_test, ddof=1) / np.sqrt(K_folds)
-            CV_train_score_mean = np.mean(objn_train)
-            CV_train_score_std  = np.std(objn_train, ddof=1) / np.sqrt(K_folds)
-        CV_test_scores[Nres]  = {'mean':CV_test_score_mean , 'std':CV_test_score_std }
-        CV_train_scores[Nres] = {'mean':CV_train_score_mean, 'std':CV_train_score_std}
-    return CV_test_scores, CV_train_scores
+            CV_test_score_std  = 1.4826*np.median(np.abs(objn_test  - CV_test_score_mean ), axis=0)
+            CV_train_score_std = 1.4826*np.median(np.abs(objn_train - CV_train_score_mean), axis=0)
+            CV_test_score_means .append(CV_test_score_mean )
+            CV_train_score_means.append(CV_train_score_mean)
+            CV_test_score_stds  .append(CV_test_score_std  )
+            CV_train_score_stds .append(CV_train_score_std )
+        CV_test_score_cov  = np.diag(np.array(CV_test_score_stds )**2)
+        CV_train_score_cov = np.diag(np.array(CV_train_score_stds)**2)
+    else:
+        CV_test_score_means , CV_test_score_cov  = calculate_mean_and_cov(objn_tests )
+        CV_train_score_means, CV_train_score_cov = calculate_mean_and_cov(objn_trains)
+
+    Nres = np.array(list(fold_results.keys()))
+    return Nres, CV_test_score_means, CV_test_score_cov, CV_train_score_means, CV_train_score_cov
+
+def calculate_mean_and_cov(y):
+    K_folds = y.shape[1]
+    y_mean = np.mean(y, axis=1)
+    res = y - y_mean[:,NA]
+    y_cov = np.sum(res[:,NA,:]*res[NA,:,:], axis=2) / (K_folds*(K_folds-1))
+    return y_mean, y_cov
+
+# def find_CV_scores(fold_results, use_MAD:bool=False):
+#     """
+#     ...
+#     """
+
+#     CV_test_scores = {}
+#     CV_train_scores = {}
+#     for Nres, fold_result in fold_results.items():
+#         obj_test    = np.array(fold_result.obj_test   )
+#         ndata_test  = np.array(fold_result.ndata_test )
+#         obj_train   = np.array(fold_result.obj_train  )
+#         ndata_train = np.array(fold_result.ndata_train)
+#         objn_test  = obj_test  / ndata_test
+#         objn_train = obj_train / ndata_train
+#         K_folds = len(obj_test)
+#         if use_MAD:
+#             CV_test_score_mean  = np.median(objn_test)
+#             CV_test_score_std   = 1.4826*np.median(np.abs(objn_test - CV_test_score_mean), axis=0)
+#             CV_train_score_mean = np.median(objn_train)
+#             CV_train_score_std  = 1.4826*np.median(np.abs(objn_train - CV_train_score_mean), axis=0)
+#         else:
+#             CV_test_score_mean  = np.mean(objn_test)
+#             CV_test_score_std   = np.std(objn_test, ddof=1) / np.sqrt(K_folds)
+#             CV_train_score_mean = np.mean(objn_train)
+#             CV_train_score_std  = np.std(objn_train, ddof=1) / np.sqrt(K_folds)
+#         CV_test_scores[Nres]  = {'mean':CV_test_score_mean , 'std':CV_test_score_std }
+#         CV_train_scores[Nres] = {'mean':CV_train_score_mean, 'std':CV_train_score_std}
+#     return CV_test_scores, CV_train_scores
 
 # def find_CV_scores(fold_results, use_MAD:bool=False):
 #     """
@@ -68,33 +119,75 @@ def find_CV_scores(fold_results, use_MAD:bool=False):
 #         CV_train_scores[Nres] = {'mean': CV_train_score_mean, 'std':CV_train_score_std}
 #     return CV_test_scores, CV_train_scores
 
-def find_model_complexity(CV_scores:dict, use_1std_rule:bool=True):
+def find_model_complexity(Nres_array, CV_score_means, CV_score_cov, use_1std_rule:bool=True, use_1disc_rule:bool=False, disc_thres:float=1.0):
     """
     ...
     """
 
-    # Sorting keys in increasing order:
-    CV_scores = dict(sorted(CV_scores.items()))
+    # Sorting Nres in increasing order:
+    order = np.argsort(Nres_array)
+    Nres_array     = Nres_array    [order]
+    CV_score_means = CV_score_means[order]
+    CV_score_cov   = CV_score_cov  [np.ix_(order,order)]
 
     # Finding the minimum case:
     Nres_min = None
-    CV_score_min = {'mean': np.inf, 'std': None}
-    for Nres, CV_score in CV_scores.items():
-        if CV_score_min['mean'] > CV_score['mean']:
-            Nres_min = Nres
-            CV_score_min = CV_score
+    idx_min = np.argmin(CV_score_means)
+    Nres_min = Nres_array[idx_min]
+    CV_score_mean_min = CV_score_means[idx_min]
+    CV_score_var_min  = CV_score_cov  [idx_min,idx_min]
     
     # Applying one standard deviation rule where applicable:
-    if use_1std_rule:
-        CV_1std_limit = CV_score_min['mean'] + CV_score_min['std']
-        for Nres, CV_score in CV_scores.items():
-            if CV_score['mean'] < CV_1std_limit:
+    if   use_1disc_rule:
+        for idx, (Nres, CV_score_mean) in enumerate(zip(Nres_array, CV_score_means)):
+            if idx == idx_min:
+                Nres_selected = Nres_min
+                break
+            CV_score_var   = CV_score_cov[idx,idx]
+            CV_score_cross = CV_score_cov[idx,idx_min]
+            discrepancy = (CV_score_mean-CV_score_mean_min)/np.sqrt(CV_score_var_min + CV_score_var - 2*CV_score_cross)
+            print(discrepancy)
+            if discrepancy < disc_thres:
+                Nres_selected = Nres
+                break
+    elif use_1std_rule:
+        CV_1std_limit = CV_score_mean_min + disc_thres*np.sqrt(CV_score_var_min)
+        for idx, (Nres, CV_score_mean) in enumerate(zip(Nres_array, CV_score_means)):
+            if CV_score_mean < CV_1std_limit:
                 Nres_selected = Nres
                 break
     else:
         Nres_selected = Nres_min
-
+    print(Nres_selected)
     return Nres_selected
+
+# def find_model_complexity(CV_scores:dict, use_1std_rule:bool=True, use_1disc_rule:bool=False):
+#     """
+#     ...
+#     """
+
+#     # Sorting keys in increasing order:
+#     CV_scores = dict(sorted(CV_scores.items()))
+
+#     # Finding the minimum case:
+#     Nres_min = None
+#     CV_score_min = {'mean': np.inf, 'std': None}
+#     for Nres, CV_score in CV_scores.items():
+#         if CV_score_min['mean'] > CV_score['mean']:
+#             Nres_min = Nres
+#             CV_score_min = CV_score
+    
+#     # Applying one standard deviation rule where applicable:
+#     if use_1std_rule:
+#         CV_1std_limit = CV_score_min['mean'] + CV_score_min['std']
+#         for Nres, CV_score in CV_scores.items():
+#             if CV_score['mean'] < CV_1std_limit:
+#                 Nres_selected = Nres
+#                 break
+#     else:
+#         Nres_selected = Nres_min
+
+#     return Nres_selected
 
 
 

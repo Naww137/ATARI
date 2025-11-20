@@ -385,13 +385,20 @@ class FitAndEliminate:
             print(f"Options to vary: {self.options.fitpar1}")
 
         initial_feature_bank = update_vary_resonance_ladder(initial_feature_bank, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
+        
+        print('Initial Feature Bank:')
+        print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
+        print()
+
         # external_resonance_ladder = update_vary_resonance_ladder(external_resonance_ladder, varyE = self.options.fitpar_external[0], varyGg = self.options.fitpar_external[1], varyGn1 = self.options.fitpar_external[2])
         total_resonance_ladder, fixed_resonance_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
         self.output.external_resonance_indices = fixed_resonance_indices
 
         outs_fit_1 = self.fit_and_eliminate_by_Gn(total_resonance_ladder, fixed_resonance_indices)
         reslad_1 = copy(outs_fit_1[-1].par_post)
-        assert(isinstance(reslad_1, pd.DataFrame))
+        # if reslad_1 is None:
+        #     reslad_1 = outs_fit_1[-1].par
+        assert(isinstance(reslad_1, pd.DataFrame)), f'\nResonance Ladder:\n{reslad_1}'
 
         if np.all(self.options.fitpar1 == self.options.fitpar2):
             if self.options.print_bool: print(f"Options to vary for initial fit 2 are the same, skipping")
@@ -428,6 +435,7 @@ class FitAndEliminate:
     def fit_and_eliminate_by_Gn(self, resonance_ladder, external_resonance_indices):
         
         if self.options.print_bool: print(f"Initial solve from {len(resonance_ladder)-len(external_resonance_indices)} resonance features\n")
+        self.solver_initial.set_bayes(True)
         sammyOUT_fit = self.solver_initial.fit(resonance_ladder, external_resonance_indices)
         outs = [sammyOUT_fit]
 
@@ -789,6 +797,7 @@ class FitAndEliminate:
                 selected_ladder_chars = best_shuffle_samout
                 selected_ladder_chi2_post = np.sum(selected_ladder_chars.chi2_post)
                 print('selected_ladder_chi2_post', selected_ladder_chi2_post)
+                best_shuffle_samout.par_post.reset_index(inplace=True, drop=True)
                 print('best_shuffle.par_post', best_shuffle_samout.par_post)
                 selected_ladder_obj_post = objective_func(selected_ladder_chi2_post, best_shuffle_samout.par_post, self.particle_pair, fixed_resonances_indices,
                                                           self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
@@ -896,6 +905,24 @@ class FitAndEliminate:
         priors_passed_cnt = 0
 
         for j in range(current_level):  # For every resonance in the current ladder
+
+            ### Choose resonance if the widths are too low
+            Gn_value = initial_feature_bank.loc[j,'Gn1']
+            GN_LIMIT = 0.000100
+            if abs(Gn_value) < GN_LIMIT:
+                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
+                prior_chars = self.evaluate_prior(ladder)
+
+                prior_sum_chi2 = np.sum(prior_chars.chi2)
+                best_prior_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
+                                                self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
+
+                best_prior_model_chars = prior_chars
+                any_prior_passed_test = True
+                best_removed_resonance_prior = j
+                priors_passed_cnt = 1
+                break
             
             # Skip if side resonances
             # if j in fixed_resonances_indices:

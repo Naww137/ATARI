@@ -9,6 +9,7 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 # from ATARI.sammy_interface.sammy_functions import run_sammy_YW
 from ATARI.AutoFit.functions import objective_func
 from ATARI.AutoFit.sammy_interface_bindings import Solver
+from ATARI.AutoFit.external_fit import run_sammy_EXT
 # from ATARI.AutoFit.functions import separate_external_resonance_ladder
 
 from ATARI.TAZ.RunMaster import RunMaster
@@ -84,10 +85,10 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
 
     run_master = RunMaster(E=respar_window['E'], energy_range=window_E_bounds, level_spacing_dists=reaction_TAZ.distributions('Wigner'), false_dens=false_dens, prior=prior, log_likelihood_prior=log_likelihood_prior)
     spin_shuffles = run_master.WigSample(num_trials=num_shuffles, rng=rng, seed=seed)
-    posterior = run_master.WigBayes()
-    print('Wigner Posterior:')
-    print(posterior)
-    print()
+    # posterior = run_master.WigBayes()
+    # print('Wigner Posterior:')
+    # print(posterior)
+    # print()
     # neutron_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling neutron width sign
     # capture_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling capture width sign
     neutron_width_signs = rng.choice([1], size=spin_shuffles.shape) # shuffling neutron width sign
@@ -216,13 +217,18 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
             # Else, optimize and add to the list:
             shuffled_respars_already_listed.append(shuffled_respar)
             sammy_out = solver.fit(shuffled_respar, external_resonance_indices=fixed_resonance_indices)
+            if sammy_out.par_post is None:
+                sammy_out.par_post  = sammy_out.par
+                sammy_out.pw_post   = sammy_out.pw
+                sammy_out.chi2_post = sammy_out.chi2
             if len(shuffled_respar) == len(fixed_resonance_indices):
                 sammy_out.par_post   = sammy_out.par
                 sammy_out.pw_post    = sammy_out.pw
                 sammy_out.chi2_post  = sammy_out.chi2
                 sammy_out.chi2n_post = sammy_out.chi2n
-            sammy_out.par.index      = shuffled_respar.index
-            sammy_out.par_post.index = shuffled_respar.index
+            if solver.fit_func != run_sammy_EXT:
+                sammy_out.par.index      = shuffled_respar.index
+                sammy_out.par_post.index = shuffled_respar.index
             chi2 = np.sum(sammy_out.chi2_post)
             respar = sammy_out.par_post
             obj_value = objective_func(chi2=chi2, res_ladder=respar, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,

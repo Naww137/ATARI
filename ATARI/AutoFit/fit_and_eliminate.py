@@ -386,9 +386,10 @@ class FitAndEliminate:
 
         initial_feature_bank = update_vary_resonance_ladder(initial_feature_bank, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
         
-        print('Initial Feature Bank:')
-        print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
-        print()
+        if self.options.print_bool: 
+            print('Initial Feature Bank:')
+            print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
+            print()
 
         # external_resonance_ladder = update_vary_resonance_ladder(external_resonance_ladder, varyE = self.options.fitpar_external[0], varyGg = self.options.fitpar_external[1], varyGn1 = self.options.fitpar_external[2])
         total_resonance_ladder, fixed_resonance_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)

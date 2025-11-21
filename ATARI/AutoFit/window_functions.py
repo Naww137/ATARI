@@ -539,6 +539,7 @@ def execute_stage_3(energy_range_total:tuple,
                     particle_pair,
                     eval_data:Evaluation_Data,
 
+                    do_shuffle:bool=True,
                     num_shuffles:int=10,
                     variable_selection:str='chi2',
 
@@ -597,17 +598,22 @@ def execute_stage_3(energy_range_total:tuple,
         # print('Data Range:', min(data_range_data_buffer), max(data_range_data_buffer), 'eV')
         particle_pair.resonance_ladder = res_ladder_comb
         particle_pair.energy_range = data_range_param
-        spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
-        samout_best = None
-        obj_best    = np.inf
-        for spin_shuffle_case in spin_shuffle_cases:
-            if spin_shuffle_case['obj_value'] < obj_best:
-                obj_best = spin_shuffle_case['obj_value']
-                samout_best = spin_shuffle_case['sammy_out']
-        respar_window = samout_best.par_post
+        if do_shuffle:
+            spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
+            samout_best = None
+            obj_best    = np.inf
+            for spin_shuffle_case in spin_shuffle_cases:
+                if spin_shuffle_case['obj_value'] < obj_best:
+                    obj_best = spin_shuffle_case['obj_value']
+                    samout_best = spin_shuffle_case['sammy_out']
+            respar_window = samout_best.par_post
+        else:
+            samout = solver.fit(res_ladder_comb, external_resonance_indices=fixed_spingroup_indices)
+            respar_window = samout.par_post
         # mask_full = (full_ladder.E>data_range[0]) & (full_ladder.E<data_range[1])
         # non_vary_cols = [col for col in res_ladder_fixed.columns if not col.startswith("vary")]
-        print(res_ladder_comb)
+        # print(res_ladder_comb)
+        print('\nRefit Window:')
         print(respar_window)
         assert len(respar_window) == len(res_ladder_comb)
         full_ladder.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']] = respar_window.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']]

@@ -40,7 +40,7 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                               "sammy_runDIR": runDIR
                               })
 
-    E = fine_egrid(energy_range)
+    E = fine_egrid((energy_range[0]+1e-3, energy_range[-1]-1e-3))
 
     exp_theo = Experimental_Model(title = "theo",
                                       reaction='total',

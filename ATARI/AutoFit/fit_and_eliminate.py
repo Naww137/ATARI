@@ -911,7 +911,8 @@ class FitAndEliminate:
             Gn_value = initial_feature_bank.loc[j,'Gn1']
             GN_LIMIT = 0.000100
             if abs(Gn_value) < GN_LIMIT:
-                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                if self.options.print_bool:     print('A resonance is becoming too small. Stopping varied widths.')
+                N_minus_1_ifb = self.set_no_smaller_resonance(initial_feature_bank, j, GN_LIMIT)
                 ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
                 prior_chars = self.evaluate_prior(ladder)
 
@@ -1181,8 +1182,7 @@ class FitAndEliminate:
         time_proc = time.time() - time_start
 
         return sammy_OUT, time_proc, sammy_OUT.total_derivative_evaluations
-
-
+    
     def remove_resonance(self,
                          ladder: pd.DataFrame,
                          index_to_remove: int):
@@ -1197,3 +1197,17 @@ class FitAndEliminate:
             raise ValueError(f'Invalid index {index_to_remove}\n\nladder:\n{ladder}')
         return new_ladder, removed_row
     
+    def set_no_smaller_resonance(self,
+                         ladder: pd.DataFrame,
+                         index_to_fix: int,
+                         Gn_limit: float):
+        """..."""
+
+        if index_to_fix in ladder.index:
+            new_ladder = copy(ladder)
+            new_ladder.loc[index_to_fix,'varyGn1'] = 0
+            new_ladder.loc[index_to_fix,'Gn1'] = Gn_limit
+        else:
+            if self.options.print_bool: print(ladder)
+            raise ValueError(f'Invalid index {index_to_fix}\n\nladder:\n{ladder}')
+        return new_ladder

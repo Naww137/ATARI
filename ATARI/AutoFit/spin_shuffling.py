@@ -115,7 +115,8 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                  target_Nres:int=None, unique_cases_only:bool=False,
                                  rng:np.random.Generator=None, seed:int=None,
                                  verbose:bool=False,
-                                 no_shuffle_indices = []):
+                                 no_shuffle_indices = [],
+                                 no_wigner_indices = []):
     """
     ...
     """
@@ -140,7 +141,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
 
     # Check if there is enough resonances to generate the desired number of shuffles:
     respar_prior_mask_in_window = (respar_prior['E'] > window_E_bounds[0]) & (respar_prior['E'] < window_E_bounds[1])
-    num_res_prior = len(respar_prior[respar_prior_mask_in_window])
+    num_res_prior = len(respar_prior.loc[respar_prior_mask_in_window])
     if unique_cases_only and (num_shuffles > len(particle_pair.spin_groups)**num_res_prior):
         raise RuntimeError(f'With {num_res_prior} resonances in the prior window, there are not enough unique cases to generate {num_shuffles} shuffles.')
     
@@ -160,15 +161,18 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
     if verbose:
         print('Shuffling Spingroups')
     for attempt in range(1000):
-        shuffled_respars = shuffle_spingroups(respar=respar_prior, particle_pair=particle_pair,
+        shuffled_respars = shuffle_spingroups(respar=respar_prior[~respar_prior.index.isin(no_wigner_indices)], particle_pair=particle_pair,
                                             num_shuffles=num_shuffles_per_attempt,
                                             window_E_bounds=window_E_bounds,
                                             false_dens=false_dens, false_width_dist=false_width_dist,
                                             no_shuffle_indices=no_shuffle_indices,
                                             rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
+        shuffled_respars = [pd.concat((respar_prior.loc[no_wigner_indices], shuffled_respar)) for shuffled_respar in shuffled_respars]
         
         # Only accept shuffles that have the desired size:
         for shuffled_respar in shuffled_respars:
+            print('CANDIDATE RESONANCE PARAMETERS:')
+            print(shuffled_respar)
             
             # Checking if shuffle meets target number of resonances:
             respar_mask_in_window = (shuffled_respar['E'] > window_E_bounds[0]) & (shuffled_respar['E'] < window_E_bounds[1])

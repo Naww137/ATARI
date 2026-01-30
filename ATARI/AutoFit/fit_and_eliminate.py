@@ -920,27 +920,27 @@ class FitAndEliminate:
                 best_prior_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
                                                 self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
-                best_prior_model_chars = prior_chars
-                any_prior_passed_test = True
-                best_removed_resonance_prior = j
-                priors_passed_cnt = 1
+                # best_prior_model_chars = prior_chars
+                # any_prior_passed_test = True
+                # best_removed_resonance_prior = j
+                # priors_passed_cnt = 1
                 break
-            
-            # Skip if side resonances
-            # if j in fixed_resonances_indices:
-            #     if (self.options.print_bool):
-            #         print('Warning!')
-            #         print(f'Res. index {j} in fixed:')
-            #         print()
-            #         print(fixed_resonances)
-            #         print()
-            #     continue
-            
-            ### Create and evaluate a ladder with the j-th resonance removed
-            # note - always keep the side-resonances
-            N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
-            ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
-            prior_chars = self.evaluate_prior(ladder) 
+            else:
+                # Skip if side resonances
+                # if j in fixed_resonances_indices:
+                #     if (self.options.print_bool):
+                #         print('Warning!')
+                #         print(f'Res. index {j} in fixed:')
+                #         print()
+                #         print(fixed_resonances)
+                #         print()
+                #     continue
+                
+                ### Create and evaluate a ladder with the j-th resonance removed
+                # note - always keep the side-resonances
+                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
+                prior_chars = self.evaluate_prior(ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
 

@@ -33,6 +33,7 @@ def get_Gs_Ts(resonance_ladder,
         Ts.append(sammy_out.pw[key].values)
         pw_list.append(sammy_out.pw)
 
+    # print('SAMMY PAR DERIV:', sammy_out.par)
     return Gs, Ts, pw_list
 
 def get_Ds_Vs(datasets, covariance_data, normalization_uncertainty = 0.0384200, idc_at_theory = False):
@@ -166,7 +167,6 @@ def get_derivatives_for_step(rto, D, V,
 
     # zero derivative for parameters not varied
     if zero_derivs_at_no_vary:
-        print('Zeroing Res. Lad.:', res_lad)
         G = zero_G_at_no_vary(G, res_lad)
 
     if V_is_inv:
@@ -192,6 +192,8 @@ def get_derivatives_for_step(rto, D, V,
 
     # Zeroing out non-varied resonances:
     if zero_derivs_at_no_vary:
+        # print('Zeroing Res. Lad.:', res_lad)
+
         indices_e = 3*res_lad.index[res_lad['varyE'] == 0].to_numpy()
         indices_g = 3*res_lad.index[res_lad['varyGg'] == 0].to_numpy() + 1
         indices_n = 3*res_lad.index[res_lad['varyGn1'] == 0].to_numpy()  + 2
@@ -309,7 +311,8 @@ def take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode="LMa", m
     max_estep = 0.05 
     total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
     
-    total_gradient[i_no_step] = 0
+    # print('SHAPES:', total_gradient.shape, i_no_step)
+    # total_gradient[i_no_step] = 0
 
     return Pu - total_gradient
 
@@ -381,11 +384,11 @@ def fit(rto,
     obj_log = []
 
     total_derivative_evaluations = 0
-    original_order = starting_ladder.reset_index().sort_values(by=['J_ID', 'E']).index
-    original_order = np.argsort(original_order)
+    # original_order = starting_ladder.reset_index().sort_values(by=['varyE', 'J_ID', 'E']).index
+    # original_order = np.argsort(original_order)
     # print('Start:', starting_ladder)
     # print('Order:', original_order)
-    starting_ladder.sort_values(by=['J_ID', 'E'], inplace=True)
+    # starting_ladder.sort_values(by=['varyE', 'J_ID', 'E'], inplace=True)
     # print('Reordered:', starting_ladder)
     # res_lad_ordered = starting_ladder.reset_index(drop=True).loc[original_order].reset_index()
     # print('Back to Start:', res_lad_ordered)
@@ -395,7 +398,8 @@ def fit(rto,
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
-        chi2, jac_next, hess, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data, experiments, inp_for_theory, V_is_inv=V_is_inv, covs=covs, Porter_Thomas_fitting=Porter_Thomas_fitting, Wigner_fitting=Wigner_fitting)
+        chi2, jac_next, hess_next, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data, experiments, inp_for_theory, V_is_inv=V_is_inv, covs=covs, Porter_Thomas_fitting=Porter_Thomas_fitting, Wigner_fitting=Wigner_fitting)
+        # jac = jac_next
         total_derivative_evaluations += 1
         reg_pen, dreg_dpar_next = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
                                                                     lasso =lasso, lasso_parameters = lasso_parameters,
@@ -433,7 +437,8 @@ def fit(rto,
                             print(f"\t\t{np.round(float(alpha),8):<10}: {obj_temp:.2f}\t{chi2_temp:.2f}")
                         if obj_temp < obj_log[istep-1] or alpha==minV: # or abs(obj_temp - obj_log[istep-1])<thresh:
                         # if Dobj < thresh or alpha==minV:
-                            obj, chi2, jac_next, hess, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, jac_temp, hess_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
+                            obj, chi2, jac_next, hess_next, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, jac_temp, hess_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
+                            # jac = jac_next
                             Pu_next = Pu_temp
                             break
                         else:
@@ -461,11 +466,12 @@ def fit(rto,
             print(f"{int(istep)}\t{np.round(float(alpha),7):<8}:\t{obj:.2f}\t{chi2:.2f}")
 
         ### Put res ladder order back to how it started
-        res_lad_ordered = res_lad.reset_index(drop=True).loc[original_order].reset_index(drop=True)
+        res_lad_ordered = res_lad#.reset_index(drop=True).loc[original_order].reset_index(drop=True)
         
         ### update Pu to Pu_next and save things
         Pu = Pu_next
         jac = jac_next
+        hess = hess_next
         dreg_dpar = dreg_dpar_next
         obj_log.append(obj)
         chi2_log.append(chi2)
@@ -479,7 +485,7 @@ def fit(rto,
         Pu_next = take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode=mode)
 
     # print('Unordered Final Ladder:', res_lad)
-    print('Final Ladder:', res_lad_ordered)
+    # print('Final Ladder:', res_lad_ordered)
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
 

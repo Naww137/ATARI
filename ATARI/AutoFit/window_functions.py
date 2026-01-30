@@ -10,6 +10,7 @@ from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
 from ATARI.sammy_interface.sammy_classes import SolverOPTs, SammyRunTimeOptions
 from ATARI.utils.datacontainers import Evaluation_Data
 from ATARI.AutoFit.spin_shuffling import minimize_spingroup_shuffling
+from ATARI.AutoFit.functions import objective_func
 
 def get_windows(resonance_energies_start, resonances_per_window, data_overlap, external_resonance_buffer, total_data_range, data_overlap_fraction = None, minimum_step=5):
 
@@ -540,6 +541,7 @@ def execute_stage_3(energy_range_total:tuple,
                     eval_data:Evaluation_Data,
 
                     do_shuffle:bool=True,
+                    do_not_accept_prior:bool=True,
                     num_shuffles:int=10,
                     variable_selection:str='chi2',
 
@@ -547,6 +549,7 @@ def execute_stage_3(energy_range_total:tuple,
                     data_overlap_fraction:float = 0.25,
                     parameter_buffer:float = 5.0, # eV
                     data_buffer:float = 2.0, # eV
+
                     ):
     
     assert 0.0 < data_overlap_fraction < 1.0, 'Overlap fraction must be a number between 0 and 1.'
@@ -562,35 +565,31 @@ def execute_stage_3(energy_range_total:tuple,
         eval_data_trunc = eval_data.truncate(data_range_data_buffer)
         solver = Solver_factory(sammy_rto, solver_opts._solver, solver_opts, particle_pair, eval_data_trunc)
         solver.set_bayes(True)
-        # solver_no_bayes = copy(solver)
-        # solver_no_bayes.set_bayes(False)
 
         mask_param = (full_ladder.E>data_range_param[0]) & (full_ladder.E<data_range_param[1])
         res_ladder_internal = full_ladder.loc[mask_param].copy()
         mask_can_vary = (res_ladder_internal.E > data_range[0]) & (res_ladder_internal.E < data_range[1])
         res_ladder_can_vary = res_ladder_internal.loc[mask_can_vary].copy()#.reset_index(drop=True)
         res_ladder_fixed = res_ladder_internal.loc[~mask_can_vary].copy()
-        # res_ladder_fixed.sort_values(by='E', inplace=True)
-        # res_ladder_fixed.reset_index(drop=True, inplace=True)
         vary_cols = [col for col in res_ladder_fixed.columns if col.startswith("vary")]
         res_ladder_fixed[vary_cols] = 0
-        # ext_res = find_external_levels(particle_pair, data_range_param, return_reduced=False)
-        # ext_res['varyE']   = 0
-        # ext_res['varyGg']  = 0
-        # ext_res['varyGn1'] = 1
-        # res_ladder_fixed = pd.concat((ext_res, res_ladder_fixed), join='outer', ignore_index=True)
+        # res_ladder_external = find_external_levels(particle_pair, data_range_param, return_reduced=False)
+        # res_ladder_external.index = [-i for i in range(1,len(res_ladder_external)+1)]
+        # res_ladder_external['varyE'] = 0.0; res_ladder_external['varyGg'] = 0.0; res_ladder_external['varyGn1'] = 0.0
+        # res_ladder_comb = pd.concat((res_ladder_external, res_ladder_fixed, res_ladder_can_vary))
         res_ladder_comb = pd.concat((res_ladder_fixed, res_ladder_can_vary))
-        # res_ladder_comb.reset_index(drop=True, inplace=True)
+
         # FIXME: THIS IS A PATCHFIX FOR AN UNDERLYING PROBLEM OF UNKNOWN SOURCE:
-        # res_ladder_comb.drop(columns=[] inplace=True)
         res_ladder_comb['Gn2'] = 0.0
         res_ladder_comb['Gn3'] = 0.0
         res_ladder_comb['varyGn2'] = 0.0
         res_ladder_comb['varyGn3'] = 0.0
 
-        # fixed_indices_window = [i for i in range(len(res_ladder_fixed))]
-        # varied_indices_window = [i for i in range(len(res_ladder_fixed), len(res_ladder_comb))]
-        fixed_spingroup_indices = res_ladder_comb.index[res_ladder_comb.E < data_range[0]]
+        fixed_spingroup_indices = res_ladder_internal.index[(res_ladder_internal.E < data_range[0]) | (res_ladder_internal.E > data_range_param[-1])]
+        fixed_resonance_indices = res_ladder_internal.index[(res_ladder_internal.E < data_range[0]) | (res_ladder_internal.E > data_range[-1])]
+
+
+
         
         # samout = solver_no_bayes.fit(res_ladder_comb, fixed_indices_window)
         # print('chi2:', np.sum(samout.chi2)/eval_data_trunc.N)
@@ -599,25 +598,58 @@ def execute_stage_3(energy_range_total:tuple,
         particle_pair.resonance_ladder = res_ladder_comb
         particle_pair.energy_range = data_range_param
         if do_shuffle:
-            spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_spingroup_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
-            samout_best = None
-            obj_best    = np.inf
+            print('Shuffling On!')
+            # spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_resonance_indices, no_shuffle_indices=fixed_spingroup_indices, no_wigner_indices=res_ladder_external.index, verbose=True)
+            spin_shuffle_cases = minimize_spingroup_shuffling(res_ladder_comb, solver, num_shuffles=num_shuffles, window_E_bounds=data_range_param, model_selection=variable_selection, fixed_resonance_indices=fixed_resonance_indices, no_shuffle_indices=fixed_spingroup_indices, verbose=True)
+            if do_not_accept_prior:
+                samout_best = None
+                obj_best    = np.inf
+            else:
+                samout_best = solver.fit(res_ladder_comb, external_resonance_indices=fixed_spingroup_indices)
+                if   variable_selection == 'chi2':
+                    Wig_informed = False
+                    PT_informed  = False
+                elif variable_selection == 'chi2+PT':
+                    Wig_informed = False
+                    PT_informed  = True
+                elif variable_selection == 'chi2+Wig':
+                    Wig_informed = True
+                    PT_informed  = False
+                elif variable_selection in ('chi2+Wig+PT','chi2+PT+Wig'):
+                    Wig_informed = True
+                    PT_informed  = True
+                else:
+                    raise ValueError(f'Unknown model selection criteria, "{variable_selection}".')
+                chi2 = np.sum(samout_best.chi2)
+                obj_best    = objective_func(chi2=chi2, res_ladder=samout_best.par_post, particle_pair=particle_pair, fixed_resonances_indices=fixed_resonance_indices,
+                                    Wigner_informed=Wig_informed, PorterThomas_informed=PT_informed)
+                print(f'Prior Objective = {obj_best:.5f}')
             for spin_shuffle_case in spin_shuffle_cases:
                 if spin_shuffle_case['obj_value'] < obj_best:
                     obj_best = spin_shuffle_case['obj_value']
                     samout_best = spin_shuffle_case['sammy_out']
             respar_window = samout_best.par_post
+            respar_window.index = res_ladder_comb.index # ensure the index is consistent
+            print(f'Best Objective = {obj_best:.5f}')
         else:
-            samout = solver.fit(res_ladder_comb, external_resonance_indices=fixed_spingroup_indices)
-            respar_window = samout.par_post
-        # mask_full = (full_ladder.E>data_range[0]) & (full_ladder.E<data_range[1])
-        # non_vary_cols = [col for col in res_ladder_fixed.columns if not col.startswith("vary")]
-        # print(res_ladder_comb)
+            print('Shuffling Off!')
+            if any(res_ladder_comb.varyE) or any(res_ladder_comb.varyGg) or any(res_ladder_comb.varyGn1):
+                samout = solver.fit(res_ladder_comb, external_resonance_indices=fixed_spingroup_indices)
+                respar_window = samout.par_post
+                respar_window.index = res_ladder_comb.index # ensure the index is consistent
+            else:
+                respar_window = res_ladder_comb
+
         print('\nRefit Window:')
         print(respar_window)
-        assert len(respar_window) == len(res_ladder_comb)
+
+        assert len(respar_window) == len(res_ladder_comb), 'The prior and posterior windows do not have the same size.'
+        assert all(respar_window.loc[fixed_resonance_indices,['E','Gg','Gn1']] == res_ladder_comb.loc[fixed_resonance_indices,['E','Gg','Gn1']]), 'The windows do not have the same fixed parameters.'
+        # assert all(respar_window.loc[fixed_spingroup_indices,'J_ID'] == res_ladder_comb.loc[fixed_spingroup_indices,'J_ID']), 'The windows do not have the same fixed spingroups.'
+        
         full_ladder.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']] = respar_window.loc[res_ladder_can_vary.index,['E','Gg','Gn1','J_ID']]
-        assert len(full_ladder) == len(resonance_ladder)
+        
+        assert len(full_ladder) == len(resonance_ladder), 'The prior and posterior full ladders do not have the same size.'
 
         # print(full_ladder)
 

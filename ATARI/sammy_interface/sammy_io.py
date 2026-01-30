@@ -397,11 +397,17 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
 
 def check_sampar_inputs(df):
     # Small perurbation for duplicate resonances
-    duplicates = df.duplicated(subset=['E', 'J_ID'], keep=False)
-    if duplicates.any():
+    df_rounded = copy(df)
+    df_rounded['E'] = df['E'].round(4)
+    duplicates = df_rounded.duplicated(subset=['E', 'J_ID'], keep=False)
+    while duplicates.any():
         random_signs = np.sign(np.random.default_rng().uniform(-1, 1, size=duplicates.sum()))
         random_mags = np.random.default_rng().uniform(5e-6, 5e-5, size=duplicates.sum())
         df.loc[duplicates, 'E'] += random_signs*random_mags
+
+        df_rounded = copy(df)
+        df_rounded['E'] = df['E'].round(4)
+        duplicates = df_rounded.duplicated(subset=['E', 'J_ID'], keep=False)
     return df
 
 

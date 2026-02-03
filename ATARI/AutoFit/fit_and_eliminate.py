@@ -911,7 +911,8 @@ class FitAndEliminate:
             Gn_value = initial_feature_bank.loc[j,'Gn1']
             GN_LIMIT = 0.000100
             if abs(Gn_value) < GN_LIMIT:
-                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                if self.options.print_bool:     print('A resonance is becoming too small. Stopping varied widths.')
+                N_minus_1_ifb = self.set_no_smaller_resonance(initial_feature_bank, j, GN_LIMIT)
                 ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
                 prior_chars = self.evaluate_prior(ladder)
 
@@ -919,27 +920,27 @@ class FitAndEliminate:
                 best_prior_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
                                                 self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
-                best_prior_model_chars = prior_chars
-                any_prior_passed_test = True
-                best_removed_resonance_prior = j
-                priors_passed_cnt = 1
+                # best_prior_model_chars = prior_chars
+                # any_prior_passed_test = True
+                # best_removed_resonance_prior = j
+                # priors_passed_cnt = 1
                 break
-            
-            # Skip if side resonances
-            # if j in fixed_resonances_indices:
-            #     if (self.options.print_bool):
-            #         print('Warning!')
-            #         print(f'Res. index {j} in fixed:')
-            #         print()
-            #         print(fixed_resonances)
-            #         print()
-            #     continue
-            
-            ### Create and evaluate a ladder with the j-th resonance removed
-            # note - always keep the side-resonances
-            N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
-            ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
-            prior_chars = self.evaluate_prior(ladder) 
+            else:
+                # Skip if side resonances
+                # if j in fixed_resonances_indices:
+                #     if (self.options.print_bool):
+                #         print('Warning!')
+                #         print(f'Res. index {j} in fixed:')
+                #         print()
+                #         print(fixed_resonances)
+                #         print()
+                #     continue
+                
+                ### Create and evaluate a ladder with the j-th resonance removed
+                # note - always keep the side-resonances
+                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
+                prior_chars = self.evaluate_prior(ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
 
@@ -1181,8 +1182,7 @@ class FitAndEliminate:
         time_proc = time.time() - time_start
 
         return sammy_OUT, time_proc, sammy_OUT.total_derivative_evaluations
-
-
+    
     def remove_resonance(self,
                          ladder: pd.DataFrame,
                          index_to_remove: int):
@@ -1197,3 +1197,17 @@ class FitAndEliminate:
             raise ValueError(f'Invalid index {index_to_remove}\n\nladder:\n{ladder}')
         return new_ladder, removed_row
     
+    def set_no_smaller_resonance(self,
+                         ladder: pd.DataFrame,
+                         index_to_fix: int,
+                         Gn_limit: float):
+        """..."""
+
+        if index_to_fix in ladder.index:
+            new_ladder = copy(ladder)
+            new_ladder.loc[index_to_fix,'varyGn1'] = 0
+            new_ladder.loc[index_to_fix,'Gn1'] = Gn_limit
+        else:
+            if self.options.print_bool: print(ladder)
+            raise ValueError(f'Invalid index {index_to_fix}\n\nladder:\n{ladder}')
+        return new_ladder

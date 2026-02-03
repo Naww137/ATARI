@@ -279,7 +279,7 @@ def sample_GE_eigs(num_eigs:int, beta:int=1,
     eigs.sort()
     return eigs
 
-def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
+def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1, fraction_drop:float=0.2,
                        rng=None, seed:Optional[int]=None):
     """
     Samples GOE (β = 1), GUE (β = 2), or GSE (β = 4) resonance energies within a given energy
@@ -294,6 +294,8 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
     beta : 1, 2, or 4
         The ensemble parameter, where β = 1 is GOE, β = 2 is GUE, and β = 4 is GSE.
         Default is β = 1.
+    fraction_drop : float
+        The fraction of eigenvalues to drop at the margins. >0.2 is suggested.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -316,24 +318,24 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    margin = 0.1 # a margin of safety where we consider the GOE samples to properly follow the semicircle law. This removes tails that diverge from the semicircle law.
     E_limits = (min(E_range), max(E_range))
     num_res_est = (E_limits[1]-E_limits[0]) / avg_level_spacing # estimate number of resonances
-    num_res_tot = round((1 + 2*margin) * num_res_est) # number of resonances sampled (estimate + buffer)
+    num_res_tot = round(num_res_est / (1-fraction_drop)) # number of resonances sampled (estimate + buffer)
 
     eigs = sample_GE_eigs(num_res_tot, beta=beta, rng=rng)
     eigs /= 2*np.sqrt(num_res_tot)
-    eigs = eigs[eigs > -1.0+margin]
-    eigs = eigs[eigs <  1.0-margin]
+    eigs = eigs[eigs > -1.0+fraction_drop]
+    eigs = eigs[eigs <  1.0-fraction_drop]
 
     # Using semicircle law CDF to make the resonances uniformly spaced:
     # Source: https://github.com/LLNL/fudge/blob/master/brownies/BNL/restools/level_generator.py
-    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+margin))
+    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+fraction_drop))
+    # E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+margin))
     E_res = E_res[E_res < E_limits[1]]
     E_res = np.sort(E_res)
     return E_res
 
-def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
+def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE', fraction_drop:float=0.2,
                       rng=None, seed=None):
     """
     Sample the resonance energy levels.
@@ -356,6 +358,8 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
         GUE : Gaussian Unitary Ensemble
         GSE : Gaussian Symplectic Ensemble
         Poisson : Poisson Ensemble
+    fraction_drop : float
+        The fraction of eigenvalues to drop at the margins. >0.2 is suggested.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -397,15 +401,15 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    if ensemble == 'NNE': # Nearest Neighbor Ensemble
+    if ensemble.lower() == 'nne': # Nearest Neighbor Ensemble
         levels = sample_NNE_energies(E_range, avg_level_spacing, rng=rng)
-    elif ensemble == 'GOE': # Gaussian Orthogonal Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=1, rng=rng)
-    elif ensemble == 'GUE': # Gaussian Unitary Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=2, rng=rng)
-    elif ensemble == 'GSE': # Gaussian Symplectic Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=4, rng=rng)
-    elif ensemble == 'Poisson': # Poisson Ensemble (i.i.d. resonances)
+    elif ensemble.lower() == 'goe': # Gaussian Orthogonal Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=1, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'gue': # Gaussian Unitary Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=2, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'gse': # Gaussian Symplectic Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=4, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'poisson': # Poisson Ensemble (i.i.d. resonances)
         E_limits = (min(E_range), max(E_range))
         num_samples = rng.poisson((E_limits[1] - E_limits[0]) / avg_level_spacing)
         levels = rng.uniform(*E_limits, size=num_samples)
@@ -505,6 +509,63 @@ def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=
     array([0.30326533, 0.1432524 , 0.11156508])
     """
     return porter_thomas_dist.pdf(x=x, mean=avg_reduced_width_square, df=DOF, trunc=trunc)
+
+# =====================================================================
+# Gaussian Ensemble Number Variance
+# =====================================================================
+
+def num_variance_GE(N_exp, beta:int=1):
+    """
+    Calculates the variance for the number of parameters.
+    
+    Parameters
+    ----------
+    N_exp : array-like of float
+        The expected number(s) of resonances in a window.
+    beta : 1, 2, or 4
+        The ensemble to consider, corresponding to GOE, GUE, and GSE respectively.
+
+    Returns
+    ----------
+    """
+
+    EULER_CONST = 0.5772156649
+    if   beta == 1:
+        d = 2
+        e = -np.pi**2 / 8
+    elif beta == 2:
+        d = 2
+        e = 0
+    elif beta == 4:
+        d = 4
+        e = np.pi**2 / 8
+    else:
+        raise ValueError(f'"beta" value of {beta} is invalid.')
+    c = (2/np.pi**2) / beta
+    num_var = c * (np.log(d*np.pi*N_exp) + EULER_CONST + 1 + e)
+    return num_var
+
+def find_number_variance(particle_pair, window_size:tuple, ensemble:str='GOE'):
+    """
+    ...
+    """
+
+    # Collecting mean level spacings:
+    if   ensemble.lower() == 'goe': # Gaussian Orthogonal Ensemble
+        beta = 1
+    elif ensemble.lower() == 'gue': # Gaussian Unitary Ensemble
+        beta = 2
+    elif ensemble.lower() == 'gse': # Gaussian Symplectic Ensemble
+        beta = 4
+
+    num_var_tot = 0.0
+    for Jpi, spingroup in particle_pair.spin_groups.items():
+        mean_lvl_spacing = spingroup['<D>']
+        num_res_exp = np.sum((window_size[1] - window_size[0])/mean_lvl_spacing)
+        num_var = num_variance_GE(num_res_exp, beta=beta)
+        num_var_tot += num_var
+
+    return num_var_tot
 
 # =====================================================================
 # Dyson Mehta ∆3 Metric

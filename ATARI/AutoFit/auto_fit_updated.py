@@ -2,6 +2,7 @@ from copy import copy
 from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
 from ATARI.AutoFit.fit_and_eliminate import FitAndEliminate, FitAndEliminateOPT, FitAndEliminateOUT
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SolverOPTs, Particle_Pair, SammyOutputData
+from ATARI.theory.resonance_statistics import num_variance_GE
 import numpy as np
 from typing import Optional, List, Union
 from dataclasses import dataclass
@@ -14,23 +15,25 @@ from ATARI.utils.datacontainers import Evaluation
 from ATARI.AutoFit.functions import * 
 from ATARI.AutoFit.cross_validation import find_CV_scores, find_model_complexity
 
-def find_max_num_resonances(particle_pair:Particle_Pair, window_size:tuple, tol:float=1e-2):
-    """
-    ...
-    """
+# def find_max_num_resonances(particle_pair:Particle_Pair, window_size:tuple, tol:float=1e-2):
+#     """
+#     ...
+#     """
 
-    # Collecting mean level spacings:
-    mean_lvl_spacings = []
-    for Jpi, spingroup in particle_pair.spin_groups.items():
-        mean_lvl_spacing = spingroup['<D>']
-        mean_lvl_spacings.append(mean_lvl_spacing)
-    num_spingroups = len(mean_lvl_spacings)
+#     # Collecting mean level spacings:
+#     mean_lvl_spacings = []
+#     for Jpi, spingroup in particle_pair.spin_groups.items():
+#         mean_lvl_spacing = spingroup['<D>']
+#         num_res_exp_sg = np.sum((window_size[1] - window_size[0])/mean_lvl_spacing)
+#         num_var = num_variance_GE(num_res_exp_sg)
+#         mean_lvl_spacings.append(mean_lvl_spacing)
+#     num_spingroups = len(mean_lvl_spacings)
 
-    num_res_exp = np.sum((window_size[1] - window_size[0])/np.array(mean_lvl_spacing))
-    std_of_num_res = 2.0 # according to GOE, the STD of the number of resonances asymptotically approaches 2
-    num_std_desired = -norm.ppf(tol)
-    num_res_max = ceil(num_res_exp + std_of_num_res * num_std_desired * np.sqrt(num_spingroups))
-    return num_res_max
+#     num_res_exp = np.sum((window_size[1] - window_size[0])/np.array(mean_lvl_spacing))
+#     std_of_num_res = np.sqrt(num_variance_GE(num_res_exp)) # according to GOE, the STD of the number of resonances asymptotically approaches 2
+#     num_std_desired = -norm.ppf(tol)
+#     num_res_max = ceil(num_res_exp + std_of_num_res * num_std_desired * np.sqrt(num_spingroups))
+#     return num_res_max
 
 
 # @dataclass
@@ -159,7 +162,7 @@ class AutoFit:
             self.output.final_samout = sammyOUT
             return self.output
         
-        Nres_max_num_res = find_max_num_resonances(self.particle_pair, window_size=self.fit_and_elim_options.E_window_spin)
+        Nres_max_num_res = 9
 
         ### Run CV
         if not hasattr(self.options,'Nres_selected') \

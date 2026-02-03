@@ -163,7 +163,7 @@ class Syndat_Model:
                particle_pair: Optional[Particle_Pair] = None,
                sammyRTO = None,
                num_samples:int = 1,
-               save_raw_data:bool = False,
+               save_raw_data:bool = True,
                pw_true: Optional[pd.DataFrame] = None
                ):
         """

@@ -109,7 +109,7 @@ def readpar(filepath):
                 start += width
             data.append(row)
     df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
-    return df.dropna(axis=1)
+    return df.dropna(how='all', axis=1).fillna(value=0.0)
 
 
 def read_ECSCM(file_path):

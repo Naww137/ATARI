@@ -2,7 +2,7 @@ from typing import Protocol
 from ATARI.AutoFit.functions import * #eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 import numpy as np
 import pandas as pd
-from copy import copy
+from copy import copy, deepcopy
 from ATARI.AutoFit import sammy_interface_bindings
 from ATARI.AutoFit.spin_shuffling import minimize_spingroup_shuffling
 from ATARI.ModelData.particle_pair import Particle_Pair
@@ -75,6 +75,7 @@ class FitAndEliminateOPT:
     def __init__(self, **kwargs):
 
         ### Initial fit settings
+        self._initial_fit_only_trans = True
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,0,1]
         self._width_elimination = False
@@ -150,6 +151,13 @@ class FitAndEliminateOPT:
         self._PorterThomas_informed_variable_selection = PorterThomas_informed_variable_selection
 
     ### Initial Fit Opts
+    @property
+    def initial_fit_only_trans(self):
+        return self._initial_fit_only_trans
+    @initial_fit_only_trans.setter()
+    def initial_fit_only_trans(self, initial_fit_only_trans):
+        self._initial_fit_only_trans = initial_fit_only_trans
+
     @property
     def fitpar1(self):
         return self._fitpar1
@@ -378,6 +386,27 @@ class FitAndEliminate:
                     initial_feature_bank,
                     fixed_resonance_ladder = pd.DataFrame(),
                     ):
+        
+        if self.options.initial_fit_only_trans:
+            if self.options.print_bool: 
+                print("========================================\nInitial Fit 0\n========================================")
+                print("Fitting Gn >> Gg resonances with only transmission or total cross section")
+
+            initial_feature_bank = update_vary_resonance_ladder(initial_feature_bank, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
+            if self.options.print_bool: 
+                print('Initial Feature Bank:')
+                print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
+                print()
+
+            total_resonance_ladder, fixed_resonance_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
+            self.output.external_resonance_indices = fixed_resonance_indices
+
+            samout = self.fit_with_total_only(total_resonance_ladder, fixed_resonance_indices)
+            reslad_0 = samout.par_post
+            assert(isinstance(reslad_0, pd.DataFrame)), f'\nResonance Ladder:\n{reslad_0}'
+
+            initial_feature_bank, fixed_resonance_ladder = separate_external_resonance_ladder(reslad_0, fixed_resonance_indices)
+
 
         ### Fit 1 on Gn only
         if self.options.print_bool: 
@@ -431,6 +460,28 @@ class FitAndEliminate:
         
         return samout_final 
     
+
+
+    def fit_with_total_only(self, resonance_ladder, external_resonance_indices):
+
+        if self.options.print_bool: print("Initial solve with total only to capture large resonances\n")
+
+        # 
+        solver_initial_total_only = deepcopy(self.solver_initial)
+        reactions = [experiment.reaction for experiment in self.solver_initial.sammyINP.experiments[0]]
+        for i,reaction in enumerate(reactions):
+            if reaction not in ('total', 'transmission'):
+                del self.solver_initial.sammyINP.experiments[i]
+                if self.solver_initial.sammyINP.experimental_covariance is not None:
+                    del self.solver_initial.sammyINP.experimental_covariance[i]
+                if self.solver_initial.sammyINP.experiments_no_pup is not None:
+                    del self.solver_initial.sammyINP.experiments_no_pup[i]
+                if self.solver_initial.sammyINP.measurement_models is not None:
+                    del self.solver_initial.sammyINP.measurement_models[i]
+
+        solver_initial_total_only.set_bayes(True)
+        sammyOUT_fit = solver_initial_total_only.fit(resonance_ladder, external_resonance_indices)
+        return sammyOUT_fit
 
 
     def fit_and_eliminate_by_Gn(self, resonance_ladder, external_resonance_indices):

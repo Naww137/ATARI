@@ -4,7 +4,7 @@ from copy import copy
 import warnings
 
 from ATARI.theory.resonance_statistics import wigner_LL, width_LL, find_external_levels
-from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.theory.scattering_params import FofE_recursive, gstat
 from ATARI.utils.atario import add_Gw_from_gw
 
 
@@ -92,9 +92,9 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
     Ls   = np.empty((num_Er,), dtype=int)
     num_sgs = len(spin_groups)
     for isg, (jpi_, spin_group) in enumerate(spin_groups.items()):
+        J = abs(float(jpi_))
         gg2 [isg::num_sgs] = spin_group["<gg2>"] * starting_Gg_multiplier
-        gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier
-        # gn2 [isg::(2*num_sgs)] *= -1
+        gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier / gstat(J, particle_pair.I, particle_pair.i)
         J_ID[isg::num_sgs] = spin_group['J_ID']
         Jpi [isg::num_sgs] = jpi_
         Ls  [isg::num_sgs] = spin_group['Ls'][0]

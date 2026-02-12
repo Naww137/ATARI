@@ -360,6 +360,23 @@ class Reaction:
         P = 1.0 # penetrability is 1 for capture widths
         return g2_to_G(self.gg2m, P)
     
+    def gstat(self, J:float):
+        """
+        Calculates the spin statistical factor.
+
+        Parameters
+        ----------
+        J : float, array-like
+            The total angular momentum(s)
+
+        Returns
+        -------
+        gJ : float, array-like
+            The spin statistical factor(s)
+        """
+        gJ = (2*J+1)/((2*self.proj.I+1)*(2*self.targ.I+1))
+        return gJ
+    
     def __repr__(self):
         txt = ''
         txt += f'Target Particle      = {self.targ.name}\n'

@@ -504,7 +504,7 @@ class Particle_Pair:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -522,8 +522,8 @@ class Particle_Pair:
             N = len(levels)
 
             # sample reduced widths
-            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], rng=rng)
-            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)
+            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], signed=False, rng=rng)
+            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], signed=False, rng=rng)
 
             # convert to partial widths with checks for multiple channels not-implemented error
             # if len(Jinfo["Ls"]) > 1:
@@ -871,7 +871,7 @@ class Particle_Pair:
 #         # Random number generator:
 #         if rng is None:
 #             if seed is None:
-#                 rng = np.random # uses np.random.seed
+#                 rng = np.random.default_rng() # uses np.random.seed
 #             else:
 #                 rng = np.random.default_rng(seed) # generates rng from provided seed
 

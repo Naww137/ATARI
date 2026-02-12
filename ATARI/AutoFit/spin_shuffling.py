@@ -36,6 +36,9 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_
         # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
         # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
 
+    # Maintaining gJ*Gn1:
+    respar_post.loc[selected_index, 'Gn1' ] *= (2*respar.loc[selected_index, 'Jpi']+1) / (2*respar_post.loc[selected_index, 'Jpi']+1)
+
     selected_rows = respar_post.loc[respar_mask_in_window]
     selected_index = selected_rows.loc[spingroups == num_spingroups].index
     respar_post.drop(selected_index, inplace=True)

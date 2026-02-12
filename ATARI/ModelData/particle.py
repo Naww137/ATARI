@@ -113,3 +113,5 @@ class Particle:
 Neutron = Particle(Z=0 , A=1  , I=0.5, mass=mass_neutron, radius=0.08  , name='neutron')
 Proton  = Particle(Z=1 , A=1  , I=0.5, mass=mass_proton , radius=0.0833, name='proton')
 Ta181   = Particle(Z=73, A=181, I=3.5, mass=180.94803   , radius=None  , name='Ta181')
+Zr90    = Particle(Z=40, A=90 , I=0.0, mass=89.90469876 , radius=None  , name='Zr90')
+Zr91    = Particle(Z=40, A=91 , I=2.5, mass=90.90564021 , radius=None  , name='Zr91')

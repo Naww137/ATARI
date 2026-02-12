@@ -175,7 +175,7 @@ def sample_wigner_invCDF(N_samples:int,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -212,7 +212,7 @@ def sample_NNE_energies(E_range, avg_level_spacing:float,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
     
@@ -260,7 +260,7 @@ def sample_GE_eigs(num_eigs:int, beta:int=1,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -314,7 +314,7 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1, fractio
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -397,7 +397,7 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE', frac
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -430,7 +430,7 @@ def wigner_PDF(x, avg_level_spacing:float, beta:int=1):
 
 def sample_RRR_widths(N_levels, 
                       avg_reduced_width_square, 
-                      DOF:int=1, trunc:float=0.0,
+                      DOF:int=1, trunc:float=0.0, signed:bool=True,
                       rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
@@ -448,6 +448,8 @@ def sample_RRR_widths(N_levels,
         Degrees of freedom applied to the PT distiribution (chi-square).
     trunc : float
         All reduced widths below this value are ignored. Default = 0.0.
+    signed : bool
+        Determines if the sampled width should be signed. Default is True.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -461,7 +463,7 @@ def sample_RRR_widths(N_levels,
     # Random number generator:
     if rng is None:
         if seed is None:
-            rng = np.random # uses np.random.seed
+            rng = np.random.default_rng() # uses np.random.seed
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -469,7 +471,10 @@ def sample_RRR_widths(N_levels,
         reduced_widths_square = np.repeat(avg_reduced_width_square, N_levels)
     else:
         reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
-    sign = 2*rng.integers(0, 2, size=N_levels)-1
+    
+    if signed:      sign = 2*rng.integers(0, 2, size=N_levels)-1
+    else:           sign = 1.0
+    
     return np.array(reduced_widths_square * sign, dtype=float)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):

@@ -441,7 +441,7 @@ numerical instability.
                 last_seen[g] = i
                 sampled_groups[i-1,tr] = g
 
-                print(i, prob_sgs, g)
+                # print(i, prob_sgs, g)
 
         # for tr in range(num_trials):
         #     last_seen = np.zeros((G,), dtype='u4') # last seen indices for each spingroup, for each trial
@@ -775,8 +775,8 @@ def transposer(array_in, mapped_dims:Tuple[int], num_dims:int):
         The outgoing array.
     """
 
-    num_working_dim = len(array_in.shape)
-    new_shape = np.concatenate((array_in.shape, [1]*num_working_dim))
+    num_additional_dims = num_dims - len(array_in.shape)
+    new_shape = np.concatenate((array_in.shape, [1]*num_additional_dims)) # FIXME!!!
     permutation = np.arange(len(mapped_dims), num_dims)
     for working_dim, mapped_dim in enumerate(mapped_dims):
         permutation = np.insert(permutation, mapped_dim, working_dim)

@@ -109,6 +109,7 @@ class FitAndEliminateOPT:
         self._print_bool = True
 
         ### Resonance Statistics
+        self._rng = np.random.default_rng()
         self._Wigner_informed_variable_selection = False
         self._PorterThomas_informed_variable_selection = False
 
@@ -141,13 +142,18 @@ class FitAndEliminateOPT:
     @Wigner_informed_variable_selection.setter
     def Wigner_informed_variable_selection(self, Wigner_informed_variable_selection):
         self._Wigner_informed_variable_selection = Wigner_informed_variable_selection
-    
     @property
     def PorterThomas_informed_variable_selection(self):
         return self._PorterThomas_informed_variable_selection
     @PorterThomas_informed_variable_selection.setter
     def PorterThomas_informed_variable_selection(self, PorterThomas_informed_variable_selection):
         self._PorterThomas_informed_variable_selection = PorterThomas_informed_variable_selection
+    @property
+    def rng(self):
+        return self._rng
+    @rng.setter
+    def rng(self, rng):
+        self._rng = rng
 
     ### Initial Fit Opts
     @property
@@ -775,6 +781,8 @@ class FitAndEliminate:
                 print()
 
             if self.options.spin_shuffle:
+                if self.options.E_window_spin is None:
+                    raise ValueError('Please define fit_and_eliminate option "E_window_spin" when using spin group shuffling.')
                 shuffle_selection_criteria = 'chi2'
                 if self.options.Wigner_informed_variable_selection:
                     shuffle_selection_criteria += '+Wig'
@@ -782,7 +790,7 @@ class FitAndEliminate:
                     shuffle_selection_criteria += '+PT'
                 spin_shuffle_cases = minimize_spingroup_shuffling(selected_ladder_chars.par_post, self.solver_eliminate, self.options.num_shuffles,
                                                                   self.options.E_window_spin, model_selection=shuffle_selection_criteria,
-                                                                  fixed_resonance_indices=fixed_resonances_indices)
+                                                                  fixed_resonance_indices=fixed_resonances_indices, rng=self.options.rng)
                 
                 best_shuffle_obj = selected_ladder_obj_post
                 best_shuffle_samout = copy(selected_ladder_chars)

@@ -504,7 +504,7 @@ class Particle_Pair:
         # Random number generator:
         if rng is None:
             if seed is None:
-                rng = np.random # uses np.random.seed
+                rng = np.random.default_rng() # uses np.random.seed
             else:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
@@ -871,7 +871,7 @@ class Particle_Pair:
 #         # Random number generator:
 #         if rng is None:
 #             if seed is None:
-#                 rng = np.random # uses np.random.seed
+#                 rng = np.random.default_rng() # uses np.random.seed
 #             else:
 #                 rng = np.random.default_rng(seed) # generates rng from provided seed
 

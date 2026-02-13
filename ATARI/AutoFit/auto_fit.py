@@ -2,11 +2,14 @@ from copy import copy
 from ATARI.AutoFit.sammy_interface_bindings import Solver_factory
 from ATARI.AutoFit.fit_and_eliminate import FitAndEliminate, FitAndEliminateOPT, FitAndEliminateOUT
 from ATARI.sammy_interface.sammy_classes import SammyRunTimeOptions, SolverOPTs, Particle_Pair, SammyOutputData
+from ATARI.theory.resonance_statistics import num_variance_GE
 import numpy as np
 from typing import Optional, List, Union
 from dataclasses import dataclass
 import multiprocessing
-import os
+from scipy.stats import norm
+from math import ceil
+
 from ATARI.utils.file_handling import clean_and_make_directory, return_random_subdirectory
 from ATARI.utils.datacontainers import Evaluation
 from ATARI.AutoFit.functions import * 
@@ -53,11 +56,16 @@ class AutoFitOPT:
 
     # other
     print_bool                      : bool  = True
-    use_1std_rule                   : bool  = True
+    Nres_selected                   : int   = None
+    use_1std_rule                   : bool  = False
+    use_1disc_rule                  : bool  = True
+    discrepancy_threshold           : float = 1.0
     use_MAD                         : bool  = False
     final_fit_to_0_res              : bool  = False
 
     # Resonance Statistics
+    Nres_max_num_res                        : int  = 100
+    use_spin_shuffle                        : bool = True
     Wigner_informed_cross_validation        : bool = False
     PorterThomas_informed_cross_validation  : bool = False
     
@@ -119,7 +127,6 @@ class AutoFit:
         self.rto_train = copy(sammyRTO)
         self.rto_train.bayes = True
 
-
     def fit(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
         resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         ### if resonance ladder is all fixed
@@ -136,40 +143,76 @@ class AutoFit:
             return self.output
 
         ### Run CV
-        if self.options.print_bool:
-            print("=============\nRunning Cross Validation\n=============")
-        folds_data, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices)
-        CV_test_scores, CV_train_scores = find_CV_scores(folds_data, use_MAD=self.options.use_MAD)
-        
-        ### Get cardinality from CV results
-        Nres_selected = find_model_complexity(CV_test_scores, use_1std_rule=self.options.use_1std_rule)
+        if not hasattr(self.options,'Nres_selected') \
+            or (self.options.Nres_selected is None):
+            if self.options.print_bool:
+                print("=============\nRunning Cross Validation\n=============")
+            folds_data, kfolds = self.cross_validation(evaluation_data, total_resonance_ladder, fixed_resonance_indices=fixed_resonance_indices, Nres_max_num_res=self.options.Nres_max_num_res)
+            Nres_array, CV_test_score_means, CV_test_score_cov, CV_train_score_means, CV_train_score_cov = find_CV_scores(folds_data, use_MAD=self.options.use_MAD)
+            ### Get cardinality from CV results
+            Nres_selected = find_model_complexity(Nres_array, CV_test_score_means, CV_test_score_cov, use_1std_rule=self.options.use_1std_rule, use_1disc_rule=self.options.use_1disc_rule, disc_thres=self.options.discrepancy_threshold)
+        else:
+            Nres_selected = self.options.Nres_selected
 
         if self.options.final_fit_to_0_res: Nres_target = 0
         else: Nres_target = Nres_selected
 
         ### Final solve to target Nres with all data 
-        solver_initial = Solver_factory(self.rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data) 
-        solver_elim = Solver_factory(self.rto_train, self.solver_options_eliminate._solver, self.solver_options_eliminate, self.particle_pair, evaluation_data)
+        solver_options_pre_shuffle = copy(self.solver_options_eliminate)
+        if solver_options_pre_shuffle._solver == 'EXT':
+            solver_options_pre_shuffle.Porter_Thomas_fitting = False
+            solver_options_pre_shuffle.Wigner_fitting        = False
+        solver_options_post_shuffle = copy(self.solver_options_eliminate)
+        solver_initial      = Solver_factory(self.rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data) 
+        solver_pre_shuffle  = Solver_factory(self.rto_train, solver_options_pre_shuffle._solver , solver_options_pre_shuffle , self.particle_pair, evaluation_data)
+        solver_post_shuffle = Solver_factory(self.rto_train, solver_options_post_shuffle._solver, solver_options_post_shuffle, self.particle_pair, evaluation_data)
 
-        if self.options.print_bool:
-            print(f"=============\nFitting to {Nres_target} Resonances\n=============")
+        if len(resonance_ladder) >= self.options.Nres_max_num_res:
             
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=self.fit_and_elim_options, particle_pair=self.particle_pair)
-        initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
-        internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
+            if self.options.print_bool:
+                print(f"=============\nFitting to {self.options.Nres_max_num_res} Resonances Without Spin Shuffling\n=============")
+            fit_eliminate_options_pre_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_pre_shuffle.spin_shuffle = False
+            fit_eliminate_options_pre_shuffle.width_elimination_Nres_threshold = self.options.Nres_max_num_res
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_pre_shuffle, options=fit_eliminate_options_pre_shuffle, particle_pair=self.particle_pair)
+            initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
+            fixed_resonance_indices = fe.output.external_resonance_indices
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fixed_resonance_indices)
+            elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=self.options.Nres_max_num_res, fixed_resonance_ladder=fixed_resonances)
+
+            if self.options.print_bool:
+                print(f"=============\nFitting to {Nres_target} Resonances With Spin Shuffling\n=============")
+            fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_with_shuffle.spin_shuffle = self.options.use_spin_shuffle
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(elimination_history[self.options.Nres_max_num_res]['selected_ladder_chars'].par_post, fixed_resonance_indices)
+            elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
+
+        else:
+
+            if self.options.print_bool:
+                print(f"=============\nFitting to {Nres_target} Resonances With Spin Shuffling\n=============")
+            fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_with_shuffle.spin_shuffle = self.options.use_spin_shuffle
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
+            initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
+            fixed_resonance_indices = fe.output.external_resonance_indices
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fixed_resonance_indices)
+            elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=Nres_target, fixed_resonance_ladder=fixed_resonances)
 
         self.output.Nres_target = Nres_selected # The number of resonances in the model
         if self.options.save_elimination_history:
             self.output.fit_and_eliminate_output = fe.output
         self.output.final_samout = elimination_history[Nres_selected]['selected_ladder_chars']
-        self.output.final_evaluation = Evaluation.from_samout('fit', self.output.final_samout, post=True, external_resonance_indices=fe.output.external_resonance_indices)
+        self.output.final_evaluation = Evaluation.from_samout('fit', self.output.final_samout, post=True, external_resonance_indices=fixed_resonance_indices)
         self.output.total_time = fe.total_derivative_evaluations
 
         return self.output
 
 
-    def cross_validation(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[]):
+    def cross_validation(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[], Nres_max_num_res=0):
 
         ### Split CV data
         if True: #measurement_wise
@@ -193,7 +236,7 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, total_resonance_ladder, fixed_resonance_indices) for train, test in zip(list_evaluation_data_train, list_evaluation_data_test)]
+            multi_input = [(train, test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold) for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test))]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 folds_results = pool.map(self.get_cross_validation_score, multi_input)
             assert len(folds_results) == kfolds
@@ -201,8 +244,8 @@ class AutoFit:
         ### get CVE score in serial
         else:
             folds_results = []
-            for train, test in zip(list_evaluation_data_train, list_evaluation_data_test):
-                fold_results = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices))
+            for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test)):
+                fold_results = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold))
                 folds_results.append(fold_results)
 
         # # if save:
@@ -275,28 +318,64 @@ class AutoFit:
     
 
     def get_cross_validation_score(self, input_arguments):
-        evaluation_data_train, evaluation_data_test, total_resonance_ladder, fixed_resonance_indices = input_arguments
+        evaluation_data_train, evaluation_data_test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold = input_arguments
         resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         
         # set RTO options if in parallel
+        rto_train = copy(self.rto_train)
+        rto_test  = copy(self.rto_test)
         if self.options.parallel_CV:
-            rto_train=copy(self.rto_train); rto_test=copy(self.rto_test)
-            rto_train.Print=False; rto_test.Print=False; fit_and_elim_options = copy(self.fit_and_elim_options); fit_and_elim_options.print_bool=False
+            rto_train.Print=False; rto_test.Print=False
             rto_train.keep_runDIR=False; rto_test.keep_runDIR=False
-            rto_train.sammy_runDIR = return_random_subdirectory(self.rto_train.sammy_runDIR); rto_test.sammy_runDIR = return_random_subdirectory(self.rto_train.sammy_runDIR)
+            fit_and_elim_options = copy(self.fit_and_elim_options)
+            fit_and_elim_options.print_bool = False
         else:
-            rto_train=self.rto_train; rto_test=self.rto_test; fit_and_elim_options = self.fit_and_elim_options
+            fit_and_elim_options = copy(self.fit_and_elim_options)
+        rto_train.sammy_runDIR = f'{rto_train.sammy_runDIR}_CV_fold_{ifold}'
+        rto_test.sammy_runDIR  = f'{rto_test.sammy_runDIR }_CV_fold_{ifold}'
 
         # create solvers
-        solver_initial = Solver_factory(rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_train) 
-        solver_elim = Solver_factory(rto_train, self.solver_options_eliminate._solver, self.solver_options_eliminate, self.particle_pair, evaluation_data_train)
-        solver_test = Solver_factory(rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test)
+        solver_options_pre_shuffle = copy(self.solver_options_eliminate)
+        if solver_options_pre_shuffle._solver == 'EXT':
+            solver_options_pre_shuffle.Porter_Thomas_fitting = False
+            solver_options_pre_shuffle.Wigner_fitting        = False
+        solver_options_post_shuffle = copy(self.solver_options_eliminate)
+        solver_initial      = Solver_factory(rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_train) 
+        solver_pre_shuffle  = Solver_factory(rto_train, solver_options_pre_shuffle._solver , solver_options_pre_shuffle , self.particle_pair, evaluation_data_train)
+        solver_post_shuffle = Solver_factory(rto_train, solver_options_post_shuffle._solver, solver_options_post_shuffle, self.particle_pair, evaluation_data_train)
+        solver_test         = Solver_factory(rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test)
 
-        # fit and eliminate
-        fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_elim, options=fit_and_elim_options, particle_pair=self.particle_pair)
-        initial_samout = fe.initial_fit(resonance_ladder,fixed_resonance_ladder=fixed_resonance_ladder)
-        internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fe.output.external_resonance_indices)
-        elimination_history = fe.eliminate(internal_resonance_ladder, fixed_resonance_ladder=fixed_resonances)#, target_ires=len(fixed_resonances))
+        if len(resonance_ladder) >= Nres_max_num_res:
+            
+            # Optimization of the resonance ladder prior to spin-shuffling:
+            fit_eliminate_options_pre_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_pre_shuffle.spin_shuffle = False
+            fit_eliminate_options_pre_shuffle.width_elimination_Nres_threshold = Nres_max_num_res
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_pre_shuffle, options=fit_eliminate_options_pre_shuffle, particle_pair=self.particle_pair)
+            initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
+            fixed_resonance_indices = fe.output.external_resonance_indices
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fixed_resonance_indices)
+            elimination_history_pre_shuffle = fe.eliminate(internal_resonance_ladder, target_ires=Nres_max_num_res, fixed_resonance_ladder=fixed_resonances)
+
+            # Optimization of the resonance ladder after spin-shuffling:
+            fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_with_shuffle.spin_shuffle = self.options.use_spin_shuffle
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(elimination_history_pre_shuffle[Nres_max_num_res]['selected_ladder_chars'].par_post, fixed_resonance_indices)
+            elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=0, fixed_resonance_ladder=fixed_resonances)
+
+        else:
+
+            # Optimization with spin-shuffling only:
+            fit_eliminate_options_with_shuffle = copy(self.fit_and_elim_options)
+            fit_eliminate_options_with_shuffle.spin_shuffle = self.options.use_spin_shuffle
+            fit_eliminate_options_with_shuffle.start_deep_fit_from = np.inf
+            fe = FitAndEliminate(solver_initial=solver_initial, solver_eliminate=solver_post_shuffle, options=fit_eliminate_options_with_shuffle, particle_pair=self.particle_pair)
+            initial_samout = fe.initial_fit(resonance_ladder, fixed_resonance_ladder=fixed_resonance_ladder)
+            fixed_resonance_indices = fe.output.external_resonance_indices
+            internal_resonance_ladder, fixed_resonances = separate_external_resonance_ladder(initial_samout.par_post, fixed_resonance_indices)
+            elimination_history = fe.eliminate(internal_resonance_ladder, target_ires=0, fixed_resonance_ladder=fixed_resonances)
 
         # get test and train scores
         fold_results = {}
@@ -306,16 +385,11 @@ class AutoFit:
             Ndata_test = len(test_out.pw[0])
             Ndata_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
             # Train
-            chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)#/Ntrain*(Ntrain+Ntest)
+            chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)
             obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
             # Test
-            chi2_test = np.sum(test_out.chi2)#/Ntest*(Ntrain+Ntest)
+            chi2_test = np.sum(test_out.chi2)
             obj_test = objective_func(chi2_test, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
-
-            # fold_results[key] = {'obj_test'    : obj_test,
-            #                      'ndata_test'  : Ndata_test,
-            #                      'obj_train'   : obj_train,
-            #                      'ndata_train' : Ndata_train}
 
             fold_results[key] = CrossValidationOUT(chi2_test=chi2_test,   obj_test=obj_test,   ndata_test=Ndata_test,
                                                    chi2_train=chi2_train, obj_train=obj_train, ndata_train=Ndata_train)

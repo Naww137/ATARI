@@ -153,7 +153,9 @@ autofit_options = auto_fit.AutoFitOPT(save_elimination_history   = True,
                                     save_CV_elimination_history  = True,
                                     parallel_CV                  = False,
                                     parallel_processes           = 5,
-                                    final_fit_to_0_res           = False)
+                                    final_fit_to_0_res           = False,
+                                    use_spin_shuffle             = False,
+                                    )
 af = auto_fit.AutoFit(sammy_rto_fit, Ta_pair, solver_options, solver_options, AutoFit_options=autofit_options, fit_and_elim_options=fit_and_elim_options)
 autofit_out = af.fit(eval_data, initial_feature_bank, fixed_resonance_indices=[])
 

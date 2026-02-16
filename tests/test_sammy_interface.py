@@ -15,14 +15,14 @@ from copy import copy
 import unittest
 
 
-
+sammypath = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
 
 class TestRunSammy(unittest.TestCase):
 
 
     @classmethod
     def setUpClass(cls):
-        sammyexe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
+        sammyexe = sammypath
 
         cls.exp_model = Experimental_Model(channel_widths={"maxE": [250],"chw": [100.0],"dchw": [0.8]})
         # template_creator.make_input_template('samtemplate.inp', Ta_pair, cls.exp_model, rto)
@@ -164,8 +164,7 @@ class TestRunSammyYW(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        sammyexe = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
-
+        sammyexe = sammypath
         cls.exp_model = Experimental_Model(channel_widths={"maxE": [250],"chw": [100.0],"dchw": [0.8]})
         # template_creator.make_input_template('samtemplate.inp', Ta_pair, cls.exp_model, rto)
         cls.exp_model.template = os.path.realpath('samtemplate.inp')

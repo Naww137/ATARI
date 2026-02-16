@@ -1,12 +1,16 @@
+import sys
 import unittest
-from tests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation
 
 __doc__ = """
 This file runs all of the unit tests from the "tests" directory.
 """
 
 
+sammy_run_path = sys.argv[1]
+if sammy_run_path == None:
+    sammy_run_path = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
 
+from tests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation, test_utils_stats #, test_fit_and_eliminate
 
 if __name__ == '__main__':
     
@@ -28,6 +32,7 @@ if __name__ == '__main__':
 
     ### those that require sammy
     sammy_test_suite = loader.loadTestsFromModule(test_sammy_interface)
+    # fit_and_eliminate_test_suite = loader.loadTestsFromModule(test_fit_and_eliminate)
     # TODO: add fitting_from_theory_test_suite
     # TODO: add autofit_test_suite
 
@@ -59,6 +64,9 @@ if __name__ == '__main__':
     print("Now running tests that require SAMMY - if you have not already, go into test files and change your sammy path.")
     print("Running sammy_interface test suite")
     result = runner.run(sammy_test_suite)
+
+    # print("Running fit_and_eliminate test suite")
+    # result = runner.run(fit_and_eliminate_test_suite)
 
 
 

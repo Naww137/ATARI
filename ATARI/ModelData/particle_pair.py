@@ -525,8 +525,8 @@ class Particle_Pair:
             N = len(levels)
 
             # sample reduced widths
-            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], rng=rng)
-            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)
+            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], random_sign=False, rng=rng)
+            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], random_sign=False, rng=rng)
 
             # convert to partial widths with checks for multiple channels not-implemented error
             # if len(Jinfo["Ls"]) > 1:

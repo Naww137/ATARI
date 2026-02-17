@@ -62,6 +62,15 @@ class Syndat_Control:
                  seed:int = None
                  ):
         
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                self.rng = np.random.default_rng() # uses np.random.seed
+            else:
+                self.rng = np.random.default_rng(seed) # generates rng from provided seed
+        else:
+            self.rng = rng
+        
         ### user supplied options
         self.particle_pair = particle_pair
         self.syndat_models = syndat_models
@@ -117,7 +126,7 @@ class Syndat_Control:
                pw_true_list: Optional[list[pd.DataFrame]] = None,
                save_samples_to_hdf5 = False,
                hdf5_file = None,
-               overwrite=False
+               overwrite = False
                ):
 
         generate_pw_true_with_sammy = False
@@ -145,7 +154,7 @@ class Syndat_Control:
                 par_true = self.particle_pair.resonance_ladder
             
             ### sample correlated model parameters - need to pass to generate_true_experimental_objects and generate_true_raw_obs
-            sampled_parameter_correlations = self.sample_model_correlations()
+            sampled_parameter_correlations = self.sample_model_correlations(rng=self.rng)
 
             ### generate true experimental objects with sammy or just take pw_true arguement
             pw_true_list = []
@@ -233,7 +242,14 @@ class Syndat_Control:
     
 
 
-    def sample_model_correlations(self):
+    def sample_model_correlations(self, rng:np.random.Generator=None, seed:int=None):
+
+        # Random number generator:
+        if rng is None:
+            if seed is None:
+                rng = np.random.default_rng() # uses np.random.seed
+            else:
+                rng = np.random.default_rng(seed) # generates rng from provided seed
 
         sampled_model_correlations = []
 
@@ -278,7 +294,7 @@ class Syndat_Control:
                                         sample = mean
                                     else:
                                         if param_name == 'a_b':
-                                            sample = np.random.multivariate_normal(mean, uncertainty)
+                                            sample = rng.multivariate_normal(mean, uncertainty)
                                         else:
                                             sample = np.random.normal(loc=mean, scale=uncertainty)
                                     if self.no_systematic_bias:
@@ -286,7 +302,7 @@ class Syndat_Control:
                                     else:
                                         sampled_dict[param_name] = (sample, 0.0)
                                 if isinstance(param_values, pd.DataFrame):
-                                    new_c = np.random.normal(loc=param_values.ct, scale=param_values.dct)
+                                    new_c = rng.normal(loc=param_values.ct, scale=param_values.dct)
                                     df = deepcopy(param_values)
                                     if self.no_systematic_bias:
                                         df.loc[:,'ct'] = param_values.ct

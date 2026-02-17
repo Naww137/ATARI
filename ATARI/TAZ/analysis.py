@@ -166,7 +166,8 @@ def correlate_probabilities(pred_probs:ndarray, answer:ndarray):
 
     nBin = round(np.sqrt(len(answer)))
     edges = np.linspace(0.0, 1.0, nBin+1)
-    Qs = []
+    Qs     = []
+    Qs_max = []
     for g in range(num_groups):
         prob_guess_type = pred_probs[:,g]
         prob_guess_cor  = prob_guess_type[answer == g]
@@ -189,8 +190,11 @@ def correlate_probabilities(pred_probs:ndarray, answer:ndarray):
         Q = np.zeros((len(count_all_non_zero),))
         for i, (count_all_, count_cor_, prob_expected_) in enumerate(zip(count_all_non_zero, count_cor_non_zero, prob_expected_non_zero)):
             Q[i] = binom(count_all_, prob_expected_).pmf(count_cor_) * count_all_
+        k_ideal = count_all_ * prob_expected_
+        Q_max = binom(count_all_, prob_expected_).pmf(k_ideal) * count_all_
         Qs.append(Q)
-    return Qs
+        Qs_max.append(Q_max)
+    return Qs, Qs_max
 
 def ProbCorrPlot(pred_probs:ndarray, answer:ndarray,
                  sg_names:list=None, image_name:str=None, fig_num:int=None):

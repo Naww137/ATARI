@@ -366,6 +366,9 @@ class Particle_Pair:
         P = 1.0 # penetrability is 1 for capture widths
         gg2 = G_to_g2(np.array(Gg, dtype=float), P)
         return gg2
+    
+    def gstat(self, J:float):
+        return (2*J+1) / ((2*self.i+1) * (2*self.I+1))
 
     def map_quantum_numbers(self, print_out):
         """

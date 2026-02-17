@@ -59,9 +59,9 @@ class TestPTBayes(unittest.TestCase):
         # self.skipTest('Not implemented yet')
         probabilities, log_likelihood = PTBayes(self.res_ladder, self.reaction, gamma_width_on=False)
 
-        Qs = analysis.correlate_probabilities(probabilities, self.true_assignments)
-        for g, Q in enumerate(Qs):
-            errlim = 0.01
+        Qs, Qs_max = analysis.correlate_probabilities(probabilities, self.true_assignments)
+        for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
+            errlim = 0.05*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 PTBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for gamma width information off for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.
@@ -69,9 +69,9 @@ Lowest probability density = {np.min(Q):.5f}.
             
         probabilities, log_likelihood = PTBayes(self.res_ladder, self.reaction, gamma_width_on=True)
 
-        Qs = analysis.correlate_probabilities(probabilities, self.true_assignments)
-        for g, Q in enumerate(Qs):
-            errlim = 0.01
+        Qs, Qs_max = analysis.correlate_probabilities(probabilities, self.true_assignments)
+        for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
+            errlim = 0.05*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 PTBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for gamma width information off for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.

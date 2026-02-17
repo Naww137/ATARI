@@ -74,9 +74,9 @@ Mean error    = {perror_mean:.6%}
         runmaster = RunMaster(self.E, self.EB, distributions, self.false_dens, prior, log_likelihood_prior, err=self.err)
         posterior = runmaster.WigBayes()
 
-        Qs = correlate_probabilities(posterior, self.true_assignments)
-        for g, Q in enumerate(Qs):
-            errlim = 0.01
+        Qs, Qs_max = correlate_probabilities(posterior, self.true_assignments)
+        for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
+            errlim = 0.05*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 WigBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.

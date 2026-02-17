@@ -108,10 +108,17 @@ def readpar(filepath):
                             value = None
 
                 row.append(value)
+
+                # Test Errors:
+                if start == 0:
+                    if row[0] in (None, np.nan):
+                        print(row)
+                        raise RuntimeError('SAMMY.PAR file cannot be read properly. It probably contains extra information.')
+
                 start += width
             data.append(row)
     df = pd.DataFrame(data, columns=['E', 'Gg', 'Gn1', 'Gn2', 'Gn3', 'varyE', 'varyGg', 'varyGn1', 'varyGn2', 'varyGn3', 'J_ID'])
-    return df.dropna(axis=1, how='all')
+    return df.dropna(how='all', axis=1).fillna(value=0.0)
 
 
 def read_ECSCM(file_path):

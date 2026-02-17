@@ -52,8 +52,12 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
         raise TypeError('The "mean_param" argument must be a "Reaction" object.')
     
     E  = resonances['E'].to_numpy()
-    Gg = resonances['Gg'].to_numpy()
     Gn = resonances['Gn1'].to_numpy()
+    J = abs(resonances['Jpi'].to_numpy())
+    gJ = reaction.gstat(J)
+    gGn = gJ * Gn
+
+    Gg = resonances['Gg'].to_numpy()
     
     # Setting prior:
     prob = reaction.lvl_dens_all / np.sum(reaction.lvl_dens_all)
@@ -63,8 +67,9 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
 
     # Neutron widths:
     Gnms = reaction.Gnm
+    gJs = reaction.gstat(reaction.J)
     for g, Gnm in enumerate(Gnms):
-        posterior[:,g] *= porter_thomas_dist.pdf(Gn, mean=Gnm(E), df=reaction.nDOF[g], trunc=0.0)
+        posterior[:,g] *= porter_thomas_dist.pdf(gGn, mean=gJs[g]*Gnm(E), df=reaction.nDOF[g], trunc=0.0)
 
     # Gamma widths: (if gamma_width_on is True)
     if gamma_width_on:

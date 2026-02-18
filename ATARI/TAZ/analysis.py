@@ -197,7 +197,7 @@ def correlate_probabilities(pred_probs:ndarray, answer:ndarray):
     return Qs, Qs_max
 
 def ProbCorrPlot(pred_probs:ndarray, answer:ndarray,
-                 sg_names:list=None, image_name:str=None, fig_num:int=None):
+                 sg_names:list=None, image_name:str=None, fig_num:int=100):
     """
     Groups resonances into bins based on their predicted probabilities and plots the frequency
     of correct assignments versus the binned probabilities.
@@ -264,8 +264,8 @@ def ProbCorrPlot(pred_probs:ndarray, answer:ndarray,
         plt.legend(fontsize=10)
 
         if image_name is not None:
-            image_name = str(image_name).format(sgn=sg_names[g])
-            plt.savefig(f'{image_name}.png')
+            image_name_ = image_name.format(sgn=sg_names[g])
+            plt.savefig(image_name_)
         else:
             plt.show()
 

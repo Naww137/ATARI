@@ -28,7 +28,7 @@ class TestPTBayes(unittest.TestCase):
 
         # Mean Parameters
         # cls.EB = (1e-5,1e6)
-        # cls.false_dens = 1/15.0
+        # cls.false_dens = 0#1/15.0
         # cls.lvl_dens  = [1/4.0, 1/6.0]
         # cls.gn2m  = [45.0, 30.0]
         # cls.gg2m   = [55.0, 52.0]
@@ -37,7 +37,8 @@ class TestPTBayes(unittest.TestCase):
         # cls.l     = [0, 0]
         # cls.j     = [3.0, 4.0]
         # cls.EB = (1e-5,1e5)
-        cls.EB = (1e-5,1e4)
+
+        cls.EB = (1e-5,1e5)
         cls.false_dens = 1/15.0
         cls.lvl_dens  = [1/4.0, 1/5.0, 1/6.0, 1/7.0]
         cls.gn2m  = [44.11355, 33.38697, 60.0, 25.0]
@@ -61,17 +62,19 @@ class TestPTBayes(unittest.TestCase):
 
         Qs, Qs_max = analysis.correlate_probabilities(probabilities, self.true_assignments)
         for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
-            errlim = 0.05*Q_max
+            errlim = 0.1*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 PTBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for gamma width information off for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.
 """)
             
+        # analysis.ProbCorrPlot(probabilities, self.true_assignments, image_name='/Users/colefritsch/ENCORE/ATARI/ATARI/TAZ/tests/error_plots/prob_calibration_plot_{sgn}.png', fig_num=400)
+            
         probabilities, log_likelihood = PTBayes(self.res_ladder, self.reaction, gamma_width_on=True)
 
         Qs, Qs_max = analysis.correlate_probabilities(probabilities, self.true_assignments)
         for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
-            errlim = 0.05*Q_max
+            errlim = 0.1*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 PTBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for gamma width information off for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.

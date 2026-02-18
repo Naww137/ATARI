@@ -10,7 +10,7 @@ sammy_run_path = sys.argv[1]
 if sammy_run_path == None:
     sammy_run_path = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
 
-from tests import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation, test_utils_stats #, test_fit_and_eliminate
+from tests_mine import test_resonance_distributions, test_level_spacing_distributions, test_sammy_interface, test_res_generator, test_syndat_functionality, test_measurement_covariance, test_atario, test_mean_parameter_estimation, test_utils_stats #, test_fit_and_eliminate
 
 if __name__ == '__main__':
     

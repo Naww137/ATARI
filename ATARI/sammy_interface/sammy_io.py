@@ -590,6 +590,8 @@ def write_saminp(filepath   :   str,
                 temp        :   tuple,
                 FP          :   tuple,
                 n           :   tuple,
+                DELTAE      :   tuple = (0.0, 0.0),
+                DELTAG      :   tuple = (0.0, 0.0),
 
                 alphanumeric:   str    = None,
                 use_IDC     :   bool    = False,
@@ -657,7 +659,7 @@ def write_saminp(filepath   :   str,
 
             elif line.startswith('%%%card5/6%%%'):
                 if broadening:
-                    f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}        \n')
+                    f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}  {float(DELTAE[0]):<8.7}  {float(DELTAG[0]):<8.7}        \n')
                 else:
                     pass
 

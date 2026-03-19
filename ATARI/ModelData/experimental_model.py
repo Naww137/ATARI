@@ -25,25 +25,29 @@ class Experimental_Model:
         title: str
             Title
         reaction: str
-            Title
-        energy_range: str
-            Title
+            The reaction for the model
+        energy_range: (float, float)
+            ...
         template: str
-            Title
-        energy_grid: str
-            Title
-        n: str
-            Title
-        FP: str
-            Title
-        t0: str
-            Title
-        burst: str
-            Title
-        temp: str
-            Title
-        additional_resfunc_lines: str
-            Title
+            ...
+        energy_grid: array of floats
+            ...
+        n: (float, float)
+            ...
+        FP: (float, float)
+            ...
+        DELTAE: (float, float)
+            Exponential Broadening Width
+        DELTAG: (float, float)
+            Gaussian Broadening Width
+        t0: (float, float)
+            ...
+        burst: (float, float)
+            ...
+        temp: (float, float)
+            The temperature
+        additional_resfunc_lines: list
+            Extra lines
         """
         self.title = "T12mm"
         self.reaction = "transmission"
@@ -53,6 +57,8 @@ class Experimental_Model:
 
         self.n = (0.067166, 0.0)
         self.FP = (35.185, 0.0)
+        self.DELTAE = (0.0, 0.0),
+        self.DELTAG = (0.0, 0.0),
         self.t0 = (3326.0, 0.0)
         self.burst = (10, 1.0)
         self.temp = (300, 0.0)

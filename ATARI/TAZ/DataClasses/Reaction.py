@@ -9,7 +9,7 @@ from ATARI.ModelData.spingroups import Spingroup
 from ATARI.theory import distributions
 from ATARI.theory import level_spacing_distributions
 from ATARI.TAZ.Theory import Samplers
-from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
+from ATARI.ASTEROIDS.false_missing_determination import fraction_below_threshold_gn2
 
 from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G

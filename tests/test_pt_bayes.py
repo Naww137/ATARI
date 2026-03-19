@@ -8,6 +8,13 @@ import numpy as np
 
 import unittest
 
+__doc__ == """
+This file tests the "pt_bayes" algorithm. "test_probability_frequency" ensures that the
+PT probabilities are consistent with expected frequencies.
+"""
+
+rng = np.random.default_rng(seed=2026)
+
 class TestPTBayes(unittest.TestCase):
     """
     Tests that PTBayes provides accurate probabilities given the provided width information.
@@ -50,7 +57,7 @@ class TestPTBayes(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
+        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble, rng=rng)
 
     def test_probability_frequency(self):
         """

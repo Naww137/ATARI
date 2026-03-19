@@ -42,7 +42,8 @@ import time
 os.chdir(os.path.dirname(__file__))
 
 isamples = 2
-sammypath = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
+from run_tests import sammy_run_path as sammypath
+# sammypath = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
 rto = sammy_classes.SammyRunTimeOptions(sammypath,
                                         **{"Print":   True,
                                          "bayes":   True,

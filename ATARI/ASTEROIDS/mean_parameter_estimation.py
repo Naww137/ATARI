@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 from ATARI.theory.distributions import porter_thomas_dist
-from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
+from ATARI.ASTEROIDS.false_missing_determination import fraction_below_threshold_gn2
 from ATARI.ModelData.spingroups import HalfInt
 
 __doc__ = """

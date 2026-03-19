@@ -1,5 +1,4 @@
-import sys
-sys.path.append('../')
+import numpy as np
 import pandas as pd
 
 from ATARI.ModelData.particle import Particle, Neutron
@@ -7,14 +6,19 @@ from ATARI.ModelData.spingroups import Spingroup
 from ATARI.TAZ.DataClasses.Reaction import Reaction
 from ATARI.TAZ.PTBayes import PTBayes
 from ATARI.TAZ.RunMaster import RunMaster
-from utils import chi2_test
-
-import numpy as np
+from tests.utils import chi2_test
 
 import warnings
 warnings.filterwarnings('error', category=RuntimeWarning)
 
 import unittest
+
+__doc__ == """
+This file tests the "wig_sample" algorithm. These tests make sure the sampled spin groups follow
+expected probability distributions.
+"""
+
+rng = np.random.default_rng(seed=2026)
 
 class TestBayesSample1(unittest.TestCase):
     """
@@ -48,7 +52,7 @@ class TestBayesSample1(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
 
         cls.prior, log_likelihood_prior = PTBayes(cls.res_ladder, cls.reaction)
         cls.distributions = cls.reaction.distributions(dist_type='Wigner')
@@ -56,7 +60,7 @@ class TestBayesSample1(unittest.TestCase):
         runMaster = RunMaster(cls.E, cls.EB,
                                   cls.distributions, cls.false_dens,
                                   cls.prior, log_likelihood_prior)
-        cls.samples = runMaster.WigSample(cls.num_trials)
+        cls.samples = runMaster.WigSample(cls.num_trials, rng=rng)
         # print(cls.samples)
 
     def test_level_densities(self):
@@ -122,7 +126,7 @@ class TestBayesSample2(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
 
         cls.prior, log_likelihood_prior = PTBayes(cls.res_ladder, cls.reaction)
         cls.distributions = cls.reaction.distributions(dist_type='Wigner')
@@ -130,7 +134,7 @@ class TestBayesSample2(unittest.TestCase):
         runMaster = RunMaster(cls.E, cls.EB,
                                   cls.distributions, cls.false_dens,
                                   cls.prior, log_likelihood_prior)
-        cls.samples = runMaster.WigSample(cls.num_trials)
+        cls.samples = runMaster.WigSample(cls.num_trials, rng=rng)
         cls.bayes = runMaster.WigBayes()
 
     def test_level_densities(self):
@@ -214,7 +218,7 @@ Discrepancy = {err:.5f} standard deviations.
 #         runMaster = RunMaster(cls.E, cls.EB,
 #                                   cls.distributions, cls.false_dens,
 #                                   cls.prior, log_likelihood_prior)
-#         cls.samples = runMaster.WigSample(cls.num_trials)
+#         cls.samples = runMaster.WigSample(cls.num_trials, rng=rng)
 #         cls.rm = runMaster
 
 #     def test_wig_sample(self):

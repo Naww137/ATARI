@@ -14,8 +14,8 @@ from copy import copy
 
 import unittest
 
-
-sammypath = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
+from run_tests import sammy_run_path as sammypath
+# sammypath = '/Users/noahwalton/gitlab/sammy/sammy/build/bin/sammy'
 
 class TestRunSammy(unittest.TestCase):
 

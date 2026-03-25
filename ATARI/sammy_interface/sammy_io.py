@@ -77,9 +77,6 @@ def readpar(filepath):
                 if value == '':
                     value = None
                 else:
-                    # if iw == 0: # energy can be negative
-                        # value = float(value)
-                    # else: # widths cannots
                     try:
                         value = float(value)
                     except:
@@ -322,16 +319,42 @@ def read_idc(filepath):
 # =============================================================================
 # Sammy Parameter File
 # =============================================================================
-def format_float(value, width, sep=''):
-    formatted_value = f'{abs(value):0<15f}'  
+def format_float(value, width, sep:str='', signed:bool=True):
+    formatted_value = f'{abs(value):0<15f}'
 
-    if value < 0:
-        formatted_value = f'{sep}-' + formatted_value
+    if signed:
+        if value < 0:
+            formatted_value = f'{sep}-' + formatted_value
+        else:
+            formatted_value = f'{sep} ' + formatted_value
     else:
-        formatted_value = f'{sep} ' + formatted_value
+        if value < 0:
+            raise ValueError(f'The value, {value}, should not be negative.')
+        formatted_value = f'{sep}' + formatted_value
 
     if len(formatted_value) > width:
         formatted_value = formatted_value[:width]
+
+    return formatted_value
+
+def format_int(value, width, sep:str='', signed:bool=True):
+    if value != int(value):
+        raise ValueError(f'Value, {value}, must be an integer')
+    formatted_value = f'{int(value)}'
+    if signed:
+        if value < 0:
+            formatted_value = f'{sep}-{int(value)}'
+        else:
+            formatted_value = f'{sep} {int(value)}'
+    else:
+        if value < 0:
+            raise ValueError(f'The value, {value}, should not be negative.')
+        formatted_value = f'{sep}{int(value)}'
+
+    if len(formatted_value) > width:
+        raise ValueError(f'The value, {formatted_value}, is too long to fit in a width of {width}.')
+    else:
+        formatted_value = f'{' '*(width-len(formatted_value))}{formatted_value}'
 
     return formatted_value
 
@@ -438,13 +461,19 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
             raise ValueError("NoneType was passed as J_ID in the resonance ladder")
 
     widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+    signed = [True, True, True, True, True, False, False, False, False, False, False]
+    isinte = [False, False, False, False, False, True, True, True, True, True, True]
     with open(filename, 'w') as file:
         for row in par_array:
+            values = []
             for icol, val in enumerate(row):
                 column_width = widths[icol]
-                formatted_value = format_float(val, column_width)
+                if isinte[icol]:    formatted_value = format_int  (val, column_width, signed=signed[icol])
+                else:               formatted_value = format_float(val, column_width, signed=signed[icol])
+                values.append(formatted_value)
                 file.write(formatted_value)
             file.write('\n')
+            print(values)
         file.write(f'\n{initial_parameter_uncertainty}\n')
 
     return
@@ -533,18 +562,18 @@ def write_idc(filepath, J, C, stat):
         width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
 
         for E, data in J.items():
-            formatted_E = format_float(E, width)
+            formatted_E = format_float(E, width, signed=True)
             f.write(formatted_E)
-            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')
+            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width, sep=' ')#, signed=False)
             f.write(formatted_data_stat_unc)
             for derivative in data:
-                formatted_derivative = format_float(derivative, width, sep=' ')
+                formatted_derivative = format_float(derivative, width, sep=' ', signed=True)
                 f.write(formatted_derivative)
             f.write('\n')
 
         f.write("\nUNCERTAINTies on data- reduction parameters\n")
         for sys_uncertainty in np.sqrt(np.diag(C)):
-            formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')
+            formatted_uncertainty = format_float(sys_uncertainty, width, sep=' ')#, signed=False)
             f.write(formatted_uncertainty)
         f.write("\n\n")
         
@@ -553,7 +582,7 @@ def write_idc(filepath, J, C, stat):
         Corr = Dinv @ C @ Dinv
         for i, row in enumerate(Corr):
             for corr in row[0:i]:
-                formatted_correlation = format_float(corr, width, sep=' ')
+                formatted_correlation = format_float(corr, width, sep=' ', signed=True)
                 f.write(formatted_correlation)
             f.write("\n")
 

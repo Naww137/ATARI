@@ -372,6 +372,7 @@ class FitAndEliminate:
             eliminating = True
             while eliminating:
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
+                print(internal_resonance_ladder)
                 internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:

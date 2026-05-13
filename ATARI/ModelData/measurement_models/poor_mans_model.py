@@ -21,8 +21,11 @@ class Poor_Mans_Model:
     This model is a low-fidelity measurement model, used when limited information is provided.
     """
 
-    def __init__(self, covariance_data:dict):
+    def __init__(self, covariance_data:dict, model_parameters=None):
         self._covariance_data = covariance_data
+        if model_parameters is None:
+            model_parameters = np.zeros((len(covariance_data['Cov_sys']),))
+        self._model_parameters = model_parameters
 
     @property
     def covariance_data(self):
@@ -31,9 +34,17 @@ class Poor_Mans_Model:
     def covariance_data(self, covariance_data):
         self._covariance_data = covariance_data
 
+    @property
+    def model_parameters(self):
+        return self._model_parameters
+    @model_parameters.setter
+    def model_parameters(self, model_parameters):
+        self._model_parameters = model_parameters
+
     def __repr__(self):
         string = 'Measurement model (data reduction) parameters:\n'
-        string += self.covariance_data
+        string += 'Covariance Data:'
+        string += repr(self.covariance_data)
         return string
     
     def sample_model_parameters(self, rng:np.random.Generator=None, seed:int=None):
@@ -47,39 +58,63 @@ class Poor_Mans_Model:
     def generate_raw_data(self,
                           pw_true:pd.DataFrame,
                           true_model_parameters,
+                          options:syndatOPT,
                           rng:np.random.Generator=None,
                           seed:int=None):
         if rng is None:
             rng = np.random.default_rng(seed)
-        print('tmp', true_model_parameters.shape)
-        # print('stat', self.covariance_data['diag_stat']['var_stat'].values)
         var_stat = self.covariance_data['diag_stat']
         var_stat.sort_index(inplace=True)
         stat_part = rng.normal(scale=np.sqrt(var_stat['var_stat'].values))
-        print('stat', stat_part.shape)
         jac = self.covariance_data['Jac_sys'].T
         jac.sort_index(inplace=True)
         syst_part = jac @ true_model_parameters
-        print('jac', self.covariance_data['Jac_sys'].to_numpy().shape)
-        unc_part = stat_part + syst_part
+        unc_part = np.array(stat_part + syst_part)
 
         # Interpolating to true grid:
         E_idc = self.covariance_data['diag_stat'].index
-        print(E_idc)
         pw_true.sort_values(by='E', inplace=True)
-        print(pw_true['E'].values)
-        print('true', pw_true['true'].values.shape)
         exp = pw_true['true'].values + unc_part
         raw_data = {'E':pw_true['E'].values, 'exp':exp}
         return raw_data
     
-    def reduce_raw_data(self, raw_data):
-        var_stat = self.covariance_data['diag_stat']
-        var_stat.sort_index().to_numpy()
-        jac = self.covariance_data['Jac_sys']
-        jac = jac.sort_index().to_numpy()
-        print(self.covariance_data['diag_stat'].values[:,0])
-        exp_unc = np.sqrt(self.covariance_data['diag_stat'].values[:,0] + np.diag(jac.T @ self.covariance_data['Cov_sys'] @ jac))
-        print(exp_unc.shape)
-        data = pd.DataFrame({'E':raw_data['E'], 'exp':raw_data['exp'], 'exp_unc':exp_unc})
-        return data, self.covariance_data, raw_data
+    def reduce_raw_data(self, raw_data, options:syndatOPT):
+        
+        # Getting data:
+        data = pd.DataFrame({'E':raw_data['E'], 'exp':raw_data['exp']})
+
+        if options.calculate_covariance:
+            # Get diagonal experimental uncertainty:
+            var_stat = self.covariance_data['diag_stat']
+            var_stat.sort_index().to_numpy()
+            jac = self.covariance_data['Jac_sys']
+            jac = jac.sort_index().to_numpy()
+            exp_unc = np.sqrt(self.covariance_data['diag_stat'].values[:,0] + np.diag(jac.T @ self.covariance_data['Cov_sys'] @ jac))
+            data['exp_unc'] = exp_unc
+
+            # Updating covariance data:
+            cov_data = self.covariance_data
+
+
+            if options.explicit_covariance:
+                cov_sys = jac.T @ self.covariance_data['Cov_sys'] @ jac
+                cov = np.diag(var_stat) + cov_sys
+                cov_data['Cov'] = cov
+        else:
+            cov_data = {}
+
+        return data, cov_data, raw_data
+
+    def truncate_energy_range(self, new_energy_range):
+        minE = float(min(new_energy_range))
+        maxE = float(max(new_energy_range))
+        filtered_cov = {}
+        if 'Cov_sys' in self._covariance_data.keys():
+            # print(np.array(self._covariance_data['diag_stat'].index>=minE) & np.array(new_energy_range['diag_stat'].index<=maxE))
+            filtered_cov["diag_stat"] = self._covariance_data['diag_stat'].loc[np.array(self._covariance_data['diag_stat'].index>=minE) & np.array(self._covariance_data['diag_stat'].index<=maxE)]
+            filtered_cov["Jac_sys"]   = self._covariance_data['Jac_sys'].loc[:,np.array(self._covariance_data['Jac_sys'].columns>=minE) & np.array(self._covariance_data['Jac_sys'].columns<=maxE)]
+            filtered_cov["Cov_sys"]   = self._covariance_data['Cov_sys']
+        else:
+            raise ValueError("Filtering not implemented for explicit cov yet")
+        self._covariance_data = filtered_cov
+        return

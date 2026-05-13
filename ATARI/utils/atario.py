@@ -130,14 +130,15 @@ def check_and_place_resonance_latter_columns(resonance_ladder, item, key):
 
 def add_Gw_from_gw(resonance_ladder, particle_pair):
     ladder = copy(resonance_ladder)
-    Ls_present = np.unique(ladder.L)
-    if len(Ls_present) == 1 and Ls_present[0] == 0:
-        pass
-    else:
-        raise NotImplementedError("Need to update Gw_from_gw function for multiple L-waves")
-    _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
-    ladder['Gg'] = Gg = 2*ladder.gg2.values
-    ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
+    ladder = particle_pair.expand_ladder(ladder)
+    # Ls_present = np.unique(ladder.L)
+    # if len(Ls_present) == 1 and Ls_present[0] == 0:
+    #     pass
+    # else:
+    #     raise NotImplementedError("Need to update Gw_from_gw function for multiple L-waves")
+    # _, P_array, _, _ = FofE_recursive(ladder.E.values, particle_pair.ac, particle_pair.M, particle_pair.m, Ls_present)
+    # ladder['Gg'] = Gg = 2*ladder.gg2.values
+    # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
     ladder = ladder[["E", "Gg", "Gn1"]+ [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
     return ladder
 

@@ -1,9 +1,11 @@
 import numpy as np
+import pandas as pd
 from scipy.linalg import eigvalsh_tridiagonal
 from typing import Union, Optional
 from scipy.stats.distributions import chi2
 
 from ATARI.theory.distributions import wigner_dist, porter_thomas_dist, semicircle_dist
+from ATARI.theory.scattering_params import gstat
 
 def getD(xi,res_par_avg):    
     return res_par_avg['<D>']*2*np.sqrt(np.log(1/(1-xi))/np.pi)
@@ -18,14 +20,120 @@ def make_res_par_avg(Jpi, J_ID, D_avg, gn_avg, n_dof, gg_avg, g_dof):
     quantiles['D99']  = getD(0.99,res_par_avg)
     quantiles['gn01'] = res_par_avg['<gn2>']*chi2.ppf(0.01, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
     quantiles['gn99'] = res_par_avg['<gn2>']*chi2.ppf(0.99, df=res_par_avg['n_dof'])/res_par_avg['n_dof']
-    quantiles['gg01'] = res_par_avg['<gg2>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
-    quantiles['gg99'] = res_par_avg['<gg2>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+    if (g_dof is None) or (g_dof == np.inf):
+        quantiles['gg01'] = res_par_avg['<gg2>']
+        quantiles['gg99'] = res_par_avg['<gg2>']
+    else:
+        quantiles['gg01'] = res_par_avg['<gg2>']*chi2.ppf(0.01, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
+        quantiles['gg99'] = res_par_avg['<gg2>']*chi2.ppf(0.99, df=res_par_avg['g_dof'])/res_par_avg['g_dof']
     quantiles['gt01'] = quantiles['gn01'] + quantiles['gg01']
     quantiles['gt99'] = quantiles['gn99'] + quantiles['gg99']
 
     res_par_avg['quantiles'] = quantiles
 
     return res_par_avg
+
+def expected_strength(particle_pair):
+    """
+    ...
+    """
+
+    Sns = {}
+    for Jpi, spingroup in particle_pair.spin_groups.items():
+        l = spingroup['Ls'][0]
+        gJ = gstat(abs(Jpi), particle_pair.I, particle_pair.i)
+        gn2m = spingroup['<gn2>']
+        Dm = spingroup['<D>']
+        Sn_Jpi = gJ/(2*l+1) * (gn2m*1e-3/Dm)
+        Sns[Jpi] = Sn_Jpi
+    return Sns
+
+def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool=True):
+    """
+    From F. Frohner and Olivier Bouland, "Treatment of External Levels in Neutron Resonance
+    Fitting: Applications to the Nonfissile Nuclide Cr-52".
+    URL: https://doi.org/10.13182/NSE01-A2176
+    """
+    energy_bounds = (min(energy_bounds), max(energy_bounds))
+    Eb = (energy_bounds[0] + energy_bounds[1])/2
+    I  = energy_bounds[1] - energy_bounds[0]
+
+    E_low  = Eb - (np.sqrt(3)/2) * I
+    E_high = Eb + (np.sqrt(3)/2) * I
+
+    res_ext = pd.DataFrame()
+    for spingroup in particle_pair.spin_groups.values():
+        Ls   = spingroup['Ls']
+        Jpi  = spingroup['Jpi']
+        J_ID = spingroup['J_ID']
+        gn2m = spingroup['<gn2>']
+        gg2m = spingroup['<gg2>']
+        Dm   = spingroup['<D>']
+        
+        s = 1e-3 * gn2m / Dm
+        gn2 = 1e3 * (3/2) * I * s
+
+        Ggm = particle_pair.gg2_to_Gg(gg2m)
+        Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
+        res_ext_sg = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gns[0],Gns[1]], 'J_ID':[J_ID,J_ID]})
+        if return_reduced:
+            res_ext_sg['gg2'] = gg2m
+            res_ext_sg['gn2'] = gn2
+            res_ext_sg['Jpi'] = Jpi
+            res_ext_sg['L']   = Ls[0] # we only support the first L...
+        res_ext = pd.concat((res_ext, res_ext_sg))
+        res_ext.reset_index(drop=True, inplace=True)
+    return res_ext
+
+# def find_external_levels(particle_pair, energy_bounds:tuple, return_reduced:bool=True):
+#     """
+#     From F. Frohner and Olivier Bouland, "Treatment of External Levels in Neutron Resonance
+#     Fitting: Applications to the Nonfissile Nuclide Cr-52".
+#     URL: https://doi.org/10.13182/NSE01-A2176
+#     """
+#     energy_bounds = (min(energy_bounds), max(energy_bounds))
+#     Eb = (energy_bounds[0] + energy_bounds[1])/2
+#     I  = energy_bounds[1] - energy_bounds[0]
+
+#     spingroups = particle_pair.spin_groups
+#     Ls    = [spingroup['Ls']    for spingroup in spingroups.values()]
+#     Jpis  = [spingroup['Jpi']    for spingroup in spingroups.values()]
+#     gn2ms = [spingroup['<gn2>'] for spingroup in spingroups.values()]
+#     Dms   = [spingroup['<D>']   for spingroup in spingroups.values()]
+    
+#     gg2m = max([spingroup['<gg2>'] for spingroup in spingroups.values()])
+
+#     E_low  = Eb - (np.sqrt(3)/2) * I
+#     E_high = Eb + (np.sqrt(3)/2) * I
+
+#     s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
+#     gn2 = 1e3 * (3/2) * I * s
+
+#     Ggm = particle_pair.gg2_to_Gg(gg2m)
+#     # Gns = particle_pair.gn2_to_Gn(gn2, np.array([E_low,E_high]), 0)
+#     Gn_low  = particle_pair.gn2_to_Gn(gn2, np.array([E_low ]), 0)[0]
+#     Gn_high = particle_pair.gn2_to_Gn(gn2, np.array([E_high]), 0)[0]
+#     res_ext = pd.DataFrame({'E':[E_low,E_high], 'Gg':[Ggm,Ggm], 'Gn1':[Gn_low,Gn_high], 'J_ID':[1,1]})
+#     if return_reduced:
+#         res_ext['gg2'] = gg2m
+#         res_ext['gn2'] = gn2
+#         res_ext['Jpi'] = Jpis[0]
+#         res_ext['L']   = 0
+#     return res_ext
+
+    # Gnms_low = [particle_pair.gn2_to_Gn(gn2m, np.array([E_low]), l[0]) for gn2m, l in zip(gn2ms, Ls)]
+    # str_low = np.sum(Gnms_low)*1e-3 * np.sum(1/np.array(Dms))
+    # Gn_low  = 1e3 * (3/2) * I * str_low
+    # Gnms_high = [particle_pair.gn2_to_Gn(gn2m, np.array([E_high]), l[0]) for gn2m, l in zip(gn2ms, Ls)]
+    # str_high = np.sum(Gnms_high)*1e-3 * np.sum(1/np.array(Dms))
+    # Gn_high = 1e3 * (3/2) * I * str_high
+    # s = 1e-3 * np.sum(gn2ms) * np.sum(1/np.array(Dms))
+    # a = particle_pair.ac
+    # k_low  = k_wavenumber(E_low, particle_pair.M, particle_pair.m)
+    # Gn_low  = 1e3 * (3/2) * I * (2*s*k_low*a)
+    # k_high = k_wavenumber(E_high, particle_pair.M, particle_pair.m)
+    # Gn_high = 1e3 * (3/2) * I * (2*s*k_high*a)
+    # return res_ext
 
 # =====================================================================
 # Resonance level sampling
@@ -171,7 +279,7 @@ def sample_GE_eigs(num_eigs:int, beta:int=1,
     eigs.sort()
     return eigs
 
-def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
+def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1, fraction_drop:float=0.2,
                        rng=None, seed:Optional[int]=None):
     """
     Samples GOE (β = 1), GUE (β = 2), or GSE (β = 4) resonance energies within a given energy
@@ -186,6 +294,8 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
     beta : 1, 2, or 4
         The ensemble parameter, where β = 1 is GOE, β = 2 is GUE, and β = 4 is GSE.
         Default is β = 1.
+    fraction_drop : float
+        The fraction of eigenvalues to drop at the margins. >0.2 is suggested.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -208,24 +318,24 @@ def sample_GE_energies(E_range, avg_level_spacing:float=1.0, beta:int=1,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    margin = 0.1 # a margin of safety where we consider the GOE samples to properly follow the semicircle law. This removes tails that diverge from the semicircle law.
     E_limits = (min(E_range), max(E_range))
     num_res_est = (E_limits[1]-E_limits[0]) / avg_level_spacing # estimate number of resonances
-    num_res_tot = round((1 + 2*margin) * num_res_est) # number of resonances sampled (estimate + buffer)
+    num_res_tot = round(num_res_est / (1-fraction_drop)) # number of resonances sampled (estimate + buffer)
 
     eigs = sample_GE_eigs(num_res_tot, beta=beta, rng=rng)
     eigs /= 2*np.sqrt(num_res_tot)
-    eigs = eigs[eigs > -1.0+margin]
-    eigs = eigs[eigs <  1.0-margin]
+    eigs = eigs[eigs > -1.0+fraction_drop]
+    eigs = eigs[eigs <  1.0-fraction_drop]
 
     # Using semicircle law CDF to make the resonances uniformly spaced:
     # Source: https://github.com/LLNL/fudge/blob/master/brownies/BNL/restools/level_generator.py
-    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+margin))
+    E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+fraction_drop))
+    # E_res = E_limits[0] + (num_res_tot * avg_level_spacing) * (semicircle_dist.cdf(eigs) - semicircle_dist.cdf(-1.0+margin))
     E_res = E_res[E_res < E_limits[1]]
     E_res = np.sort(E_res)
     return E_res
 
-def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
+def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE', fraction_drop:float=0.2,
                       rng=None, seed=None):
     """
     Sample the resonance energy levels.
@@ -248,6 +358,8 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
         GUE : Gaussian Unitary Ensemble
         GSE : Gaussian Symplectic Ensemble
         Poisson : Poisson Ensemble
+    fraction_drop : float
+        The fraction of eigenvalues to drop at the margins. >0.2 is suggested.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -289,15 +401,15 @@ def sample_RRR_levels(E_range, avg_level_spacing:float, ensemble:str='NNE',
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    if ensemble == 'NNE': # Nearest Neighbor Ensemble
+    if ensemble.lower() == 'nne': # Nearest Neighbor Ensemble
         levels = sample_NNE_energies(E_range, avg_level_spacing, rng=rng)
-    elif ensemble == 'GOE': # Gaussian Orthogonal Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=1, rng=rng)
-    elif ensemble == 'GUE': # Gaussian Unitary Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=2, rng=rng)
-    elif ensemble == 'GSE': # Gaussian Symplectic Ensemble
-        levels = sample_GE_energies(E_range, avg_level_spacing, beta=4, rng=rng)
-    elif ensemble == 'Poisson': # Poisson Ensemble (i.i.d. resonances)
+    elif ensemble.lower() == 'goe': # Gaussian Orthogonal Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=1, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'gue': # Gaussian Unitary Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=2, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'gse': # Gaussian Symplectic Ensemble
+        levels = sample_GE_energies(E_range, avg_level_spacing, beta=4, fraction_drop=fraction_drop, rng=rng)
+    elif ensemble.lower() == 'poisson': # Poisson Ensemble (i.i.d. resonances)
         E_limits = (min(E_range), max(E_range))
         num_samples = rng.poisson((E_limits[1] - E_limits[0]) / avg_level_spacing)
         levels = rng.uniform(*E_limits, size=num_samples)
@@ -318,7 +430,7 @@ def wigner_PDF(x, avg_level_spacing:float, beta:int=1):
 
 def sample_RRR_widths(N_levels, 
                       avg_reduced_width_square, 
-                      DOF:int=1, trunc:float=0.0,
+                      DOF:int=1, trunc:float=0.0, signed:bool=True,
                       rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
@@ -336,6 +448,8 @@ def sample_RRR_widths(N_levels,
         Degrees of freedom applied to the PT distiribution (chi-square).
     trunc : float
         All reduced widths below this value are ignored. Default = 0.0.
+    signed : bool
+        Determines if the sampled width should be signed. Default is True.
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -353,12 +467,15 @@ def sample_RRR_widths(N_levels,
         else:
             rng = np.random.default_rng(seed) # generates rng from provided seed
 
-    if DOF == np.inf:
-        reduced_widths_square = avg_reduced_width_square * np.ones((N_levels,))
+    if DOF in (None, np.inf):
+        reduced_widths_square = np.repeat(avg_reduced_width_square, N_levels)
     else:
         reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
-    sign = 2*rng.integers(0, 2, size=N_levels)-1
-    return np.array(reduced_widths_square * sign)
+    
+    if signed:      sign = 2*rng.integers(0, 2, size=N_levels)-1
+    else:           sign = 1.0
+    
+    return np.array(reduced_widths_square * sign, dtype=float)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):
     """
@@ -397,6 +514,63 @@ def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=
     array([0.30326533, 0.1432524 , 0.11156508])
     """
     return porter_thomas_dist.pdf(x=x, mean=avg_reduced_width_square, df=DOF, trunc=trunc)
+
+# =====================================================================
+# Gaussian Ensemble Number Variance
+# =====================================================================
+
+def num_variance_GE(N_exp, beta:int=1):
+    """
+    Calculates the variance for the number of parameters.
+    
+    Parameters
+    ----------
+    N_exp : array-like of float
+        The expected number(s) of resonances in a window.
+    beta : 1, 2, or 4
+        The ensemble to consider, corresponding to GOE, GUE, and GSE respectively.
+
+    Returns
+    ----------
+    """
+
+    EULER_CONST = 0.5772156649
+    if   beta == 1:
+        d = 2
+        e = -np.pi**2 / 8
+    elif beta == 2:
+        d = 2
+        e = 0
+    elif beta == 4:
+        d = 4
+        e = np.pi**2 / 8
+    else:
+        raise ValueError(f'"beta" value of {beta} is invalid.')
+    c = (2/np.pi**2) / beta
+    num_var = c * (np.log(d*np.pi*N_exp) + EULER_CONST + 1 + e)
+    return num_var
+
+def find_number_variance(particle_pair, window_size:tuple, ensemble:str='GOE'):
+    """
+    ...
+    """
+
+    # Collecting mean level spacings:
+    if   ensemble.lower() == 'goe': # Gaussian Orthogonal Ensemble
+        beta = 1
+    elif ensemble.lower() == 'gue': # Gaussian Unitary Ensemble
+        beta = 2
+    elif ensemble.lower() == 'gse': # Gaussian Symplectic Ensemble
+        beta = 4
+
+    num_var_tot = 0.0
+    for Jpi, spingroup in particle_pair.spin_groups.items():
+        mean_lvl_spacing = spingroup['<D>']
+        num_res_exp = np.sum((window_size[1] - window_size[0])/mean_lvl_spacing)
+        num_var = num_variance_GE(num_res_exp, beta=beta)
+        num_var_tot += num_var
+
+    return num_var_tot
 
 # =====================================================================
 # Dyson Mehta ∆3 Metric

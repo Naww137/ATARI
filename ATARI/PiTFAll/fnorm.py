@@ -40,7 +40,7 @@ def calc_theo_broad_xs_for_all_reaction(sammy_exe,
                               "sammy_runDIR": runDIR
                               })
 
-    E = fine_egrid(energy_range)
+    E = fine_egrid((energy_range[0]+1e-3, energy_range[-1]-1e-3))
 
     exp_theo = Experimental_Model(title = "theo",
                                       reaction='total',
@@ -169,8 +169,9 @@ def calculate_fnorms(ResidualMatrixDict, reactions):
     Rf = {}
     for rxn in reactions:
         R = ResidualMatrixDict[rxn]
-        Rf[rxn] = np.linalg.norm(R, ord='fro')/R.size
-    ResidualMatrix_allrxns = np.vstack([ResidualMatrixDict[rxn] for rxn in reactions])
-    Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')/ResidualMatrix_allrxns.size
+        F = np.linalg.norm(R, ord='fro')
+        Rf[rxn] = F/np.sqrt(R.size)
+    ResidualMatrix_allrxns = np.hstack([ResidualMatrixDict[rxn] for rxn in reactions])
+    Rf["all"] = np.linalg.norm(ResidualMatrix_allrxns, ord='fro')/np.sqrt(ResidualMatrix_allrxns.size)
 
     return Rf, ResidualMatrix_allrxns

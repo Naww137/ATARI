@@ -8,7 +8,7 @@ Created on Thu Jun 16 12:18:04 2022
 from typing import Union
 import numpy as np
 import pandas as pd
-from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths
+from ATARI.theory.resonance_statistics import make_res_par_avg, sample_RRR_levels, sample_RRR_widths, find_external_levels
 from ATARI.ModelData.particle import Particle, Ta181, Neutron
 from ATARI.theory.scattering_params import FofE_recursive, G_to_g2, g2_to_G
 
@@ -288,8 +288,8 @@ class Particle_Pair:
         P : float, array-like
             The penetration factor.
         """
-        S, P, psi, k = FofE_recursive(np.array(E), self.ac, self.M, self.m, l)
-        return P
+        S, P, psi, k = FofE_recursive(np.array(E, dtype=float), self.ac, self.M, self.m, l)
+        return P[l]
     def gn2_to_Gn(self, gn2, E, l:int):
         """
         Converts reduced neutron widths to partial neutron widths.
@@ -329,8 +329,8 @@ class Particle_Pair:
         gn2 : float, array-like
             Reduced neutron widths.
         """
-        P = self.penetration_factor(np.array(E), l)
-        gn2 = G_to_g2(np.array(Gn), P)
+        P = self.penetration_factor(np.array(E, dtype=float), l)
+        gn2 = G_to_g2(Gn, P)
         return gn2
     def gg2_to_Gg(self, gg2):
         """
@@ -347,7 +347,7 @@ class Particle_Pair:
             Partial capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        Gg = g2_to_G(np.array(gg2), P)
+        Gg = g2_to_G(gg2, P)
         return Gg
     def Gg_to_gg2(self, Gg):
         """
@@ -364,7 +364,7 @@ class Particle_Pair:
             Reduced capture widths.
         """
         P = 1.0 # penetrability is 1 for capture widths
-        gg2 = G_to_g2(np.array(Gg), P)
+        gg2 = G_to_g2(np.array(Gg, dtype=float), P)
         return gg2
 
     def map_quantum_numbers(self, print_out):
@@ -471,6 +471,7 @@ class Particle_Pair:
 
     def sample_resonance_ladder(self,
                                 ensemble='NNE',
+                                sample_external_resonances:bool=False,
                                 rng=None, seed=None):
         """
         Generate a resonance ladder sample.
@@ -488,6 +489,8 @@ class Particle_Pair:
             GUE : Gaussian Unitary Ensemble
             GSE : Gaussian Symplectic Ensemble
             Poisson : Poisson Ensemble
+        sample_external_resonances : bool
+            Determines whether external resonances will be sampled. Default is False.
         rng : np.random.Generator or None
             Numpy random number generator object. Default is None.
         seed : int or None
@@ -506,6 +509,12 @@ class Particle_Pair:
                 rng = np.random.default_rng(seed) # generates rng from provided seed
 
         resonance_ladders = []
+        # External Resonances:
+        if sample_external_resonances:
+            ext_res_ladder = find_external_levels(self, self.energy_range, return_reduced=True)
+            resonance_ladders.append(ext_res_ladder)
+        
+        # Internal Resonances:
         for Jpi, Jinfo in self.spin_groups.items():
 
             # sample resonance levels for each spin group with negative parity
@@ -513,17 +522,17 @@ class Particle_Pair:
             N = len(levels)
 
             # sample reduced widths
-            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], rng=rng)
-            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], rng=rng)
+            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], signed=False, rng=rng)
+            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], signed=False, rng=rng)
 
             # convert to partial widths with checks for multiple channels not-implemented error
-            if len(Jinfo["Ls"]) > 1:
-                raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
-            else:
-                L = Jinfo["Ls"][0]
-            _, P_array, _, _ = FofE_recursive(levels, self.ac, self.M, self.m, L)
-            Gg_samples = 2*gg2_samples
-            Gn1_samples = 2*P_array[0]*gn2_samples
+            # if len(Jinfo["Ls"]) > 1:
+            #     raise NotImplementedError("Sampling for multiple channels contributing to on spin group has not been implemented")
+            # else:
+            #     L = Jinfo["Ls"][0]
+            L = min(Jinfo["Ls"])
+            Gg_samples = self.gg2_to_Gg(gg2_samples)
+            Gn1_samples = self.gn2_to_Gn(gn2_samples, levels, L)
             zeros = np.zeros(len(levels)) #"varyE", "varyGg", "varyGn1", #zeros, zeros, zeros,
             E_Gn_gnx2 = pd.DataFrame([levels, Gg_samples, Gn1_samples,  [Jinfo['J_ID']]*N, gg2_samples, gn2_samples, [Jpi]*N, [L]*N],
                                      index=['E', 'Gg', 'Gn1',  'J_ID', 'gg2', 'gn2', 'Jpi', 'L',])

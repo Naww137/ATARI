@@ -2,10 +2,13 @@ from typing import Protocol
 from ATARI.AutoFit.functions import * #eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 from ATARI.sammy_interface import sammy_classes, sammy_functions
 import numpy as np
+from numpy import newaxis as NA
 import pandas as pd
+# from sklearn.gaussian_process import GaussianProcessRegressor
+# from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 from copy import copy
 from ATARI.AutoFit import sammy_interface_bindings
-
+from ATARI.utils.datacontainers import Evaluation_Data
 
 class InitialFBOPT:
     """
@@ -22,8 +25,10 @@ class InitialFBOPT:
         If True, one resonance of variable widths for each spin group will be fixed at one average level spacing outside of the window.
     width_elimination: bool = True
         Option to eliminate resonances during fitting stages based on neutron width.
-    Gn_threshold: Float = 1e-2
+    width_elimination_Gn_threshold: float = 1e-2
         Neutron width threshold for width-based elimination
+    width_elimination_Nres_threshold: int = None
+        Number of resonances, below which width-based elimination stops.
     decrease_chi2_threshold_for_width_elimination: bool = True
         If running width elimination, decrease the chi2 threshold convergence criteria
 
@@ -82,6 +87,8 @@ class InitialFBOPT:
         self._external_resonances = True
         self._fit_all_spin_groups = True
         self._spin_group_keys = []
+        self._alternate_spingroups = False
+        self._spacing = None
         self._num_Elam = None
         self._Elam_shift = 0
         self._starting_Gg_multiplier = 1
@@ -92,7 +99,8 @@ class InitialFBOPT:
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,1,1]
         self._width_elimination = True
-        self._Gn_threshold = 1e-2
+        self._width_elimination_Gn_threshold = 1e-2
+        self._width_elimination_Nres_threshold = None
         self._decrease_chi2_threshold_for_width_elimination = True
 
         # ### Solver 
@@ -160,11 +168,18 @@ class InitialFBOPT:
         self._width_elimination = width_elimination
 
     @property
-    def Gn_threshold(self):
-        return self._Gn_threshold
-    @Gn_threshold.setter
-    def Gn_threshold(self, Gn_threshold):
-        self._Gn_threshold = Gn_threshold
+    def width_elimination_Gn_threshold(self):
+        return self._width_elimination_Gn_threshold
+    @width_elimination_Gn_threshold.setter
+    def width_elimination_Gn_threshold(self, width_elimination_Gn_threshold):
+        self._width_elimination_Gn_threshold = width_elimination_Gn_threshold
+
+    @property
+    def width_elimination_Nres_threshold(self):
+        return self._width_elimination_Nres_threshold
+    @width_elimination_Gn_threshold.setter
+    def width_elimination_Nres_threshold(self, width_elimination_Nres_threshold):
+        self._width_elimination_Nres_threshold = width_elimination_Nres_threshold
 
     @property
     def decrease_chi2_threshold_for_width_elimination(self):
@@ -207,6 +222,20 @@ class InitialFBOPT:
     @spin_group_keys.setter
     def spin_group_keys(self, spin_group_keys):
         self._spin_group_keys = [float(each) for each in spin_group_keys]
+
+    @property
+    def alternate_spingroups(self):
+        return self._alternate_spingroups
+    @alternate_spingroups.setter
+    def alternate_spingroups(self, alternate_spingroups):
+        self._alternate_spingroups = alternate_spingroups
+
+    @property
+    def spacing(self):
+        return self._spacing
+    @spacing.setter
+    def spacing(self, spacing):
+        self._spacing = spacing
 
     @property
     def num_Elam(self):
@@ -341,13 +370,12 @@ class InitialFB:
         outs = [sammyOUT_fit]
 
         if self.options.width_elimination:
-            eliminating = True
-            while eliminating:
+            for it in range(10_000):
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
-                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
-                    eliminating = False
+                    break # no longer eliminating after not eliminating any more resonances
                 elif fraction_eliminated == 100.0:
                     raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
@@ -357,11 +385,102 @@ class InitialFB:
                     print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyOUT_fit = self.solver.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
+                if (self.options.width_elimination_Nres_threshold is not None) \
+                    and (len(internal_resonance_ladder_reduced) <= self.options.width_elimination_Nres_threshold):
+                    break # no longer eliminating after going below the threshold number of resonances
+            else:
+                raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')
             print(f"\nComplete after no neutron width features below threshold\n")
 
         return outs
     
 
-    # def report(self, string):
-    #     if self.report_to_file:
-    #         self.
+
+# def correlation_func_generator(dataset:pd.DataFrame, cov_data:dict, points_per_eval:int=100):
+#     """
+#     ...
+#     """
+#     dataset = copy(dataset.sort_values(by='E'))
+#     if (cov_data is not None) and ('diag_stat' in cov_data):
+#         assert len(dataset) == len(cov_data['diag_stat'])
+#         diag_stat = cov_data['diag_stat']
+#         dataset['exp_unc'] = np.sqrt(diag_stat.sort_values(by='E').values)
+#     num_points = len(dataset)
+#     energies = []
+#     corr_widths = []
+#     for i in range(int(num_points/points_per_eval)):
+#         if i == int(num_points/points_per_eval) - 1:
+#             the_end = None
+#         else:
+#             the_end = (i+1)*points_per_eval
+#         dataset_subset = dataset[i*points_per_eval:the_end]
+#         E = np.array(dataset_subset['E'])
+#         E_avg = 0.5*(max(E)+min(E))
+#         corr_width = correlation_width_estimate(dataset_subset, cov_data=None)
+#         energies.append(E_avg)
+#         corr_widths.append(corr_width)
+#     def corr_func(E):
+#         return np.interp(E, energies, corr_widths)
+#     return corr_func
+
+# def find_feature_bank_spacing(eval_data:Evaluation_Data, rel_dens_factor:float=1.1):
+#     """
+#     Empirically determines the initial feature bank resonance spacing from the auto-correlation
+#     length of a window found using Gaussian Process regression. A relative density factor
+#     can be provided to adjust the spacing.
+
+#     Parameters
+#     ----------
+#     eval_data: Evaluation_Data
+#         The evaluation data.
+#     rel_dens_factor: float
+#         The relative density factor to find the initial feature bank resonance spacing.
+#         Default is 1.1.
+
+#     Returns
+#     -------
+#     spacing
+#         The initial feature bank resonance spacing in eV.
+#     """
+#     corr_width_min = np.inf
+#     for dataset, cov_data in zip(eval_data.datasets, eval_data.covariance_data):
+#         corr_width = correlation_width_estimate(dataset, cov_data)
+#         if corr_width < corr_width_min:
+#             corr_width_min = corr_width
+#     spacing = corr_width_min / rel_dens_factor
+#     return spacing
+
+# def correlation_width_estimate(dataset:pd.DataFrame, cov_data:dict=None):
+#     """
+#     Estimates the auto-correlation length for a given dataset and covariance data. The
+#     auto-correlation length is found by fitting the data with a Gaussian Process model. Note that
+#     the Gaussian Process needs to be fit with the statistical variance. The systematic parts can
+#     be largely ignored since they will be captured in the regression.
+    
+#     Parameters
+#     ----------
+#     dataset: DataFrame
+#         The dataset under study for auto-correlation.
+#     cov_data: dict
+#         The implicit data covariance matrix.
+
+#     Returns
+#     -------
+#     corr_width
+#         The auto-correlation length.
+#     """
+#     dataset = copy(dataset.sort_values(by='E'))
+#     E = dataset['E'].values
+#     Y = dataset['exp'].values
+#     if (cov_data is not None) and ('diag_stat' in cov_data):
+#         assert len(dataset) == len(cov_data['diag_stat'])
+#         diag_stat = cov_data['diag_stat']
+#         Y_var = diag_stat.sort_values(by='E').values
+#     else:
+#         Y_var = dataset['exp_unc'].values**2
+#     length_scale_est = (max(E)-min(E))/len(E) # estimating the length scale from the datapoint frequency
+#     kernel = ConstantKernel(1.0) * RBF(length_scale=length_scale_est, length_scale_bounds=(0.3*length_scale_est, 50*length_scale_est))  # Initial guess
+#     gp = GaussianProcessRegressor(kernel=kernel, optimizer="fmin_l_bfgs_b", alpha=Y_var, n_restarts_optimizer=5)
+#     gp.fit(E[:,NA], Y)
+#     corr_width = gp.kernel_.k2.length_scale
+#     return corr_width

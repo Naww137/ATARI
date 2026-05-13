@@ -4,8 +4,8 @@ import pandas as pd
 import os
 from ATARI.utils.atario import save_syndat_model, save_syndat_control, load_general_object
 from ATARI.syndat.syndat_model import Syndat_Model
-from ATARI.syndat.control import Syndat_Control
 from ATARI.syndat.data_classes import syndatOPT
+from ATARI.syndat.control import Syndat_Control
 from ATARI.ModelData.particle_pair import Particle_Pair
 
 __doc__ == """

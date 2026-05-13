@@ -1,39 +1,38 @@
 import numpy as np
 import pandas as pd
 from copy import copy
-from ATARI.theory.resonance_statistics import wigner_LL, width_LL
-from ATARI.theory.scattering_params import FofE_recursive
+import warnings
+
+from ATARI.theory.resonance_statistics import wigner_LL, width_LL, find_external_levels
+from ATARI.theory.scattering_params import FofE_recursive, gstat
 from ATARI.utils.atario import add_Gw_from_gw
 
 
-def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function):
+def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starting_Gg_multiplier, starting_Gn1_multiplier):
 
-    if len(res_par_avg["Ls"]) > 1:
-            raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
-    else:
-        L = res_par_avg["Ls"][0]
+    # if len(res_par_avg["Ls"]) > 1:
+    #         raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+    # else:
+    L = res_par_avg["Ls"][0]
 
     # allow Elambda to be just outside of the window
     _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
     Gt99_min_max = res_par_avg['quantiles']['gt99']*P_array[0]
-    max_Elam = max(energy_range) + Gt99_min_max[0]/10e3
-    min_Elam = min(energy_range) - Gt99_min_max[1]/10e3
+    max_Elam = max(energy_range) + Gt99_min_max[0]*1e-3
+    min_Elam = min(energy_range) - Gt99_min_max[1]*1e-3
 
     # get energies and spin info
-    if do_dE_function:
-        x_start = min_Elam; x_end = max_Elam
-        d_start = 0.8; d_end = 2.0
-        Er = [x_start]
-        x = x_start
-        while x < x_end:
-            t = (x - x_start) / (x_end - x_start)
-            d = d_start + t * (d_end - d_start)
-            x += d
-            Er.append(x)
-        Er = np.array(Er)
-        num_Er = len(Er)
-    else:
-        Er = np.linspace(              min_Elam,              max_Elam,                num_Er)
+    x_start = min_Elam; x_end = max_Elam
+    x = x_start
+    Er = []
+    while x < x_end:
+        Er.append(x)
+        if callable(spacing):
+            x += spacing(x)
+        else:
+            x += spacing
+    Er = np.array(Er)
+    num_Er = len(Er)
 
     # get widths
     gg2 = np.repeat(res_par_avg["<gg2>"], num_Er)*starting_Gg_multiplier
@@ -41,12 +40,70 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, num_Er, startin
     
     J_ID = np.repeat(res_par_avg["J_ID"], num_Er)
     Jpi = np.repeat(res_par_avg['Jpi'], num_Er)
-    Ls = np.repeat(res_par_avg['Ls'], num_Er)
+    Ls = [res_par_avg['Ls'][0] for i in range(num_Er)]
+
+    return Er, gg2, gn2, J_ID, Jpi, Ls
+
+def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_multiplier, starting_Gn1_multiplier):
+    
+    spin_groups = particle_pair.spin_groups
+    # for Jpi, spin_group in spin_groups.items():
+    #     if len(spin_group["Ls"]) > 1:
+    #         raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+        
+    Gt99_min_max_all = np.array([0.0, 0.0])
+    gn01_min = np.inf
+    for Jpi, spin_group in spin_groups.items():
+        L = spin_group["Ls"][0]
+        _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
+        Gt99_min_max = spin_group['quantiles']['gt99']*P_array[0]
+        if Gt99_min_max[0] > Gt99_min_max_all[0]:
+            Gt99_min_max_all[0] = Gt99_min_max[0]
+        if Gt99_min_max[-1] > Gt99_min_max_all[-1]:
+            Gt99_min_max_all[-1] = Gt99_min_max[-1]
+        if spin_group['quantiles']["gn01"] < gn01_min:
+            gn01_min = spin_group['quantiles']["gn01"]
+    
+
+    # allow Elambda to be just outside of the window
+    max_Elam = max(energy_range) + Gt99_min_max_all[0]/10e3
+    min_Elam = min(energy_range) - Gt99_min_max_all[-1]/10e3
+
+    # get energy spacings
+    x_start = min_Elam; x_end = max_Elam
+    x = x_start
+    Er = []
+    while x < x_end:
+        Er.append(x)
+        if callable(spacing):
+            x += spacing(x)
+        else:
+            x += spacing
+    Er = np.array(Er)
+    num_Er = len(Er)
+    if num_Er < len(spin_groups):
+        warnings.warn('There are more spingroups than resonance energies in the initial feature bank.')
+
+    # get widths
+    gg2  = np.empty((num_Er,), dtype=float)
+    gn2  = np.empty((num_Er,), dtype=float)
+    J_ID = np.empty((num_Er,), dtype=int)
+    Jpi  = np.empty((num_Er,), dtype=float)
+    Ls   = np.empty((num_Er,), dtype=int)
+    num_sgs = len(spin_groups)
+    for isg, (jpi_, spin_group) in enumerate(spin_groups.items()):
+        J = abs(float(jpi_))
+        gg2 [isg::num_sgs] = spin_group["<gg2>"] * starting_Gg_multiplier
+        gn2 [isg::num_sgs] = gn01_min * starting_Gn1_multiplier / gstat(J, particle_pair.I, particle_pair.i)
+        J_ID[isg::num_sgs] = spin_group['J_ID']
+        Jpi [isg::num_sgs] = jpi_
+        Ls  [isg::num_sgs] = spin_group['Ls'][0]
 
     return Er, gg2, gn2, J_ID, Jpi, Ls
 
 
 def get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=0, varyGn1=0):
+    print(len(Er), len(gn2), len(Ls))
     atari_ladder = pd.DataFrame({"E":Er, "gg2":gg2, "gn2":gn2, "Jpi":Jpi, "L":Ls, "varyE":np.ones(len(Er))*varyE, "varyGg":np.ones(len(Er))*varyGg, "varyGn1":np.ones(len(Er))*varyGn1 ,"J_ID":J_ID})
     return add_Gw_from_gw(atari_ladder, particle_pair)
 
@@ -59,10 +116,19 @@ def update_vary_resonance_ladder(resonance_ladder, varyE=0, varyGg=0, varyGn1=0)
     return return_resonance_ladder
 
 
-def eliminate_small_Gn(resonance_ladder, threshold):
-    fraction_eliminated = np.count_nonzero(resonance_ladder.Gn1<threshold)/len(resonance_ladder)
-    return_resonance_ladder =copy(resonance_ladder)
-    return_resonance_ladder = return_resonance_ladder[return_resonance_ladder.Gn1>threshold]
+def eliminate_small_Gn(resonance_ladder, Gn_threshold, Nres_elimination_thres):
+    if Nres_elimination_thres is None:
+        Nres_elimination_thres = 0
+    num_res_left = np.count_nonzero(abs(resonance_ladder.Gn1) >= Gn_threshold)
+    if num_res_left < Nres_elimination_thres:
+        fraction_eliminated = 1.0 - Nres_elimination_thres / len(resonance_ladder)
+        return_resonance_ladder = resonance_ladder.loc[resonance_ladder['Gn1'].abs().nlargest(Nres_elimination_thres).index]
+        assert len(return_resonance_ladder) == Nres_elimination_thres
+    else:
+        fraction_eliminated = 1.0 - num_res_left / len(resonance_ladder)
+        return_resonance_ladder = copy(resonance_ladder)
+        return_resonance_ladder = return_resonance_ladder[abs(return_resonance_ladder.Gn1) >= Gn_threshold]
+    assert len(return_resonance_ladder) >= Nres_elimination_thres
     return_resonance_ladder.reset_index(inplace=True, drop=True)
     return return_resonance_ladder, fraction_eliminated
 
@@ -77,24 +143,30 @@ def get_starting_feature_bank(energy_range,
                             varyE = 0,
                             varyGg = 0,
                             varyGn1 = 1,
-                            do_dE_function = False
+                            ifb_spacing = None,
+                            alternate_spingroups = False,
                             ):
     # setup energy grid
-    if num_Elam is None:
-        num_Elam = int((np.max(energy_range)-np.min(energy_range)) * 1.25)
-    elif num_Elam/(np.max(energy_range)-np.min(energy_range)) < 1.25:
-        print("WARNING: User supplied a feature bank energy grid of <1 per eV, problem may not be convex")
+    if ifb_spacing is None:
+        if num_Elam is None:
+            ifb_spacing = 0.8 # eV
+        else:
+            ifb_spacing = (np.max(energy_range)-np.min(energy_range)) / num_Elam
+            if num_Elam/(np.max(energy_range)-np.min(energy_range)) < 1.25:
+                print("WARNING: User supplied a feature bank energy grid of <1 per eV, problem may not be convex")
 
-    Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
-    for sg in spin_groups:
-        Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, num_Elam, starting_Gg_multiplier, starting_Gn1_multiplier, do_dE_function)
-        Er.append(Er_1); gg2.append(gg2_1); gn2.append(gn2_1); J_ID.append(J_ID_1); Jpi.append(Jpi_1); L.append(L_1)
-    Er = np.concatenate(Er)
-    gg2 = np.concatenate(gg2)
-    gn2 = np.concatenate(gn2)
-    J_ID = np.concatenate(J_ID) 
-    Jpi = np.concatenate(Jpi)    
-    L = np.concatenate(L)       
+    if alternate_spingroups:
+        Er, gg2, gn2, J_ID, Jpi, L = get_parameter_grid_v2(energy_range, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
+    else:
+        Er, gg2, gn2, J_ID, Jpi, L = [], [], [], [], [], []
+        for sg in spin_groups:
+            Er_1, gg2_1, gn2_1, J_ID_1, Jpi_1, L_1 = get_parameter_grid(energy_range, sg, particle_pair, ifb_spacing, starting_Gg_multiplier, starting_Gn1_multiplier)
+            Er.append(Er_1); gg2.append(gg2_1); gn2.append(gn2_1); J_ID.append(J_ID_1); Jpi.append(Jpi_1); L += L_1
+        Er = np.concatenate(Er)
+        gg2 = np.concatenate(gg2)
+        gn2 = np.concatenate(gn2)
+        J_ID = np.concatenate(J_ID) 
+        Jpi = np.concatenate(Jpi)
 
     return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, L, varyE=varyE, varyGg=varyGg, varyGn1=varyGn1)
 
@@ -104,22 +176,23 @@ def generate_external_resonance_ladder(spin_groups: list[dict],
                                         energy_range,
                                         particle_pair):
     
-    Er = []; gg2 = []; gn2 = []; J_ID = []; Jpi = []; Ls = []
-    for sg in spin_groups:
-        Er.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])
-        gg2.extend([sg["<gg2>"]]*2)
-        gn2.extend([sg["<gn2>"]]*2)
-        J_ID.extend([sg["J_ID"]]*2)
-        Jpi.extend([sg["Jpi"]]*2)
+    # Er = []; gg2 = []; gn2 = []; J_ID = []; Jpi = []; Ls = []
+    # for sg in spin_groups:
+    #     Er.extend([np.max(energy_range) + sg["<D>"], np.min(energy_range) - sg["<D>"] ])
+    #     gg2.extend([sg["<gg2>"]]*2)
+    #     gn2.extend([sg["<gn2>"]]*2)
+    #     J_ID.extend([sg["J_ID"]]*2)
+    #     Jpi.extend([sg["Jpi"]]*2)
         
-        # check for L
-        if len(sg["Ls"]) > 1:
-                raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
-        else:
-            L = sg["Ls"][0]
-        Ls.extend([L]*2)
-
-    return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=1, varyGn1=1)
+    #     # check for L
+    #     if len(sg["Ls"]) > 1:
+    #             raise NotImplementedError("Multiple Ls to one spin group has not been implemented")
+    #     else:
+    #         L = sg["Ls"][0]
+    #     Ls.extend([L]*2)
+    # return get_resonance_ladder(particle_pair, Er, gg2, gn2, J_ID, Jpi, Ls, varyE=0, varyGg=1, varyGn1=1)
+    ext_ladder = find_external_levels(particle_pair, energy_range, return_reduced=True)
+    return get_resonance_ladder(particle_pair, ext_ladder.E, ext_ladder.gg2, ext_ladder.gn2, ext_ladder.J_ID, ext_ladder.Jpi, ext_ladder.L, varyE=0, varyGg=0, varyGn1=1)
 
 
 def separate_external_resonance_ladder(resonance_ladder, external_resonance_indices):
@@ -166,11 +239,11 @@ def get_LL_by_parameter(ladder,
 
 
 
-def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None, do_dE_function=False):
+def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, external_resonance_ladder=None):
 
     ### setup spin groups
-    if initialFBopt.fit_all_spin_groups:
-        spin_groups = [each[1] for each in particle_pair.spin_groups.items()] 
+    if initialFBopt.fit_all_spin_groups or initialFBopt.alternate_spingroups:
+        spin_groups = [each[1] for each in particle_pair.spin_groups.items()]
     else:
         assert len(initialFBopt.spin_group_keys)>0
         spin_groups = [each[1] for each in particle_pair.spin_groups.items() if each[0] in initialFBopt.spin_group_keys]
@@ -183,12 +256,14 @@ def get_initial_resonance_ladder(initialFBopt, particle_pair, energy_window, ext
                                                         Elam_shift = initialFBopt.Elam_shift,
                                                         starting_Gg_multiplier = initialFBopt.starting_Gg_multiplier,
                                                         starting_Gn1_multiplier = initialFBopt.starting_Gn1_multiplier,
-                                                        do_dE_function = do_dE_function)
+                                                        ifb_spacing=initialFBopt.spacing,
+                                                        alternate_spingroups=initialFBopt.alternate_spingroups)
 
     ### setup external resonances
     if initialFBopt.external_resonances:
         # external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
         if external_resonance_ladder is None:
+            # spin_groups = [each[1] for each in particle_pair.spin_groups.items()] # FIXME: THIS IS A TEMPORARY FIX!!!!!!!!!!!!!!!!!!!!
             external_resonance_ladder = generate_external_resonance_ladder(spin_groups, energy_window, particle_pair)
         else:
             assert(np.all([each in external_resonance_ladder.keys() for each in initial_resonance_ladder.keys()]))
@@ -233,10 +308,14 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
             Gn_int = partial_ladder_internal['Gn1'].to_numpy(dtype=float) # Porter-Thomas distribution should only be used on the internal resonances
 
             if Wigner_informed:
-                mean_level_spacing = spingroup['<D>']
-                log_likelihood += wigner_LL(E, mean_level_spacing)
-                wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances
-                log_likelihood -= wigner_correction_factor
+                if len(E) == 0:
+                    log_likelihood += 0.0
+                else:
+                    mean_level_spacing = spingroup['<D>']
+                    log_likelihood += wigner_LL(E, mean_level_spacing)
+                    # wigner_correction_factor = (len(E) - 1) * np.sqrt(np.pi/(2*np.e)) / mean_level_spacing # to account for virtual resonances (old and incorrect implementation)
+                    wigner_correction_factor = (len(E) - 1) * np.log(np.sqrt(np.pi/(2*np.e)) / mean_level_spacing) # to account for virtual resonances (new implementation at mode of Wigner distribution)
+                    log_likelihood -= wigner_correction_factor
 
             if PorterThomas_informed:
                 mean_neutron_width = spingroup['<gn2>']
@@ -244,8 +323,8 @@ def objective_func(chi2, res_ladder, particle_pair:Particle_Pair, fixed_resonanc
                     raise NotImplementedError('Cannot do Porter-Thomas when more than one l quantum state shares the same Jpi.')
                 l = int(spingroup['Ls'][0])
                 gn2 = particle_pair.Gn_to_gn2(Gn_int, E_int, l)
-                log_likelihood += -np.sum(gn2)/(2*mean_neutron_width) - len(gn2)*0.5*np.log(2*np.pi*mean_neutron_width)
-                log_likelihood -= 0 - len(gn2)*0.5*np.log(2*np.pi*mean_neutron_width) # to account for virtual resonances
+                log_likelihood += -np.sum(np.abs(gn2))/(2*mean_neutron_width) - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width)
+                log_likelihood -= 0 - len(gn2) * 0.5*np.log(2*np.pi*mean_neutron_width) # to account for virtual resonances
     else:
         log_likelihood = 0.0
 

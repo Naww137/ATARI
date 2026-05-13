@@ -37,7 +37,7 @@ def write_shell_script(sammy_INP: SammyInputData, sammy_RTO:SammyRunTimeOptions,
         elif sammy_INP.experimental_data is not None:
             iter = np.arange(np.floor(np.min(sammy_INP.experimental_data.E)),np.ceil(np.max(sammy_INP.experimental_data.E))+sammy_RTO.energy_window,sammy_RTO.energy_window)
             if len(iter) >= 50:
-                raise ValueError("To many energy windows supplied, please solve in less sections")
+                raise ValueError("Too many energy windows supplied, please solve in less sections")
             string = ''
             for ie in range(len(iter)-1):
                 string += f'{int(iter[ie])}. {int(iter[ie+1])}.\n'
@@ -77,7 +77,7 @@ def runsammy_shellpipe(sammy_RTO: SammyRunTimeOptions, getchi2= True):
     if getchi2:
         chi2, chi2n = [float(e) for e in runsammy_process.stdout.split('\n')[-2].split()]
     else:
-        chi2=None
+        chi2  = None
         chi2n = None
 
     return chi2, chi2n
@@ -143,6 +143,9 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
                 if inres:
                     f.write(line)
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"))
+    if resonance_ladder.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
+    
     
     # could also read endf spin groups here! 
 
@@ -184,7 +187,7 @@ def get_ECSCM(sammyRTO, sammyINP):
     energy_grid = np.linspace(min(sammyINP.experimental_data.E), max(sammyINP.experimental_data.E), len(exp.energy_grid)) # if more than 498 datapoints then I need a new reader!
     write_estruct_file(energy_grid, os.path.join(sammyRTO.sammy_runDIR,'sammy.dat'))
     write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                filepath    =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
                 bayes       =   sammyRTO.bayes,
                 iterations  =   sammyRTO.iterations,
                 formalism   =   sammyINP.particle_pair.formalism,
@@ -196,8 +199,8 @@ def get_ECSCM(sammyRTO, sammyINP):
                 temp        =   exp.temp,
                 FP          =   exp.FP,
                 n           =   exp.n,
-                alphanumeric=["CROSS SECTION COVARIance matrix is wanted"],
-                )
+                alphanumeric=   ["CROSS SECTION COVARIance matrix is wanted"],
+                plot_fit    =   True)
     
     write_shell_script(sammyINP, sammyRTO, use_RPCM=True)
     _, _ = runsammy_shellpipe(sammyRTO, getchi2=False)
@@ -214,6 +217,8 @@ def execute_sammy(sammy_RTO:SammyRunTimeOptions):
     chi2, chi2n = runsammy_shellpipe(sammy_RTO)
     lst_df = readlst(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.LST'))
     par_df = readpar(os.path.join(sammy_RTO.sammy_runDIR, 'SAMMY.PAR'))
+    if par_df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     return lst_df, par_df, chi2, chi2n
 
 
@@ -274,15 +279,13 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
         write_estruct_file(sammyINP.energy_grid, os.path.join(sammyRTO.sammy_runDIR,"sammy.dat"))
 
     if isinstance(sammyINP.experimental_covariance, dict) and len(sammyINP.experimental_covariance)>0:
-        write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), 
-                  sammyINP.experimental_covariance['Jac_sys'],
-                  sammyINP.experimental_covariance['Cov_sys'],
-                  sammyINP.experimental_covariance['diag_stat'])
-        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
+        cov = filter_idc_dict(sammyINP.experimental_covariance, sammyINP.experimental_data)
+        write_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
+        # filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'), sammyINP.experimental_data)
         idc = True
     elif isinstance(sammyINP.experimental_covariance, str):
         shutil.copy(sammyINP.experimental_covariance, os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'))
-        filter_idc(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
+        filter_idc_file(os.path.join(sammyRTO.sammy_runDIR, 'sammy.idc'),sammyINP.experimental_data)
         idc = True
     else:
         if not sammyINP.experimental_covariance:
@@ -299,21 +302,21 @@ def run_sammy(sammyINP: SammyInputData, sammyRTO:SammyRunTimeOptions):
                                "sammy.inp", 
                                sammyRTO.sammy_runDIR)
     write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
-                bayes       =   sammyRTO.bayes,
-                iterations  =   sammyRTO.iterations,
-                formalism   =   sammyINP.particle_pair.formalism,
-                isotope     =   sammyINP.particle_pair.isotope,
-                M           =   sammyINP.particle_pair.M,
-                ac          =   sammyINP.particle_pair.ac*10,
-                reaction    =   sammyINP.experiment.reaction,
-                energy_range=   sammyINP.experiment.energy_range,
-                temp        =   sammyINP.experiment.temp,
-                FP          =   sammyINP.experiment.FP,
-                n           =   sammyINP.experiment.n,
-                use_IDC     =   idc,
-                alphanumeric =  sammyINP.alphanumeric
-                )
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR,"sammy.inp"),
+                bayes        =   sammyRTO.bayes,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINP.particle_pair.formalism,
+                isotope      =   sammyINP.particle_pair.isotope,
+                M            =   sammyINP.particle_pair.M,
+                ac           =   sammyINP.particle_pair.ac*10,
+                reaction     =   sammyINP.experiment.reaction,
+                energy_range =   sammyINP.experiment.energy_range,
+                temp         =   sammyINP.experiment.temp,
+                FP           =   sammyINP.experiment.FP,
+                n            =   sammyINP.experiment.n,
+                use_IDC      =   idc,
+                alphanumeric =   sammyINP.alphanumeric,
+                plot_fit     =   True)
                 
     write_shell_script(sammyINP, 
                        sammyRTO, 
@@ -374,57 +377,57 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
         ### make YWY initial
         fill_runDIR_with_templates(exp.template, f"{exp.title}_initial.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
-                    bayes       =   True,
-                    iterations  =   sammyRTO.iterations,
-                    formalism   =   sammyINPYW.particle_pair.formalism,
-                    isotope     =   sammyINPYW.particle_pair.isotope,
-                    M           =   sammyINPYW.particle_pair.M,
-                    ac          =   sammyINPYW.particle_pair.ac*10,
-                    reaction    =   exp.reaction,
-                    energy_range=   exp.energy_range,
-                    temp        =   exp.temp,
-                    FP          =   exp.FP,
-                    n           =   exp.n,
-                    # use_IDC=idc,
-                    alphanumeric=["yw"]+idc_flag
-                                    )
+                filepath     =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_initial.inp"),
+                bayes        =   True,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
+                # use_IDC=idc,
+                alphanumeric =   ["yw"]+idc_flag,
+                plot_fit     =   False)
         ### make YWY for iterations
         fill_runDIR_with_templates(exp.template, f"{exp.title}_iter.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
-                bayes       =   True,
-                iterations  =   sammyRTO.iterations,
-                formalism   =   sammyINPYW.particle_pair.formalism,
-                isotope     =   sammyINPYW.particle_pair.isotope,
-                M           =   sammyINPYW.particle_pair.M,
-                ac          =   sammyINPYW.particle_pair.ac*10,
-                reaction    =   exp.reaction,
-                energy_range=   exp.energy_range,
-                temp        =   exp.temp,
-                FP          =   exp.FP,
-                n           =   exp.n,
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_iter.inp"),
+                bayes        =   True,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
                 # use_IDC=idc,
-                alphanumeric=["yw","Use remembered original parameter values"]+idc_flag
-                )
+                alphanumeric =   ["yw","Use remembered original parameter values"]+idc_flag,
+                plot_fit     =   True)
         ### make plotting
         fill_runDIR_with_templates(exp.template, f"{exp.title}_plot.inp", sammyRTO.sammy_runDIR)
         write_saminp(
-                    filepath   =    os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
-                    bayes       =   False,
-                    iterations  =   sammyRTO.iterations,
-                    formalism   =   sammyINPYW.particle_pair.formalism,
-                    isotope     =   sammyINPYW.particle_pair.isotope,
-                    M           =   sammyINPYW.particle_pair.M,
-                    ac          =   sammyINPYW.particle_pair.ac*10,
-                    reaction    =   exp.reaction,
-                    energy_range=   exp.energy_range,
-                    temp        =   exp.temp,
-                    FP          =   exp.FP,
-                    n           =   exp.n,
-                    # use_IDC=idc,
-                    alphanumeric=[]+idc_flag
-                    )
+                filepath     =   os.path.join(sammyRTO.sammy_runDIR, f"{exp.title}_plot.inp"),
+                bayes        =   False,
+                iterations   =   sammyRTO.iterations,
+                formalism    =   sammyINPYW.particle_pair.formalism,
+                isotope      =   sammyINPYW.particle_pair.isotope,
+                M            =   sammyINPYW.particle_pair.M,
+                ac           =   sammyINPYW.particle_pair.ac*10,
+                reaction     =   exp.reaction,
+                energy_range =   exp.energy_range,
+                temp         =   exp.temp,
+                FP           =   exp.FP,
+                n            =   exp.n,
+                # use_IDC=idc,
+                alphanumeric =   []+idc_flag,
+                plot_fit     =   True)
     
     ### options for least squares
     if sammyINPYW.LS:
@@ -469,29 +472,42 @@ def make_inputs_for_YW(sammyINPYW: SammyInputDataYW, sammyRTO:SammyRunTimeOption
                 alphanumeric=["wy", "CHI SQUARED IS WANTED", "Use remembered original parameter values"]+alphanumeric_LS_opts
                 )
 
-def filter_idc(filepath, pw_df):
+def filter_idc_file(filepath, pw_df):
     minE = np.min(pw_df.E)
     maxE = np.max(pw_df.E)
 
     with open(filepath, 'r') as f:
         lines = f.readlines()
-    with open (filepath, 'w') as f:
-        in_partial_derivatives = False
-        for line in lines:
-            if line.lower().startswith("free-forma"):
-                in_partial_derivatives = True
-            elif line.lower().startswith("uncertaint") or not line.strip():
-                in_partial_derivatives = False
-                in_uncertainties = True
 
-            elif in_partial_derivatives:
-                E = float(line.split()[0]) 
-                if (round(E,5)>=round(minE,5)-1e-5) & (round(E,5)<=round(maxE,5)+1e-5):
-                    pass
-                else:
-                    continue
-            
-            f.write(line)
+    text = ''
+    in_partial_derivatives = False
+    for line in lines:
+        if line.lower().startswith("free-forma"):
+            in_partial_derivatives = True
+        elif line.lower().startswith("uncertaint") or not line.strip():
+            in_partial_derivatives = False
+            in_uncertainties = True
+        elif in_partial_derivatives:
+            E = float(line.split()[0]) 
+            if (round(E,5)>=round(minE,5)-1e-5) & (round(E,5)<=round(maxE,5)+1e-5):
+                pass
+            else:
+                continue
+        text += line
+    with open(filepath, 'w') as f:
+        f.write(text)
+
+def filter_idc_dict(cov, pw_df):
+    minE = np.min(pw_df.E)
+    maxE = np.max(pw_df.E)
+    cov_new = {}
+    J, C, stat = cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat']
+    Es = stat.index
+    mask = (Es >= round(minE,5)-1e-5) & (Es <= round(maxE,5)+1e-5)
+    cov_new['Jac_sys']   = J.loc[:,mask]
+    cov_new['Cov_sys']   = C
+    cov_new['diag_stat'] = stat
+    return cov_new
 
 from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 
@@ -519,12 +535,13 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             write_samdat(d, None, os.path.join(rundir,f"{exp.title}.dat"))
             write_estruct_file(d.E, os.path.join(rundir,"dummy.dat"))
             if isinstance(cov, dict) and len(cov)>0:
+                # cov = filter_idc_dict(cov, d)
                 write_idc(os.path.join(rundir, f'{exp.title}.idc'), cov['Jac_sys'], cov['Cov_sys'], cov['diag_stat'])
-                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+                filter_idc_file(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             elif isinstance(cov, str):
                 shutil.copy(cov, os.path.join(rundir, f'{exp.title}.idc'))
-                filter_idc(os.path.join(rundir, f'{exp.title}.idc'), d)
+                filter_idc_file(os.path.join(rundir, f'{exp.title}.idc'), d)
                 idc.append(True)
             else:
                 idc.append(False)
@@ -534,104 +551,122 @@ def make_data_for_YW(datasets, experiments, rundir, exp_cov):
             # write_estruct_file(d, os.path.join(rundir,"dummy.dat"))
     return idc
 
-def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts = False):
+def make_YWY0_bash(dataset_titles, sammyexe, rundir, idc_list, save_lsts:bool=False):
     par = 'results/step$1.par'
     inp_ext = 'initial'
-    with open(os.path.join(rundir, "YWY0.sh") , 'w') as f:
-        ### Copy final iteration result to step + 1 result
-        # f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
-        for i, ds in enumerate(dataset_titles):
-            if idc_list[i]: cov=f"{ds}.idc" 
-            else: cov=""
-            title = f"{ds}_iter0"
-            f.write(f"##################################\n# Generate YW for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n")
-            if save_lsts:
-                f.write(f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n""")
-            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
-            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter0.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        f.write(""""\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $ndat_string_{ds}")
-        f.write(""""\n""")
+    
+    text = ''
+    ### Copy final iteration result to step + 1 result
+    # f.write(f"\n\n\n\n############## Copy Iteration Result ###########\nplus_one=$(( $1 + 1 ))\nhead -$(($(wc -l < iterate/bayes_iter{iterations}.par) - 1)) iterate/bayes_iter{iterations}.par > results/step$plus_one.par\n\nrm REMORI.PAR\n")
+    for i, ds in enumerate(dataset_titles):
+        if idc_list[i]: cov=f"{ds}.idc" 
+        else: cov=""
+        title = f"{ds}_iter0"
+        text += f"##################################\n# Generate YW for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n\nEOF\n"
+        if save_lsts:
+            text += f"""cp SAMMY.LST "results/trans1mm_$1.lst"\n"""
+        # text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter0.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n"""
+        text += f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter0.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    text += """"\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $ndat_string_{ds}"
+    text += """"\n"""
+    with open(os.path.join(rundir, "YWY0.sh"), 'w') as f:
+        f.write(text)
     
     cov=""
+    text = ''
+    dataset_inserts = "\n".join([f"iterate/{ds}_iter0.ywy" for ds in dataset_titles])
+    title = f"bayes_iter1"
+    text += f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n"
+    text += f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n"
+    text += f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n"""
     with open(os.path.join(rundir, "BAY0.sh") , 'w') as f:
-        dataset_inserts = "\n".join([f"iterate/{ds}_iter0.ywy" for ds in dataset_titles])
-        title = f"bayes_iter1"
-        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
-        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
-        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
+        f.write(text)
 
 
 def make_YWYiter_bash(dataset_titles, sammyexe, rundir, idc_list):
     cov = f"iterate/bayes_iter$1.cov"
     par = f"iterate/bayes_iter$1.par"
     inp_ext = 'iter'
+    
+    text = ''
+    for i, ds in enumerate(dataset_titles):
+        if idc_list[i]: dcov=f"{ds}.idc" 
+        else: dcov=""
+        title = f"{ds}_iter$1"
+        text += f"##################################\n# Generate YW for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n"
+        # text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+        text += f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n"""
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n"""
+        text += f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    text += """"\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $ndat_string_{ds}"
+    text += """"\n"""
     with open(os.path.join(rundir,"YWYiter.sh"), 'w') as f:
-        for i, ds in enumerate(dataset_titles):
-            if idc_list[i]: dcov=f"{ds}.idc" 
-            else: dcov=""
-            title = f"{ds}_iter$1"
-            f.write(f"##################################\n# Generate YW for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_{inp_ext}.inp\n{par}\n{ds}.dat\n{cov}\n{dcov}\n\nEOF\n")
-            f.write(f"""mv -f SAMMY.LPT "iterate/{title}.lpt" \nmv -f SAMMY.ODF "iterate/{title}.odf" \nmv -f SAMMY.LST "iterate/{title}.lst" \nmv -f SAMMY.YWY "iterate/{title}.ywy" \n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" iterate/{ds}_iter$1.lpt)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n""")
-            f.write(f"""ndat_line_{ds}=$(grep -i "Number of experimental data points = " iterate/{ds}_iter$1.lpt)\nndat_string_{ds}=$(echo "$ndat_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        f.write(""""\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $ndat_string_{ds}")
-        f.write(""""\n""")
+        f.write(text)
 
+    text = ''
+    dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
+    title = f"bayes_iter$plus_one"
+    text += f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n"
+    text += f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n"
+    text += "plus_one=$(( $1 + 1 ))\n"
+    text += f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n"""
     with open(os.path.join(rundir,"BAYiter.sh"), 'w') as f:
-        dataset_inserts = "\n".join([f"iterate/{ds}_iter$1.ywy" for ds in dataset_titles])
-        title = f"bayes_iter$plus_one"
-        f.write(f"#######################################################\n# Run Bayes for {title}\n#\n#######################################################\n")
-        f.write(f"{sammyexe}<<eod\nsolvebayes_{inp_ext}.inp\n{par}\ndummy.dat\n{dataset_inserts}\n\n{cov}\n\neod\n")
-        f.write("plus_one=$(( $1 + 1 ))\n")
-        f.write(f"""mv -f SAMMY.LPT iterate/{title}.lpt \nmv -f SAMMY.PAR iterate/{title}.par \nmv -f SAMMY.COV iterate/{title}.cov \nrm -f SAM*\n""")
+        f.write(text)
 
 
-def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list):
+def make_final_plot_bash(dataset_titles, sammyexe, rundir, idc_list, del_odf:bool=True):
+    text = ''
+    for i,ds in enumerate(dataset_titles):
+        if idc_list[i]: dcov=f"{ds}.idc" 
+        else: dcov=""
+        text += f"##################################\n# Plot for {ds}\n"
+        text += f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n"
+        text += f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""" 
+        if del_odf:
+            text += """rm -f SAMMY.ODF"""
+        else:
+            text += f"""mv -f SAMMY.ODF "results/{ds}.odf" \n"""
+    text += "################# read chi2 #######################\n#\n"
+    for ds in dataset_titles:
+        text += f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+        text += f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """
+        text += """| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n"""
+    text += """\necho "$1"""
+    for ds in dataset_titles:
+        text += f" $chi2_string_{ds}"
+    for ds in dataset_titles:
+        text += f" $chi2n_string_{ds}"
+    text += """"\n"""
     with open(os.path.join(rundir, "plot.sh") , 'w') as f:
-        for i,ds in enumerate(dataset_titles):
-            if idc_list[i]: dcov=f"{ds}.idc" 
-            else: dcov=""
-            f.write(f"##################################\n# Plot for {ds}\n")
-            f.write(f"{sammyexe}<<EOF\n{ds}_plot.inp\nresults/step$1.par\n{ds}.dat\n{dcov}\n\nEOF\n")
-            f.write(f"""mv -f SAMMY.LPT "results/{ds}.lpt" \nmv -f SAMMY.ODF "results/{ds}.odf" \nmv -f SAMMY.LST "results/{ds}.lst" \n\n""")    
-        f.write("################# read chi2 #######################\n#\n")
-        for ds in dataset_titles:
-            f.write(f"""chi2_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED =" results/{ds}.lpt | tail -n 1)\nchi2_string_{ds}=$(echo "$chi2_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-            f.write(f"""chi2n_line_{ds}=$(grep -i "CUSTOMARY CHI SQUARED DIVIDED" results/{ds}.lpt | tail -n 1)\nchi2n_string_{ds}=$(echo "$chi2n_line_{ds}" """)
-            f.write("""| awk '{ for (i=1; i<=NF; i++) if ($i ~ /[0-9]+(\.[0-9]+)?([Ee][+-]?[0-9]+)?/) print $i }')\n\n""")
-        f.write("""\necho "$1""")
-        for ds in dataset_titles:
-            f.write(f" $chi2_string_{ds}")
-        for ds in dataset_titles:
-            f.write(f" $chi2n_string_{ds}")
-        f.write(""""\n""")
+        f.write(text)
     
 
-def setup_YW_scheme(sammyRTO, sammyINPyw): 
+def setup_YW_scheme(sammyRTO, sammyINPyw, del_odf:bool=True): 
 
     try:
         shutil.rmtree(sammyRTO.sammy_runDIR)
@@ -649,7 +684,7 @@ def setup_YW_scheme(sammyRTO, sammyINPyw):
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     make_YWY0_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, save_lsts=sammyRTO.save_lsts_YW_steps)
     make_YWYiter_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
-    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list)
+    make_final_plot_bash(dataset_titles, sammyRTO.path_to_SAMMY_exe, sammyRTO.sammy_runDIR, idc_list, del_odf=del_odf)
 
     return idc_list
     
@@ -701,6 +736,11 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
     if sammyINP.idc_at_theory:
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
+        if resonance_ladder.isnull().values.any():
+            if sammyRTO.Print:
+                print('Encountered invalid value when reading SAMMY.par. Taking value from previous iteration.')
+            resonance_ladder = resonance_ladder.combine_first(sammyINP.resonance_ladder)
+        sammyINP.resonance_ladder = resonance_ladder
         _ = update_idc_to_theory(sammyINP, sammyRTO, resonance_ladder)
     
     runsammy_ywy0 = subprocess.run(
@@ -735,6 +775,8 @@ def reduce_width_randomly(rundir, istep, sammyINPyw, fudge):
     # if True:# sammyINPyw.batch_reduce_width:
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
     df = readpar(parfile)
+    if df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     proportion = 0.
     factor = np.random.rand(len(df))
     factor[factor <= proportion] = 0.75
@@ -776,6 +818,8 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
     parfile = os.path.join(rundir,'results',f'step{istep}.par')
     df = readpar(parfile)
+    if df.isnull().values.any():
+        raise ValueError('The sammy.par file contains unreadable text.')
     df_internal, df_external = separate_external_resonance_ladder(df, sammyINPyw.external_resonance_indices)
     varyE = np.any(df_internal['varyE']==1)
     varyGg = np.any(df_internal['varyGg']==1)
@@ -799,18 +843,21 @@ def batch_fitpar(rundir, istep, sammyINPyw, fudge):
 
 def step_until_convergence_YW(sammyRTO, sammyINPyw):
     ### some convenient definitions
-    istep = 0
     no_improvement_tracker = 0
     chi2_log = []
     fudge = sammyINPyw.initial_parameter_uncertainty
-    par_df_current = sammyINPyw.resonance_ladder
     rundir = os.path.realpath(sammyRTO.sammy_runDIR)
     criteria="max steps"
     total_derivative_evaluations = 0
+    if sammyINPyw.LevMar:
+        assert sammyINPyw.LevMarV > 1.0
+        starting_off = sammyINPyw.calibrate_fudge # this says that we are still calibrating the fudge parameter at the start.
+        if starting_off:    assert sammyINPyw.LevMarVc > 1.0
+        stop_stepping = False
     ### start loop
     if sammyRTO.Print:
         print(f"Stepping until convergence\nchi2 values\nstep fudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
-    while istep<sammyINPyw.max_steps:
+    for istep in range(sammyINPyw.max_steps):
         
         ### options to batch parameters being fit
         if sammyINPyw.batch_fitpar:
@@ -823,74 +870,128 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
         ### after step 1, do convergence checking
-        if istep>=1:
-            # par_df_current = par_df_next
+        if istep >= 1:
+            if (istep == 1) and sammyRTO.Print:
+                print('Calibrating initial step size...')
 
             ### Levenberg-Marquardt algorithm to update fudge for upcoming step based on chi2 of current parameters
             if sammyINPyw.LevMar:
-                assert(sammyINPyw.LevMarV>1)
 
                 if chi2_list[-1] < chi2_log[istep-1][-1]:
-                    fudge *= sammyINPyw.LevMarV
-                    fudge = min(fudge,sammyINPyw.maxF)
+                    # Searching for significant change to end calibration phase:
+                    if starting_off:
+                        if abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold:
+                            starting_off = False
+                            if sammyRTO.Print:
+                                print('Found significent change. No longer calibrating initial step size...')
+                        elif fudge >= sammyINPyw.maxF:
+                            criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
+                            stop_stepping = True
+                            starting_off = False
+                            last_step = istep
+
+                    if starting_off:
+                        fudge *= sammyINPyw.LevMarVc
+                    else:
+                        fudge *= sammyINPyw.LevMarV
+                    fudge = min(fudge, sammyINPyw.maxF)
                     update_fudge_in_parfile(rundir, istep, fudge)
+
                 else:
                     if sammyRTO.Print:
                         print(f"Repeat step {int(i)}, \tfudge: {[exp.title for exp in sammyINPyw.experiments]+['sum', 'sum/ndat']}")
                         print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
 
                     while True:  
-                        fudge /= sammyINPyw.LevMarVd
-                        fudge = max(fudge, sammyINPyw.minF)
+                        # Searching for significant change to end calibration phase:
+                        if starting_off and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) > sammyINPyw.step_threshold):
+                            starting_off = False
+                            if sammyRTO.Print:
+                                print('Found significent change. No longer calibrating initial step size...')
+
+                        if starting_off: # still calibrating initial step size
+                            if fudge >= sammyINPyw.maxF:
+                                criteria = 'Fudge above maximum value. No step is large enough. Ending iterations.'
+                                stop_stepping = True
+                                starting_off = False
+                                last_step = max(istep-1, 0)
+                                break
+                            fudge *= sammyINPyw.LevMarVc
+                            fudge = min(fudge, sammyINPyw.maxF)
+                        else:
+                            fudge /= sammyINPyw.LevMarVd
+                            fudge = max(fudge, sammyINPyw.minF)
                         update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
                         converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
                         total_derivative_evaluations += iterations
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
                         #     fudge /= sammyINPyw.LevMarVd
                         #     fudge = max(fudge, sammyINPyw.minF)
+
+                        chi2_prev = chi2_list[-1]
                         i, chi2_list = run_YWY0_and_get_chi2(sammyINPyw, sammyRTO, istep)
 
                         if sammyRTO.Print:
-                            print(f"\t\t{np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
+                            print(f"\t\t{fudge:<5.3f}: {np.round(chi2_list,4)}")
 
-                        if chi2_list[-1] < chi2_log[istep-1][-1] or fudge==sammyINPyw.minF:
+                        if chi2_list[-1] < chi2_log[istep-1][-1]: # found a better solution!
                             break
-                        else:
-                            pass
-            
-            ### convergence check
-            Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
-            if Dchi2 < sammyINPyw.step_threshold:
 
-                no_improvement_tracker += 1
-                if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
-                    
-                    if Dchi2 < 0:
-                        criteria = f"Chi2 increased, taking solution {istep-1}"
-                        if sammyINPyw.LevMar and fudge==sammyINPyw.minF:
+                        elif fudge <= sammyINPyw.minF:
                             criteria = f"Fudge below minimum value, taking solution {istep-1}"
-                        if sammyRTO.Print:
-                            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
-                            print(criteria)
-                        return max(istep-1, 0), total_derivative_evaluations
-                    else:
-                        criteria = "Chi2 improvement below threshold"
-                    if sammyRTO.Print:
-                        print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
-                        print(criteria)
-                    return istep, total_derivative_evaluations
-                
-                else:
-                    pass
+                            stop_stepping = True
+                            last_step = max(istep-1, 0)
+                            break
 
-            else:   
-                no_improvement_tracker = 0
+                        elif (not starting_off) and (abs(chi2_list[-1] - chi2_log[istep-1][-1]) < sammyINPyw.step_threshold) \
+                             and (abs(chi2_list[-1] - chi2_prev) < sammyINPyw.step_threshold):
+                            criteria = "No significant change in chi2 has been made. Assuming convergence."
+                            stop_stepping = True
+                            last_step = max(istep-1, 0)
+                            break
+            
+                ### convergence check
+                Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+                if not starting_off:
+                    if stop_stepping:
+                        if sammyRTO.Print:
+                            print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                            print(criteria)
+                        return last_step, total_derivative_evaluations
+                    elif Dchi2 < sammyINPyw.step_threshold:
+                        no_improvement_tracker += 1
+                        if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print("Chi2 improvement below threshold")
+                            return istep, total_derivative_evaluations
+                    else:   
+                        no_improvement_tracker = 0
+
+            else: # not using LevMar
+                Dchi2 = chi2_log[istep-1][-1] - chi2_list[-1]
+                ### convergence check
+                if Dchi2 < sammyINPyw.step_threshold:
+                    no_improvement_tracker += 1
+                    if no_improvement_tracker >= sammyINPyw.step_threshold_lag:
+                        if Dchi2 < 0:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print(f"Chi2 increased, taking solution {istep-1}")
+                            return max(istep-1, 0), total_derivative_evaluations
+                        else:
+                            if sammyRTO.Print:
+                                print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
+                                print("Chi2 improvement below threshold")
+                            return istep, total_derivative_evaluations
+                else:   
+                    no_improvement_tracker = 0
             
 
         ### Log chi2
         chi2_log.append(chi2_list)
         if sammyRTO.Print:
-            print(f"{int(i)}    {np.round(float(fudge),3):<5}: {np.round(chi2_list,4)}")
+            print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
         
         ### Solve Bayes for this step
         # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
@@ -901,11 +1002,9 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
         #     fudge /= sammyINPyw.LevMarVd
         #     fudge = max(fudge, sammyINPyw.minF)
 
-        ### update step
-        istep += 1
-
-    if sammyRTO.Print: print("Maximum steps reached")
-    return max(istep, 0), total_derivative_evaluations
+    if sammyRTO.Print:
+        print("Maximum steps reached")
+    return istep, total_derivative_evaluations
 
 
 # from ATARI.utils.datacontainers import Evaluation_Data
@@ -1021,6 +1120,8 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
 
 def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     par = readpar(os.path.join(sammyRTO.sammy_runDIR,f"results/step{i}.par"))
+    if par.isnull().values.any():
+        raise ValueError(f'The sammy.par file contains unreadable text:\n{par}')
 
     if sammyINP.idc_at_theory:
         covariance_data_at_theory = update_idc_to_theory(sammyINP, sammyRTO, par)
@@ -1040,7 +1141,7 @@ def plot_YW(sammyINP, sammyRTO, dataset_titles, i):
     return par, lsts, chi2s, chi2ns, covariance_data_at_theory
 
 
-def check_inputs_YW(sammyINPyw, sammyRTO):
+def check_inputs_YW(sammyINPyw, sammyRTO, ignore_bayes_conflict:bool=True):
     empty = False
     dataset_titles = [exp.title for exp in sammyINPyw.experiments]
     if len(np.unique(dataset_titles)) != len(dataset_titles):
@@ -1057,7 +1158,10 @@ def check_inputs_YW(sammyINPyw, sammyRTO):
         if not np.any([each in sammyINPyw.resonance_ladder for each in ["varyE", "varyGg", "varyGn1"]]):
             raise ValueError("No vary flag columns in resonance ladder")
         if np.sum([sammyINPyw.resonance_ladder["varyE"], sammyINPyw.resonance_ladder["varyGg"], sammyINPyw.resonance_ladder["varyGn1"]]) == 0:
-            raise ValueError("Bayes set to true but no varied parameters")
+            if ignore_bayes_conflict:
+                sammyRTO.bayes = False
+            else:
+                raise ValueError("Bayes set to true but no varied parameters")
 
     return dataset_titles, empty
 
@@ -1066,7 +1170,7 @@ def run_sammy_YW(sammyINPyw, sammyRTO):
     ## need to update functions to just pull titles and reactions from sammyINPyw.experiments
     dataset_titles, empty = check_inputs_YW(sammyINPyw, sammyRTO)
 
-    setup_YW_scheme(sammyRTO, sammyINPyw)
+    setup_YW_scheme(sammyRTO, sammyINPyw, del_odf=True)
     for bash in ["YWY0.sh", "YWYiter.sh", "BAY0.sh", "BAYiter.sh", "plot.sh"]:
         os.system(f"chmod +x {os.path.join(sammyRTO.sammy_runDIR, f'{bash}')}")
 
@@ -1188,6 +1292,8 @@ def step_until_convergence_YW_Lasso(sammyRTO, sammyINPyw):
         # def Lasso_from_previous_step(rundir, istep, sammyINPyw, fudge):
             parfile_next = os.path.join(rundir,'results',f'step{istep+1}.par') # file to actually update as P = P_prior - a*dL/dP
             par_df_next = readpar(parfile_next)
+            if par_df_next.isnull().values.any():
+                raise ValueError('The sammy.par file contains unreadable text.')
             df_internal_next, df_external_next = separate_external_resonance_ladder(par_df_next, sammyINPyw.external_resonance_indices)
             df_internal_current, df_external_current = separate_external_resonance_ladder(par_df_current, sammyINPyw.external_resonance_indices)
             fit_mask = df_internal_current.varyGn1 == 1

@@ -2,8 +2,9 @@ from typing import Protocol
 from ATARI.AutoFit.functions import * #eliminate_small_Gn, update_vary_resonance_ladder, get_external_resonance_ladder, get_starting_feature_bank
 import numpy as np
 import pandas as pd
-from copy import copy
+from copy import copy, deepcopy
 from ATARI.AutoFit import sammy_interface_bindings
+from ATARI.AutoFit.spin_shuffling import minimize_spingroup_shuffling
 from ATARI.ModelData.particle_pair import Particle_Pair
 import time
 from ATARI.AutoFit import elim_addit_funcs
@@ -11,6 +12,8 @@ from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
+# TODO:
+#    * Instead of going in order every time, if test fails, add resonance to end of queue for next iteration.
 
 class FitAndEliminateOPT:
     """
@@ -30,8 +33,10 @@ class FitAndEliminateOPT:
         Boolean list for fit 2 that determines which parameters will be optimized (E, Gg, Gn1).
     width_elimination: bool = False
         Option to eliminate resonances during initial fitting stages based on neutron width.
-    Gn_threshold: Float = 1e-2
+    width_elimination_Gn_threshold: float = 1e-2
         Neutron width threshold for width-based elimination if width_elimination=True.
+    width_elimination_Nres_threshold: int = None
+        Number of resonances, below which width-based elimination stops.
     decrease_chi2_threshold_for_width_elimination: bool = True
         If width_elimination=True, decrease the chi2 threshold convergence criteria
 
@@ -70,15 +75,18 @@ class FitAndEliminateOPT:
     def __init__(self, **kwargs):
 
         ### Initial fit settings
+        self._initial_fit_only_trans = True
         self._fitpar1 = [0,0,1]
         self._fitpar2 = [1,0,1]
         self._width_elimination = False
-        self._Gn_threshold = 1e-2
+        self._width_elimination_Gn_threshold = 1e-2
+        self._width_elimination_Nres_threshold = None
         self._decrease_chi2_threshold_for_width_elimination = False
 
         ### elimination options
         self._fitpar_elim = [1,0,1]
         self._chi2_allowed = kwargs.get('chi2_allowed', 0)
+        self._chi2_memory_factor = kwargs.get('chi2_memory_factor', 0.0)
         self._greedy_mode = kwargs.get('greedy_mode', False)
 
         self._interm_fit_max_iter = kwargs.get('interm_fit_max_iter', 20)
@@ -92,6 +100,11 @@ class FitAndEliminateOPT:
 
         self._stop_at_chi2_thr = kwargs.get('stop_at_chi2_thr', False)             
         self._final_stage_vary_pars = kwargs.get('final_stage_vary_pars', [1,0,1]) 
+
+        self._spin_shuffle = kwargs.get('spin_shuffle', False)
+        self.shuffle_selection_criteria = kwargs.get('shuffle_selection_criteria', 'chi2+Wig+PT')
+        self._num_shuffles = kwargs.get('num_shuffles', 5)
+        self._E_window_spin = kwargs.get('E_window_spin', None)
 
         ### Other
         self._print_bool = True
@@ -139,6 +152,13 @@ class FitAndEliminateOPT:
 
     ### Initial Fit Opts
     @property
+    def initial_fit_only_trans(self):
+        return self._initial_fit_only_trans
+    @initial_fit_only_trans.setter()
+    def initial_fit_only_trans(self, initial_fit_only_trans):
+        self._initial_fit_only_trans = initial_fit_only_trans
+
+    @property
     def fitpar1(self):
         return self._fitpar1
     @fitpar1.setter
@@ -160,11 +180,18 @@ class FitAndEliminateOPT:
         self._width_elimination = width_elimination
 
     @property
-    def Gn_threshold(self):
-        return self._Gn_threshold
-    @Gn_threshold.setter
-    def Gn_threshold(self, Gn_threshold):
-        self._Gn_threshold = Gn_threshold
+    def width_elimination_Gn_threshold(self):
+        return self._width_elimination_Gn_threshold
+    @width_elimination_Gn_threshold.setter
+    def width_elimination_Gn_threshold(self, width_elimination_Gn_threshold):
+        self._width_elimination_Gn_threshold = width_elimination_Gn_threshold
+
+    @property
+    def width_elimination_Nres_threshold(self):
+        return self._width_elimination_Nres_threshold
+    @width_elimination_Nres_threshold.setter
+    def width_elimination_Nres_threshold(self, width_elimination_Nres_threshold):
+        self._width_elimination_Nres_threshold = width_elimination_Nres_threshold
 
     @property
     def decrease_chi2_threshold_for_width_elimination(self):
@@ -183,6 +210,13 @@ class FitAndEliminateOPT:
         self._chi2_allowed = chi2_allowed
     
     @property
+    def chi2_memory_factor(self):
+        return self._chi2_memory_factor
+    @chi2_memory_factor.setter
+    def chi2_memory_factor(self, chi2_memory_factor):
+        self._chi2_memory_factor = chi2_memory_factor
+    
+    @property
     def stop_at_chi2_thr(self):
         return self._stop_at_chi2_thr
     @stop_at_chi2_thr.setter
@@ -193,15 +227,45 @@ class FitAndEliminateOPT:
     def final_stage_vary_pars(self):
         return self._final_stage_vary_pars 
     @final_stage_vary_pars.setter
-    def final_stage_vary_pars(self, final_stage_vary_pars ):
+    def final_stage_vary_pars(self, final_stage_vary_pars):
         self._final_stage_vary_pars = final_stage_vary_pars 
+
+    @property
+    def spin_shuffle(self):
+        return self._spin_shuffle
+    @spin_shuffle.setter
+    def spin_shuffle(self, spin_shuffle):
+        self._spin_shuffle = bool(spin_shuffle)
+
+    @property
+    def num_shuffles(self):
+        return self._num_shuffles
+    @num_shuffles.setter
+    def num_shuffles(self, num_shuffles):
+        self._num_shuffles = int(num_shuffles)
+
+    @property
+    def E_window_spin(self):
+        return self._E_window_spin
+    @E_window_spin.setter
+    def E_window_spin(self, E_window_spin):
+        self._E_window_spin = E_window_spin
+
+    @property
+    def shuffle_selection_criteria(self):
+        return self._shuffle_selection_criteria
+    @shuffle_selection_criteria.setter
+    def shuffle_selection_criteria(self, shuffle_selection_criteria):
+        if shuffle_selection_criteria not in ('chi2', 'chi2+Wig', 'chi2+PT', 'chi2+Wig+PT'):
+            raise ValueError(f"'shuffle_selection_criteria' must be one of 'chi2', 'chi2+Wig', 'chi2+PT', or 'chi2+Wig+PT', not {shuffle_selection_criteria}.")
+        self._shuffle_selection_criteria = shuffle_selection_criteria
 
     @property
     def greedy_mode(self):
         return self._greedy_mode
     @greedy_mode.setter
     def greedy_mode(self, greedy_mode):
-        self._greedy_mode = greedy_mode
+        self._greedy_mode = bool(greedy_mode)
 
     @property 
     def start_deep_fit_from(self):
@@ -322,6 +386,27 @@ class FitAndEliminate:
                     initial_feature_bank,
                     fixed_resonance_ladder = pd.DataFrame(),
                     ):
+        
+        if self.options.initial_fit_only_trans:
+            if self.options.print_bool: 
+                print("========================================\nInitial Fit 0\n========================================")
+                print("Fitting Gn >> Gg resonances with only transmission or total cross section")
+
+            initial_feature_bank = update_vary_resonance_ladder(initial_feature_bank, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
+            if self.options.print_bool: 
+                print('Initial Feature Bank:')
+                print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
+                print()
+
+            total_resonance_ladder, fixed_resonance_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
+            self.output.external_resonance_indices = fixed_resonance_indices
+
+            samout = self.fit_with_total_only(total_resonance_ladder, fixed_resonance_indices)
+            reslad_0 = samout.par_post
+            assert(isinstance(reslad_0, pd.DataFrame)), f'\nResonance Ladder:\n{reslad_0}'
+
+            initial_feature_bank, fixed_resonance_ladder = separate_external_resonance_ladder(reslad_0, fixed_resonance_indices)
+
 
         ### Fit 1 on Gn only
         if self.options.print_bool: 
@@ -329,13 +414,21 @@ class FitAndEliminate:
             print(f"Options to vary: {self.options.fitpar1}")
 
         initial_feature_bank = update_vary_resonance_ladder(initial_feature_bank, varyE = self.options.fitpar1[0], varyGg = self.options.fitpar1[1], varyGn1 = self.options.fitpar1[2])
+        
+        if self.options.print_bool: 
+            print('Initial Feature Bank:')
+            print(initial_feature_bank[['E','Gg','Gn1','varyE','varyGg','varyGn1','J_ID']])
+            print()
+
         # external_resonance_ladder = update_vary_resonance_ladder(external_resonance_ladder, varyE = self.options.fitpar_external[0], varyGg = self.options.fitpar_external[1], varyGn1 = self.options.fitpar_external[2])
         total_resonance_ladder, fixed_resonance_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
         self.output.external_resonance_indices = fixed_resonance_indices
 
         outs_fit_1 = self.fit_and_eliminate_by_Gn(total_resonance_ladder, fixed_resonance_indices)
         reslad_1 = copy(outs_fit_1[-1].par_post)
-        assert(isinstance(reslad_1, pd.DataFrame))
+        # if reslad_1 is None:
+        #     reslad_1 = outs_fit_1[-1].par
+        assert(isinstance(reslad_1, pd.DataFrame)), f'\nResonance Ladder:\n{reslad_1}'
 
         if np.all(self.options.fitpar1 == self.options.fitpar2):
             if self.options.print_bool: print(f"Options to vary for initial fit 2 are the same, skipping")
@@ -357,26 +450,54 @@ class FitAndEliminate:
                 self.output.initial_fits.append(out)
                 self.total_derivative_evaluations += out.total_derivative_evaluations
                 self.output.derivative_evaluations.append(out.total_derivative_evaluations)
+
+        Ndata = np.sum([len(df) for df in samout_final.pw_post])
+        chi2n = np.sum(samout_final.chi2_post) / Ndata
+        if chi2n > 1.0:
+            warnings.warn(f'Chi-squared is higher than expected for the initial fit: {chi2n:.3f}.')
+        # if chi2n > 4.0:
+        #     raise RuntimeError(f'Chi-squared is way higher than expected: {chi2n:.3f}.\nFitting has failed.')
         
         return samout_final 
     
 
 
+    def fit_with_total_only(self, resonance_ladder, external_resonance_indices):
+
+        if self.options.print_bool: print("Initial solve with total only to capture large resonances\n")
+
+        # 
+        solver_initial_total_only = deepcopy(self.solver_initial)
+        reactions = [experiment.reaction for experiment in self.solver_initial.sammyINP.experiments[0]]
+        for i,reaction in enumerate(reactions):
+            if reaction not in ('total', 'transmission'):
+                del self.solver_initial.sammyINP.experiments[i]
+                if self.solver_initial.sammyINP.experimental_covariance is not None:
+                    del self.solver_initial.sammyINP.experimental_covariance[i]
+                if self.solver_initial.sammyINP.experiments_no_pup is not None:
+                    del self.solver_initial.sammyINP.experiments_no_pup[i]
+                if self.solver_initial.sammyINP.measurement_models is not None:
+                    del self.solver_initial.sammyINP.measurement_models[i]
+
+        solver_initial_total_only.set_bayes(True)
+        sammyOUT_fit = solver_initial_total_only.fit(resonance_ladder, external_resonance_indices)
+        return sammyOUT_fit
+
+
     def fit_and_eliminate_by_Gn(self, resonance_ladder, external_resonance_indices):
         
         if self.options.print_bool: print(f"Initial solve from {len(resonance_ladder)-len(external_resonance_indices)} resonance features\n")
+        self.solver_initial.set_bayes(True)
         sammyOUT_fit = self.solver_initial.fit(resonance_ladder, external_resonance_indices)
         outs = [sammyOUT_fit]
 
         if self.options.width_elimination:
-            eliminating = True
-            while eliminating:
+            for it in range(10_000):
                 internal_resonance_ladder, external_resonance_ladder = separate_external_resonance_ladder(sammyOUT_fit.par_post, external_resonance_indices)
-                print(internal_resonance_ladder)
-                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.Gn_threshold)
+                internal_resonance_ladder_reduced, fraction_eliminated = eliminate_small_Gn(internal_resonance_ladder, self.options.width_elimination_Gn_threshold, self.options.width_elimination_Nres_threshold)
                 resonance_ladder, external_resonance_indices = concat_external_resonance_ladder(internal_resonance_ladder_reduced, external_resonance_ladder)
                 if fraction_eliminated == 0.0:
-                    eliminating = False
+                    break # no longer eliminating after not eliminating any more resonances
                 elif fraction_eliminated == 100.0:
                     raise ValueError("Eliminated all resonances due to width, please change settings")
                 else:
@@ -387,6 +508,11 @@ class FitAndEliminate:
                         print(f"Resolving with {len(internal_resonance_ladder_reduced)} resonance features\n----------------------------------------\n")
                     sammyOUT_fit = self.solver_initial.fit(resonance_ladder, external_resonance_indices)
                     outs.append(sammyOUT_fit)
+                if (self.options.width_elimination_Nres_threshold is not None) \
+                    and (len(internal_resonance_ladder_reduced) == self.options.width_elimination_Nres_threshold):
+                    break # no longer eliminating after going below the threshold number of resonances
+            else:
+                raise RuntimeError('Initial IFB solve never stopped eliminating somehow.')
             if self.options.print_bool: print(f"\nComplete after no neutron width features below threshold\n")
 
         return outs
@@ -494,6 +620,8 @@ class FitAndEliminate:
 
 
         ### Start elimination
+        will_test_priors = True
+        delta_objn_log = [None for i in range(input_num_res)]
         while True: 
 
             level_start_time = time.time()
@@ -506,9 +634,14 @@ class FitAndEliminate:
 
             current_level = len(initial_feature_bank) # note - from which we are going to N-1!
 
-            if (self.options.greedy_mode):
-                initial_feature_bank = initial_feature_bank.sort_values(by='Gn1') # sort ladder by Gn - to del smallest res. first
-            
+            # if (self.options.greedy_mode):
+            # Reordering resonances:
+            initial_feature_bank = initial_feature_bank.sort_values(by='Gn1') # sort ladder by Gn - to del smallest res. first
+            if self.options.chi2_memory_factor != 0.0:
+                print('Log of last recorded changes in objective value:')
+                print(delta_objn_log)
+            fixed_resonance_ladder.index
+            delta_objn_log = [delta_objn_log[idx-np.sum(fixed_resonance_ladder.index < idx)] for idx in initial_feature_bank.index]
             initial_feature_bank.reset_index(drop=True, inplace=True)
 
             ### Identify fixed resonances
@@ -532,7 +665,6 @@ class FitAndEliminate:
                 print('*'*40)
                 print()
             
-            fit_code_init_level = f'init_sol_level_{current_level}'
             ladder, fixed_resonances_indices = concat_external_resonance_ladder(initial_feature_bank, fixed_resonance_ladder)
             initial_ladder_chars = self.evaluate_prior(ladder)
             
@@ -542,74 +674,70 @@ class FitAndEliminate:
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
 
             if (self.options.print_bool):
-                print()
-                print(f'\t{fit_code_init_level}')
-                print(f'\tBase objective value for level: {base_obj}')
-                print()
+                print(f'\n\tBase objective value for level: {base_obj}\n')
 
             # if we are on the level of target resonances - just stop - by default don't stop until 0
-            if (current_level==target_ires):
+            if current_level == target_ires:
                 break
 
-            ### test all N-1 priors 
-            time_test_priors_start = time.time()
-            prior_test_out = self.test_priors(current_level,
-                                              fixed_resonance_ladder,
-                                              initial_feature_bank,
-                                              delta_obj_allowed,
-                                              base_obj)
-            priors_test_time = time.time() - time_test_priors_start
-            any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_obj, priors_passed_cnt, best_removed_resonance_prior = prior_test_out
-        
-            ### if any priors passed remove, 
-            if (any_prior_passed_test):
-                if (self.options.print_bool):
-                    print()
-                    print(f'Priors passed the test...{priors_passed_cnt}')
-                    print(f'Best model found {best_removed_resonance_prior}:')
-                    print(f'Objective value:\t{best_prior_obj}')
-                    #print(f'Time for priors test: {np.round(priors_test_time,2)} sec')
-                    print(f'Time for priors test: {elim_addit_funcs.format_time_2_str(priors_test_time)[1]}')
-                    print()
+            ### test all N-1 priors
+            any_prior_passed_test = False
+            if will_test_priors:
+                time_test_priors_start = time.time()
+                prior_test_out = self.test_priors(current_level,
+                                                fixed_resonance_ladder,
+                                                initial_feature_bank,
+                                                delta_obj_allowed,
+                                                base_obj)
+                priors_test_time = time.time() - time_test_priors_start
+                any_prior_passed_test, any_model_passed_test, best_prior_model_chars, best_prior_obj, priors_passed_cnt, best_removed_resonance_prior = prior_test_out
+            
+                ### if any priors passed remove, 
+                if (any_prior_passed_test):
+                    if (self.options.print_bool):
+                        print()
+                        print(f'Priors passed the test...{priors_passed_cnt}')
+                        print(f'Best model found {best_removed_resonance_prior}:')
+                        print(f'Objective value:\t{best_prior_obj}')
+                        #print(f'Time for priors test: {np.round(priors_test_time,2)} sec')
+                        print(f'Time for priors test: {elim_addit_funcs.format_time_2_str(priors_test_time)[1]}')
+                        print()
 
-                best_model_obj = best_prior_obj
-                best_removed_resonance = best_removed_resonance_prior
-                best_model_chars = best_prior_model_chars
-                any_model_passed_test = True
+                    best_model_obj = best_prior_obj
+                    best_removed_resonance = best_removed_resonance_prior
+                    best_model_chars = best_prior_model_chars
+                    any_model_passed_test = True
 
-                LevMarV0 = self.options.LevMarV0_priorpassed # if prior passed, starting step should be small
+                    LevMarV0 = self.options.LevMarV0_priorpassed # if prior passed, starting step should be small
 
-                level_derivative_evaluations = 0
+                    level_derivative_evaluations = 0
+                    deep_stage_ladder_start = best_model_chars.par
+                else:
+                    will_test_priors = False
+                    print('\nNo priors passed test. No longer testing priors...\n')
             ### else test all N-1 fitted models 
-            else:
+            if (not will_test_priors) or (not any_prior_passed_test):
                 fitted_test_out = self.test_fitted_models(current_level,
                                         fixed_resonance_ladder,
                                         initial_feature_bank,
                                         base_obj,
                                         delta_obj_allowed,
                                         best_model_obj,
-                                        any_model_passed_test)
+                                        any_model_passed_test,
+                                        delta_objn_log,
+                                        self.options.chi2_memory_factor)
                 
-                best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations = fitted_test_out
-
+                best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations, delta_objn_log = fitted_test_out
                 LevMarV0 = self.options.start_fudge_for_deep_stage
-
-            
+                deep_stage_ladder_start = best_model_chars.par_post
 
 
             ### Do deep fitting after selecting model from prior or deep fit       
             # if we are doing deep fit on this stage
-            if (any_prior_passed_test):
-                deep_stage_ladder_start = best_model_chars.par
-            else:
-                deep_stage_ladder_start = best_model_chars.par_post
-
             if ((deep_stage_ladder_start.shape[0]- fixed_resonance_ladder.shape[0]) <= start_deep_fit_from):
                 if (self.options.print_bool):
-                    print()
                     print('Starting "deep" fitting of best initial guess by chi2...')
-                    print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}')
-                    print()
+                    print(f'DA = {deep_fit_max_iter}/{deep_fit_step_thr}\n')
 
                 posterior_deep_SO, sol_fit_time_deep, derivative_evaluations = self.fit_YW_by_ig(ladder_df = deep_stage_ladder_start, 
                                                                                                  fixed_resonance_df= fixed_resonance_ladder,
@@ -619,9 +747,7 @@ class FitAndEliminate:
                 level_derivative_evaluations += derivative_evaluations
             else:
                 if (self.options.print_bool):
-                    print()
-                    print('Skipping "deep" fitting stage, utilizing best model for the next step w/o chi2...')
-                    print()
+                    print('\nSkipping "deep" fitting stage, utilizing best model for the next step w/o chi2...\n')
                 
                 posterior_deep_SO = best_model_chars
                 sol_fit_time_deep = 0
@@ -633,19 +759,14 @@ class FitAndEliminate:
                     posterior_deep_SO.chi2n_post = posterior_deep_SO.chi2n
                     posterior_deep_SO.pw_post    = posterior_deep_SO.pw
 
-                else:
-                    pass
-
             cur_sol_chars_deep = posterior_deep_SO
             deep_chi2_prior = np.sum(cur_sol_chars_deep.chi2)
             deep_obj_prior = objective_func(deep_chi2_prior, cur_sol_chars_deep.par, self.particle_pair, fixed_resonances_indices,
                                             self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-            deep_chi2 = np.sum(cur_sol_chars_deep.chi2_post)
-            deep_obj = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+            deep_chi2_post = np.sum(cur_sol_chars_deep.chi2_post)
+            deep_obj_post = objective_func(deep_chi2_post, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
                                       self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-            benefit_deep_obj = deep_obj - base_obj
-
-            selected_ladder_chars = cur_sol_chars_deep
+            benefit_deep_obj = deep_obj_post - base_obj
             
             ### printout
             if (self.options.print_bool):
@@ -655,8 +776,12 @@ class FitAndEliminate:
                 print('Deep fitting decision about model selection:')
                 print()
                 print(f'\t objective value before: {deep_obj_prior}')
-                print(f'\t objective value after: {deep_obj}')
+                print(f'\t objective value after: {deep_obj_post}')
                 print()
+
+            selected_ladder_chars     = cur_sol_chars_deep
+            selected_ladder_chi2_post = deep_chi2_post
+            selected_ladder_obj_post  = deep_obj_post
 
             # checking if final model passed the test
             if ((benefit_deep_obj <= delta_obj_allowed) & final_model_passed_test):
@@ -700,18 +825,47 @@ class FitAndEliminate:
                 print('*'*40)
                 print()
 
+            if self.options.spin_shuffle:
+                shuffle_selection_criteria = 'chi2'
+                if self.options.Wigner_informed_variable_selection:
+                    shuffle_selection_criteria += '+Wig'
+                if self.options.PorterThomas_informed_variable_selection:
+                    shuffle_selection_criteria += '+PT'
+                spin_shuffle_cases = minimize_spingroup_shuffling(selected_ladder_chars.par_post, self.solver_eliminate, self.options.num_shuffles,
+                                                                  self.options.E_window_spin, model_selection=shuffle_selection_criteria,
+                                                                  fixed_resonance_indices=fixed_resonances_indices)
+                
+                best_shuffle_obj = selected_ladder_obj_post
+                best_shuffle_samout = copy(selected_ladder_chars)
+                print(f'Prior Obj: {best_shuffle_obj:.5f}')
+                for j, spin_shuffle_case in enumerate(spin_shuffle_cases):
+                    print(f'Shuffle case #{j:>2} Obj: {spin_shuffle_case['obj_value']:.5f}')
+                    if spin_shuffle_case['obj_value'] is None:
+                        print('Chi2 was somehow "None" for one spin shuffle case. Ignoring case.')
+                        continue
+                    elif spin_shuffle_case['obj_value'] < best_shuffle_obj:
+                        best_shuffle_obj = spin_shuffle_case['obj_value']
+                        best_shuffle_samout = spin_shuffle_case['sammy_out']
+                selected_ladder_chars = best_shuffle_samout
+                selected_ladder_chi2_post = np.sum(selected_ladder_chars.chi2_post)
+                print('selected_ladder_chi2_post', selected_ladder_chi2_post)
+                best_shuffle_samout.par_post.reset_index(inplace=True, drop=True)
+                print('best_shuffle.par_post', best_shuffle_samout.par_post)
+                selected_ladder_obj_post = objective_func(selected_ladder_chi2_post, best_shuffle_samout.par_post, self.particle_pair, fixed_resonances_indices,
+                                                          self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
+
             ### save model data, and continue or break while loop
-            deep_obj_stopping_criteria = {}
+            selected_ladder_stopping_criteria = {}
             for Wigner_informed_stopping_criteria in (False, True):
                 for PorterThomas_informed_stopping_criteria in (False, True):
-                    obj_stopping_criteria = objective_func(deep_chi2, cur_sol_chars_deep.par_post, self.particle_pair, fixed_resonances_indices,
+                    obj_stopping_criteria = objective_func(selected_ladder_chi2_post, selected_ladder_chars.par_post, self.particle_pair, fixed_resonances_indices,
                                                            Wigner_informed_stopping_criteria, PorterThomas_informed_stopping_criteria)
                     obj_type = 'chi2'
                     if Wigner_informed_stopping_criteria:
                         obj_type += '+Wig'
                     if PorterThomas_informed_stopping_criteria:
                         obj_type += '+PT'
-                    deep_obj_stopping_criteria[obj_type] = obj_stopping_criteria
+                    selected_ladder_stopping_criteria[obj_type] = obj_stopping_criteria
                     
             current_num_of_res_wo_sides = selected_ladder_chars.par_post.shape[0] - fixed_resonance_ladder.shape[0]
             model_history[current_num_of_res_wo_sides] = {
@@ -721,19 +875,22 @@ class FitAndEliminate:
                 'final_model_passed_test': final_model_passed_test,
                 'level_time': level_time,
                 'total_time': time.time() - start_time,
-                'objective_value_stopping_criteria': deep_obj_stopping_criteria,
+                'objective_value_stopping_criteria': selected_ladder_stopping_criteria,
             }
 
             ### Printout the history of chi2 - for all the elimination
-            all_curr_levels = []
-            all_curr_chi2 = []
+            all_curr_levels    = []
+            all_curr_chi2      = []
             all_curr_chi2_stat = []
             for hist_level in model_history.keys():
                 curr_sol_chars = model_history[hist_level]['selected_ladder_chars']
                 cur_N_dat = np.sum([df.shape[0] for df in curr_sol_chars.pw])
                 cur_N_par = 3 * curr_sol_chars.par_post.shape[0]
                 cur_sum_chi2 = np.sum(curr_sol_chars.chi2_post)
-                cur_sum_chi2_stat = cur_sum_chi2 / (cur_N_dat - cur_N_par)
+                if cur_N_dat > cur_N_par:
+                    cur_sum_chi2_stat = cur_sum_chi2 / (cur_N_dat - cur_N_par)
+                else:
+                    cur_sum_chi2_stat = np.nan
                 all_curr_levels.append(hist_level)
                 all_curr_chi2.append(cur_sum_chi2)
                 all_curr_chi2_stat.append(cur_sum_chi2_stat)
@@ -800,22 +957,41 @@ class FitAndEliminate:
         priors_passed_cnt = 0
 
         for j in range(current_level):  # For every resonance in the current ladder
-            
-            # Skip if side resonances
-            # if j in fixed_resonances_indices:
-            #     if (self.options.print_bool):
-            #         print('Warning!')
-            #         print(f'Res. index {j} in fixed:')
-            #         print()
-            #         print(fixed_resonances)
-            #         print()
-            #     continue
-            
-            ### Create and evaluate a ladder with the j-th resonance removed
-            # note - always keep the side-resonances
-            N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
-            ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
-            prior_chars = self.evaluate_prior(ladder) 
+
+            ### Choose resonance if the widths are too low
+            Gn_value = initial_feature_bank.loc[j,'Gn1']
+            GN_LIMIT = 0.000100
+            if abs(Gn_value) < GN_LIMIT:
+                if self.options.print_bool:     print('A resonance is becoming too small. Stopping varied widths.')
+                N_minus_1_ifb = self.set_no_smaller_resonance(initial_feature_bank, j, GN_LIMIT)
+                ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
+                prior_chars = self.evaluate_prior(ladder)
+
+                prior_sum_chi2 = np.sum(prior_chars.chi2)
+                best_prior_obj = objective_func(prior_sum_chi2, prior_chars.par, self.particle_pair, fixed_resonances_indices,
+                                                self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
+
+                # best_prior_model_chars = prior_chars
+                # any_prior_passed_test = True
+                # best_removed_resonance_prior = j
+                # priors_passed_cnt = 1
+                break
+            else:
+                # Skip if side resonances
+                # if j in fixed_resonances_indices:
+                #     if (self.options.print_bool):
+                #         print('Warning!')
+                #         print(f'Res. index {j} in fixed:')
+                #         print()
+                #         print(fixed_resonances)
+                #         print()
+                #     continue
+                
+                ### Create and evaluate a ladder with the j-th resonance removed
+                # note - always keep the side-resonances
+                N_minus_1_ifb, row_removed = self.remove_resonance(initial_feature_bank, j)
+                ladder, fixed_resonances_indices = concat_external_resonance_ladder(N_minus_1_ifb, fixed_resonance_ladder)
+                prior_chars = self.evaluate_prior(ladder) 
 
             prior_sum_chi2 = np.sum(prior_chars.chi2)
 
@@ -832,7 +1008,7 @@ class FitAndEliminate:
                 best_removed_resonance_prior = j
 
             ### Check if un-fitted N-1 model still is acceptable
-            if ((prior_benefit_obj_per_Ndata<=delta_obj_allowed)):
+            if ((prior_benefit_obj_per_Ndata < delta_obj_allowed)):
                 test_result = "✓"  # Check mark if the test is passed
                 sign = "<="
                 any_prior_passed_test = True
@@ -874,7 +1050,9 @@ class FitAndEliminate:
                            base_obj,
                            delta_obj_allowed,
                            best_model_obj,
-                           any_model_passed_test
+                           any_model_passed_test,
+                           delta_objn_log,
+                           chi2_memory_factor,
                            ):
        
         # if no priors passed the test - do the fitting for each model
@@ -888,7 +1066,9 @@ class FitAndEliminate:
         # TODO: change this..
         best_removed_resonance = None
         best_model_chars = None
+        best_benefit_obj_per_ndata = np.inf
         level_derivative_evaluations = 0
+        best_model_obj = np.inf
 
         # selecting the most perspective model from the chi2 point of view with limited iterations allowed
         for j in range(current_level):  # For every resonance in the current ladder
@@ -903,6 +1083,12 @@ class FitAndEliminate:
             #         print(fixed_resonances)
             #         print()
             #     continue
+
+            # No need to fit if we know it will be bad (from historical runs)
+            print(delta_objn_log[j])
+            if (delta_objn_log[j] is not None) and (delta_objn_log[j] != np.inf)  and (best_benefit_obj_per_ndata < delta_objn_log[j] * chi2_memory_factor):
+                print(f'Skipping model #{j} because historical delta chi2 was too high relative to current best...')
+                continue
         
             # Create a ladder with the j-th resonance removed
             # note - always keep the side-resonances
@@ -927,18 +1113,20 @@ class FitAndEliminate:
             interm_step_chi2 = np.sum(cur_sol_chars.chi2_post)
             interm_step_obj = objective_func(interm_step_chi2, cur_sol_chars.par_post, self.particle_pair, fixed_resonances_indices,
                                              self.options.Wigner_informed_variable_selection, self.options.PorterThomas_informed_variable_selection)
-
+            print('interm_step_chi2', interm_step_chi2)
+            print('interm_step_obj', interm_step_obj)
+            print('base_obj', base_obj)
             benefit_obj = interm_step_obj - base_obj
+            benefit_obj_per_ndata = benefit_obj / self.solver_eliminate.Ndata
+            delta_objn_log[j] = benefit_obj_per_ndata
 
             # Check if this model is best so far
-            if ((benefit_obj <= delta_obj_allowed)):
+            if ((benefit_obj_per_ndata <= delta_obj_allowed)):
+                test_result = "✓"  # Check mark if the test is passed
+                sign = "<="
                 
                 # mark that at least one sol passed the chi2 test
                 any_model_passed_test = True
-                current_model_passed_test = True
-
-                test_result = "✓"  # Check mark if the test is passed
-                sign = "<="
 
                 posteriors_passed_cnt +=1
 
@@ -946,25 +1134,23 @@ class FitAndEliminate:
                     print()
                     print('Model passed chi2 test!')
             else:
-
-                current_model_passed_test = False
-
                 test_result = "✗"
                 sign = ">"
 
             # TODO: check - so we will use always
-            if (interm_step_obj < best_model_obj):
+            if (best_model_obj == np.inf) or (interm_step_obj <= best_model_obj):
                 
-                best_model_obj = interm_step_obj
-                best_removed_resonance = j
-                best_model_chars = cur_sol_chars
+                best_model_obj             = interm_step_obj
+                best_benefit_obj_per_ndata = benefit_obj_per_ndata
+                best_removed_resonance     = j
+                best_model_chars           = cur_sol_chars
 
             if (self.options.print_bool):
                 print()
                 print(f'Intermediate fitting stage (IA = {self.options.interm_fit_max_iter}/{self.options.interm_fit_step_thr}), deleted {j}, E_λ  = {row_removed["E"].item()}')
                 print(f'\tChi2:\t{np.round(interm_step_chi2,4)}')
                 print(f'\tObjective Value:\t{np.round(interm_step_obj,4)}\tbase: {np.round(base_obj,4)} | current best: {best_model_obj}  ')
-                print(f'\t\t\t{np.round(benefit_obj,4)}\t{sign}\t{delta_obj_allowed}\t => \t {test_result}')
+                print(f'\t\t\t{np.round(benefit_obj_per_ndata,4)}\t{sign}\t{delta_obj_allowed}\t => \t {test_result}')
                 #print(f'\t\t\t{sol_fit_time_interm} sec for processing')
                 print(f'\t\t\tproc_time: {elim_addit_funcs.format_time_2_str(sol_fit_time_interm)[1]}')
                 print()
@@ -996,7 +1182,7 @@ class FitAndEliminate:
 
             print('End Doing limited iterations to find the best model inside current level...')
 
-        return (best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations)
+        return (best_removed_resonance, best_model_chars, any_model_passed_test, level_derivative_evaluations, delta_objn_log)
 
 
 
@@ -1035,9 +1221,9 @@ class FitAndEliminate:
         
         if ladder_df.shape[0] == fixed_resonance_df.shape[0]:
             sammy_OUT = self.evaluate_prior(ladder_df)
-            sammy_OUT.pw_post = sammy_OUT.pw
-            sammy_OUT.par_post = sammy_OUT.par
-            sammy_OUT.chi2_post = sammy_OUT.chi2
+            sammy_OUT.pw_post    = sammy_OUT.pw
+            sammy_OUT.par_post   = sammy_OUT.par
+            sammy_OUT.chi2_post  = sammy_OUT.chi2
             sammy_OUT.chi2n_post = sammy_OUT.chi2n
         else:
             sammy_OUT = self.solver_eliminate.fit(ladder_df, [])
@@ -1047,8 +1233,7 @@ class FitAndEliminate:
         time_proc = time.time() - time_start
 
         return sammy_OUT, time_proc, sammy_OUT.total_derivative_evaluations
-
-
+    
     def remove_resonance(self,
                          ladder: pd.DataFrame,
                          index_to_remove: int):
@@ -1060,6 +1245,20 @@ class FitAndEliminate:
             new_ladder.reset_index(drop=True, inplace=True)  # Reindex the new ladder
         else:
             if self.options.print_bool: print(ladder)
-            raise ValueError(f'Invalid index {index_to_remove}')
+            raise ValueError(f'Invalid index {index_to_remove}\n\nladder:\n{ladder}')
         return new_ladder, removed_row
     
+    def set_no_smaller_resonance(self,
+                         ladder: pd.DataFrame,
+                         index_to_fix: int,
+                         Gn_limit: float):
+        """..."""
+
+        if index_to_fix in ladder.index:
+            new_ladder = copy(ladder)
+            new_ladder.loc[index_to_fix,'varyGn1'] = 0
+            new_ladder.loc[index_to_fix,'Gn1'] = Gn_limit
+        else:
+            if self.options.print_bool: print(ladder)
+            raise ValueError(f'Invalid index {index_to_fix}\n\nladder:\n{ladder}')
+        return new_ladder

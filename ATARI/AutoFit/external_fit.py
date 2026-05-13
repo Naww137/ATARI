@@ -5,7 +5,10 @@ from ATARI.utils.stats import add_normalization_uncertainty_to_covariance
 from ATARI.sammy_interface.convert_u_p_params import p2u_E, p2u_g, p2u_n,   u2p_E, u2p_g, u2p_n,   get_Pu_vec_from_reslad
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from ATARI.sammy_interface import sammy_classes
+from ATARI.AutoFit.res_stat_derivatives import Porter_Thomas_multi_sg, Wigner_multi_sg
+from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 
 
 def get_Gs_Ts(resonance_ladder, 
@@ -18,8 +21,10 @@ def get_Gs_Ts(resonance_ladder,
     Gs = []; Ts = []; pw_list = []
     for exp, dat, exp_cov in zip(experiments, datasets, covariance_data):
         sammyINP = sammy_classes.SammyInputData(particle_pair, resonance_ladder, experiment=exp, experimental_data = dat, experimental_covariance=exp_cov)
+        # print('Resonance Ladder In:', sammyINP.resonance_ladder)
         sammy_out = get_derivatives(sammyINP, rto, get_theo=True, u_or_p='u')
         Gs.append(sammy_out.derivatives)
+        # print('Resonance Ladder Out:', sammy_out.par)
         
         if exp.reaction == "transmission":
             key = "theo_trans"
@@ -28,6 +33,7 @@ def get_Gs_Ts(resonance_ladder,
         Ts.append(sammy_out.pw[key].values)
         pw_list.append(sammy_out.pw)
 
+    # print('SAMMY PAR DERIV:', sammy_out.par)
     return Gs, Ts, pw_list
 
 def get_Ds_Vs(datasets, covariance_data, normalization_uncertainty = 0.0384200, idc_at_theory = False):
@@ -94,7 +100,7 @@ def get_Pu_vec_and_indices(resonance_ladder,
     Pu = get_Pu_vec_from_reslad(resonance_ladder, particle_pair)
 
     ires = np.arange(0,len(resonance_ladder), 1)
-    iE = 3*ires
+    iE  = 3*ires
     igg = 3*ires + 1
     ign = 3*ires + 2
 
@@ -130,22 +136,30 @@ def get_p_resonance_ladder_from_Pu_vector(Pu,
     Pp[:,2] = u2p_n(Gnu, Pp[:,0], L[J_ID-1], particle_pair)
 
     par_post = pd.DataFrame(Pp, columns=['E', 'Gg', 'Gn1'])
+    initial_reslad = initial_reslad.reset_index(drop=True)
+    # print(f'Pp: {Pp}')
+    # print(f'INIT: {initial_reslad[['E', 'Gg', 'Gn1', 'J_ID', 'varyE', 'varyGn1']]}')
     par_post['J_ID']    = initial_reslad['J_ID']
     par_post['varyE']   = initial_reslad['varyE']
-    par_post['varyGn1'] = initial_reslad['varyGn1']
     par_post['varyGg']  = initial_reslad['varyGg']
+    par_post['varyGn1'] = initial_reslad['varyGn1']
+    # print('Par Post:', par_post)
 
-    return par_post
+    # original_order = par_post.reset_index().sort_values(by=['J_ID', 'E']).index
+
+    return par_post#, original_order
 
 def get_derivatives_for_step(rto, D, V, 
                              datasets, covariance_data, ### dont need these two things if I update get_derivatives function Cole created
-                             res_lad, 
+                             res_lad,
                              particle_pair,
                              experiments, 
                              zero_derivs_at_no_vary = True,
                              V_is_inv=False,
                              covs=None,
-                             inp_for_theory =None,
+                             inp_for_theory=None,
+                             Porter_Thomas_fitting:bool=False,
+                             Wigner_fitting:bool=False,
                              ):
     Gs, Ts, sammy_pws = get_Gs_Ts(res_lad, particle_pair, experiments, datasets, covariance_data, rto)
     G = np.concatenate(Gs, axis=0)
@@ -161,23 +175,52 @@ def get_derivatives_for_step(rto, D, V,
         Vinv = np.linalg.inv(V)
 
     # calculate derivative and chi2
-    dchi2_dpar = - 2 * G.T @ Vinv @ (D - T)
-    hessian_approx = G.T @ Vinv @ G
     chi2 = (D-T).T @ Vinv @ (D-T)
+    jac_chi2  = - 2 * G.T @ Vinv @ (D - T)
+    hess_chi2 = 2 * G.T @ Vinv @ G
+    
+    jac  = jac_chi2
+    hess = hess_chi2
+    if Porter_Thomas_fitting:
+        LL_PT, jac_PT, hess_PT = Porter_Thomas_multi_sg(res_lad, particle_pair)
+        jac  += -2*jac_PT
+        hess += -2*hess_PT
+    if Wigner_fitting:
+        LL_Wig, jac_Wig, hess_Wig = Wigner_multi_sg(res_lad, particle_pair)
+        jac  += -2*jac_Wig
+        hess += -2*hess_Wig
 
-    return chi2, dchi2_dpar, hessian_approx, sammy_pws
+    # Zeroing out non-varied resonances:
+    if zero_derivs_at_no_vary:
+        # print('Zeroing Res. Lad.:', res_lad)
+
+        indices_e = 3*res_lad.index[res_lad['varyE'] == 0].to_numpy()
+        indices_g = 3*res_lad.index[res_lad['varyGg'] == 0].to_numpy() + 1
+        indices_n = 3*res_lad.index[res_lad['varyGn1'] == 0].to_numpy()  + 2
+        jac[indices_e] = 0.0
+        jac[indices_g] = 0.0
+        jac[indices_n] = 0.0
+        hess[indices_e,indices_e] = 0.0
+        hess[indices_g,indices_g] = 0.0
+        hess[indices_n,indices_n] = 0.0
+
+    return chi2, jac, hess, sammy_pws
 
 
-def evaluate_chi2_location_and_gradient(rto, Pu, starting_ladder, particle_pair, D, V, datasets, covariance_data, experiments, inp_for_theory, V_is_inv=False, covs=None):
-    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder,particle_pair)
+def evaluate_chi2_location_and_gradient(rto, Pu, starting_ladder, particle_pair,
+                                        D,V,
+                                        datasets,covariance_data,experiments,
+                                        inp_for_theory, V_is_inv=False, covs=None,
+                                        Porter_Thomas_fitting:bool=False, Wigner_fitting:bool=False):
+    res_lad = get_p_resonance_ladder_from_Pu_vector(Pu, starting_ladder, particle_pair)
 
     if inp_for_theory is not None:
         V = get_V_at_T(inp_for_theory, rto, res_lad)
     else: pass # don't need to redefine V
 
-    chi2, dchi2_dpar, hessian_approx, sammy_pws = get_derivatives_for_step(rto, D, V, datasets, covariance_data, res_lad, particle_pair,experiments, V_is_inv=V_is_inv, covs=covs, inp_for_theory=inp_for_theory)
-    # dchi2_dpar = np.clip(dchi2_dpar, -100, 100) ### Gradient cliping (value, could also do norm) for exploding gradients and numerical stability
-    return chi2, dchi2_dpar, hessian_approx, sammy_pws, res_lad
+    chi2, jac, hess, sammy_pws = get_derivatives_for_step(rto, D, V, datasets, covariance_data, res_lad, particle_pair,experiments, V_is_inv=V_is_inv, covs=covs, inp_for_theory=inp_for_theory, Porter_Thomas_fitting=Porter_Thomas_fitting, Wigner_fitting=Wigner_fitting)
+    # jac = np.clip(jac, -100, 100) ### Gradient cliping (value, could also do norm) for exploding gradients and numerical stability
+    return chi2, jac, hess, sammy_pws, res_lad
 
 
 
@@ -234,30 +277,30 @@ def get_regularization_location_and_gradient(Pu, ign, iE, iext,
 
 
 
-def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode="LMa", momentum = 0):
+def take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode="LMa", momentum = 0):
 
     alpha_vec = np.ones_like(Pu)*alpha
     alpha_vec[iE] = alpha/100
 
     if mode == "GD":
-        chi2_step = alpha_vec*dchi2_dpar
+        chi2_step = alpha_vec*jac
     elif mode == "GLS":
-        chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hessian_approx) @ dchi2_dpar) # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
+        chi2_step = alpha_vec* (np.linalg.inv(np.diag(np.ones_like(Pu)*1e-10) + hess) @ jac) # diag 1e-10 to keep matrix from being singular due to 0s in G for non-fitted parameters
         # Q = copy(Pu)
         # Q[iE] = Pu[ign]
         # Q /= 10
         # chi2_step = np.where(abs(chi2_step)>abs(Q), np.sign(chi2_step)*abs(Q), chi2_step)
     elif mode == "LMa" or mode == "LM": 
         dampening = 1/alpha_vec
-        chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hessian_approx) @ dchi2_dpar
+        chi2_step = np.linalg.inv(dampening*np.diag(np.ones_like(Pu)) + hess) @ jac
     elif mode == "LMb":
         dampening = 1/alpha_vec
-        chi2_step = np.linalg.inv(dampening*np.diag(np.diag(hessian_approx)+1e-10) + hessian_approx) @ dchi2_dpar
+        chi2_step = np.linalg.inv(dampening*np.diag(np.diag(hess)+1e-10) + hess) @ jac
     elif mode == "LMc":
         dampening = 1/alpha_vec
         Q = copy(Pu)
         Q[iE] = Pu[ign]
-        chi2_step = np.linalg.inv(dampening*np.diag(abs(Q)) + hessian_approx) @ dchi2_dpar
+        chi2_step = np.linalg.inv(dampening*np.diag(abs(Q)) + hess) @ jac
     else:
         raise ValueError(f"Solver step direction mode {mode} not recognized")
     
@@ -268,12 +311,11 @@ def take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_st
     max_estep = 0.05 
     total_gradient[iE] = np.where(abs(total_gradient[iE])>max_estep, np.sign(total_gradient[iE])*max_estep, total_gradient[iE])
     
-    total_gradient[i_no_step] = 0
+    # print('SHAPES:', total_gradient.shape, i_no_step)
+    # total_gradient[i_no_step] = 0
 
     return Pu - total_gradient
 
-
-from ATARI.sammy_interface.sammy_misc import get_idc_at_theory
 
 def get_V_at_T(inp, rto, ladder):
     covariance_data_at_theory = get_idc_at_theory(inp, rto, ladder)
@@ -319,6 +361,9 @@ def fit(rto,
                                 "alpha":0.7},
 
         covs = None,
+
+        Porter_Thomas_fitting:bool = False,
+        Wigner_fitting:bool = False,
         ):
 
     ### Check inputs
@@ -339,13 +384,22 @@ def fit(rto,
     obj_log = []
 
     total_derivative_evaluations = 0
+    # original_order = starting_ladder.reset_index().sort_values(by=['varyE', 'J_ID', 'E']).index
+    # original_order = np.argsort(original_order)
+    # print('Start:', starting_ladder)
+    # print('Order:', original_order)
+    # starting_ladder.sort_values(by=['varyE', 'J_ID', 'E'], inplace=True)
+    # print('Reordered:', starting_ladder)
+    # res_lad_ordered = starting_ladder.reset_index(drop=True).loc[original_order].reset_index()
+    # print('Back to Start:', res_lad_ordered)
     Pu_next, iE, igg, ign, iext, i_no_step = get_Pu_vec_and_indices(starting_ladder, particle_pair, external_resonance_indices)
     # print(f"Stepping until convergence\nchi2 values\nstep alpha: {[exp.title for exp in experiments]+['sum', 'sum/ndat']}")
     print(f"Stepping until convergence\nstep\talpha\t:\tobj\tchi2\n")
     for istep in range(steps):
 
         # Get current location derivatives and objective function values
-        chi2, dchi2_dpar_next, hessian_approx, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data, experiments, inp_for_theory, V_is_inv=V_is_inv, covs=covs)
+        chi2, jac_next, hess_next, sammy_pws, res_lad = evaluate_chi2_location_and_gradient(rto, Pu_next, starting_ladder, particle_pair, D, V, datasets,covariance_data, experiments, inp_for_theory, V_is_inv=V_is_inv, covs=covs, Porter_Thomas_fitting=Porter_Thomas_fitting, Wigner_fitting=Wigner_fitting)
+        # jac = jac_next
         total_derivative_evaluations += 1
         reg_pen, dreg_dpar_next = get_regularization_location_and_gradient(Pu_next, ign, iE, iext,
                                                                     lasso =lasso, lasso_parameters = lasso_parameters,
@@ -368,8 +422,8 @@ def fit(rto,
                     while True:  
                         alpha /= LevMarVd
                         alpha = max(alpha, minV)
-                        Pu_temp = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode=mode)
-                        chi2_temp, dchi2_dpar_temp, hessian_approx_temp, sammy_pws_temp, res_lad_temp = evaluate_chi2_location_and_gradient(rto, Pu_temp, starting_ladder, particle_pair,D, V, datasets,covariance_data,experiments, inp_for_theory, V_is_inv=V_is_inv)
+                        Pu_temp = take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode=mode)
+                        chi2_temp, jac_temp, hess_temp, sammy_pws_temp, res_lad_temp = evaluate_chi2_location_and_gradient(rto, Pu_temp, starting_ladder, particle_pair, D,V, datasets,covariance_data,experiments, inp_for_theory, V_is_inv=V_is_inv, Porter_Thomas_fitting=Porter_Thomas_fitting, Wigner_fitting=Wigner_fitting)
                         total_derivative_evaluations += 1
                         reg_pen_temp, dreg_dpar_temp = get_regularization_location_and_gradient(Pu_temp, ign, iE, iext,
                                                                                                 lasso =lasso, lasso_parameters = lasso_parameters,
@@ -383,7 +437,8 @@ def fit(rto,
                             print(f"\t\t{np.round(float(alpha),8):<10}: {obj_temp:.2f}\t{chi2_temp:.2f}")
                         if obj_temp < obj_log[istep-1] or alpha==minV: # or abs(obj_temp - obj_log[istep-1])<thresh:
                         # if Dobj < thresh or alpha==minV:
-                            obj, chi2, dchi2_dpar_next, hessian_approx, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, dchi2_dpar_temp, hessian_approx_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
+                            obj, chi2, jac_next, hess_next, dreg_dpar_next, sammy_pws, res_lad = obj_temp, chi2_temp, jac_temp, hess_temp, dreg_dpar_temp, sammy_pws_temp, res_lad_temp
+                            # jac = jac_next
                             Pu_next = Pu_temp
                             break
                         else:
@@ -410,21 +465,27 @@ def fit(rto,
         if print_bool:
             print(f"{int(istep)}\t{np.round(float(alpha),7):<8}:\t{obj:.2f}\t{chi2:.2f}")
 
+        ### Put res ladder order back to how it started
+        res_lad_ordered = res_lad#.reset_index(drop=True).loc[original_order].reset_index(drop=True)
+        
         ### update Pu to Pu_next and save things
         Pu = Pu_next
-        dchi2_dpar = dchi2_dpar_next
+        jac = jac_next
+        hess = hess_next
         dreg_dpar = dreg_dpar_next
         obj_log.append(obj)
         chi2_log.append(chi2)
-        gradient = dchi2_dpar
+        gradient = jac
         saved_gradients.append(gradient)
         save_Pu.append(Pu)
         saved_pw_lists.append(sammy_pws)
-        saved_res_lads.append(copy(res_lad))
+        saved_res_lads.append(copy(res_lad_ordered))
 
         ### step coeficients
-        Pu_next = take_step(Pu, alpha, dchi2_dpar, hessian_approx, dreg_dpar, iE, ign, i_no_step, mode=mode)
+        Pu_next = take_step(Pu, alpha, jac, hess, dreg_dpar, iE, ign, i_no_step, mode=mode)
 
+    # print('Unordered Final Ladder:', res_lad)
+    # print('Final Ladder:', res_lad_ordered)
     return saved_res_lads, save_Pu, saved_pw_lists, saved_gradients, chi2_log, obj_log, total_derivative_evaluations
 
 
@@ -599,7 +660,10 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
     
     rto_temp = deepcopy(sammyRTO)
     rto_temp.bayes = False
-    N = np.sum([len(each) for each in sammyINP.datasets])
+    if sammyINP.V_is_inv and not sammyINP.idc_at_theory:
+        N = len(sammyINP.D)
+    else:
+        N = np.sum([len(each) for each in sammyINP.datasets])
 
     empty = False
     if sammyINP.resonance_ladder.empty:
@@ -625,6 +689,7 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
         chi2 = get_chi2(D, sammyINP.Vinv, sammyOUT.pw, sammyINP.experiments_no_pup)
         sammyOUT.chi2 = chi2
         sammyOUT.chi2n = chi2/np.sum([len(each) for each in sammyOUT.pw])
+        covs = None
     else:
         Ds, covs = get_Ds_Vs(sammyINP.datasets, 
             sammyINP.experimental_covariance, 
@@ -675,7 +740,8 @@ def run_sammy_EXT(sammyINP:SammyInputDataEXT, sammyRTO:SammyRunTimeOptions):
                                                                                             sammyINP.LevMar,sammyINP.LevMarV,sammyINP.LevMarVd,sammyINP.maxF,sammyINP.minF,
                                                                                             sammyINP.lasso, sammyINP.lasso_parameters,
                                                                                             sammyINP.ridge, sammyINP.ridge_parameters,
-                                                                                            sammyINP.elastic_net, sammyINP.elastic_net_parameters, covs = covs)
+                                                                                            sammyINP.elastic_net, sammyINP.elastic_net_parameters, covs=covs,
+                                                                                            Porter_Thomas_fitting=sammyINP.Porter_Thomas_fitting, Wigner_fitting=sammyINP.Wigner_fitting)
             
             inpyw_post = sammy_classes.SammyInputDataYW(particle_pair=sammyINP.particle_pair, resonance_ladder=saved_res_lads[-1],  
                                                         datasets=sammyINP.datasets, experiments=sammyINP.experiments, experiments_no_pup=sammyINP.experiments_no_pup, experimental_covariance=sammyINP.experimental_covariance,

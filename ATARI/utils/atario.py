@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from ATARI.theory.scattering_params import FofE_recursive
+from ATARI.theory.scattering_params import FofE_recursive, g2_to_G, G_to_g2
 from copy import deepcopy, copy
 import pickle
 import os
@@ -140,6 +140,12 @@ def add_Gw_from_gw(resonance_ladder, particle_pair):
     # ladder['Gg'] = Gg = 2*ladder.gg2.values
     # ladder['Gn1'] = 2*P_array[0]*ladder.gn2.values
     ladder = ladder[["E", "Gg", "Gn1"]+ [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
+    
+    # ladder['Gg'] = g2_to_G(ladder.gg2.values, 1.0) # capture widths have a penetrability of 1.0
+    # for l in Ls_present:
+    #     _, P_array, _, _ = FofE_recursive(ladder.loc[ladder.L==l,'E'].values, particle_pair.ac, particle_pair.M, particle_pair.m, l)
+    #     ladder.loc[ladder.L==l,'Gn1'] = g2_to_G(ladder.loc[ladder.L==l,'gn2'].values, P_array[0])
+    # ladder = ladder[["E", "Gg", "Gn1"] + [each for each in ladder.keys() if each not in ["E", "Gg", "Gn1"]]]
     return ladder
 
 
@@ -214,12 +220,12 @@ def fill_resonance_ladder(resonance_ladder, particle_pair,
 
     def gn2G(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
-        Gn = 2*np.sum(P)*row.gn2
+        Gn = g2_to_G(row.gn2, np.sum(P))
         return Gn.item()
 
     def G2gn(row):
         _, P, _, _ = FofE_recursive([row.E], particle_pair.ac, particle_pair.M, particle_pair.m, row.lwave)
-        gn2 = row.Gn/2/np.sum(P)
+        gn2 = G_to_g2(row.Gn, np.sum(P))
         return gn2.item()
 
     # check spin group information

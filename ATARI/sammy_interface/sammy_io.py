@@ -80,27 +80,29 @@ def readpar(filepath):
                     try:
                         value = float(value)
                     except:
-                        sign='+'
-                        splitvals = value.split('-')
-                        if splitvals[0] == '':
-                            splitvals = splitvals[1::]
-                            sign = '-'
-
-                        if len(splitvals) == 1:
-                            splitvals = splitvals[0].split('+')
+                        try:
+                            sign='+'
+                            splitvals = value.split('-')
                             if splitvals[0] == '':
                                 splitvals = splitvals[1::]
-                                sign = '+'
-                            joiner = 'e+'
+                                sign = '-'
 
-                        else:
-                            joiner = 'e-'
+                            if len(splitvals) == 1:
+                                splitvals = splitvals[0].split('+')
+                                if splitvals[0] == '':
+                                    splitvals = splitvals[1::]
+                                    sign = '+'
+                                joiner = 'e+'
 
-                        if sign == '-':
-                            value = -float(joiner.join(splitvals))
-                        else:
-                            value = float(joiner.join(splitvals))
-                            
+                            else:
+                                joiner = 'e-'
+
+                            if sign == '-':
+                                value = -float(joiner.join(splitvals))
+                            else:
+                                value = float(joiner.join(splitvals))
+                        except ValueError:
+                            value = None
 
                 row.append(value)
                 start += width
@@ -137,8 +139,6 @@ def read_ECSCM(file_path):
     dfcov = data.iloc[:, 3:]
 
     return df_tdte, dfcov
-
-
 
 
 def readpds(pdsfilepath):
@@ -416,14 +416,22 @@ def fill_sammy_ladder(df, particle_pair, vary_parm=False, J_ID=None):
 
     return df
 
+
 def check_sampar_inputs(df):
     # Small perurbation for duplicate resonances
-    duplicates = df.duplicated(subset=['E', 'J_ID'], keep=False)
-    if duplicates.any():
+    df_rounded = copy(df)
+    df_rounded['E'] = df['E'].round(4)
+    duplicates = df_rounded.duplicated(subset=['E', 'J_ID'], keep=False)
+    while duplicates.any():
         random_signs = np.sign(np.random.default_rng().uniform(-1, 1, size=duplicates.sum()))
         random_mags = np.random.default_rng().uniform(5e-6, 5e-5, size=duplicates.sum())
         df.loc[duplicates, 'E'] += random_signs*random_mags
+
+        df_rounded = copy(df)
+        df_rounded['E'] = df['E'].round(4)
+        duplicates = df_rounded.duplicated(subset=['E', 'J_ID'], keep=False)
     return df
+
 
 def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=False, template=None):
                                     # template = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', 'templates', 'sammy_template_RM_only.par'))):
@@ -487,11 +495,12 @@ def write_estruct_file(Energies, filename):
         pass
     else:
         Energies = np.array([float(E) for E in Energies])
+    text = ''
+    for ept in Energies:
+        text += f'{ept:0<19} {1.0:<19} {1.0:0<7}\n'
     with open(filename,'w') as f:
-        for ept in Energies:
-            f.write(f'{ept:0<19} {1.0:<19} {1.0:0<7}\n')
-        f.close()
-    return
+        f.write(text)
+
 
 def write_samdat(exp_pw, exp_cov, filename):
     """
@@ -545,11 +554,11 @@ def write_samdat(exp_pw, exp_cov, filename):
     iexp = cols.get_loc('exp')
     idT = cols.get_loc('exp_unc')
     
-
+    text = ''
+    for each in iterable:
+        text += f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n'
     with open(filename,'w') as f:
-        for each in iterable:
-            f.write(f'{each[iE]:0<19f} {each[iexp]:0<19f} {each[idT]:0<19f}\n')
-        f.close()
+        f.write(text)
 
 
 def write_idc(filepath, J, C, stat):
@@ -593,14 +602,10 @@ def create_sammyinp(filename='sammy.inp', \
     
     with open(template, 'r') as f:
         template_lines = f.readlines()
-    f.close()
     
     with open(filename,'w+') as f:
-        for line in template_lines:
-            f.write(line)
-        f.close()
-        
-    return
+        f.write(''.join(template_lines))
+
 
 def write_saminp(filepath   :   str, 
 
@@ -624,8 +629,8 @@ def write_saminp(filepath   :   str,
                 use_IDC     :   bool    = False,
                 use_least_squares: bool = False,
                 derivatives : bool = False,
-                bayes_scheme  : bool = None
-
+                bayes_scheme  : bool = None,
+                plot_fit    : bool = True
                 ):
     
     alphanumeric = copy(alphanumeric)
@@ -665,49 +670,52 @@ def write_saminp(filepath   :   str,
     if use_IDC:
         alphanumeric.append("USER-SUPPLIED IMPLICIT DATA COVARIANCE MATRIX")
 
+    if plot_fit:
+        alphanumeric.append('GENERATE PLOT FILE AUTOMATICALLY')
+
 
 
     with open(filepath,'r') as f:
         old_lines = f.readlines()
 
-    with open(filepath,'w') as f:
-        for line in old_lines:
+    text = ''
+    for line in old_lines:
 
-            if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
-                broadening = False
+        if "broadening is not wa" in line.lower() or np.any([each.lower().startswith("broadening is not wa") for each in alphanumeric]):
+            broadening = False
 
-            if line.startswith("%%%alphanumeric%%%"):
-                for cmd in alphanumeric:
-                    f.write(f'{cmd}\n')
-            
-            elif line.startswith("%%%card2%%%"):
-                f.write(f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n")
-
-
-            elif line.startswith('%%%card5/6%%%'):
-                if broadening:
-                    f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}  {float(DELTAE[0]):<8.7}  {float(DELTAG[0]):<8.7}        \n')
-                else:
-                    pass
-
-            elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-                f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
-
-            elif line.startswith('%%%card8%%%'):
-                f.write(f'{reaction}\n')
-
+        if line.startswith("%%%alphanumeric%%%"):
+            for cmd in alphanumeric:
+                text += f'{cmd}\n'
+        
+        elif line.startswith("%%%card2%%%"):
+            text += f"{isotope: <9} {M:<9.8} {float(min(energy_range)):<9.8} {float(max(energy_range)):<9.8}      {iterations: <5} \n"
+        
+        elif line.startswith('%%%card5/6%%%'):
+            if broadening:
+                f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}  {float(DELTAE[0]):<8.7}  {float(DELTAG[0]):<8.7}        \n')
             else:
-                f.write(line)
+                pass
 
+        elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
+            f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
 
+        elif line.startswith('%%%card8%%%'):
+            f.write(f'{reaction}\n')
 
-           
+        else:
+            text += line
+            
+    with open(filepath,'w') as f:
+        f.write(text)
+
 
 def make_runDIR(sammy_runDIR):
     if os.path.isdir(sammy_runDIR):
         pass
     else:
-        os.mkdir(sammy_runDIR)
+        # os.mkdir(sammy_runDIR)
+        os.makedirs(sammy_runDIR)
 
 def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
 
@@ -719,18 +727,15 @@ def fill_runDIR_with_templates(input_template, input_name, sammy_runDIR):
     shutil.copy(template_path, os.path.join(sammy_runDIR, input_name))
 
 
-
 # ################################################ ###############################################
 # MISC
 # ################################################ ###############################################
 
-
-
 def remove_resolution_function_from_template(template_filepath):
-    file = open(template_filepath, 'r')
-    readlines = file.readlines()
-    file.close()
-    file = open(template_filepath, 'w')
+    with open(template_filepath, 'r') as f:
+        readlines = f.readlines()
+
+    text = ''
     sg_started = False
     end = False
     for line in readlines:
@@ -740,7 +745,6 @@ def remove_resolution_function_from_template(template_filepath):
         if line.startswith("%%%card8%%%"):
             sg_started = True
         if not end:
-            file.write(line)
-    file.close()
-
-
+            text += line
+    with open(template_filepath, 'w') as f:
+        f.write(text)

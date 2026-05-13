@@ -1,7 +1,13 @@
 import sys
-from ATARI.TAZ import TAZ
+sys.path.append('../')
+import pandas as pd
+
+from ATARI.ModelData.particle import Particle, Neutron
+from ATARI.ModelData.spingroups import Spingroup
+from ATARI.TAZ.DataClasses.Reaction import Reaction
+from ATARI.TAZ.PTBayes import PTBayes
+from ATARI.TAZ.RunMaster import RunMaster
 from utils import chi2_test
-import ATARI
 
 import numpy as np
 
@@ -10,16 +16,9 @@ warnings.filterwarnings('error', category=RuntimeWarning)
 
 import unittest
 
-print(dir(TAZ))
-
-print(dir(TAZ.ATARI_interface))
-
-
 class TestBayesSample1(unittest.TestCase):
     """
-    The purpose of this test is to verify that the WigSample algorithm is working correctly for 1
-    spingroup. This will be verified with distribution analysis, including chi-squared goodness of
-    fit on the level-spacing distribution.
+    The purpose of this test is to verify that the WigSample algorithm is working correctly for 1 spingroup. This will be verified with distribution analysis, including chi-squared goodness of fit on the level-spacing distribution.
     """
 
     ensemble = 'NNE' # Nearest Neighbor Ensemble
@@ -33,8 +32,8 @@ class TestBayesSample1(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB = (1e-5,1000)
@@ -47,14 +46,14 @@ class TestBayesSample1(unittest.TestCase):
         cls.l     = [0]
         cls.j     = [3.0]
 
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
 
-        cls.prior, log_likelihood_prior = TAZ.PTBayes(cls.res_ladder, cls.reaction)
+        cls.prior, log_likelihood_prior = PTBayes(cls.res_ladder, cls.reaction)
         cls.distributions = cls.reaction.distributions(dist_type='Wigner')
         cls.E = cls.res_ladder.E.to_numpy()
-        runMaster = TAZ.RunMaster(cls.E, cls.EB,
+        runMaster = RunMaster(cls.E, cls.EB,
                                   cls.distributions, cls.false_dens,
                                   cls.prior, log_likelihood_prior)
         cls.samples = runMaster.WigSample(cls.num_trials)
@@ -78,8 +77,7 @@ Discrepancy = {err:.5f} standard deviations.
 
     def test_distributions(self):
         """
-        Tests that the sampled assignments produce level-spacings that match the expected
-        level-spacing distributions.
+        Tests that the sampled assignments produce level-spacings that match the expected level-spacing distributions.
         """
         num_bins = 40
         spacings = [np.empty((0,)), np.empty((0,))]
@@ -93,9 +91,7 @@ Discrepancy = {err:.5f} standard deviations.
 
 class TestBayesSample2(unittest.TestCase):
     """
-    The purpose of this test is to verify that the WigSample algorithm is working correctly for 2
-    spingroups. This will be verified with distribution analysis, including chi-squared goodness of
-    fit on the level-spacing distribution.
+    The purpose of this test is to verify that the WigSample algorithm is working correctly for 2 spingroups. This will be verified with distribution analysis, including chi-squared goodness of fit on the level-spacing distribution.
     """
 
     ensemble = 'NNE' # Nearest Neighbor Ensemble
@@ -109,8 +105,8 @@ class TestBayesSample2(unittest.TestCase):
         """
 
         # Particle Types:
-        Target = TAZ.Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
-        Projectile = TAZ.Neutron
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
 
         # Mean Parameters
         cls.EB = (1e-5,1000)
@@ -123,17 +119,18 @@ class TestBayesSample2(unittest.TestCase):
         cls.l     = [0, 0]
         cls.j     = [3.0, 4.0]
 
-        SGs = TAZ.Spingroup.zip(cls.l, cls.j)
-        cls.reaction = TAZ.Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
         cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
 
-        cls.prior, log_likelihood_prior = TAZ.PTBayes(cls.res_ladder, cls.reaction)
+        cls.prior, log_likelihood_prior = PTBayes(cls.res_ladder, cls.reaction)
         cls.distributions = cls.reaction.distributions(dist_type='Wigner')
         cls.E = cls.res_ladder.E.to_numpy()
-        runMaster = TAZ.RunMaster(cls.E, cls.EB,
+        runMaster = RunMaster(cls.E, cls.EB,
                                   cls.distributions, cls.false_dens,
                                   cls.prior, log_likelihood_prior)
         cls.samples = runMaster.WigSample(cls.num_trials)
+        cls.bayes = runMaster.WigBayes()
 
     def test_level_densities(self):
         """
@@ -154,8 +151,7 @@ Discrepancy = {err:.5f} standard deviations.
 
     def test_distributions(self):
         """
-        Tests that the sampled assignments produce level-spacings that match the expected
-        level-spacing distributions.
+        Tests that the sampled assignments produce level-spacings that match the expected level-spacing distributions.
         """
         num_bins = 40
         spacings = [np.empty((0,)), np.empty((0,))]
@@ -166,6 +162,66 @@ Discrepancy = {err:.5f} standard deviations.
                 spacings[g] = np.concatenate((spacings[g], np.diff(Eg)))
         for g in range(self.num_groups):
             chi2_test(self.distributions[g], spacings[g], num_bins, self, threshold=100, quantity_name='level spacing', p_or_chi2='chi2')
+
+    def test_against_wig_bayes_1(self):
+        """
+        The frequency of a assignment across ladders should reflect that from WigBayes.
+        """
+        self.skipTest('Not Implemented Yet...')
+
+class TestBayesSampleCase(unittest.TestCase):
+    """
+    ...
+    """
+
+    num_trials = 10 # number of sample trials
+    num_groups = 2   # number of spingroups
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Generates the resonances.
+        """
+
+        # Particle Types:
+        Target = Particle(Z=73, A=181, I=7/2, mass=180.9479958, name='Ta-181')
+        Projectile = Neutron
+
+        # Mean Parameters
+        cls.EB = (570.0,630.0)
+        cls.false_dens = 0.0
+        cls.lvl_dens  = [0.111074, 0.120437]
+        cls.gn2m  = [452.566150, 332.243470]
+        cls.gg2m   = [55.00000, 55.00000]
+        cls.dfn   = [1, 1]
+        cls.dfg   = [1000, 1000]
+        cls.l     = [0, 0]
+        cls.j     = [3.0, 4.0]
+        cls.missing_fraction = [0.05,0.05]
+
+        SGs = Spingroup.zip(cls.l, cls.j)
+        cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens, MissFrac=cls.missing_fraction)
+        cls.res_ladder = pd.DataFrame({'E':[576.28,591.67,596.60,606.18,608.93,617.72,624.58,626.55],
+                                       'Gg':[64]*8,
+                                       'Gn1':np.array([5.11,45.94,446.22,8.76,38.19,87.45,43.47,176.52]),
+                                       'J_ID':[1,1,2,2,2,1,1,1]})
+
+        cls.prior, log_likelihood_prior = PTBayes(cls.res_ladder, cls.reaction)
+        print(cls.prior)
+        cls.distributions = cls.reaction.distributions(dist_type='Missing')
+        cls.E = cls.res_ladder.E.to_numpy()
+        runMaster = RunMaster(cls.E, cls.EB,
+                                  cls.distributions, cls.false_dens,
+                                  cls.prior, log_likelihood_prior)
+        cls.samples = runMaster.WigSample(cls.num_trials)
+        cls.rm = runMaster
+
+    def test_wig_sample(self):
+        """
+        ...
+        """
+        print(self.samples)
+        print(self.WigBayes()[0,:])
     
 if __name__ == '__main__':
     unittest.main()

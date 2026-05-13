@@ -219,7 +219,63 @@ class Evaluation_Data:
 
         return Evaluation_Data(tuple(self.experimental_titles), tuple(experiments), tuple(datasets), tuple(covariance_data), measurement_models=measurement_models, experimental_models_no_pup=experiments_no_pup)
 
+    def select_datapoints(self, indices):
+        """
+        ...
+        """
+        # return self
+        datasets = []
+        for iset, d in enumerate(copy(self.datasets)):
+            d.sort_values("E", inplace=True)
+            d.reset_index(drop=True, inplace=True)
+            dataset = d.loc[indices[iset]]
+            datasets.append(dataset)
+        
+        covariance_data = []
+        for iset, exp_cov in enumerate(copy(self.covariance_data)):
+            filtered_cov = {}
+            if not exp_cov:
+                pass
+            elif 'Cov_sys' in exp_cov.keys():
+                E_indices = datasets[iset]['E']
+                diag_stat = exp_cov['diag_stat']
+                diag_stat.sort_values("E", inplace=True)
+                # diag_stat.reset_index(drop=True, inplace=True)
+                filtered_cov["diag_stat"] = diag_stat.loc[E_indices]
+                
+                Jac_sys = exp_cov["Jac_sys"]
+                Jac_sys.sort_index(axis=1, inplace=True)
+                Jac_sys.reset_index(drop=True, inplace=True)
+                filtered_cov["Jac_sys"] = Jac_sys.loc[:,E_indices]
 
+                filtered_cov["Cov_sys"] = exp_cov['Cov_sys']
+            else: # 'CovT' in exp_cov.keys() or 'CovY' in exp_cov.keys():
+                raise ValueError("Filtering not implemented for explicit cov yet")
+        
+            covariance_data.append(filtered_cov)
+
+        experiments = deepcopy(self.experimental_models)
+        for iset, exp in enumerate(experiments):
+            exp.select_data_points(indices[iset])
+
+        if self.experimental_models_no_pup:
+            experiments_no_pup = deepcopy(self.experimental_models_no_pup)
+            for iset, exp_no_pup in enumerate(experiments_no_pup):
+                exp_no_pup.select_data_points(indices[iset])
+            experiments_no_pup = tuple(experiments_no_pup)
+        else:
+            experiments_no_pup = None
+
+        if self.measurement_models:
+            measurement_models = deepcopy(self.measurement_models)
+            for iset, meas in enumerate(measurement_models):
+                if meas:
+                    meas.select_data_points(indices[iset])
+            measurement_models = tuple(measurement_models)
+        else:
+            measurement_models = None
+
+        return Evaluation_Data(tuple(self.experimental_titles), tuple(experiments), tuple(datasets), tuple(covariance_data), measurement_models=measurement_models, experimental_models_no_pup=experiments_no_pup)
 
 
 @dataclass

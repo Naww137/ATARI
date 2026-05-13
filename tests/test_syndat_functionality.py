@@ -7,6 +7,7 @@ from ATARI.ModelData.particle_pair import Particle_Pair
 from ATARI.ModelData.measurement_models.transmission_rpi import Transmission_RPI
 from ATARI.ModelData.measurement_models.capture_yield_rpi import Capture_Yield_RPI
 
+from ATARI.syndat.data_classes import syndatOPT
 from ATARI.syndat.control import Syndat_Control
 from ATARI.syndat.syndat_model import Syndat_Model
 from ATARI.syndat.data_classes import syndatOUT, syndatOPT

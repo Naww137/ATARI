@@ -154,7 +154,7 @@ class FitAndEliminateOPT:
     @property
     def initial_fit_only_trans(self):
         return self._initial_fit_only_trans
-    @initial_fit_only_trans.setter()
+    @initial_fit_only_trans.setter
     def initial_fit_only_trans(self, initial_fit_only_trans):
         self._initial_fit_only_trans = initial_fit_only_trans
 
@@ -466,21 +466,29 @@ class FitAndEliminate:
 
         if self.options.print_bool: print("Initial solve with total only to capture large resonances\n")
 
-        # 
+        # Getting all of the total/transmission reactions:
+        reactions = [experiment.reaction for experiment in self.solver_initial.sammyINP.experiments]
+        tot_dset_indices = [dset_idx for dset_idx,reaction in enumerate(reactions) if reaction.lower() in ('total','transmission')]
+        if len(tot_dset_indices) == 0:
+            raise ValueError('There is no transmission/total data, so total only fitting cannot be done.')
+        
+        # Getting only transmission/total:
         solver_initial_total_only = deepcopy(self.solver_initial)
-        reactions = [experiment.reaction for experiment in self.solver_initial.sammyINP.experiments[0]]
-        for i,reaction in enumerate(reactions):
-            if reaction not in ('total', 'transmission'):
-                del self.solver_initial.sammyINP.experiments[i]
-                if self.solver_initial.sammyINP.experimental_covariance is not None:
-                    del self.solver_initial.sammyINP.experimental_covariance[i]
-                if self.solver_initial.sammyINP.experiments_no_pup is not None:
-                    del self.solver_initial.sammyINP.experiments_no_pup[i]
-                if self.solver_initial.sammyINP.measurement_models is not None:
-                    del self.solver_initial.sammyINP.measurement_models[i]
+        sammyINP_initial_all = self.solver_initial.sammyINP
+        solver_initial_total_only.sammyINP.datasets    = tuple(sammyINP_initial_all.datasets   [dset_idx] for dset_idx in tot_dset_indices)
+        solver_initial_total_only.sammyINP.experiments = tuple(sammyINP_initial_all.experiments[dset_idx] for dset_idx in tot_dset_indices)
+        if sammyINP_initial_all.experiments_no_pup is not None:
+            solver_initial_total_only.sammyINP.experiments_no_pup = tuple(sammyINP_initial_all.experiments_no_pup[dset_idx]           for dset_idx in tot_dset_indices)
+        if sammyINP_initial_all.experimental_covariance is not None:
+            solver_initial_total_only.sammyINP.experimental_covariance = tuple(sammyINP_initial_all.experimental_covariance[dset_idx] for dset_idx in tot_dset_indices)
+        if sammyINP_initial_all.measurement_models is not None:
+            solver_initial_total_only.sammyINP.measurement_models = tuple(sammyINP_initial_all.measurement_models[dset_idx]           for dset_idx in tot_dset_indices)
 
+        # Fitting with only total/transmission:
         solver_initial_total_only.set_bayes(True)
         sammyOUT_fit = solver_initial_total_only.fit(resonance_ladder, external_resonance_indices)
+
+        # Returning fit:
         return sammyOUT_fit
 
 

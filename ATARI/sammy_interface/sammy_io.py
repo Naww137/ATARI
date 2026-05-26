@@ -562,36 +562,38 @@ def write_samdat(exp_pw, exp_cov, filename):
 
 
 def write_idc(filepath, J, C, stat):
+    text  = f"NUmber of data-reduction parameters = {J.shape[0]} \n\n"
+    text += f"FREE-FORMAt partial derivatives\n"
+    width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
+    width_hp = 20
+
+    for E, data in J.items():
+        formatted_E = format_float(E, width, signed=True)
+        text += formatted_E
+        formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width_hp, sep=' ', signed=False, format='18.12e')
+        text += formatted_data_stat_unc
+        for derivative in data:
+            formatted_derivative = format_float(derivative, width_hp, sep=' ', signed=True, format='18.12e')
+            text += formatted_derivative
+        text += '\n'
+
+    text += '\nUNCERTAINTies on data- reduction parameters\n'
+    for sys_uncertainty in np.sqrt(np.diag(C)):
+        formatted_uncertainty = format_float(sys_uncertainty, width_hp, sep=' ', signed=False, format='18.12e')
+        text += formatted_uncertainty
+    text += '\n\n'
+    
+    text += "CORRELATIOns for data-reduction parameters"
+    Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
+    Corr = Dinv @ C @ Dinv
+    for i, row in enumerate(Corr):
+        for corr in row[0:i]:
+            formatted_correlation = format_float(corr, width, sep=' ', signed=True)
+            text += formatted_correlation
+        text += '\n'
+
     with open(filepath, 'w+') as f:
-        f.write(f"NUmber of data-reduction parameters = {J.shape[0]} \n\n")
-        f.write(f"FREE-FORMAt partial derivatives\n")
-        width = 13 #[11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
-        width_hp = 20
-
-        for E, data in J.items():
-            formatted_E = format_float(E, width, signed=True)
-            f.write(formatted_E)
-            formatted_data_stat_unc = format_float(np.sqrt(stat.loc[E, 'var_stat']), width_hp, sep=' ', signed=False, format='18.12e')
-            f.write(formatted_data_stat_unc)
-            for derivative in data:
-                formatted_derivative = format_float(derivative, width_hp, sep=' ', signed=True, format='18.12e')
-                f.write(formatted_derivative)
-            f.write('\n')
-
-        f.write("\nUNCERTAINTies on data- reduction parameters\n")
-        for sys_uncertainty in np.sqrt(np.diag(C)):
-            formatted_uncertainty = format_float(sys_uncertainty, width_hp, sep=' ', signed=False, format='18.12e')
-            f.write(formatted_uncertainty)
-        f.write("\n\n")
-        
-        f.write("CORRELATIOns for data-reduction parameters")
-        Dinv = np.diag(1 / np.sqrt(np.diag(C))) 
-        Corr = Dinv @ C @ Dinv
-        for i, row in enumerate(Corr):
-            for corr in row[0:i]:
-                formatted_correlation = format_float(corr, width, sep=' ', signed=True)
-                f.write(formatted_correlation)
-            f.write("\n")
+        f.write(text)
 
 # ################################################ ###############################################
 # Sammy Input file
@@ -693,15 +695,15 @@ def write_saminp(filepath   :   str,
         
         elif line.startswith('%%%card5/6%%%'):
             if broadening:
-                f.write(f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}  {float(DELTAE[0]):<8.7}  {float(DELTAG[0]):<8.7}        \n')
+                text += f'  {float(temp[0]):<8.7}  {float(FP[0]):<8.7}  {float(FP[1]):<8.7}  {float(DELTAE[0]):<8.7}  {float(DELTAG[0]):<8.7}        \n'
             else:
                 pass
 
         elif line.startswith('%%%card7%%%'): #ac*10 because sqrt(bn) -> fm for sammy 
-            f.write(f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n')
+            text += f'  {float(ac):<8.7}  {float(n[0]):<8.7}                       0.00000          \n'
 
         elif line.startswith('%%%card8%%%'):
-            f.write(f'{reaction}\n')
+            text += f'{reaction}\n'
 
         else:
             text += line

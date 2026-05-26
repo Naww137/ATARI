@@ -16,8 +16,7 @@ def get_parameter_grid(energy_range, res_par_avg, particle_pair, spacing, starti
     L = res_par_avg["Ls"][0]
 
     # allow Elambda to be just outside of the window
-    _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
-    Gt99_min_max = res_par_avg['quantiles']['gt99']*P_array[0]
+    Gt99_min_max = particle_pair.gn2_to_Gn(res_par_avg['quantiles']['gt99'], [min(energy_range), max(energy_range)], L)
     max_Elam = max(energy_range) + Gt99_min_max[0]*1e-3
     min_Elam = min(energy_range) - Gt99_min_max[1]*1e-3
 
@@ -55,8 +54,7 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
     gn01_min = np.inf
     for Jpi, spin_group in spin_groups.items():
         L = spin_group["Ls"][0]
-        _, P_array, _, _ = FofE_recursive(np.sort(energy_range), particle_pair.ac, particle_pair.M, particle_pair.m, L)
-        Gt99_min_max = spin_group['quantiles']['gt99']*P_array[0]
+        Gt99_min_max = particle_pair.gn2_to_Gn(spin_group['quantiles']['gt99'], [min(energy_range), max(energy_range)], L)
         if Gt99_min_max[0] > Gt99_min_max_all[0]:
             Gt99_min_max_all[0] = Gt99_min_max[0]
         if Gt99_min_max[-1] > Gt99_min_max_all[-1]:
@@ -66,8 +64,8 @@ def get_parameter_grid_v2(energy_range, particle_pair, spacing, starting_Gg_mult
     
 
     # allow Elambda to be just outside of the window
-    max_Elam = max(energy_range) + Gt99_min_max_all[0]/10e3
-    min_Elam = min(energy_range) - Gt99_min_max_all[-1]/10e3
+    max_Elam = max(energy_range) + Gt99_min_max_all[ 0]*1e-3
+    min_Elam = min(energy_range) - Gt99_min_max_all[-1]*1e-3
 
     # get energy spacings
     x_start = min_Elam; x_end = max_Elam

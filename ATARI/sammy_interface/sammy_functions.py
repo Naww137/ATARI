@@ -694,18 +694,18 @@ def setup_YW_scheme(sammyRTO, sammyINPyw, del_odf:bool=True):
 def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead="", print_bool=False):
     runsammy_bay0 = subprocess.run(
                             ["sh", "-c", f"./BAY0.sh {step}"], cwd=os.path.realpath(rundir),
-                            capture_output=True, timeout=60*10
+                            capture_output=True, timeout=60*60*10
                             )
     chi2_old = np.inf
     for i in range(1, iterations+1):
         runsammy_ywyiter = subprocess.run(
                                     ["sh", "-c", f"./YWYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, text=True, timeout=60*10
+                                    capture_output=True, text=True, timeout=60*60*10
                                     )
 
         runsammy_bayiter = subprocess.run(
                                     ["sh", "-c", f"./BAYiter.sh {i}"], cwd=os.path.realpath(rundir),
-                                    capture_output=True, timeout=60*10
+                                    capture_output=True, timeout=60*60*10
                                     )
         
         i_chi2s = [float(s) for s in runsammy_ywyiter.stdout.split('\n')[-3].split()]
@@ -728,7 +728,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead="", pr
     out = subprocess.run(
         ["sh", "-c", 
         f"""head -$(($(wc -l < iterate/bayes_iter{i+1}.par) - 1)) iterate/bayes_iter{i+1}.par > results/step{step+1}.par"""],
-        cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
+        cwd=os.path.realpath(rundir), capture_output=True, timeout=60*60*10)
     
     return converged, i
 
@@ -754,6 +754,10 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
     i=i_chi2s[0]; chi2s=i_chi2s[1:] 
     if len(chi2s) != 5:
         _ =0
+
+    # if not (np.sum(chi2s) > 0):
+    # print('GET CHI2:\n', runsammy_ywy0.stdout)
+    # raise ValueError('STOP!!!')
     return i, [c for c in chi2s]+[np.sum(chi2s), np.sum(chi2s)/np.sum(ndats)]
 
 

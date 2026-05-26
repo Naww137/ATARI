@@ -308,7 +308,7 @@ class Particle_Pair:
         Gn : float, array-like
             Partial neutron widths.
         """
-        P = self.penetration_factor(np.array(E), l)[-1,:]
+        P = self.penetration_factor(np.array(E), l)
         Gn = g2_to_G(np.array(gn2), P)
         return Gn
     def Gn_to_gn2(self, Gn, E, l:int):

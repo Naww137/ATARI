@@ -132,6 +132,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
     try:
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"))
     except:
+        if sammyRTO.Print:      print('Reading SAMNDF.PAR failed. Trying to make "SAMNDF_paronly.PAR"')
         with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF.PAR"), 'r') as f:
             readlines = f.readlines()
         with open(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"), 'w') as f:
@@ -144,7 +145,7 @@ def get_endf_parameters(endf_file, matnum, sammyRTO: SammyRunTimeOptions):
                     f.write(line)
         resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, "SAMNDF_paronly.PAR"))
     if resonance_ladder.isnull().values.any():
-        raise ValueError('The sammy.par file contains unreadable text.')
+        raise ValueError(f'The sammy.par file contains unreadable text.\n\nResonance Ladder:\n{resonance_ladder}')
     
     
     # could also read endf spin groups here! 

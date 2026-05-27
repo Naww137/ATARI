@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 from ATARI.theory.distributions import porter_thomas_dist
-from ATARI.ASTERIODS.false_missing_determination import fraction_below_threshold_gn2
+from ATARI.ASTEROIDS.false_missing_determination import fraction_below_threshold_gn2
 from ATARI.ModelData.spingroups import HalfInt
 
 __doc__ = """
@@ -56,7 +56,7 @@ def mean_spacing_Bethe(J:HalfInt, A:int, E:float, E0:float=0.0):
     c = np.exp(2*np.sqrt(a*(E-E0))) / (12 * np.sqrt(2*s2c) * (a*(E-E0)**5)**(1/4))
     return c * fJ
 
-def mean_spacing_averaging(E):
+def mean_spacing_averaging(E, EB:tuple):
     """
     Finds the mean level-spacing by taking the average of the level-spacings. Also returns the
     standard deviation of the mean level-spacing.
@@ -65,6 +65,8 @@ def mean_spacing_averaging(E):
     ----------
     E : ndarray[float]
         Resonance energies.
+    EB : tuple[float]
+        Resonance ladder boundaries.
 
     Returns
     -------
@@ -74,7 +76,7 @@ def mean_spacing_averaging(E):
         The standard deviation of the mean level-spacing for the given energies.
     """
 
-    E = np.sort(E)
+    E = np.sort(E)[(E > EB[0]) & (E < EB[-1])]
     N = len(E) - 1
     lvl_spacings = np.diff(E)
     mean_lvl_spacing = np.mean(lvl_spacings)
@@ -100,18 +102,21 @@ def mean_spacing_regression(E, EB:tuple):
         The mean level-spacing of the given energies.
     """
     
+    E = np.sort(E)[(E > EB[0]) & (E < EB[1])]
     N = len(E)
     x = np.concatenate(([EB[0]], E, [EB[1]]))
     dx = np.diff(x)
     dx2 = np.diff(x**2)
     y = np.arange(N+1)
-    # Delta  = EB[1] - EB[0]
+    Delta1 = EB[1] - EB[0]
     Delta2 = EB[1]**2 - EB[0]**2
     Delta3 = EB[1]**3 - EB[0]**3
 
     a = np.sum(y*dx)
     b = np.sum(y*dx2)
-    A = 3*(b - a*(EB[1]+EB[0])) / (2*Delta3-(3/2)*(EB[0]+EB[1])*Delta2)
+    # A = 3*(b - a*(EB[1]+EB[0])) / (2*Delta3-(3/2)*(EB[0]+EB[1])*Delta2)
+    A = 6*(b*Delta1 - a*Delta2) / (4*Delta1*Delta3 - 3*Delta2*Delta2)
+
     mean_lvl_spacing = 1 / A
     return mean_lvl_spacing
 
@@ -176,7 +181,7 @@ def mean_width_CDF_regression(widths, dof:int=1, thres:float=0.0):
     X = np.linspace(*bounds, 100_000)
     Y = np.searchsorted(widths_trunc, X) / num_trunc_widths
     func = lambda g2, g2m: porter_thomas_dist(mean=g2m, df=dof, trunc=thres).cdf(g2)
-    mean_width, mean_width_cov = curve_fit(func, X, Y, bounds=(0.0, np.inf))
+    mean_width, mean_width_cov = curve_fit(func, X, Y, bounds=(1e-5, 1e10))
     np.set_printoptions(threshold=np.inf)
     # FIXME: the standard deviation of the mean of the widths is under-estimated!
     mean_width_std = np.sqrt(mean_width_cov[0,0])

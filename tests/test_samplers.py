@@ -21,6 +21,8 @@ This file tests resonance sampling using level-spacing distributions (Wigner dis
 level-spacing ratio distributions, Dyson-Mehta Delta-3 statistic, and more. Reduced width samples
 are also compared to Porter-Thomas distribution.
 """
+
+rng = np.random.default_rng(seed=2026)
         
 class TestResonanceGeneration(unittest.TestCase):
 
@@ -49,7 +51,7 @@ class TestResonanceGeneration(unittest.TestCase):
         # 2 Spingroup Case:
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
-        cls.res_ladder = cls.reaction.sample('NNE')[0]
+        cls.res_ladder = cls.reaction.sample(ensemble='NNE', rng=rng)[0]
 
     def test_wigner(self):
         """
@@ -118,7 +120,7 @@ class TestGOESampler(unittest.TestCase):
         # 2 Spingroup Case:
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_dyson_mehta_3(self):
@@ -207,7 +209,7 @@ class TestGUESampler(unittest.TestCase):
         # 2 Spingroup Case:
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
     
     def test_uniform_density(self):
@@ -271,7 +273,7 @@ class TestGSESampler(unittest.TestCase):
         # 2 Spingroup Case:
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, MLS=cls.mls, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
     
     def test_uniform_density(self):
@@ -341,7 +343,7 @@ class TestBrodySampler(unittest.TestCase):
                                     spingroups=SGs,
                                     EB=cls.EB,
                                     brody_param=cls.w)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_brody(self):
@@ -390,7 +392,7 @@ class TestMissingSampler(unittest.TestCase):
                                     spingroups=SGs,
                                     EB=cls.EB,
                                     MissFrac=cls.pM)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_missing(self):
@@ -433,7 +435,7 @@ class TestMerger(unittest.TestCase):
 
         SGs = Spingroup.zip(l, j)
         reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=lvl_dens, gn2m=gn2m, nDOF=dfn, gg2m=gg2m, gDOF=dfg, spingroups=SGs, EB=EB)
-        res_ladder = reaction.sample(self.ensemble)[0]
+        res_ladder = reaction.sample(self.ensemble, rng=rng)[0]
         E = res_ladder.E.to_numpy()
         level_spacings = np.diff(E)
         freq_obs, _ = np.histogram(level_spacings, bins)

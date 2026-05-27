@@ -53,8 +53,16 @@ def PTBayes(resonances:DataFrame, reaction:Reaction, false_width_dist=None, prio
     
     E  = resonances['E'].to_numpy()
     Gn = resonances['Gn1'].to_numpy()
-    J = abs(resonances['Jpi'].to_numpy())
-    gJ = reaction.gstat(J)
+    if 'Jpi' in resonances.columns:
+        Js = abs(resonances['Jpi'].to_numpy())
+    elif 'J_ID' in resonances.columns:
+        Jids = resonances['J_ID'].to_numpy()
+        Js = np.zeros_like(Jids, dtype=float)
+        for jid, j in zip(reaction.J_ID, reaction.J):
+            Js[Jids == jid] = j
+    else:
+        raise ValueError('Cannot find spin statistical factor without spin group.')
+    gJ = reaction.gstat(Js)
     gGn = gJ * Gn
 
     Gg = resonances['Gg'].to_numpy()

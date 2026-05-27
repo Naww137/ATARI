@@ -296,12 +296,19 @@ class Syndat_Control:
                                         if param_name == 'a_b':
                                             sample = rng.multivariate_normal(mean, uncertainty)
                                         else:
+<<<<<<< HEAD
                                             sample = rng.normal(loc=mean, scale=uncertainty)
+=======
+                                            sample = np.random.normal(loc=mean, scale=uncertainty)
+>>>>>>> res_stat_fitting_and_CV_unit_testing
                                     if self.no_systematic_bias:
                                         sampled_dict[param_name] = (mean, 0.0)
                                     else:
                                         sampled_dict[param_name] = (sample, 0.0)
+<<<<<<< HEAD
 
+=======
+>>>>>>> res_stat_fitting_and_CV_unit_testing
                                 if isinstance(param_values, pd.DataFrame):
                                     new_c = rng.normal(loc=param_values.ct, scale=param_values.dct)
                                     df = deepcopy(param_values)

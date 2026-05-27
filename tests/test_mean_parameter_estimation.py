@@ -2,7 +2,7 @@ from ATARI.ModelData.particle import Particle, Neutron
 from ATARI.ModelData.spingroups import Spingroup
 from ATARI.TAZ.DataClasses.Reaction import Reaction
 from ATARI.TAZ.Theory.Samplers import SampleEnergies
-from ATARI.ASTERIODS.mean_parameter_estimation import mean_spacing_averaging, mean_width_averaging, mean_width_CDF_regression
+from ATARI.ASTEROIDS.mean_parameter_estimation import mean_spacing_averaging, mean_width_averaging, mean_width_CDF_regression
 
 import numpy as np
 
@@ -26,7 +26,7 @@ class TestMeanParameters(unittest.TestCase):
         mls_true = 2.3
         EB = (1e-5, 1000)
         E = SampleEnergies(EB, lvl_dens=1/mls_true, ensemble=self.ensemble)
-        mls_mean, mls_std = mean_spacing_averaging(E)
+        mls_mean, mls_std = mean_spacing_averaging(E, EB)
         err = abs(mls_true - mls_mean) / mls_std
         self.assertLess(err, 3.0, f'The "mean_spacing_averaging" function predicts a mean level-spacing beyond reasonable statistics.\n{err = :.3f} > 3.')
 

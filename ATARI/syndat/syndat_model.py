@@ -161,9 +161,15 @@ class Syndat_Model:
 
     def sample(self,
                particle_pair: Optional[Particle_Pair] = None,
+<<<<<<< HEAD
                sammyRTO=None,
                num_samples=1,
                save_raw_data = False,
+=======
+               sammyRTO = None,
+               num_samples:int = 1,
+               save_raw_data:bool = True,
+>>>>>>> res_stat_fitting_and_CV_unit_testing
                pw_true: Optional[pd.DataFrame] = None,
                rng:np.random.Generator = None,
                seed:int = None

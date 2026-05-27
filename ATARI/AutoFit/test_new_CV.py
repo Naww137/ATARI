@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, '/home/wfritsc1/ATARI/ATARI')
 from cross_validation import find_CV_scores, find_model_complexity
-from auto_fit_updated import CrossValidationOUT
+from ATARI.AutoFit.auto_fit_updated_ import CrossValidationOUT
 import numpy as np
 
 folds_data = {}

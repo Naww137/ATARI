@@ -19,7 +19,7 @@ def chi2_test(dist, data, num_bins:int,
     """
 
     data_len = len(data)
-    quantiles = np.linspace(0.0, 1.0, num_bins+1)
+    quantiles = np.linspace(0.0, 0.999999999, num_bins+1)
     with np.errstate(divide='ignore'):
         edges = dist.ppf(quantiles)
     obs_counts, edges = np.histogram(data, edges)

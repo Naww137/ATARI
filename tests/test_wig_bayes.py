@@ -12,6 +12,16 @@ warnings.filterwarnings('error', category=RuntimeWarning)
 
 import unittest
 
+__doc__ == """
+This file tests the "wig_bayes" algorithm. "test_poisson" makes sure the algorithm is
+consistent with a trivial Poisson distribution. "test_probability_frequency" makes sure that
+calculated probabilities are unbiased. "test_1_2_sg_match" ensures that the 2 spin group case will
+converge to the 1 spin group case if one spin group is very rare. "test_false" ensures that the
+false probability is zero when the false frequency is set to 0.
+"""
+
+rng = np.random.default_rng(seed=2026)
+
 class TestBayesSampler2SG(unittest.TestCase):
     """
     The purpose of this test is to verify that the WigBayes algorithm is working correctly. This will be verified with cross-case verification and special cases with known results.
@@ -44,7 +54,7 @@ class TestBayesSampler2SG(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
+        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble, rng=rng)
         cls.E = cls.res_ladder.E.to_numpy()
     
     def test_poisson(self):
@@ -74,9 +84,9 @@ Mean error    = {perror_mean:.6%}
         runmaster = RunMaster(self.E, self.EB, distributions, self.false_dens, prior, log_likelihood_prior, err=self.err)
         posterior = runmaster.WigBayes()
 
-        Qs = correlate_probabilities(posterior, self.true_assignments)
-        for g, Q in enumerate(Qs):
-            errlim = 0.01
+        Qs, Qs_max = correlate_probabilities(posterior, self.true_assignments)
+        for g, (Q, Q_max) in enumerate(zip(Qs, Qs_max)):
+            errlim = 0.1*Q_max
             self.assertTrue(np.all(Q > errlim), f"""
 WigBayes probabilities do not match the frequency of correct sampling to within {errlim} standard deviations for group {g} of {self.num_groups}.
 Lowest probability density = {np.min(Q):.5f}.
@@ -107,7 +117,7 @@ class TestBayesSampler1or2SG(unittest.TestCase):
         SGs = Spingroup.zip(l, j)
         reaction2 = Reaction(targ=Target, proj=Projectile, lvl_dens=lvl_dens, gn2m=gn2m, nDOF=dfn, gg2m=gg2m, gDOF=dfg, spingroups=SGs, EB=EB, false_dens=false_dens)
         reaction1 = Reaction(targ=Target, proj=Projectile, lvl_dens=[lvl_dens_tot], gn2m=gn2m[:1], nDOF=dfn[:1], gg2m=gg2m[:1], gDOF=dfg[:1], spingroups=SGs[:1], EB=EB, false_dens=false_dens)
-        res_ladder, true_assignments, _, _ = reaction1.sample(self.ensemble)
+        res_ladder, true_assignments, _, _ = reaction1.sample(self.ensemble, rng=rng)
         E = res_ladder.E.to_numpy()
 
         prior1, log_likelihood_prior1 = PTBayes(res_ladder, reaction1)
@@ -176,7 +186,7 @@ class TestBayesSamplerNoFalse(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
+        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble, rng=rng)
         cls.E = cls.res_ladder.E.to_numpy()
     
     def test_false(self):
@@ -229,7 +239,7 @@ class TestBayesSamplerNoFalseSmall(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble)
+        cls.res_ladder, cls.true_assignments, _, _ = cls.reaction.sample(cls.ensemble, rng=rng)
         cls.E = cls.res_ladder.E.to_numpy()
     
     def test_false(self):
@@ -244,9 +254,6 @@ class TestBayesSamplerNoFalseSmall(unittest.TestCase):
         perrors = posterior[:,-1]
         perror_max = np.max(abs(perrors))
         perror_mean = np.mean(abs(perrors))
-        print(posterior)
-        print()
-        # print(perrors)
         self.assertTrue(perror_max < 1e-3, f"""
 WigBayes returns non-zero false probabilities when the false level-density is zero.
 Maximum error = {perror_max:.6%}

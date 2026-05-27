@@ -11,6 +11,14 @@ warnings.filterwarnings('error', category=RuntimeWarning)
 
 import unittest
 
+__doc__ == """
+This file tests the "wig_max_likelihood" algorithm. "test_poisson" makes sure the algorithm is
+consistent with a trivial Poisson distribution. "test_symmetry_no_false" makes sure that
+likelihoods are the same if resonance statistics is symmetric between spin groups.
+"""
+
+rng = np.random.default_rng(seed=2026)
+
 class TestBayesMaxLogLikelihoods(unittest.TestCase):
     """
     The purpose of this test is to verify that the WigMaxLikelihoods algorithm is working correctly.
@@ -43,7 +51,7 @@ class TestBayesMaxLogLikelihoods(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_poisson(self):
@@ -84,7 +92,7 @@ class TestBayesMaxLogLikelihoodsSymmetric(unittest.TestCase):
         cls.EB         = (1e-5, 150)
         cls.false_dens = 0.0 #1/20.0
         cls.lvl_dens   = [1/5.0, 1/5.0]
-        cls.gn2m       = [ 40,  40]
+        cls.gn2m       = [40/3.0, 40/4.0]
         cls.gg2m       = [55.00000, 55.00000]
         cls.dfn        = [  1,   1]
         cls.dfg        = [250, 250]
@@ -93,7 +101,7 @@ class TestBayesMaxLogLikelihoodsSymmetric(unittest.TestCase):
 
         SGs = Spingroup.zip(cls.l, cls.j)
         cls.reaction = Reaction(targ=Target, proj=Projectile, lvl_dens=cls.lvl_dens, gn2m=cls.gn2m, nDOF=cls.dfn, gg2m=cls.gg2m, gDOF=cls.dfg, spingroups=SGs, EB=cls.EB, false_dens=cls.false_dens)
-        cls.res_ladder = cls.reaction.sample(cls.ensemble)[0]
+        cls.res_ladder = cls.reaction.sample(cls.ensemble, rng=rng)[0]
         cls.E = cls.res_ladder.E.to_numpy()
 
     def test_symmetry_no_false(self):

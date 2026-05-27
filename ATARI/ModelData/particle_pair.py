@@ -366,6 +366,9 @@ class Particle_Pair:
         P = 1.0 # penetrability is 1 for capture widths
         gg2 = G_to_g2(np.array(Gg, dtype=float), P)
         return gg2
+    
+    def gstat(self, J:float):
+        return (2*J+1) / ((2*self.i+1) * (2*self.I+1))
 
     def map_quantum_numbers(self, print_out):
         """
@@ -522,8 +525,13 @@ class Particle_Pair:
             N = len(levels)
 
             # sample reduced widths
+<<<<<<< HEAD
             gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], signed=False, rng=rng)
             gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], signed=False, rng=rng)
+=======
+            gg2_samples = sample_RRR_widths(N, Jinfo["<gg2>"], Jinfo["g_dof"], random_sign=False, rng=rng)
+            gn2_samples = sample_RRR_widths(N, Jinfo["<gn2>"], Jinfo["n_dof"], random_sign=False, rng=rng)
+>>>>>>> res_stat_fitting_and_CV_unit_testing
 
             # convert to partial widths with checks for multiple channels not-implemented error
             # if len(Jinfo["Ls"]) > 1:

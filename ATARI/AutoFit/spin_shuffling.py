@@ -36,8 +36,20 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_
         # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
         # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
 
+<<<<<<< HEAD
     # Maintaining gJ*Gn1:
     respar_post.loc[selected_index, 'Gn1' ] *= (2*respar.loc[selected_index, 'Jpi']+1) / (2*respar_post.loc[selected_index, 'Jpi']+1)
+=======
+        J_ID = spingroup_params['J_ID']
+        selected_rows = respar.loc[respar_mask_in_window]
+        selected_index = selected_rows.loc[respar['J_ID'] == J_ID].index
+        respar.loc[selected_index,'Jpi'] = Jpi
+
+    # Maintaining gJ*Gn1:
+    J_old = abs(respar['Jpi'].to_numpy())
+    J_new = abs(respar_post['Jpi'].to_numpy())
+    respar_post['Gn1'] = respar['Gn1'] * (2*J_old+1) / (2*J_new+1)
+>>>>>>> res_stat_fitting_and_CV_unit_testing
 
     selected_rows = respar_post.loc[respar_mask_in_window]
     selected_index = selected_rows.loc[spingroups == num_spingroups].index
@@ -69,6 +81,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     respar_window = respar_sorted.loc[respar_mask_in_window]
 
     # num_res = len(respar_window)
+    particle_pair.resonance_ladder = respar
     reaction_TAZ, _, spingroup_IDs_TAZ = ATARI_to_TAZ(particle_pair)
     num_spingroups = reaction_TAZ.num_groups
     # J_IDs = [spingroup['J_ID'] for spingroup in particle_pair.spin_groups.values()]

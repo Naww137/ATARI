@@ -454,7 +454,7 @@ class Reaction:
         E          = np.zeros((0,))
         Gn         = np.zeros((0,))
         Gg         = np.zeros((0,))
-        spingroups = np.zeros((0,), dtype=int)
+        spingroups_true_real = np.zeros((0,), dtype=int)
         for g in range(self.num_groups):
             # Energy sampling:
             brody_param = self.brody_param[g] if self.brody_param is not None else None
@@ -469,15 +469,15 @@ class Reaction:
             E          = np.concatenate((E         , E_group ))
             Gn         = np.concatenate((Gn        , Gn_group))
             Gg         = np.concatenate((Gg        , Gg_group))
-            spingroups = np.concatenate((spingroups, g*np.ones((len_group,), dtype=int)))
+            spingroups_true_real = np.concatenate((spingroups_true_real, g*np.ones((len_group,), dtype=int)))
 
         # False Resonances:
         if self.false_dens != 0.0:
             # Energy sampling:
             E_false = Samplers.SampleEnergies(self.EB, self.false_dens, ensemble='Poisson')
             
-            # False width sampling:
-            # False widths are sampled by taking the level-density-weighted average of each spingroup's width distributions.
+            # False strength sampling:
+            # False widths are sampled by taking the level-density-weighted average of each spingroup's strength distributions.
             num_false = len(E_false)
             Gn_false_group = np.zeros((num_false,self.num_groups))
             Gg_false_group = np.zeros((num_false,self.num_groups))
@@ -485,43 +485,48 @@ class Reaction:
                 Gn_false_group[:,g] = Samplers.SampleNeutronWidth(E_false, Gnms[g], self.nDOF[g], rng=rng)
                 Gg_false_group[:,g] = Samplers.SampleGammaWidth(num_false, Ggms[g], self.gDOF[g], rng=rng)
             idx = np.arange(num_false)
-            group_idx = rng.choice(self.num_groups, size=(num_false,), p=self.lvl_dens/np.sum(self.lvl_dens))
-            Gn_false = Gn_false_group[idx,group_idx]
-            Gg_false = Gg_false_group[idx,group_idx]
+            spingroups_assigned_false = rng.choice(self.num_groups, size=(num_false,), p=self.lvl_dens/np.sum(self.lvl_dens))
+            Gn_false = Gn_false_group[idx,spingroups_assigned_false]
+            Gg_false = Gg_false_group[idx,spingroups_assigned_false]
 
             # Append to group:
-            E          = np.concatenate((E         , E_false ))
-            Gn         = np.concatenate((Gn        , Gn_false))
-            Gg         = np.concatenate((Gg        , Gg_false))
-            spingroups = np.concatenate((spingroups, self.num_groups*np.ones((num_false,), dtype=int)))
+            E                   = np.concatenate((E         , E_false ))
+            Gn                  = np.concatenate((Gn        , Gn_false))
+            Gg                  = np.concatenate((Gg        , Gg_false))
+            spingroups_true     = np.concatenate((spingroups_true_real, self.num_groups*np.ones((num_false,), dtype=int)))
+            spingroups_assigned = np.concatenate((spingroups_true_real, spingroups_assigned_false                       ))
+        else:
+            spingroups_true     = spingroups_true_real
+            spingroups_assigned = spingroups_true_real
 
         # Sorting Indices:
         idx = np.argsort(E)
         E  = E[idx]
         Gn = Gn[idx]
         Gg = Gg[idx]
-        spingroups = spingroups[idx]
+        spingroups_true = spingroups_true[idx]
 
         # Setting "True" Ladder:
-        self.resonances = DataFrame({'E':E, 'Gg':Gg, 'Gn1':Gn, 'J_ID': spingroups})
+        J_IDs = np.array([self.J_ID[spingroup] for spingroup in spingroups_assigned])
+        self.resonances = DataFrame({'E':E, 'Gg':Gg, 'Gn1':Gn, 'J_ID':J_IDs})
 
         # Missing Resonance Indices:
         if self.Gn_trunc_provided: # given Gn_trunc
             missed_idx = (Gn <= self.Gn_trunc)
         else:
             miss_frac = np.concatenate((self.MissFrac, [0]))
-            missed_idx = (rng.uniform(size=E.shape) < miss_frac[spingroups])
+            missed_idx = (rng.uniform(size=E.shape) < miss_frac[spingroups_true])
 
         # Missing resonances:
         resonances_missed = self.resonances.iloc[missed_idx]
         resonances_missed.reset_index(drop=True, inplace=True)
-        spingroups_missed = spingroups[missed_idx]
+        spingroups_missed = spingroups_true[missed_idx]
 
         # Caught resonances:
-        resonances_no_sg = self.resonances.drop(columns=['J_ID'])
+        resonances_no_sg = self.resonances#.drop(columns=['J_ID'])
         resonances_caught = resonances_no_sg.iloc[~missed_idx]
         resonances_caught.reset_index(drop=True, inplace=True)
-        spingroups_caught = spingroups[~missed_idx]
+        spingroups_caught = spingroups_true[~missed_idx]
 
         # Returning resonance data:
         return resonances_caught, spingroups_caught, resonances_missed, spingroups_missed

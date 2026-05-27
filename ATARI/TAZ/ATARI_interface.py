@@ -58,6 +58,8 @@ def ATARI_to_TAZ(particle_pair:Particle_Pair, **kwargs):
             J_ID.append(mean_param_dict['J_ID'])
 
     # Resonances:
+    print('\n\nResonances:')
+    print(particle_pair.resonance_ladder)
     resonances = particle_pair.resonance_ladder.sort_values(by=['E'], ignore_index=True)
     res_J_IDs = resonances['J_ID'].to_numpy()
     

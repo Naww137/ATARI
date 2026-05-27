@@ -13,7 +13,7 @@ from math import ceil
 from ATARI.utils.file_handling import clean_and_make_directory, return_random_subdirectory
 from ATARI.utils.datacontainers import Evaluation
 from ATARI.AutoFit.functions import * 
-from ATARI.AutoFit.cross_validation import find_CV_scores, find_model_complexity
+from ATARI.AutoFit.cross_validation import find_CV_scores, find_model_complexity, get_train_test_over_datasets, get_train_test_non_factorized, evaluate_chi2s
 
 # def find_max_num_resonances(particle_pair:Particle_Pair, window_size:tuple, tol:float=1e-2):
 #     """
@@ -78,6 +78,8 @@ class AutoFitOPT:
     # other
     print_bool                      : bool  = True
     Nres_selected                   : int   = None
+    split_by_dataset                : bool  = False
+    num_folds                       : int   = 5
     use_1std_rule                   : bool  = True
     use_1disc_rule                  : bool  = False
     discrepancy_threshold           : float = 1.0
@@ -237,14 +239,17 @@ class AutoFit:
     def cross_validation(self, evaluation_data, total_resonance_ladder, fixed_resonance_indices=[], Nres_max_num_res=0):
 
         ### Split CV data
-        if True: #measurement_wise
+        if self.options.split_by_dataset: #measurement_wise
+            # kfolds = len(evaluation_data.experimental_models)
+            # list_evaluation_data_train, list_evaluation_data_test = [], []
+            # for k in range(kfolds):
+            #     evaluation_data_train, evaluation_data_test = evaluation_data.get_train_test_over_datasets(k)
+            #     list_evaluation_data_train.append(evaluation_data_train); list_evaluation_data_test.append(evaluation_data_test)
             kfolds = len(evaluation_data.experimental_models)
-            list_evaluation_data_train, list_evaluation_data_test = [], []
-            for k in range(kfolds):
-                evaluation_data_train, evaluation_data_test = evaluation_data.get_train_test_over_datasets(k)
-                list_evaluation_data_train.append(evaluation_data_train); list_evaluation_data_test.append(evaluation_data_test)
-        else:
-            pass # perform SVD and stuff
+            list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list = get_train_test_over_datasets(evaluation_data)
+        else: # perform non-factorized cross-validation
+            kfolds = self.options.num_folds
+            list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list = get_train_test_non_factorized(evaluation_data, k_folds=kfolds)
 
 
         ### Could have option to save folds here
@@ -258,7 +263,7 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold) for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test))]
+            multi_input = [(train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold) for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list))]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 folds_results = pool.map(self.get_cross_validation_score, multi_input)
             assert len(folds_results) == kfolds
@@ -266,8 +271,8 @@ class AutoFit:
         ### get CVE score in serial
         else:
             folds_results = []
-            for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test)):
-                fold_results = self.get_cross_validation_score((train, test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold))
+            for ifold, (train, test, train_indices, test_indices) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list)):
+                fold_results = self.get_cross_validation_score((train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold))
                 folds_results.append(fold_results)
 
         # # if save:
@@ -338,9 +343,8 @@ class AutoFit:
 
         return folds_data, kfolds
     
-
     def get_cross_validation_score(self, input_arguments):
-        evaluation_data_train, evaluation_data_test, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold = input_arguments
+        evaluation_data_train, evaluation_data_test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold = input_arguments
         resonance_ladder, fixed_resonance_ladder = separate_external_resonance_ladder(total_resonance_ladder, fixed_resonance_indices)
         
         # set RTO options if in parallel
@@ -365,7 +369,7 @@ class AutoFit:
         solver_initial      = Solver_factory(rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_train) 
         solver_pre_shuffle  = Solver_factory(rto_train, solver_options_pre_shuffle._solver , solver_options_pre_shuffle , self.particle_pair, evaluation_data_train)
         solver_post_shuffle = Solver_factory(rto_train, solver_options_post_shuffle._solver, solver_options_post_shuffle, self.particle_pair, evaluation_data_train)
-        solver_test         = Solver_factory(rto_test, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test)
+        solver_test         = Solver_factory(rto_test , self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_test )
 
         # solver_initial = Solver_factory(rto_train, self.solver_options_initial._solver, self.solver_options_initial, self.particle_pair, evaluation_data_train) 
         # solver_elim    = Solver_factory(rto_train, self.solver_options_eliminate._solver, self.solver_options_eliminate, self.particle_pair, evaluation_data_train)
@@ -413,22 +417,20 @@ class AutoFit:
         fold_results = {}
         for key, val in elimination_history.items():
             res_ladder = val['selected_ladder_chars'].par_post
-            test_out = solver_test.fit(res_ladder)
-            Ndata_test = len(test_out.pw[0])
-            Ndata_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
-            # Train
-            chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)
+            if self.options.split_by_dataset:
+                test_out = solver_test.fit(res_ladder)
+                Ndata_train = np.sum([len(each) for each in val['selected_ladder_chars'].pw_post])
+                Ndata_test = len(test_out.pw[0])
+                chi2_train = np.sum(val['selected_ladder_chars'].chi2_post)
+                chi2_test = np.sum(test_out.chi2)
+                chi2_eff = chi2_test
+            else:
+                Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff = evaluate_chi2s(res_ladder, solver_test, train_indices, test_indices)
+
+            # Creating the objective function:
             obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
-            # Test
-            chi2_test = np.sum(test_out.chi2)
-            obj_test = objective_func(chi2_test, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
-
-            # fold_results[key] = {'obj_test'    : obj_test,
-            #                      'ndata_test'  : Ndata_test,
-            #                      'obj_train'   : obj_train,
-            #                      'ndata_train' : Ndata_train}
-
-            fold_results[key] = CrossValidationOUT(chi2_test=chi2_test,   obj_test=obj_test,   ndata_test=Ndata_test,
+            obj_eff   = objective_func(chi2_eff  , res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)
+            fold_results[key] = CrossValidationOUT(chi2_test=chi2_eff   , obj_test=obj_eff   , ndata_test=Ndata_test  ,
                                                    chi2_train=chi2_train, obj_train=obj_train, ndata_train=Ndata_train)
 
         return fold_results

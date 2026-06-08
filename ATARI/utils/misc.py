@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 from copy import copy
 from uuid import uuid4
+from scipy.linalg import cho_factor, cho_solve
 
 def fine_egrid(energy, ppeV=10):
     """
@@ -149,3 +150,25 @@ def set_vary_columns_on_resonance_ladder(resonance_ladder: pd.DataFrame, vary_li
 
     if inplace: return
     else: return resonance_ladder
+
+def psd_solve(V, A):
+    """
+    Calculates V\A, where V is symmetric, positive-semidefinite, and A is an arbitrary
+    matrix. `psd_solve` uses Cholesky decomposition to perform the matrix solve faster.
+
+    Parameters
+    ----------
+    V : array
+        The positive-semidefinite matrix.
+    A : array
+        An arbitrary matrix V backdivides with.
+    
+    Returns
+    -------
+    B : array
+        The solution matrix.
+    """
+
+    U, ulo = cho_factor(V)
+    B = cho_solve((U, ulo), A)
+    return B

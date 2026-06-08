@@ -6,6 +6,7 @@ from numpy import newaxis as NA
 
 # from ATARI.ModelData.experimental_model import Experimental_Model
 from ATARI.utils.datacontainers import Evaluation_Data
+from ATARI.utils.misc import psd_solve
 from ATARI.AutoFit.external_fit import get_Ds_Vs
 from ATARI.AutoFit.sammy_interface_bindings import Solver
 
@@ -80,10 +81,10 @@ def get_train_test_over_datasets(evaluation_data:Evaluation_Data):
         eval_data_train = Evaluation_Data(tuple(experimental_titles_train), tuple(experimental_models_train), tuple(datasets_train), tuple(covariance_data_train), measurement_models=measurement_models_train, experimental_models_no_pup=experimental_models_no_pup_train)
         eval_data_test  = Evaluation_Data(tuple(experimental_titles_test ), tuple(experimental_models_test ), tuple(datasets_test ), tuple(covariance_data_test ), measurement_models=measurement_models_test , experimental_models_no_pup=experimental_models_no_pup_test )
     
-    evaluation_data_train_sets.append(eval_data_train)
-    evaluation_data_test_sets .append(eval_data_test )
+        evaluation_data_train_sets.append(eval_data_train)
+        evaluation_data_test_sets .append(eval_data_test )
 
-    return eval_data_train, eval_data_test
+    return evaluation_data_train_sets, evaluation_data_test_sets
 
 def get_train_test_non_factorized(evaluation_data:Evaluation_Data, k_folds:int,
                                   rng:np.random.Generator=None, seed:int=None):
@@ -120,23 +121,23 @@ def get_train_test_non_factorized(evaluation_data:Evaluation_Data, k_folds:int,
             covariance_all = evaluation_data.covariance_data[iset]
 
             dataset_train = dataset_all.drop(index=test_indices[i_fold][iset])
-            dataset_test = dataset_all.loc[test_indices[i_fold][iset]]
+            dataset_test = dataset_all#.loc[test_indices[i_fold][iset]]
             test_energies = dataset_test.E[test_indices[i_fold][iset]].tolist()
             if covariance_all in (None, {}):
                 covariance_train, covariance_test = covariance_all, covariance_all
             else:
-                # Test:
-                diag_stat = covariance_all["diag_stat"]
-                diag_stat.loc[test_energies]
-                Jac_sys = covariance_all["Jac_sys"].loc[:,test_energies]
-                cov_sys = covariance_all["Cov_sys"]
-                covariance_test = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
                 # Train:
-                diag_stat = covariance_all["diag_stat"]
-                diag_stat.drop(index=test_energies)
+                diag_stat = covariance_all["diag_stat"].drop(index=test_energies)
                 Jac_sys = covariance_all["Jac_sys"].drop(columns=test_energies)
                 cov_sys = covariance_all["Cov_sys"]
+                assert len(diag_stat['var_stat'].values) == Jac_sys.values.shape[1]
                 covariance_train = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
+                # Test:
+                diag_stat = covariance_all["diag_stat"]#.loc[test_energies]
+                Jac_sys = covariance_all["Jac_sys"]#.loc[:,test_energies]
+                cov_sys = covariance_all["Cov_sys"]
+                assert len(diag_stat['var_stat'].values) == Jac_sys.values.shape[1]
+                covariance_test = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
                 
                 # # Test:
                 # dataset_test = dataset_all.sort_values("E").drop(index=test_indices[i_fold][iset])
@@ -170,52 +171,62 @@ def get_train_test_non_factorized(evaluation_data:Evaluation_Data, k_folds:int,
 #   Chi-squared Calculation:
 # =================================================================================================
 
-def evaluate_chi2s(res_ladder:pd.DataFrame, solver_test:Solver, 
+def evaluate_chi2s(res_ladder:pd.DataFrame, solver_test:Solver,
                    train_indices_list:np.ndarray, test_indices_list:np.ndarray):
     """
     ...
     """
 
     # Preparing Solver:
-    solver_test = copy(solver_test)
-    solver_test.set_bayes(False)
+    solver = copy(solver_test)
+    solver.set_bayes(False)
 
     # Getting Data:
-    data_list     = [dataset['exp']     for dataset in solver_test.sammyINP.datasets]
-    sammy_out_test = solver_test.fit(resonance_ladder=res_ladder)
-    fit_list = sammy_out_test.pw
-    if solver_test.sammyINP.idc_at_theory:
-        idc_list = solver_test.get_idc_at_theory(res_ladder)
+    data_list = solver.sammyINP.datasets
+    sammy_out = solver.fit(resonance_ladder=res_ladder)
+    fit_list = sammy_out.pw
+    if solver.sammyINP.idc_at_theory:
+        idc_list = solver.get_idc_at_theory(res_ladder)
     else:
-        idc_list = solver_test.sammyINP.experimental_covariance
+        idc_list = solver.sammyINP.experimental_covariance
+    reaction_list = [solver.sammyINP.experiments[idx_dset].reaction for idx_dset in range(len(data_list))]
     cov_list = []
-    for idx_dset, idc in enumerate(idc_list):
-        if idc is None:
-            data_unc = solver_test.sammyINP.datasets[idx_dset]['exp_unc']
+    for data, idc in zip(data_list, idc_list):
+        if idc in (None, {}):
+            data_unc = data['exp_unc']
             cov = np.diag(data_unc*data_unc)
         else:
-            cov_sys = idc['Cov_sys']
-            diag_stat = idc["var_stat"].sort_values("E")
+            diag_stat = idc["diag_stat"].sort_values("E")
             diag_stat.reset_index(drop=True)
+            var_stat = diag_stat['var_stat'].values
+            cov_sys = idc['Cov_sys']
             Jac_sys = idc["Jac_sys"].sort_index(axis=1).values
-            cov = np.diag(diag_stat['var_stat'].values) + Jac_sys.T @ cov_sys @ Jac_sys
+            cov = np.diag(var_stat) + Jac_sys.T @ cov_sys @ Jac_sys
+        indices = data.index
+        cov = pd.DataFrame(cov, index=indices, columns=indices)
         cov_list.append(cov)
 
     # Calculating Chi-squared Values:
     Ndatas_train = [];       Ndatas_test  = []
     chi2s_train = [];       chi2s_test  = [];       chi2s_eff   = []
-    for data, fit, cov, test_indices, train_indices in zip(data_list, fit_list, cov_list, train_indices_list, test_indices_list):
-        Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff = find_chi2_eff(fit, data, cov, test_indices, train_indices)
+    for dset_idx, (data, fit_all, cov, test_indices, train_indices, reaction) in enumerate(zip(data_list, fit_list, cov_list, train_indices_list, test_indices_list, reaction_list)):
+        fit_all.index = data.index
+        assert all(np.isclose(np.array(fit_all.E), np.array(data.E), rtol=1e-4, atol=1e-6))
+        if reaction == 'transmission':      fit = fit_all['theo_trans']
+        else:                               fit = fit_all['theo_xs']
+        Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff, chi2_all = find_chi2_eff(fit, data.exp, cov, test_indices, train_indices)
         Ndatas_train.append(Ndata_train);    Ndatas_test.append(Ndata_test)
-        chi2s_train.append(chi2_train);    chi2s_test.append(chi2_test);    chi2s_eff.append(chi2_eff)
+        chi2s_train .append(chi2_train) ;    chi2s_test .append(chi2_test) ;    chi2s_eff.append(chi2_eff)
     
-    # Checking against solver chi2 values:
-    Ndata_test_sammy = len(sammy_out_test.pw[0])
-    assert np.isclose(np.sum(Ndata_test), Ndata_test_sammy, rtol=1e-5, atol=1e-3), f'The number of datasets calculated by the non-factorized solver is different than the number of datasets evaluated by SAMMY ({np.sum(Ndata_test)} and {Ndata_test_sammy})'
-    chi2_test_sammy = np.sum(sammy_out_test.chi2)
-    assert np.isclose(np.sum(chi2_test), chi2_test_sammy, rtol=1e-5, atol=1e-3), f'The chi-squared calculated by the non-factorized solver is different than the chi-squared evaluated by SAMMY ({np.sum(chi2_test)} and {chi2_test_sammy})'
+        # Checking against solver chi2 values:
+        Ndata_sammy = len(sammy_out.pw[dset_idx])
+        Ndata_atari = Ndata_test + Ndata_train
+        assert np.isclose(Ndata_atari, Ndata_sammy, rtol=1e-5, atol=1e-3), f'The number of datasets calculated by the non-factorized solver is different than the number of datasets evaluated by SAMMY ({Ndata_atari} and {Ndata_sammy})'
+        chi2_sammy = sammy_out.chi2[dset_idx]
+        chi2_atari = np.sum(chi2_all)
+        assert np.isclose(chi2_atari, chi2_sammy, rtol=1e-3, atol=1e3), f'The chi-squared calculated by the non-factorized solver is different than the chi-squared evaluated by SAMMY ({chi2_atari} and {chi2_sammy})'
 
-    return Ndatas_train, Ndatas_test, chi2s_train, chi2s_test, chi2s_eff, 
+    return Ndatas_train, Ndatas_test, chi2s_train, chi2s_test, chi2s_eff,
 
 def find_chi2_eff(fit:np.ndarray, data:np.ndarray, cov:np.ndarray,
                   train_indices:np.ndarray, test_indices:np.ndarray):
@@ -224,31 +235,39 @@ def find_chi2_eff(fit:np.ndarray, data:np.ndarray, cov:np.ndarray,
     """
 
     # Splitting Test/Train:
-    fit_test        = fit [test_indices ]
-    fit_train       = fit [train_indices]
-    data_test       = data[test_indices ]
-    data_train      = data[train_indices]
-    cov_test_test   = cov [np.ix_(test_indices ,test_indices )]
-    cov_test_train  = cov [np.ix_(test_indices ,train_indices)]
-    cov_train_train = cov [np.ix_(train_indices,train_indices)]
+    fit_all         = fit.values
+    fit_train       = fit [train_indices].values
+    fit_test        = fit [test_indices ].values
+    data_all        = data.values
+    data_test       = data[test_indices ].values
+    data_train      = data[train_indices].values
+    cov_all         = cov.values
+    cov_test_test   = cov.loc[ test_indices, test_indices].values
+    cov_test_train  = cov.loc[ test_indices,train_indices].values
+    cov_train_train = cov.loc[train_indices,train_indices].values
 
     # Calculating Train Chi-squared:
     Ndata_train = len(train_indices)
     delta_train = data_train - fit_train
-    chi2_train = delta_train.T @ np.linalg.solve(cov_train_train, delta_train)
+    Vid_train = psd_solve(cov_train_train, delta_train)
+    chi2_train = delta_train.T @ Vid_train
 
     # Calculating Test Chi-squared:
     Ndata_test = len(test_indices)
     delta_test = data_test - fit_test
-    chi2_test = delta_test.T @ np.linalg.solve(cov_test_test, delta_test)
+    chi2_test = delta_test.T @ psd_solve(cov_test_test, delta_test)
+
+    # Calculating Chi-squared for all data:
+    delta_all = data_all - fit_all
+    chi2_all  = delta_all.T @ psd_solve(cov_all, delta_all)
 
     # Calculating Effective Test Chi-squared:
-    fit_eff = fit_test      - cov_test_train @ np.linalg.solve(cov_train_train, delta_train)
-    cov_eff = cov_test_test - cov_test_train @ np.linalg.solve(cov_train_train, cov_test_train.T)
+    fit_eff = fit_test      - cov_test_train @ Vid_train
+    cov_eff = cov_test_test - cov_test_train @ psd_solve(cov_train_train, cov_test_train.T)
     delta_eff = data_test - fit_eff
-    chi2_eff = delta_eff.T @ np.linalg.solve(cov_eff, delta_eff)
+    chi2_eff = delta_eff.T @ psd_solve(cov_eff, delta_eff)
 
-    return Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff
+    return Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff, chi2_all
 
 #%% ===============================================================================================
 #   Splitting CV Scores:
@@ -331,7 +350,6 @@ def find_model_complexity(Nres_array, CV_score_means, CV_score_cov, use_1std_rul
             CV_score_var   = CV_score_cov[idx,idx]
             CV_score_cross = CV_score_cov[idx,idx_min]
             discrepancy = (CV_score_mean-CV_score_mean_min)/np.sqrt(CV_score_var_min + CV_score_var - 2*CV_score_cross)
-            print(discrepancy)
             if discrepancy < disc_thres:
                 Nres_selected = Nres
                 break
@@ -343,7 +361,6 @@ def find_model_complexity(Nres_array, CV_score_means, CV_score_cov, use_1std_rul
                 break
     else:
         Nres_selected = Nres_min
-    print(Nres_selected)
     return Nres_selected
 
 

@@ -16,35 +16,32 @@ from ATARI.TAZ.RunMaster import RunMaster
 from ATARI.TAZ.PTBayes import PTBayes, prior_fix_spingroups
 from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
 
-def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, neutron_width_signs:np.ndarray, capture_width_signs:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
+def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
     """
     ...
     """
 
     respar_post = copy(respar)
-    respar_post.loc[respar_mask_in_window, 'Gn1'] *= neutron_width_signs # shuffle sign of neutron widths
-    respar_post.loc[respar_mask_in_window, 'Gg' ] *= capture_width_signs # shuffle sign of capture widths
+    # respar_post.loc[respar_mask_in_window, 'Gn1'] *= neutron_width_signs # shuffle sign of neutron widths
+    # respar_post.loc[respar_mask_in_window, 'Gg' ] *= capture_width_signs # shuffle sign of capture widths
     for TAZ_spin_id, (Jpi, spingroup_params) in enumerate(particle_pair.spin_groups.items()):
+        J_ID = spingroup_params['J_ID']
 
         # Finally, assign the value to the relevant rows in the original DataFrame
         selected_rows = respar_post.loc[respar_mask_in_window]
         selected_index = selected_rows.loc[spingroups == TAZ_spin_id].index
-        respar_post.loc[selected_index, 'J_ID'] = spingroup_params['J_ID']
+        respar_post.loc[selected_index, 'J_ID'] = J_ID
         respar_post.loc[selected_index, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
         respar_post.loc[selected_index, 'Jpi' ] = Jpi
-        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'J_ID'] = spingroup_params['J_ID']
-        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'L'   ] = spingroup_params['Ls'][0] # Assume largest L (NOTE: handling for larger L not considered yet)
-        # respar_post.loc[respar_mask_in_window].loc[spingroups == TAZ_spin_id, 'Jpi' ] = Jpi
 
-        J_ID = spingroup_params['J_ID']
         selected_rows = respar.loc[respar_mask_in_window]
         selected_index = selected_rows.loc[respar['J_ID'] == J_ID].index
         respar.loc[selected_index,'Jpi'] = Jpi
 
-    # Maintaining gJ*Gn1:
-    J_old = abs(respar['Jpi'].to_numpy())
-    J_new = abs(respar_post['Jpi'].to_numpy())
-    respar_post['Gn1'] = respar['Gn1'] * (2*J_old+1) / (2*J_new+1)
+    # Maintaining consistent gJ*Gn1:
+    J_old = abs(respar     .loc[respar_mask_in_window,'Jpi'].to_numpy())
+    J_new = abs(respar_post.loc[respar_mask_in_window,'Jpi'].to_numpy())
+    respar_post.loc[respar_mask_in_window,'Gn1'] = respar.loc[respar_mask_in_window,'Gn1'] * (2*J_old+1) / (2*J_new+1) # ratio of gJ for each to maintain gJ*Gn1
 
     selected_rows = respar_post.loc[respar_mask_in_window]
     selected_index = selected_rows.loc[spingroups == num_spingroups].index
@@ -102,16 +99,15 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
     # print()
     # neutron_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling neutron width sign
     # capture_width_signs = rng.choice([-1, 1], size=spin_shuffles.shape) # shuffling capture width sign
-    neutron_width_signs = rng.choice([1], size=spin_shuffles.shape) # shuffling neutron width sign
-    capture_width_signs = rng.choice([1], size=spin_shuffles.shape) # shuffling capture width sign
     
     print('Spin Shuffles:')
 
     shuffled_respars = []
     for shuffle_id in range(num_shuffles):
         spin_shuffle = spin_shuffles[:,shuffle_id]
-        print(f'{shuffle_id}: {spin_shuffle.tolist()} | {neutron_width_signs[:,shuffle_id].tolist()} | {capture_width_signs[:,shuffle_id].tolist()}')
-        shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, neutron_width_signs=neutron_width_signs[:,shuffle_id], capture_width_signs=capture_width_signs[:,shuffle_id], particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
+        # print(f'{shuffle_id}: {spin_shuffle.tolist()} | {neutron_width_signs[:,shuffle_id].tolist()} | {capture_width_signs[:,shuffle_id].tolist()}')
+        print(f'{shuffle_id}: {spin_shuffle.tolist()}')
+        shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
         shuffled_respar = shuffled_respar.iloc[unsort_indices].reset_index(drop=True) # unsorting resonance parameters (so that fixed resonance indices are consistent)
         shuffled_respar.index = original_indices
         shuffled_respars.append(shuffled_respar)

@@ -139,10 +139,6 @@ class syndatOPT:
         self._sampleRES = True
         self._ensemble = 'GOE'
         self._sample_external_resonances = False
-<<<<<<< HEAD
-=======
-
->>>>>>> res_stat_fitting_and_CV_unit_testing
         self._sample_counting_noise = True
         self._calculate_covariance = True
         self._explicit_covariance = False
@@ -179,11 +175,7 @@ class syndatOPT:
     @ensemble.setter
     def ensemble(self, ensemble):
         self._ensemble = ensemble
-<<<<<<< HEAD
     
-=======
-
->>>>>>> res_stat_fitting_and_CV_unit_testing
     @property
     def sample_external_resonances(self):
         return self._sample_external_resonances

@@ -430,12 +430,8 @@ def wigner_PDF(x, avg_level_spacing:float, beta:int=1):
 
 def sample_RRR_widths(N_levels, 
                       avg_reduced_width_square, 
-<<<<<<< HEAD
-                      DOF:int=1, trunc:float=0.0, signed:bool=True,
-=======
                       DOF:int=1, trunc:float=0.0,
                       random_sign:bool=True,
->>>>>>> res_stat_fitting_and_CV_unit_testing
                       rng=None, seed=None):
     """
     Samples resonance widths corresponding to a vector of resonance energies.
@@ -453,13 +449,8 @@ def sample_RRR_widths(N_levels,
         Degrees of freedom applied to the PT distiribution (chi-square).
     trunc : float
         All reduced widths below this value are ignored. Default = 0.0.
-<<<<<<< HEAD
-    signed : bool
-        Determines if the sampled width should be signed. Default is True.
-=======
     random_sign : bool
         Assigns a random sign to the spin groups.
->>>>>>> res_stat_fitting_and_CV_unit_testing
     rng : np.random.Generator or None
         Numpy random number generator object. Default is None.
     seed : int or None
@@ -481,17 +472,10 @@ def sample_RRR_widths(N_levels,
         reduced_widths_square = np.repeat(avg_reduced_width_square, N_levels)
     else:
         reduced_widths_square = porter_thomas_dist.rvs(mean=avg_reduced_width_square, df=int(DOF), trunc=trunc, size=N_levels, random_state=rng)
-<<<<<<< HEAD
-    
-    if signed:      sign = 2*rng.integers(0, 2, size=N_levels)-1
-    else:           sign = 1.0
-    
-=======
     if random_sign:
         sign = 2*rng.integers(0, 2, size=N_levels)-1
     else:
         sign = 1.0
->>>>>>> res_stat_fitting_and_CV_unit_testing
     return np.array(reduced_widths_square * sign, dtype=float)
 
 def chisquare_PDF(x, DOF:int=1, avg_reduced_width_square:float=1.0, trunc:float=0.0):

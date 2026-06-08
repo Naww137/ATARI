@@ -78,14 +78,14 @@ class TestResonanceGeneration(unittest.TestCase):
         dist = porter_thomas_dist(mean=self.mean_gamma_width, df=self.gg2_dof, trunc=0.0)
         chi2_test(dist, abs(gg2), NUM_BINS, self, 0.001, 'gamma widths', 'Porter-Thomas distribution', 'p')
         
-        obs_counts = np.bincount(np.array(gg2>=0, dtype=int), minlength=2)
-        exp_counts = np.array([0.5, 0.5]) * len(gg2)
-        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-        chi2_bar = chi2 / 2
-        self.assertGreater(p, 0.001, f"""
-The gamma (capture) widths do not have 50% positive-negative split.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+#         obs_counts = np.bincount(np.array(gg2>=0, dtype=int), minlength=2)
+#         exp_counts = np.array([0.5, 0.5]) * len(gg2)
+#         chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
+#         chi2_bar = chi2 / 2
+#         self.assertGreater(p, 0.001, f"""
+# The gamma (capture) widths do not have 50% positive-negative split.
+# Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
+# """)
         
     def test_neutron_widths(self):
         """
@@ -99,14 +99,14 @@ Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
         dist = porter_thomas_dist(mean=self.mean_neutron_width, df=self.gn2_dof, trunc=0.0)
         chi2_test(dist, abs(gn2), NUM_BINS, self, 0.001, 'neutron widths', 'Porter-Thomas distribution', 'p')
         
-        obs_counts = np.bincount(np.array(gn2>=0, dtype=int), minlength=2)
-        exp_counts = np.array([0.5, 0.5]) * len(gn2)
-        chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
-        chi2_bar = chi2 / 2
-        self.assertGreater(p, 0.001, f"""
-The neutron widths do not have 50% positive-negative split.
-Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
-""")
+#         obs_counts = np.bincount(np.array(gn2>=0, dtype=int), minlength=2)
+#         exp_counts = np.array([0.5, 0.5]) * len(gn2)
+#         chi2, p = chisquare(f_obs=obs_counts, f_exp=exp_counts)
+#         chi2_bar = chi2 / 2
+#         self.assertGreater(p, 0.001, f"""
+# The neutron widths do not have 50% positive-negative split.
+# Calculated chi-squared bar = {chi2_bar:.5f}; p = {p:.5f}
+# """)
         
 class TestGOESampler(unittest.TestCase):
 

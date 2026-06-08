@@ -246,7 +246,8 @@ class AutoFit:
             #     evaluation_data_train, evaluation_data_test = evaluation_data.get_train_test_over_datasets(k)
             #     list_evaluation_data_train.append(evaluation_data_train); list_evaluation_data_test.append(evaluation_data_test)
             kfolds = len(evaluation_data.experimental_models)
-            list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list = get_train_test_over_datasets(evaluation_data)
+            list_evaluation_data_train, list_evaluation_data_test = get_train_test_over_datasets(evaluation_data)
+            train_indices_list, test_indices_list = [None]*kfolds, [None]*kfolds
         else: # perform non-factorized cross-validation
             kfolds = self.options.num_folds
             list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list = get_train_test_non_factorized(evaluation_data, k_folds=kfolds)
@@ -263,7 +264,7 @@ class AutoFit:
                 print(f"User specified more CPUs than folds ({kfolds}), setting CPUs = {kfolds}")
                 self.options.parallel_processes = kfolds
             ## Run
-            multi_input = [(train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold) for ifold, (train, test) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list))]
+            multi_input = [(train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold) for ifold, (train, test, train_indices, test_indices) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list))]
             with multiprocessing.Pool(processes=self.options.parallel_processes) as pool:
                 folds_results = pool.map(self.get_cross_validation_score, multi_input)
             assert len(folds_results) == kfolds
@@ -272,8 +273,8 @@ class AutoFit:
         else:
             folds_results = []
             for ifold, (train, test, train_indices, test_indices) in enumerate(zip(list_evaluation_data_train, list_evaluation_data_test, train_indices_list, test_indices_list)):
-                fold_results = self.get_cross_validation_score((train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold))
-                folds_results.append(fold_results)
+                fold_result = self.get_cross_validation_score((train, test, train_indices, test_indices, total_resonance_ladder, fixed_resonance_indices, Nres_max_num_res, ifold))
+                folds_results.append(fold_result)
 
         # # if save:
         # self.output.cross_validation_output = CrossValidationOUT(ires=np.array(save_ires), test_scores=np.array(save_test_scores), train_scores=np.array(save_train_scores))
@@ -316,8 +317,8 @@ class AutoFit:
         Nres_start = len(total_resonance_ladder)
         Nres_all = []
         for Nres in range(Nres_start):
-            for fold_results in folds_results:
-                if Nres not in fold_results.keys():
+            for fold_result in folds_results:
+                if Nres not in fold_result.keys():
                     break
             else:
                 Nres_all.append(Nres)
@@ -425,7 +426,9 @@ class AutoFit:
                 chi2_test = np.sum(test_out.chi2)
                 chi2_eff = chi2_test
             else:
-                Ndata_train, Ndata_test, chi2_train, chi2_test, chi2_eff = evaluate_chi2s(res_ladder, solver_test, train_indices, test_indices)
+                Ndata_train_dsets, Ndata_test_dsets, chi2_train_dsets, chi2_test_dsets, chi2_eff_dsets = evaluate_chi2s(res_ladder, solver_test, train_indices, test_indices)
+                chi2_train = np.sum(chi2_train_dsets);        chi2_eff = np.sum(chi2_eff_dsets)
+                Ndata_train = sum(Ndata_train_dsets) ;        Ndata_test = sum(Ndata_test_dsets)
 
             # Creating the objective function:
             obj_train = objective_func(chi2_train, res_ladder, self.particle_pair, None, Wigner_informed=self.options.Wigner_informed_cross_validation, PorterThomas_informed=self.options.PorterThomas_informed_cross_validation)

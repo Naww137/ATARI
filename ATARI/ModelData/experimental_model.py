@@ -237,7 +237,6 @@ class Experimental_Model:
         self.tof_grid = e_to_t(self.energy_grid, self.FP[0], True)*1e9 + self.t0[0]
         return
 
-    def select_data_points(self, indices):
-        self.energy_grid = self.energy_grid[indices]
+    def select_data_points(self, energies):
+        self.energy_grid = np.array(energies)
         self.tof_grid = e_to_t(self.energy_grid, self.FP[0], True)*1e9 + self.t0[0]
-        return

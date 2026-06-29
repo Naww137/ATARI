@@ -451,9 +451,8 @@ class Transmission_RPI:
         self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[(self.model_parameters.open_neutron_spectrum.E.values < max(new_energy_range)) & (self.model_parameters.open_neutron_spectrum.E.values > min(new_energy_range))].copy()
         return
 
-    def select_data_points(self, indices):
-        self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[indices].copy()
-        return
+    def select_data_points(self, energies):
+        self.model_parameters.open_neutron_spectrum = self.model_parameters.open_neutron_spectrum.loc[energies].copy()
     
 
     def approximate_unknown_data(self, exp_model, smooth, check_trig = False, overwrite = False):

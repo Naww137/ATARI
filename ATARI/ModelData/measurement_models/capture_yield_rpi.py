@@ -247,10 +247,10 @@ class Capture_Yield_RPI:
         self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[(self.model_parameters.background_spectrum_bf.E.values < max(new_energy_range)) & (self.model_parameters.background_spectrum_bf.E.values > min(new_energy_range))].copy()
         return
 
-    def select_data_points(self, indices):
-        self.model_parameters.background_spectrum_bg =      self.model_parameters.background_spectrum_bg.loc[indices].copy()
-        self.model_parameters.incident_neutron_spectrum_f = self.model_parameters.incident_neutron_spectrum_f.loc[indices].copy()
-        self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[indices].copy()
+    def select_data_points(self, energies):
+        self.model_parameters.background_spectrum_bg =      self.model_parameters.background_spectrum_bg.loc[energies].copy()
+        self.model_parameters.incident_neutron_spectrum_f = self.model_parameters.incident_neutron_spectrum_f.loc[energies].copy()
+        self.model_parameters.background_spectrum_bf =      self.model_parameters.background_spectrum_bf.loc[energies].copy()
         return
 
 

@@ -7,7 +7,7 @@ def t_to_e(t, d, rel:bool):
     if rel:
         mn = 939.56542052e6 # eV/c2
         c = 299792458 # m/s
-        E = mn*(1/np.sqrt(1-(d/t/c)**2)-1)
+        E = mn*(1/np.sqrt(1-(d/(c*t))**2)-1)
     else:
         mn = 1.674927498e-27 #kg
         jev = 1.6022e-19 # J/eV

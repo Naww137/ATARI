@@ -114,15 +114,21 @@ def get_train_test_non_factorized(evaluation_data:Evaluation_Data, k_folds:int,
     for i_fold in range(k_folds):
         eval_data_train_fold = deepcopy(evaluation_data)
         eval_data_test_fold  = deepcopy(evaluation_data)
-        datasets_train    = [];    covariances_train = []
-        datasets_test     = [];    covariances_test  = []
+        datasets_train    = [];    covariances_train = [];      experimental_models_train = [];     measurement_models_train = [];      experimental_models_no_pup_train = []
+        datasets_test     = [];    covariances_test  = [];      experimental_models_test  = [];     measurement_models_test  = [];      experimental_models_no_pup_test  = []
         for iset in range(len(evaluation_data.datasets)):
-            dataset_all    = evaluation_data.datasets[iset]
-            covariance_all = evaluation_data.covariance_data[iset]
+            dataset_all = evaluation_data.datasets[iset]
+            train_energies = dataset_all.E[train_indices[i_fold][iset]].tolist()
+            test_energies  = dataset_all.E[test_indices [i_fold][iset]].tolist()
 
+            # Datasets:
             dataset_train = dataset_all.drop(index=test_indices[i_fold][iset])
             dataset_test = dataset_all#.loc[test_indices[i_fold][iset]]
-            test_energies = dataset_test.E[test_indices[i_fold][iset]].tolist()
+            datasets_train.append(dataset_train)
+            datasets_test .append(dataset_test)
+
+            # Covariance data:
+            covariance_all = evaluation_data.covariance_data[iset]
             if covariance_all in (None, {}):
                 covariance_train, covariance_test = covariance_all, covariance_all
             else:
@@ -131,39 +137,70 @@ def get_train_test_non_factorized(evaluation_data:Evaluation_Data, k_folds:int,
                 Jac_sys = covariance_all["Jac_sys"].drop(columns=test_energies)
                 cov_sys = covariance_all["Cov_sys"]
                 assert len(diag_stat['var_stat'].values) == Jac_sys.values.shape[1]
+                assert len(diag_stat['var_stat'].values) == len(dataset_train)
                 covariance_train = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
                 # Test:
                 diag_stat = covariance_all["diag_stat"]#.loc[test_energies]
                 Jac_sys = covariance_all["Jac_sys"]#.loc[:,test_energies]
                 cov_sys = covariance_all["Cov_sys"]
                 assert len(diag_stat['var_stat'].values) == Jac_sys.values.shape[1]
+                assert len(diag_stat['var_stat'].values) == len(dataset_test)
                 covariance_test = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
-                
-                # # Test:
-                # dataset_test = dataset_all.sort_values("E").drop(index=test_indices[i_fold][iset])
-                # datasets_test.append(dataset_test)
-                # diag_stat = covariance_all["diag_stat"].sort_values("E")
-                # diag_stat.reset_index(drop=True)[test_indices[i_fold][iset]]
-                # Jac_sys = covariance_all["Jac_sys"].sort_index(axis=1)[test_indices[i_fold][iset]]
-                # cov_sys = covariance_all["Cov_sys"]
-                # covariance_test = {"diag_stat": diag_stat, 'Jac_sys':Jac_sys, "Cov_sys": cov_sys}
-                # # Train:
-                # dataset_train = dataset_all.sort_values("E").drop(index=test_indices[i_fold][iset])
-                # datasets_train.append(dataset_train)
-                # diag_stat = covariance_all["diag_stat"].sort_values("E")
-                # diag_stat.reset_index(drop=True).drop(index=test_indices[i_fold][iset])
-                # Jac_sys = covariance_all["Jac_sys"].sort_index(axis=1).drop(index=test_indices[i_fold][iset])
-                # cov_sys = covariance_all["Cov_sys"]
-                # covariance_train = {"diag_stat": diag_stat, 'Jac_sys': Jac_sys, "Cov_sys": cov_sys}
-            datasets_train.append(dataset_train)
-            datasets_test .append(dataset_test)
             covariances_train.append(covariance_train)
             covariances_test .append(covariance_test )
 
+            # Experimental Models:
+            if evaluation_data.experimental_models is not None:
+                experimental_model_all = evaluation_data.experimental_models[iset]
+            else:
+                experimental_model_all = None
+            if experimental_model_all is not None:
+                experimental_model_train = copy(experimental_model_all)
+                experimental_model_train.select_data_points(train_energies)
+                experimental_model_test  = copy(experimental_model_all)
+                # experimental_model_test .select_data_points(test_energies )
+                experimental_models_train.append(experimental_model_train)
+                experimental_models_test .append(experimental_model_test )
+            else:
+                experimental_models_train = None
+                experimental_models_test  = None
+
+            # Measurement Models:
+            if evaluation_data.measurement_models is not None:
+                measurement_model_all = evaluation_data.measurement_models[iset]
+            else:
+                measurement_model_all = None
+            if measurement_model_all is not None:
+                measurement_model_train = copy(measurement_model_all)
+                measurement_model_train.select_data_points(train_energies)
+                measurement_model_test  = copy(measurement_model_all)
+                # measurement_model_test .select_data_points(test_energies )
+                measurement_models_train.append(measurement_model_train)
+                measurement_models_test .append(measurement_model_test )
+            else:
+                measurement_models_train = None
+                measurement_models_test  = None
+
+            # Experimental Models No Propagated Uncertainty Parameters:
+            if evaluation_data.experimental_models_no_pup is not None:
+                experimental_model_no_pup_all = evaluation_data.experimental_models_no_pup[iset]
+            else:
+                experimental_model_no_pup_all = None
+            if experimental_model_no_pup_all is not None:
+                experimental_model_no_pup_train = copy(experimental_model_no_pup_all)
+                experimental_model_no_pup_train.select_data_points(train_energies)
+                experimental_model_no_pup_test  = copy(experimental_model_no_pup_all)
+                # experimental_model_no_pup_test .select_data_points(test_energies )
+                experimental_models_no_pup_train.append(experimental_model_no_pup_train)
+                experimental_models_no_pup_test .append(experimental_model_no_pup_test )
+            else:
+                experimental_models_no_pup_train = None
+                experimental_models_no_pup_test  = None
+
         # Getting training/test data:
-        eval_data_train_fold.datasets = datasets_train           ;      eval_data_test_fold.datasets = datasets_test
-        eval_data_train_fold.covariance_data = covariances_train ;      eval_data_test_fold.covariance_data = covariances_test
-        eval_data_train_folds.append(eval_data_train_fold)       ;      eval_data_test_folds.append(eval_data_test_fold)
+        eval_data_train_fold = Evaluation_Data(evaluation_data.experimental_titles, tuple(experimental_models_train), tuple(datasets_train), tuple(covariances_train), measurement_models=measurement_models_train, experimental_models_no_pup=experimental_models_no_pup_train)
+        eval_data_test_fold  = Evaluation_Data(evaluation_data.experimental_titles, tuple(experimental_models_test ), tuple(datasets_test ), tuple(covariances_test ), measurement_models=measurement_models_test , experimental_models_no_pup=experimental_models_no_pup_test )
+        eval_data_train_folds.append(eval_data_train_fold);     eval_data_test_folds.append(eval_data_test_fold)
 
     return eval_data_train_folds, eval_data_test_folds, test_indices, train_indices
 

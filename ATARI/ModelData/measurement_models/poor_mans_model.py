@@ -112,11 +112,19 @@ class Poor_Mans_Model:
         maxE = float(max(new_energy_range))
         filtered_cov = {}
         if 'Cov_sys' in self._covariance_data.keys():
-            # print(np.array(self._covariance_data['diag_stat'].index>=minE) & np.array(new_energy_range['diag_stat'].index<=maxE))
             filtered_cov["diag_stat"] = self._covariance_data['diag_stat'].loc[np.array(self._covariance_data['diag_stat'].index>=minE) & np.array(self._covariance_data['diag_stat'].index<=maxE)]
             filtered_cov["Jac_sys"]   = self._covariance_data['Jac_sys'].loc[:,np.array(self._covariance_data['Jac_sys'].columns>=minE) & np.array(self._covariance_data['Jac_sys'].columns<=maxE)]
             filtered_cov["Cov_sys"]   = self._covariance_data['Cov_sys']
         else:
             raise ValueError("Filtering not implemented for explicit cov yet")
         self._covariance_data = filtered_cov
-        return
+    
+    def select_data_points(self, energies:list):
+        filtered_cov = {}
+        if 'Cov_sys' in self._covariance_data.keys():
+            filtered_cov["diag_stat"] = self._covariance_data['diag_stat'].loc[energies]
+            filtered_cov["Jac_sys"]   = self._covariance_data['Jac_sys'].loc[:,energies]
+            filtered_cov["Cov_sys"]   = self._covariance_data['Cov_sys']
+        else:
+            raise ValueError("Filtering not implemented for explicit cov yet")
+        self._covariance_data = filtered_cov

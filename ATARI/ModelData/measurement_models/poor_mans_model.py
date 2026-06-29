@@ -52,7 +52,7 @@ class Poor_Mans_Model:
             rng = np.random.default_rng(seed)
         cov_sys = self.covariance_data['Cov_sys']
         size = cov_sys.shape[0]
-        model_parameters = rng.multivariate_normal(np.zeros((size,)), cov_sys)
+        model_parameters = rng.multivariate_normal(mean=np.zeros((size,)), cov=cov_sys)
         return model_parameters
     
     def generate_raw_data(self,
@@ -66,13 +66,12 @@ class Poor_Mans_Model:
         var_stat = self.covariance_data['diag_stat']
         var_stat.sort_index(inplace=True)
         stat_part = rng.normal(scale=np.sqrt(var_stat['var_stat'].values))
-        jac = self.covariance_data['Jac_sys'].T
-        jac.sort_index(inplace=True)
+        jac = self.covariance_data['Jac_sys']
+        jac = np.array(jac.sort_index()).T
         syst_part = jac @ true_model_parameters
         unc_part = np.array(stat_part + syst_part)
 
         # Interpolating to true grid:
-        E_idc = self.covariance_data['diag_stat'].index
         pw_true.sort_values(by='E', inplace=True)
         exp = pw_true['true'].values + unc_part
         raw_data = {'E':pw_true['E'].values, 'exp':exp}
@@ -104,6 +103,9 @@ class Poor_Mans_Model:
             cov_data = {}
 
         return data, cov_data, raw_data
+    
+    def sample_true_model_parameters(self, true_model_parameters:dict, rng:np.random.Generator=None, seed:int=None):
+        return self.model_parameters
 
     def truncate_energy_range(self, new_energy_range):
         minE = float(min(new_energy_range))

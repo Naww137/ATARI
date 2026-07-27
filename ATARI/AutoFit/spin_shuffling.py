@@ -16,7 +16,7 @@ from ATARI.TAZ.RunMaster import RunMaster
 from ATARI.TAZ.PTBayes import PTBayes, prior_fix_spingroups
 from ATARI.TAZ.ATARI_interface import ATARI_to_TAZ
 
-def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int):
+def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:Particle_Pair, respar_mask_in_window:pd.Series, num_spingroups:int, cap_static:bool):
     """
     ...
     """
@@ -38,6 +38,11 @@ def assign_spingroups(respar:pd.DataFrame, spingroups:np.ndarray, particle_pair:
         selected_index = selected_rows.loc[respar['J_ID'] == J_ID].index
         respar.loc[selected_index,'Jpi'] = Jpi
 
+        if cap_static: # makes sure that the width remains equal to the average when fitting with constant width
+            gg2m = spingroup_params['<gg2>']
+            Ggm = particle_pair.gg2_to_Gg(gg2m)
+            respar_post.loc[selected_index,'Gg'] = Ggm
+
     # Maintaining consistent gJ*Gn1:
     J_old = abs(respar     .loc[respar_mask_in_window,'Jpi'].to_numpy())
     J_new = abs(respar_post.loc[respar_mask_in_window,'Jpi'].to_numpy())
@@ -53,7 +58,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
                        num_shuffles:float,
                        window_E_bounds:Tuple[float,float],
                        false_dens:float=0.0, false_width_dist:Union[rv_continuous,None]=None,
-                       no_shuffle_indices:list=[],
+                       no_shuffle_indices:list=[], cap_static:bool=True,
                        rng:np.random.Generator=None, seed:int=None):
     """
     ...
@@ -107,7 +112,7 @@ def shuffle_spingroups(respar:pd.DataFrame, particle_pair:Particle_Pair,
         spin_shuffle = spin_shuffles[:,shuffle_id]
         # print(f'{shuffle_id}: {spin_shuffle.tolist()} | {neutron_width_signs[:,shuffle_id].tolist()} | {capture_width_signs[:,shuffle_id].tolist()}')
         print(f'{shuffle_id}: {spin_shuffle.tolist()}')
-        shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups)
+        shuffled_respar = assign_spingroups(respar=respar_sorted, spingroups=spin_shuffle, particle_pair=particle_pair, respar_mask_in_window=respar_mask_in_window, num_spingroups=num_spingroups, cap_static=cap_static)
         shuffled_respar = shuffled_respar.iloc[unsort_indices].reset_index(drop=True) # unsorting resonance parameters (so that fixed resonance indices are consistent)
         shuffled_respar.index = original_indices
         shuffled_respars.append(shuffled_respar)
@@ -122,7 +127,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                  target_Nres:int=None, unique_cases_only:bool=False,
                                  rng:np.random.Generator=None, seed:int=None,
                                  verbose:bool=False,
-                                 no_shuffle_indices = [],
+                                 no_shuffle_indices = [], cap_static:bool=True,
                                  no_wigner_indices = []):
     """
     ...
@@ -172,7 +177,7 @@ def minimize_spingroup_shuffling(respar_prior:pd.DataFrame, solver:Solver,
                                             num_shuffles=num_shuffles_per_attempt,
                                             window_E_bounds=window_E_bounds,
                                             false_dens=false_dens, false_width_dist=false_width_dist,
-                                            no_shuffle_indices=no_shuffle_indices,
+                                            no_shuffle_indices=no_shuffle_indices, cap_static=cap_static,
                                             rng=rng, seed=seed) # shuffle around spingroups, weighted by their likelihood
         shuffled_respars = [pd.concat((respar_prior.loc[no_wigner_indices], shuffled_respar)) for shuffled_respar in shuffled_respars]
         

@@ -736,7 +736,7 @@ def iterate_for_nonlin_and_update_step_par(iterations, step, rundir, lead="", pr
 def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
 
     if sammyINP.idc_at_theory:
-        resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}.par"))
+        resonance_ladder = readpar(os.path.join(sammyRTO.sammy_runDIR, f"results/step{step}_restart.par"))
         if resonance_ladder.isnull().values.any():
             if sammyRTO.Print:
                 print('Encountered invalid value when reading SAMMY.par. Taking value from previous iteration.')
@@ -762,14 +762,46 @@ def run_YWY0_and_get_chi2(sammyINP, sammyRTO, step):
     return i, [c for c in chi2s]+[np.sum(chi2s), np.sum(chi2s)/np.sum(ndats)]
 
 
-def update_fudge_in_parfile(rundir, step, fudge):
-    out = subprocess.run(
-        ["sh", "-c", 
-        f"""head -$(($(wc -l < results/step{step}.par) - 1)) results/step{step}.par > results/temp;
-echo "{np.round(fudge,11)}" >> "results/temp"
-mv "results/temp" "results/step{step}.par" """],
-        cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
+# def update_fudge_in_parfile(rundir, step, fudge):
+#     out = subprocess.run(
+#         ["sh", "-c", 
+#         f"""head -$(($(wc -l < results/step{step}.par) - 1)) results/step{step}.par > results/temp;
+# echo "{np.round(fudge,11)}" >> "results/temp" """],
+#         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
+#     with open(os.path.join(os.path.realpath(rundir), f'results/step{step-1}.par'), 'r') as f:
+#         txt = f.read()
+#     splits = txt.split('RELATIVE UNCERTAINTIES FOLLOW\n')
+#     if len(splits) > 1:
+#         uncertainties = 'RELATIVE UNCERTAINTIES FOLLOW\n' + splits[1]
+#         out = subprocess.run(
+#             ["sh", "-c", f"""echo "{uncertainties}" >> "results/temp" """],
+#             cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
+#     out = subprocess.run(
+#         ["sh", "-c", f"""mv "results/temp" "results/step{step}.par" """],
+#         cwd=os.path.realpath(rundir), capture_output=True, timeout=60*1)
 
+# def update_fudge_in_parfile(rundir, step, fudge, sammyINPyw):
+#     df = readpar(os.path.join(rundir, f'results/step{step}.par'))
+#     if sammyINPyw.reset_capture_width and (step > 0):
+#         prior_df = readpar(os.path.join(rundir, f'results/step{step-1}.par'))
+#         df['Gg'] = prior_df['Gg']
+#     write_sampar(df, sammyINPyw.particle_pair, fudge, os.path.join(rundir, f'results/step{step}.par'), capture_width_rel_unc=sammyINPyw.capture_width_uncertainty)
+    
+def update_fudge_in_parfile(rundir, step, fudge, sammyINPyw):
+    df = readpar(os.path.join(rundir, f'results/step{step}.par'))
+    if sammyINPyw.reset_capture_width:
+        spin_groups = sammyINPyw.particle_pair.spin_groups
+        for Jid,spin_group in spin_groups.items():
+            J_ID = spin_group['J_ID']
+            mask = (df['J_ID'] == J_ID)
+            Gg_avg = sammyINPyw.particle_pair.gg2_to_Gg(spin_group['<gg2>'])
+            df.loc[mask,'Gg'] = Gg_avg # reset the capture width to average
+            df.loc[mask,'Gg_rel_unc'] = np.sqrt(2/spin_group['g_dof']) # capture width chi2 relative standard deviation
+    else:
+        df['Gg_rel_unc'] = None
+    df[  'E_rel_unc'] = None
+    df['Gn1_rel_unc'] = None
+    write_sampar(df, sammyINPyw.particle_pair, fudge, os.path.join(rundir, f'results/step{step}_restart.par'))#, capture_width_rel_unc=sammyINPyw.capture_width_uncertainty)
 
 
 
@@ -900,7 +932,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                     else:
                         fudge *= sammyINPyw.LevMarV
                     fudge = min(fudge, sammyINPyw.maxF)
-                    update_fudge_in_parfile(rundir, istep, fudge)
+                    update_fudge_in_parfile(rundir, istep, fudge, sammyINPyw)
 
                 else:
                     if sammyRTO.Print:
@@ -926,7 +958,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
                         else:
                             fudge /= sammyINPyw.LevMarVd
                             fudge = max(fudge, sammyINPyw.minF)
-                        update_fudge_in_parfile(rundir, istep-1, fudge) # could do batch fitting in here too, before after update fudge and before iterate
+                        update_fudge_in_parfile(rundir, istep-1, fudge, sammyINPyw) # could do batch fitting in here too, before after update fudge and before iterate
                         converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep-1, rundir, lead="\t", print_bool= sammyRTO.Print)
                         total_derivative_evaluations += iterations
                         # if not converged: # reduce fudge if not converged after iterations regardless if chi2 improves
@@ -999,7 +1031,7 @@ def step_until_convergence_YW(sammyRTO, sammyINPyw):
             print(f"{int(i)}    {fudge:<5.3f}: {np.round(chi2_list,4)}")
         
         ### Solve Bayes for this step
-        # update_fudge_in_parfile(rundir, istep, fudge)  !!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
+        update_fudge_in_parfile(rundir, istep, fudge, sammyINPyw)  #!!! might not need this - put above in > if chi2_list[-1] < chi2_log[istep-1][-1]:
         # if True: reduce_width_randomly(rundir, istep, sammyINPyw, fudge)
         converged, iterations = iterate_for_nonlin_and_update_step_par(sammyINPyw.iterations, istep, rundir, print_bool= sammyRTO.Print)
         total_derivative_evaluations += iterations

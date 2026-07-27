@@ -211,7 +211,8 @@ class SammyInputDataYW:
     
     initial_parameter_uncertainty: float = 1.0
 
-
+    capture_width_uncertainty: float = None
+    reset_capture_width: bool = False
 
 @dataclass
 class SolverOPTs:
@@ -227,6 +228,10 @@ class SolverOPTs:
     maxF            : float     = 10
 
     idc_at_theory   : bool      = False
+
+    capture_width_uncertainty: float = None
+    reset_capture_width: bool = False
+    
 
 @dataclass
 class SolverOPTs_YW(SolverOPTs):

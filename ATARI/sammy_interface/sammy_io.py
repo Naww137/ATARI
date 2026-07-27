@@ -475,6 +475,7 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
         if np.any([each is None for each in df.J_ID]):
             raise ValueError("NoneType was passed as J_ID in the resonance ladder")
 
+    # Table VI.B.2 1:1 (page 389)
     widths = [11, 11, 11, 11, 11, 2, 2, 2, 2, 2, 2]
     signed = [True, True, True, True, True, False, False, False, False, False, False]
     isinte = [False, False, False, False, False, True, True, True, True, True, True]
@@ -487,7 +488,42 @@ def write_sampar(df, pair, initial_parameter_uncertainty, filename, vary_parm=Fa
                 file.write(formatted_value)
             file.write('\n')
         file.write(f'\n{initial_parameter_uncertainty}\n')
+        for col in ("E_rel_unc", "Gg_rel_unc", "Gn1_rel_unc"):
+            if col not in df.columns:
+                df[col] = None
+        if any(df.E_rel_unc != None) or any(df.Gg_rel_unc != None) or any(df.Gn1_rel_unc != None):
+            file.write(f'RELATIVE UNCERTAINTIES FOLLOW\n')
+            mask = ((df.varyE   == 1) & (df.E_rel_unc   != None)) \
+                 | ((df.varyGg  == 1) & (df.Gg_rel_unc  != None)) \
+                 | ((df.varyGn1 == 1) & (df.Gn1_rel_unc != None))
+            vary_sub_df = df.loc[mask]
 
+            # Table VI.B.2 Last C:2 (page 428)
+            widths = [11, 11, 11, 11, 11, 11, 2, 2, 2, 2, 2]
+            signed = [True, False, False, False, False, False, False, False, False, False, False]
+            # for energy, varyE, varyGg, varyGn1 in zip(vary_sub_df.E, vary_sub_df.varyE, vary_sub_df.varyGg, vary_sub_df.varyGn1):
+            for energy, varyE, varyGg, varyGn1, E_rel_unc, Gg_rel_unc, Gn1_rel_unc in zip(vary_sub_df.E, vary_sub_df.varyE, vary_sub_df.varyGg, vary_sub_df.varyGn1, vary_sub_df.E_rel_unc, vary_sub_df.Gg_rel_unc, vary_sub_df.Gn1_rel_unc):
+                row = ''
+                row += format_float(energy, widths[0], signed=signed[0]) # resonance energy
+                if (E_rel_unc is None) or (varyE is None): # energy uncertainty
+                    row += ' '*widths[1]
+                else:
+                    row += format_float(E_rel_unc, widths[1], signed=signed[1])
+                if (Gg_rel_unc is None) or (varyGg is None): # capture width uncertainty
+                    row += ' '*widths[2]
+                else:
+                    row += format_float(Gg_rel_unc, widths[2], signed=signed[2])
+                if (Gn1_rel_unc is None) or (varyGg is None): # channel width 1 uncertainty
+                    row += ' '*widths[3]
+                else:
+                    row += format_float(Gn1_rel_unc, widths[3], signed=signed[3])
+                row += ' '*widths[4] # channel width 2 uncertainty
+                row += ' '*widths[5] # channel width 3 uncertainty
+                row += format_int(varyE  , widths[6], signed=signed[6]) # energy uncertainty flag
+                row += format_int(varyGg , widths[7], signed=signed[7]) # capture width uncertainty flag
+                row += format_int(varyGn1, widths[8], signed=signed[8]) # neutron width uncertainty flag
+                # ... (other flags not implemented yet)
+                file.write(f'{row}\n')
     return
         
       
